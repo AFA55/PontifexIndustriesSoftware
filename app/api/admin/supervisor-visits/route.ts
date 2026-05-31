@@ -155,20 +155,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to save visit', details: error.message }, { status: 500 });
   }
 
-  // C(v): Convert open equipment issues with action='maintenance' → maintenance_requests
+  // Convert ALL open equipment issues (repair AND replace) → maintenance_requests,
+  // so every supervisor-flagged issue lands in the same shop-manager inbox as operator
+  // reports. request_type distinguishes a repair from a replacement.
   Promise.resolve((async () => {
     const issues: any[] = Array.isArray(data.equipment_issues) ? data.equipment_issues : [];
-    const toConvert = issues.filter((e: any) => e.action === 'maintenance' && e.status === 'open');
+    const isConvertible = (e: any) =>
+      (e.action === 'maintenance' || e.action === 'replace') && e.status === 'open';
+    const toConvert = issues.filter(isConvertible);
     if (toConvert.length === 0) return;
 
     for (const issue of toConvert) {
+      const isReplace = issue.action === 'replace';
       await supabaseAdmin.from('maintenance_requests').insert({
         tenant_id: data.tenant_id,
         equipment_name: issue.equipment_name || null,
         equipment_id: issue.equipment_id || null,
         submitted_by: data.supervisor_id,
-        description: issue.whats_wrong || 'Issue reported via site visit',
-        priority: 'medium',
+        description: issue.whats_wrong || (isReplace ? 'Replacement requested via site visit' : 'Issue reported via site visit'),
+        request_type: isReplace ? 'replace' : 'repair',
+        priority: isReplace ? 'high' : 'medium',
         status: 'open',
         supervisor_visit_id: data.id,
         photo_urls: Array.isArray(issue.photo_urls) ? issue.photo_urls : [],
@@ -177,7 +183,7 @@ export async function POST(request: NextRequest) {
 
     // Flip converted issues to status='converted'
     const updatedIssues = issues.map((e: any) =>
-      e.action === 'maintenance' && e.status === 'open' ? { ...e, status: 'converted' } : e
+      isConvertible(e) ? { ...e, status: 'converted' } : e
     );
     await supabaseAdmin
       .from('supervisor_visits')
@@ -197,8 +203,9 @@ function clampRating(v: unknown): number | null {
 
 // Validate + normalize the equipment_issues array supplied by the client.
 // Each entry must have an equipment_name, whats_wrong, and a recognized action.
-// Once shop manager Phase 2 lands, a hook converts each entry into a real
-// maintenance_request (action='maintenance') or shop_task (action='replace').
+// Both actions are converted into maintenance_requests by the post-insert hook
+// (action='maintenance' → request_type 'repair', action='replace' → 'replace'),
+// so every flagged issue reaches the shop-manager inbox.
 function sanitizeEquipmentIssues(v: unknown): Array<Record<string, unknown>> {
   if (!Array.isArray(v)) return [];
   const out: Array<Record<string, unknown>> = [];

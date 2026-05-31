@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { CalendarPicker } from '@/components/ui/CalendarPicker';
 
 interface OperatorOpt {
   id: string;
@@ -60,8 +61,6 @@ export default function NewSiteVisitPage() {
   const [operatorId, setOperatorId] = useState('');
   const [visitDate, setVisitDate] = useState(todayStr());
   const [jobOrderId, setJobOrderId] = useState('');
-  const [arrivalTime, setArrivalTime] = useState('');
-  const [departureTime, setDepartureTime] = useState('');
 
   // Step 2 — What You Saw
   const [observations, setObservations] = useState('');
@@ -173,15 +172,6 @@ export default function NewSiteVisitPage() {
     return true;
   };
 
-  function buildArrivalTimestamp(): string | null {
-    if (!arrivalTime) return null;
-    return new Date(`${visitDate}T${arrivalTime}:00`).toISOString();
-  }
-  function buildDepartureTimestamp(): string | null {
-    if (!departureTime) return null;
-    return new Date(`${visitDate}T${departureTime}:00`).toISOString();
-  }
-
   async function uploadPhoto(file: File, pathPrefix: string): Promise<string | null> {
     const ext = file.name.split('.').pop() ?? 'jpg';
     const path = `${pathPrefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
@@ -277,8 +267,6 @@ export default function NewSiteVisitPage() {
           operator_id: operatorId,
           visit_date: visitDate,
           job_order_id: jobOrderId || null,
-          arrival_time: buildArrivalTimestamp(),
-          departure_time: buildDepartureTimestamp(),
           observations: observations.trim() || null,
           issues_flagged: issues.trim() || null,
           follow_up_required: followUp,
@@ -412,11 +400,10 @@ export default function NewSiteVisitPage() {
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1.5">
                   <Calendar className="w-4 h-4 text-violet-500" /> Date of visit
                 </label>
-                <input
-                  type="date"
+                <CalendarPicker
                   value={visitDate}
-                  onChange={(e) => setVisitDate(e.target.value)}
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  onChange={setVisitDate}
+                  icon={Calendar}
                 />
               </div>
             </section>
@@ -476,26 +463,6 @@ export default function NewSiteVisitPage() {
               </section>
             )}
 
-            <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Arrival</label>
-                <input
-                  type="time"
-                  value={arrivalTime}
-                  onChange={(e) => setArrivalTime(e.target.value)}
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Departure</label>
-                <input
-                  type="time"
-                  value={departureTime}
-                  onChange={(e) => setDepartureTime(e.target.value)}
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
-                />
-              </div>
-            </section>
           </div>
         )}
 

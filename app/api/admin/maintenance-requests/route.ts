@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
   let query = supabaseAdmin
     .from('maintenance_requests')
     .select(`
-      id, description, priority, status, equipment_name, photo_urls,
+      id, description, priority, status, request_type, equipment_name, photo_urls,
       voice_note_url, resolution_notes, resolved_at, supervisor_visit_id,
       created_at, updated_at,
       equipment:equipment_id ( id, name, unit_number ),

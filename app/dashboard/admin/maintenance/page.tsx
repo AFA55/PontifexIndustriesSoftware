@@ -22,6 +22,7 @@ interface MaintenanceRequest {
   description: string;
   priority: Priority;
   status: MRStatus;
+  request_type?: 'repair' | 'replace' | null;
   equipment_name: string | null;
   photo_urls: string[];
   resolution_notes: string | null;
@@ -126,6 +127,11 @@ function RequestCard({
               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${priorityCfg.chip}`}>
                 {priorityCfg.label}
               </span>
+              {req.request_type === 'replace' && (
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-200">
+                  ⟳ Replace
+                </span>
+              )}
               {req.submitter && (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${ROLE_CHIP[req.submitter.role] ?? ''}`}>
                   {req.submitter.role.replace(/_/g, ' ')}

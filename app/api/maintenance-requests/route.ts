@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     submitted_by: auth.userId,
     description,
     priority,
+    request_type: body.request_type === 'replace' ? 'replace' : 'repair',
     status: 'open',
     equipment_id: body.equipment_id ?? null,
     equipment_name: (body.equipment_name ?? '').trim() || null,
