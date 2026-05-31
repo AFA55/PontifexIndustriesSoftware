@@ -147,9 +147,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             {/* + New Job — Link prefetches the schedule-form chunk on hover/viewport
                 so the click feels instant instead of waiting for the JS to load.
-                Hidden for shop_manager + shop_help — they have read-only access
-                to the schedule (to plan equipment pulls), not creation. */}
-            {user?.role !== 'shop_manager' && user?.role !== 'shop_help' && (
+                Hidden for shop_manager + shop_help (read-only schedule access) and
+                for admin (back-office role — not a salesperson, doesn't create jobs). */}
+            {!['shop_manager', 'shop_help', 'admin'].includes(user?.role ?? '') && (
               <Link
                 href="/dashboard/admin/schedule-form"
                 prefetch

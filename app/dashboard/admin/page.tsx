@@ -46,6 +46,8 @@ const SupervisorDashboard = nextDynamic(() => import('./_components/SupervisorDa
 // Shop Manager + Shop Helper dashboards (Phase 1A skeletons)
 const ShopManagerDashboard = nextDynamic(() => import('./_components/ShopManagerDashboard'), { ssr: false, loading: () => null });
 const ShopHelpDashboard = nextDynamic(() => import('./_components/ShopHelpDashboard'), { ssr: false, loading: () => null });
+// Admin (back-office / operations) dashboard — no sales/commission, no job creation
+const AdminOpsDashboard = nextDynamic(() => import('./_components/AdminDashboard'), { ssr: false, loading: () => null });
 
 // ─── API response types ───────────────────────────────────────────────────────
 
@@ -637,6 +639,20 @@ export default function AdminDashboard() {
   // ── Shop Helper render branch (Phase 1A skeleton) ─────────────────────────
   if (user?.role === 'shop_help') {
     return <ShopHelpDashboard user={user} />;
+  }
+
+  // ── Admin render branch (back-office ops: no sales/commission, no job creation) ──
+  // Exact role match — super_admin / operations_manager keep the default layout.
+  if (user?.role === 'admin') {
+    return (
+      <AdminOpsDashboard
+        user={user}
+        dashData={dashData}
+        dashLoading={dashLoading}
+        activeJobs={activeJobs}
+        activeJobsLoading={activeJobsLoading}
+      />
+    );
   }
 
   // ── Salesman render branch (separate layout) ──────────────────────────────
