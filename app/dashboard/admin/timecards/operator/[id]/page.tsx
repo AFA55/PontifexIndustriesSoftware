@@ -14,6 +14,7 @@ import {
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
+import { defaultLunchMinutes } from '@/lib/lunch';
 
 // ── Types ─────────────────────────────────────────────────────
 interface OperatorInfo {
@@ -599,9 +600,12 @@ function OperatorTimecardDetailPageInner() {
       is_night_shift: entry.is_night_shift,
       pay_category: (entry as any).pay_category || 'regular',
       is_shop_time: (entry as any).is_shop_time || entry.is_shop_hours || false,
-      // Lunch field — defaults to existing lunch_duration_minutes (or break_minutes legacy fallback)
+      // Lunch field — show the recorded lunch (prefer a non-zero value across the two
+      // legacy columns, since `?? ` would surface a stale 0); else the role default.
       lunch_duration_minutes:
-        (entry as any).lunch_duration_minutes ?? (entry as any).break_minutes ?? 30,
+        ((entry as any).lunch_duration_minutes || (entry as any).break_minutes || 0) > 0
+          ? ((entry as any).lunch_duration_minutes || (entry as any).break_minutes)
+          : defaultLunchMinutes(operator?.role),
       lunch_override_reason: '',
     });
     setShowEditModal(true);
@@ -1885,114 +1889,63 @@ function OperatorTimecardDetailPageInner() {
               </div>
 
               {/* Lunch Deduction (admin-only override) */}
-              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Coffee size={14} className="text-amber-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-gray-700">Lunch Deduction (minutes)</p>
-                      <p className="text-[10px] text-gray-500">Auto-applied at 30 min when shift &gt; 6h. Set to 0 if no lunch was taken.</p>
+              {(() => {
+                const roleDefault = defaultLunchMinutes(operator?.role);
+                const presets = Array.from(new Set([0, 30, 60, roleDefault])).sort((a, b) => a - b);
+                return (
+                  <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 p-3.5 space-y-2.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                        <Coffee size={14} className="text-violet-600 dark:text-violet-300" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-800 dark:text-slate-100">Lunch Deduction</p>
+                        <p className="text-[10px] text-gray-500 dark:text-slate-400">
+                          Auto-deducts <span className="font-semibold">{roleDefault} min</span> for this role when a shift exceeds 6h. Set 0 if no lunch was taken.
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="480"
-                    step="5"
-                    value={editFormData.lunch_duration_minutes}
-                    onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
-                    className="w-24 px-3 py-2 bg-white border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-sm text-gray-900 tabular-nums"
-                  />
-                  <span className="text-xs text-gray-500">min</span>
-                  <div className="flex gap-1 ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 0 })}
-                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
-                    >
-                      No lunch
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 30 })}
-                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
-                    >
-                      30 (default)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 60 })}
-                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
-                    >
-                      60
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Reason for override (optional, e.g. 'doctor appt')"
-                  value={editFormData.lunch_override_reason}
-                  onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-xs text-gray-900"
-                />
-              </div>
-
-              {/* Lunch Deduction (admin-only override) */}
-              <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 space-y-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <Coffee size={14} className="text-amber-500 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-semibold text-gray-700">Lunch Deduction (minutes)</p>
-                      <p className="text-[10px] text-gray-500">Auto-applied at 30 min when shift &gt; 6h. Set to 0 if no lunch was taken.</p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="480"
+                        step="5"
+                        value={editFormData.lunch_duration_minutes}
+                        onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
+                        className="w-20 px-3 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 text-sm text-gray-900 dark:text-white tabular-nums"
+                      />
+                      <span className="text-xs text-gray-500 dark:text-slate-400">min</span>
+                      <div className="flex gap-1.5 ml-auto">
+                        {presets.map((m) => {
+                          const active = editFormData.lunch_duration_minutes === m;
+                          return (
+                            <button
+                              key={m}
+                              type="button"
+                              onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: m })}
+                              className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all ${
+                                active
+                                  ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
+                                  : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-violet-300'
+                              }`}
+                            >
+                              {m === 0 ? 'None' : `${m}m`}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+                    <input
+                      type="text"
+                      placeholder="Reason for override (optional, e.g. 'doctor appt')"
+                      value={editFormData.lunch_override_reason}
+                      onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
+                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 text-xs text-gray-900 dark:text-white"
+                    />
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="number"
-                    min="0"
-                    max="480"
-                    step="5"
-                    value={editFormData.lunch_duration_minutes}
-                    onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
-                    className="w-24 px-3 py-2 bg-white border border-amber-300 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-sm text-gray-900 tabular-nums"
-                  />
-                  <span className="text-xs text-gray-500">min</span>
-                  <div className="flex gap-1 ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 0 })}
-                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
-                    >
-                      No lunch
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 30 })}
-                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
-                    >
-                      30 (default)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: 60 })}
-                      className="text-[10px] font-semibold px-2 py-1 rounded bg-white border border-gray-200 hover:border-amber-300 text-gray-600"
-                    >
-                      60
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Reason for override (optional, e.g. 'doctor appt')"
-                  value={editFormData.lunch_override_reason}
-                  onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400 text-xs text-gray-900"
-                />
-              </div>
+                );
+              })()}
 
               {/* Pay Type Override */}
               <div>
