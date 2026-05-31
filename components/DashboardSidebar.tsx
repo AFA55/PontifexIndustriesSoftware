@@ -85,7 +85,9 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'VISIT REPORTS',
     accent: 'text-violet-400',
     items: [
-      { label: 'New Visit Report', href: '/dashboard/admin/site-visits/new', icon: ClipboardCheck, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
+      // Admin can review operators via Previous Visits but does NOT create reports
+      // (site_visits = 'view' in RBAC). Only supervisors (+ senior oversight) create.
+      { label: 'New Visit Report', href: '/dashboard/admin/site-visits/new', icon: ClipboardCheck, roles: ['supervisor', 'super_admin', 'operations_manager'] },
       { label: 'Previous Visits', href: '/dashboard/admin/site-visits', icon: ClipboardList, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
     ],
   },
@@ -99,7 +101,9 @@ const NAV_SECTIONS: NavSection[] = [
       // One page with 4 tabs (Inventory / Checkout / Check-In / History) + voice layer (Phase B-ii) on top.
       { label: 'Inventory Control', href: '/dashboard/admin/inventory-control', icon: RotateCcw, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'] },
       { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
-      { label: 'Shop Tasks', href: '/dashboard/admin/shop-tasks', icon: ClipboardList, roles: ['shop_manager', 'shop_help', 'admin', 'super_admin', 'operations_manager'] },
+      // 'Shop Tasks' removed — it had no page (404) and is redundant with the
+      // Maintenance Inbox, which is where equipment/maintenance requests land.
+      // The /shop-tasks route now redirects to the Maintenance Inbox as a safety net.
     ],
   },
   {

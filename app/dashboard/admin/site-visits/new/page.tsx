@@ -37,7 +37,9 @@ interface EquipmentIssue {
   photoUploading?: boolean;
 }
 
-const ALLOWED_ROLES = ['supervisor', 'admin', 'super_admin', 'operations_manager'];
+// Admins are read-only on visit reports (site_visits = 'view' in RBAC): they review
+// via Previous Visits but cannot create. Only supervisors + senior oversight create.
+const ALLOWED_ROLES = ['supervisor', 'super_admin', 'operations_manager'];
 
 const STEPS = [
   { num: 1, title: 'Visit Details', icon: UserIcon, gradient: 'from-violet-500 to-indigo-600' },
