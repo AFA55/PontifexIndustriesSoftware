@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Pontifex — Launch Animation v2 (Bridge Build)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif;background:#07061a;color:#fff;display:grid;place-items:center;min-height:100%}
+  .hint{position:fixed;top:22px;left:50%;transform:translateX(-50%);color:#8b88a8;font-size:13px;text-align:center;width:90%}
+
+  .phone{position:relative;width:300px;height:620px;border-radius:46px;overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,.6),inset 0 0 0 10px #15131f,inset 0 0 0 12px #2a2740;background:#000}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:26px;background:#000;border-radius:0 0 16px 16px;z-index:9}
+
+  .stage{position:absolute;inset:0;background:#0c0a24;overflow:hidden;display:grid;place-items:center}
+
+  /* ---- aurora mesh background ---- */
+  .blob{position:absolute;border-radius:50%;filter:blur(46px);opacity:.6;mix-blend-mode:screen;will-change:transform}
+  .b1{width:260px;height:260px;background:#4F46E5;top:-40px;left:-50px;animation:f1 9s ease-in-out infinite}
+  .b2{width:240px;height:240px;background:#A855F7;top:120px;left:90px;animation:f2 11s ease-in-out infinite}
+  .b3{width:230px;height:230px;background:#EC4899;bottom:-30px;right:-40px;animation:f3 10s ease-in-out infinite}
+  .b4{width:180px;height:180px;background:#22D3EE;top:60px;right:-30px;opacity:.4;animation:f4 13s ease-in-out infinite}
+  @keyframes f1{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(30px,40px) scale(1.15)}}
+  @keyframes f2{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-25px,30px) scale(1.1)}}
+  @keyframes f3{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-30px,-30px) scale(1.18)}}
+  @keyframes f4{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(-20px,40px) scale(1.2)}}
+
+  /* grain overlay */
+  .grain{position:absolute;inset:0;opacity:.07;mix-blend-mode:overlay;pointer-events:none}
+
+  .lockup{position:relative;z-index:5;display:flex;flex-direction:column;align-items:center;gap:22px;transform:translateY(20px)}
+
+  /* mark + glow */
+  .markwrap{position:relative;width:120px;height:120px;display:grid;place-items:center}
+  .markwrap::before{content:"";position:absolute;width:130px;height:130px;border-radius:50%;
+    background:radial-gradient(circle,rgba(168,85,247,.55),rgba(236,72,153,.25) 45%,transparent 70%);
+    filter:blur(14px);opacity:0;transform:scale(.6);will-change:opacity,transform}
+  .mark{width:108px;height:108px;position:relative;z-index:2}
+  .mark path{fill:none;stroke:url(#aurora);stroke-width:15;stroke-linecap:round;stroke-linejoin:round;
+    stroke-dasharray:1;stroke-dashoffset:1}
+  .node{fill:#fff;opacity:0}
+
+  /* shimmer sweep */
+  .shimmer{position:absolute;inset:0;z-index:3;pointer-events:none;border-radius:14px;overflow:hidden}
+  .shimmer::after{content:"";position:absolute;top:-20%;left:-60%;width:40%;height:140%;
+    background:linear-gradient(90deg,transparent,rgba(255,255,255,.65),transparent);transform:skewX(-18deg);opacity:0}
+
+  /* wordmark */
+  .word{text-align:center}
+  .pontifex{font-weight:700;font-size:31px;letter-spacing:-.01em;opacity:0;filter:blur(10px);transform:translateY(14px);
+    background:linear-gradient(100deg,#fff,#E9D5FF 60%,#fff);-webkit-background-clip:text;background-clip:text;color:transparent;will-change:opacity,filter,transform}
+  .industries{margin-top:9px;font-weight:600;font-size:11px;letter-spacing:.46em;text-transform:uppercase;opacity:0;filter:blur(8px);transform:translateY(10px);
+    background:linear-gradient(90deg,#A855F7,#EC4899 70%,#22D3EE);-webkit-background-clip:text;background-clip:text;color:transparent;will-change:opacity,filter,transform}
+
+  /* ---------- play timeline (fill forwards = holds at end) ---------- */
+  .play .mark path{animation:draw 1.05s cubic-bezier(.6,0,.2,1) .15s forwards}
+  .play .node{animation:pop .4s ease 1.05s forwards}
+  .play .markwrap::before{animation:bloom 1.1s ease .85s forwards}
+  .play .lockup{animation:settle 1s cubic-bezier(.2,.8,.2,1) .7s forwards}
+  .play .shimmer::after{animation:sweep 1s ease 1.2s 1}
+  .play .pontifex{animation:rise .7s cubic-bezier(.2,.8,.2,1) 1.35s forwards}
+  .play .industries{animation:rise .7s cubic-bezier(.2,.8,.2,1) 1.6s forwards}
+
+  @keyframes draw{to{stroke-dashoffset:0}}
+  @keyframes pop{0%{opacity:0;transform:scale(0)}70%{opacity:1;transform:scale(1.4)}100%{opacity:.9;transform:scale(1)}}
+  @keyframes bloom{0%{opacity:0;transform:scale(.6)}55%{opacity:1;transform:scale(1.12)}100%{opacity:.8;transform:scale(1)}}
+  @keyframes settle{to{transform:translateY(0)}}
+  @keyframes sweep{0%{opacity:0;left:-60%}10%{opacity:1}100%{opacity:0;left:120%}}
+  @keyframes rise{to{opacity:1;filter:blur(0);transform:translateY(0)}}
+</style>
+</head>
+<body>
+  <div class="hint">Launch animation v2 &mdash; the bridge (the &ldquo;P&rdquo;) <b>builds itself</b>, color travels across it, then resolves to the name.</div>
+
+  <!-- shared defs -->
+  <svg width="0" height="0" style="position:absolute">
+    <defs>
+      <linearGradient id="aurora" x1="0" y1="1" x2="1" y2="0" gradientUnits="objectBoundingBox">
+        <stop offset="0" stop-color="#4F46E5"/>
+        <stop offset=".38" stop-color="#A855F7"/>
+        <stop offset=".72" stop-color="#EC4899"/>
+        <stop offset="1" stop-color="#22D3EE"/>
+      </linearGradient>
+      <filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" stitchTiles="stitch"/><feColorMatrix type="saturate" values="0"/></filter>
+    </defs>
+  </svg>
+
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="stage play" id="stage">
+      <div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div><div class="blob b4"></div>
+      <svg class="grain"><rect width="100%" height="100%" filter="url(#noise)"/></svg>
+
+      <div class="lockup">
+        <div class="markwrap">
+          <div class="shimmer"></div>
+          <svg class="mark" viewBox="0 0 200 200" aria-label="Pontifex P">
+            <!-- one continuous stroke: rise up the tower, arch over the span, land -->
+            <path pathLength="1" d="M70,160 L70,44 L108,44 A32 32 0 0 1 108,108 L70,108"/>
+            <!-- connection nodes: the two points the bridge joins -->
+            <circle class="node" cx="70" cy="160" r="7"/>
+            <circle class="node" cx="70" cy="108" r="6"/>
+          </svg>
+        </div>
+        <div class="word">
+          <div class="pontifex">Pontifex</div>
+          <div class="industries">Industries</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);display:flex;gap:12px">
+    <button id="replay" style="font:600 13px/1 inherit;color:#fff;background:linear-gradient(135deg,#4F46E5,#A855F7,#EC4899);border:0;padding:11px 22px;border-radius:999px;cursor:pointer;box-shadow:0 8px 24px rgba(168,85,247,.45)">&#8635; Replay</button>
+    <button id="loop" style="font:600 13px/1 inherit;color:#fff;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);padding:11px 18px;border-radius:999px;cursor:pointer">Loop: Off</button>
+  </div>
+
+<script>
+  const stage=document.getElementById('stage'),replay=document.getElementById('replay'),loopBtn=document.getElementById('loop');
+  let looping=false,timer=null;
+  function play(){stage.classList.remove('play');void stage.offsetWidth;stage.classList.add('play');
+    if(looping){clearTimeout(timer);timer=setTimeout(play,3400);}}
+  replay.onclick=play;
+  loopBtn.onclick=()=>{looping=!looping;loopBtn.textContent='Loop: '+(looping?'On':'Off');looping?play():clearTimeout(timer);};
+</script>
+</body>
+</html>

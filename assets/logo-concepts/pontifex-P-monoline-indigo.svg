@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Pontifex "P" — Monoline mark (Claude-style minimal). Stroke recolors easily. -->
+  <g fill="none" stroke="#1E1B4B" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M72,44 L72,158"/>
+    <path d="M72,44 L106,44 A30 30 0 0 1 106,104 L72,104"/>
+  </g>
+</svg>

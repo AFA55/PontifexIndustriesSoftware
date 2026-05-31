@@ -9,7 +9,9 @@ import { supabase } from '@/lib/supabase';
 function PontifexLogo() {
   return (
     <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
-      <span className="text-white font-bold text-2xl tracking-tight">P</span>
+      <svg viewBox="0 0 200 200" className="w-9 h-9" fill="none" stroke="#ffffff" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path transform="translate(-5,-2)" d="M70,160 L70,44 L108,44 A32 32 0 0 1 108,108 L70,108" />
+      </svg>
     </div>
   );
 }

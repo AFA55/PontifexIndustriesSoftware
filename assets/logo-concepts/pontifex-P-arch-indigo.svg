@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Pontifex "P" — Arch-Counter mark. The counter (negative space) is a bridge arch. -->
+  <path fill="#1E1B4B" fill-rule="evenodd"
+        d="M58,164 L58,38 L118,38 A37 37 0 0 1 118,112 L86,112 L86,164 Z
+           M88,98 L88,76 A15 15 0 0 1 118,76 L118,98 Z"/>
+</svg>
