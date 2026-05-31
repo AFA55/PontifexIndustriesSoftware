@@ -15,6 +15,7 @@ import { BrandingProvider } from '@/lib/branding-context';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import NetworkMonitor from '@/components/NetworkMonitor';
+import DevWarningFilter from '@/components/DevWarningFilter';
 
 export const metadata: Metadata = {
   title: 'Pontifex Industries - Field Operations Platform',
@@ -89,6 +90,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <head />
       <body className="transition-colors duration-200">
+        <DevWarningFilter />
         <ThemeProvider>
           <BrandingProvider>
             <NotificationProvider>
