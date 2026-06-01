@@ -26,9 +26,10 @@ interface NfcClockInModalProps {
   }) => Promise<void>;
   /** Called when user completes clock-OUT */
   onClockOut?: (data: {
-    method: 'nfc' | 'gps';
+    method: 'nfc' | 'gps' | 'remote';
     nfc_tag_id?: string;
     nfc_tag_uid?: string;
+    clock_out_photo_url?: string;
     latitude: number;
     longitude: number;
     accuracy?: number;
@@ -354,6 +355,41 @@ export default function NfcClockInModal({
     }
   };
 
+  // ── Clock-OUT (remote / off-site, with photo) ──
+  const confirmRemoteClockOut = async () => {
+    if (!photoFile || !onClockOut) return;
+    setFlow('processing');
+    setGlobalError(null);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const path = `remote-clockout/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
+      const { error: uploadErr } = await supabase.storage
+        .from('timecard-photos')
+        .upload(path, photoFile, { contentType: photoFile.type });
+
+      let photoUrl = '';
+      if (!uploadErr) {
+        const { data: { publicUrl } } = supabase.storage.from('timecard-photos').getPublicUrl(path);
+        photoUrl = publicUrl;
+      }
+
+      await onClockOut({
+        method: 'remote',
+        clock_out_photo_url: photoUrl || 'photo-upload-failed',
+        latitude: jobsiteCoords?.latitude ?? 0,
+        longitude: jobsiteCoords?.longitude ?? 0,
+        accuracy: jobsiteCoords?.accuracy,
+      });
+
+      setSuccessTime(formatTime(new Date()));
+      setRequiresApproval(true);
+      setFlow('success');
+    } catch (err: unknown) {
+      setGlobalError(err instanceof Error ? err.message : 'Clock-out failed');
+      setFlow('jobsite_camera');
+    }
+  };
+
   // ── Shared UI bits ──
   const headerGradient = isClockOut
     ? 'bg-gradient-to-r from-orange-500 to-red-600'
@@ -414,10 +450,10 @@ export default function NfcClockInModal({
             {flow === 'choose' && (
               <div className="space-y-3">
                 {isClockOut ? (
-                  // Clock-OUT: single GPS button
+                  // Clock-OUT: GPS (on-site) or Remote (off-site, photo)
                   <>
-                    <p className="text-sm text-slate-500 dark:text-white/50 text-center mb-4">
-                      Tap below to clock out. GPS will record your location.
+                    <p className="text-sm text-slate-500 dark:text-white/50 text-center mb-3">
+                      Clock out with GPS, or submit a photo if you&apos;re off-site.
                     </p>
                     <button
                       onClick={handleClockOut}
@@ -428,16 +464,34 @@ export default function NfcClockInModal({
                       </div>
                       <div>
                         <p className="font-bold text-slate-900 dark:text-white">GPS Clock Out</p>
-                        <p className="text-xs text-slate-500 dark:text-white/50">Records your location at clock-out</p>
+                        <p className="text-xs text-slate-500 dark:text-white/50">Records your location. Off-site is fine — admin just reviews it.</p>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setPhotoFile(null);
+                        setPhotoPreview(null);
+                        setJobsiteGpsStatus('idle');
+                        setJobsiteCoords(null);
+                        setFlow('jobsite_camera');
+                      }}
+                      className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-amber-200 dark:border-amber-700/40 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-800/30 transition-all text-left"
+                    >
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center flex-shrink-0">
+                        <Camera className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-900 dark:text-white">Remote Clock Out</p>
+                        <p className="text-xs text-slate-500 dark:text-white/50">Take a photo if you finished off-site</p>
                       </div>
                     </button>
                   </>
                 ) : (
                   // Clock-IN: two options
                   <>
-                    {/* Option A: Shop */}
+                    {/* Option A: Shop — GPS verifies you're at the shop (no code needed) */}
                     <button
-                      onClick={() => { setPin(''); setPinError(null); setFlow('shop_pin'); }}
+                      onClick={() => { setGpsStatus('idle'); setFlow('shop_gps'); startShopGps(); }}
                       className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-purple-200 dark:border-purple-700/40 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-800/30 transition-all text-left group"
                     >
                       <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
@@ -445,7 +499,7 @@ export default function NfcClockInModal({
                       </div>
                       <div className="flex-1">
                         <p className="font-bold text-slate-900 dark:text-white">Shop Clock-In</p>
-                        <p className="text-xs text-slate-500 dark:text-white/50">Enter daily code + GPS confirms you&apos;re at the shop</p>
+                        <p className="text-xs text-slate-500 dark:text-white/50">GPS confirms you&apos;re at the shop — no code needed</p>
                       </div>
                       <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200 dark:bg-purple-700/50 text-purple-800 dark:text-purple-200 whitespace-nowrap">
                         STANDARD
@@ -546,7 +600,7 @@ export default function NfcClockInModal({
             {flow === 'shop_gps' && (
               <div className="text-center py-2">
                 <button
-                  onClick={() => { setFlow('shop_pin'); setPin(''); }}
+                  onClick={() => { setFlow('choose'); setGpsStatus('idle'); }}
                   className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 mb-4 transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" /> Back
@@ -729,8 +783,8 @@ export default function NfcClockInModal({
                 </button>
 
                 <div className="text-center">
-                  <h3 className="font-bold text-slate-900 dark:text-white">Direct to Jobsite</h3>
-                  <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">Take a photo to confirm your arrival</p>
+                  <h3 className="font-bold text-slate-900 dark:text-white">{isClockOut ? 'Remote Clock Out' : 'Direct to Jobsite'}</h3>
+                  <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">{isClockOut ? 'Take a photo to confirm you finished off-site' : 'Take a photo to confirm your arrival'}</p>
                 </div>
 
                 {/* Camera capture */}
@@ -812,16 +866,18 @@ export default function NfcClockInModal({
 
                 <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3 border border-amber-200 dark:border-amber-700/40">
                   <p className="text-xs text-amber-700 dark:text-amber-300">
-                    <strong>Needs approval:</strong> Direct jobsite clock-ins are reviewed by your operations manager before pay is processed.
+                    <strong>Needs approval:</strong> {isClockOut
+                      ? 'Remote clock-outs are reviewed by your operations manager before pay is processed.'
+                      : 'Direct jobsite clock-ins are reviewed by your operations manager before pay is processed.'}
                   </p>
                 </div>
 
                 <button
-                  onClick={confirmJobsiteClockIn}
+                  onClick={isClockOut ? confirmRemoteClockOut : confirmJobsiteClockIn}
                   disabled={!photoFile || jobsiteGpsStatus === 'acquiring' || jobsiteGpsStatus === 'idle'}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:from-emerald-600 hover:to-teal-700 active:scale-[0.98] transition-all"
                 >
-                  Clock In (Needs Approval)
+                  {isClockOut ? 'Clock Out (Needs Approval)' : 'Clock In (Needs Approval)'}
                 </button>
               </div>
             )}

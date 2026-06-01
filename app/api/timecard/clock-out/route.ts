@@ -26,10 +26,12 @@ export async function POST(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { latitude, longitude, accuracy, clock_out_method, nfc_tag_uid, nfc_tag_id } = body;
+    const { latitude, longitude, accuracy, clock_out_method, nfc_tag_uid, nfc_tag_id, clock_out_photo_url } = body;
+    const isRemoteOut = clock_out_method === 'remote';
 
-    // Validation
-    if (typeof latitude !== 'number' || typeof longitude !== 'number') {
+    // Validation — GPS coords are required for a normal clock-out; a REMOTE (photo)
+    // clock-out is verified by the submitted photo, so coordinates are optional there.
+    if (!isRemoteOut && (typeof latitude !== 'number' || typeof longitude !== 'number')) {
       return NextResponse.json(
         { error: 'Invalid location data. Latitude and longitude are required.' },
         { status: 400 }
@@ -190,29 +192,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Enforce GPS radius check for GPS-based clock-ins only.
-    // NFC and remote users are at jobsites, so we just record their location.
+    // Out-of-radius GPS clock-outs are NO LONGER blocked. We allow the clock-out,
+    // flag it as out-of-radius, and notify admins to review/approve afterward.
+    // Remote (photo) clock-outs are likewise flagged for review. Nobody is ever
+    // prohibited from clocking out.
     const clockInMethod = activeTimecard.clock_in_method || 'gps';
     const shopName = shopOverride?.name ?? SHOP_LOCATION.name;
-    const allowedClockOutRadius = shopOverride?.clockOutRadius ?? ALLOWED_RADIUS_CLOCKOUT_METERS;
-    if (clockInMethod === 'gps' && hasLocation && !locationCheck.isWithinRange) {
-      return NextResponse.json(
-        {
-          error: `You must be at ${shopName} to clock out.`,
-          details: `You are ${locationCheck.distanceFormatted} away. Maximum allowed distance is ${(allowedClockOutRadius * 3.28084).toFixed(0)} feet (${allowedClockOutRadius}m).`,
-          distance: locationCheck.distance,
-          distanceFormatted: locationCheck.distanceFormatted,
-          allowedRadius: allowedClockOutRadius,
-          shopLocation: {
-            latitude: shopOverride?.latitude ?? SHOP_LOCATION.latitude,
-            longitude: shopOverride?.longitude ?? SHOP_LOCATION.longitude,
-            name: shopName,
-          },
-          userLocation: { latitude, longitude, accuracy },
-        },
-        { status: 403 }
-      );
-    }
+    const clockedOutOutsideRadius = clockInMethod === 'gps' && hasLocation && !locationCheck.isWithinRange;
+    const needsClockOutReview = isRemoteOut || clockedOutOutsideRadius;
 
     // Calculate total hours
     const now = new Date();
@@ -335,10 +322,12 @@ export async function POST(request: NextRequest) {
       .from('timecards')
       .update({
         clock_out_time: now.toISOString(),
-        clock_out_latitude: latitude,
-        clock_out_longitude: longitude,
+        clock_out_latitude: typeof latitude === 'number' ? latitude : null,
+        clock_out_longitude: typeof longitude === 'number' ? longitude : null,
         clock_out_accuracy: accuracy || null,
         clock_out_method: clock_out_method || 'gps',
+        clock_out_photo_url: clock_out_photo_url || null,
+        clock_out_outside_radius: clockedOutOutsideRadius,
         nfc_tag_uid: nfc_tag_uid || null,
         nfc_tag_id: nfc_tag_id || null,
         total_hours: parseFloat(totalHours.toFixed(2)),
@@ -368,6 +357,37 @@ export async function POST(request: NextRequest) {
       .single();
 
     console.log(`Clock out: ${profileForName?.full_name || auth.userEmail} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
+
+    // Out-of-radius or remote clock-out → notify admins/ops to review & approve (fire-and-forget).
+    if (needsClockOutReview && auth.tenantId) {
+      Promise.resolve((async () => {
+        const who = profileForName?.full_name || auth.userEmail || 'An employee';
+        const reason = clockedOutOutsideRadius
+          ? `clocked out ${locationCheck.distanceFormatted} from ${shopName} — outside the allowed radius`
+          : 'submitted a remote clock-out (photo)';
+        const { data: admins } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('tenant_id', auth.tenantId)
+          .in('role', ['super_admin', 'operations_manager', 'admin']);
+        if (admins && admins.length > 0) {
+          await supabaseAdmin.from('notifications').insert(
+            admins.map((a: { id: string }) => ({
+              user_id: a.id,
+              type: 'timecard_review',
+              title: 'Clock-out needs review',
+              message: `${who} ${reason}. Tap to review & approve.`,
+              tenant_id: auth.tenantId,
+              related_entity_type: 'timecard',
+              related_entity_id: updatedTimecard.id,
+              action_url: `/dashboard/admin/timecards/operator/${auth.userId}`,
+              read: false,
+              is_read: false,
+            }))
+          );
+        }
+      })()).catch(() => {});
+    }
 
     return NextResponse.json(
       {

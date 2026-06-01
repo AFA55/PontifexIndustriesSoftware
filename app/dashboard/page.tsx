@@ -497,67 +497,59 @@ export default function Dashboard() {
     }
   };
 
-  const handleClockOut = async () => {
+  // Clock-out now opens the modal (GPS on-site OR remote photo). No client-side
+  // location block — the server allows out-of-radius clock-outs and flags them for
+  // admin approval instead of prohibiting them.
+  const handleClockOut = () => {
+    setClockMessage(null);
+    setShowNfcClockInModal(true);
+  };
+
+  // Called by NfcClockInModal when a clock-out method (gps or remote photo) is chosen.
+  // Throws on error so the modal surfaces it; resolves on success so the modal shows
+  // its success screen. The work-performed / helper-log gates still apply server-side.
+  const performClockOut = async (data: {
+    method: 'nfc' | 'gps' | 'remote';
+    nfc_tag_id?: string;
+    nfc_tag_uid?: string;
+    clock_out_photo_url?: string;
+    latitude: number;
+    longitude: number;
+    accuracy?: number;
+  }) => {
     setClockLoading(true);
     setClockMessage(null);
-
     try {
-      // Get Supabase session token
       const { data: { session } } = await supabase.auth.getSession();
-
       if (!session) {
         setClockMessage({ type: 'error', text: 'Session expired. Please log in again.' });
-        setClockLoading(false);
-        return;
+        throw new Error('Session expired. Please log in again.');
       }
 
-      // Verify location
-      const verification = await verifyShopLocation();
-
-      if (!verification.verified) {
-        setClockMessage({
-          type: 'error',
-          text: verification.error || 'Location verification failed',
-        });
-        setClockLoading(false);
-        return;
-      }
-
-      // Call clock-out API with auth token
       const response = await fetch('/api/timecard/clock-out', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
-          latitude: verification.location.latitude,
-          longitude: verification.location.longitude,
-          accuracy: verification.location.accuracy,
+          clock_out_method: data.method,
+          latitude: data.latitude,
+          longitude: data.longitude,
+          accuracy: data.accuracy,
+          clock_out_photo_url: data.clock_out_photo_url,
+          nfc_tag_id: data.nfc_tag_id,
+          nfc_tag_uid: data.nfc_tag_uid,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        // Check for work-performed block
-        if (response.status === 403 && result.block_type) {
-          setClockOutBlock({
-            show: true,
-            blockType: result.block_type,
-            incompleteJobs: result.incomplete_jobs || [],
-          });
-          setClockLoading(false);
-          return;
-        }
-
-        const errorDetail = result.details ? `\n${result.details}` : '';
-        setClockMessage({
-          type: 'error',
-          text: (result.error || 'Failed to clock out') + errorDetail,
-        });
-        setClockLoading(false);
-        return;
+        // Work-performed / helper-log gates (and rate limit) still block — surface the reason.
+        const msg = (result.error || 'Failed to clock out') + (result.details ? `\n${result.details}` : '');
+        setClockMessage({ type: 'error', text: msg });
+        throw new Error(msg);
       }
 
       setIsClockedIn(false);
@@ -567,18 +559,11 @@ export default function Dashboard() {
         type: 'success',
         text: `${result.message} — Total hours this entry: ${result.data.totalHours}`,
       });
-
-      // Refresh weekly hours
       fetchWeeklyHours();
-
-      // Hide success message after 5 seconds
       setTimeout(() => setClockMessage(null), 5000);
     } catch (error: any) {
       console.error('Error clocking out:', error);
-      setClockMessage({
-        type: 'error',
-        text: error.message || 'An error occurred while clocking out',
-      });
+      throw error;
     } finally {
       setClockLoading(false);
     }
@@ -1307,7 +1292,9 @@ export default function Dashboard() {
       {showNfcClockInModal && (
         <NfcClockInModal
           isShopHours={isShopHours}
+          isClockedIn={isClockedIn}
           onClockIn={performClockIn}
+          onClockOut={performClockOut}
           onClose={() => setShowNfcClockInModal(false)}
         />
       )}

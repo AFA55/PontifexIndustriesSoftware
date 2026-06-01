@@ -87,10 +87,11 @@ export async function POST(request: NextRequest) {
 
     // Validate clock_in_method to prevent injection of unexpected values
     // 'field' = supervisor/field-worker GPS clock-in anywhere (no shop radius, no approval)
-    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote', 'gps_remote', 'pin', 'field'] as const;
+    // PIN/code clock-in removed — clock-in is verified by GPS (on-site) or photo (remote).
+    const VALID_CLOCK_METHODS = ['nfc', 'gps', 'remote', 'gps_remote', 'field'] as const;
     if (!VALID_CLOCK_METHODS.includes(clock_in_method as any)) {
       return NextResponse.json(
-        { error: 'Invalid clock_in_method. Must be nfc, gps, remote, gps_remote, pin, or field.' },
+        { error: 'Invalid clock_in_method. Must be nfc, gps, remote, gps_remote, or field.' },
         { status: 400 }
       );
     }
