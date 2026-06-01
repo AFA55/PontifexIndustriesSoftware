@@ -26,6 +26,7 @@ const DEMO_ACCOUNTS = [
   { label: 'Operator',   name: 'Aiden', email: 'aiden@demopontifex.com', password: 'Patriot2026!', color: 'blue' },
   { label: 'Helper',     name: 'Lucas', email: 'lucas@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
   { label: 'Helper',     name: 'Javi',  email: 'javi@demopontifex.com',  password: 'Patriot2026!', color: 'emerald' },
+  { label: 'Shop Hand',  name: 'Mechanic', email: 'shophelp@pontifex.com', password: 'Help1234!', color: 'teal' },
 ];
 // per-color Tailwind classes (literal strings so Tailwind keeps them in the build)
 const DEMO_COLORS: Record<string, { wrap: string; text: string; badge: string }> = {
@@ -33,6 +34,7 @@ const DEMO_COLORS: Record<string, { wrap: string; text: string; badge: string }>
   emerald: { wrap: 'bg-emerald-50 border-emerald-200 hover:border-emerald-300', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
   violet:  { wrap: 'bg-violet-50 border-violet-200 hover:border-violet-300',  text: 'text-violet-600',  badge: 'bg-violet-100 text-violet-700' },
   amber:   { wrap: 'bg-amber-50 border-amber-200 hover:border-amber-300',     text: 'text-amber-600',   badge: 'bg-amber-100 text-amber-700' },
+  teal:    { wrap: 'bg-teal-50 border-teal-200 hover:border-teal-300',       text: 'text-teal-600',    badge: 'bg-teal-100 text-teal-700' },
 };
 const DEMO_GATE_PASSWORD = 'PontifexDemo2026';
 
