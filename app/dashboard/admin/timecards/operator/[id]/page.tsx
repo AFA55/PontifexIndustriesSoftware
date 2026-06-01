@@ -9,7 +9,7 @@ import {
   Briefcase, AlertTriangle, TrendingUp, Loader2, MapPin,
   ExternalLink, Users, Shield, MessageSquare, Send, Coffee,
   Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
-  RefreshCw, DollarSign, Zap, Timer
+  RefreshCw, DollarSign, Zap, Timer, Camera
 } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -71,6 +71,10 @@ interface TimecardEntry {
   clock_in_method: string | null;
   requires_approval: boolean | null;
   remote_verified: boolean | null;
+  remote_photo_url: string | null;
+  clock_out_photo_url: string | null;
+  clock_out_outside_radius: boolean | null;
+  clock_out_verified: boolean | null;
   job_order_id: string | null;
   job_number: string | null;
   job_customer_name: string | null;
@@ -552,6 +556,25 @@ function OperatorTimecardDetailPageInner() {
       if (response.ok) fetchData();
     } catch (error) {
       console.error('Error approving entry:', error);
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Approve / reject an out-of-radius (or remote) clock-out.
+  const handleApproveClockOut = async (entryId: string, approved: boolean) => {
+    setActionLoading(entryId);
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const response = await fetch('/api/admin/timecards/clock-out-verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ timecard_id: entryId, approved }),
+      });
+      if (response.ok) fetchData();
+    } catch (error) {
+      console.error('Error verifying clock-out:', error);
     } finally {
       setActionLoading(null);
     }
@@ -1781,6 +1804,84 @@ function OperatorTimecardDetailPageInner() {
                                 <ExternalLink size={9} />
                                 View on Maps
                               </a>
+                            </div>
+                          )}
+
+                          {/* Verification photos — clock-in selfie + clock-out photo */}
+                          {((entry.remote_photo_url && entry.remote_photo_url !== 'photo-upload-failed') ||
+                            (entry.clock_out_photo_url && entry.clock_out_photo_url !== 'photo-upload-failed')) && (
+                            <div className="mt-2 px-2 py-1.5 bg-gray-50 rounded-md border border-gray-200">
+                              <div className="flex items-center gap-1.5 mb-1.5">
+                                <Camera size={10} className="text-gray-400" />
+                                <span className="text-[9px] font-bold text-gray-500 uppercase">Verification Photos</span>
+                              </div>
+                              <div className="flex gap-3">
+                                {entry.remote_photo_url && entry.remote_photo_url !== 'photo-upload-failed' && (
+                                  <a href={entry.remote_photo_url} target="_blank" rel="noopener noreferrer" className="block">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={entry.remote_photo_url} alt="Clock-in photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                                    <span className="text-[8px] text-gray-400 block text-center mt-0.5">Clock-in</span>
+                                  </a>
+                                )}
+                                {entry.clock_out_photo_url && entry.clock_out_photo_url !== 'photo-upload-failed' && (
+                                  <a href={entry.clock_out_photo_url} target="_blank" rel="noopener noreferrer" className="block">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={entry.clock_out_photo_url} alt="Clock-out photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+                                    <span className="text-[8px] text-gray-400 block text-center mt-0.5">Clock-out</span>
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Out-of-radius clock-out — allowed, flagged for admin approval */}
+                          {entry.clock_out_outside_radius && (
+                            <div className="mt-2 px-2 py-1.5 bg-rose-50 rounded-md border border-rose-200">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <div className="flex items-center gap-1.5">
+                                  <AlertTriangle size={10} className="text-rose-500" />
+                                  <span className="text-[9px] font-bold text-rose-700 uppercase">Clocked out off-site</span>
+                                  {entry.clock_out_verified === null && (
+                                    <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500/20 text-rose-600 animate-pulse">Needs Review</span>
+                                  )}
+                                  {entry.clock_out_verified === true && (
+                                    <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-emerald-500/15 text-emerald-600">Approved</span>
+                                  )}
+                                  {entry.clock_out_verified === false && (
+                                    <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-gray-300/50 text-gray-600">Rejected</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                  {(entry.clock_out_latitude || entry.clock_out_gps_lat) && (
+                                    <a
+                                      href={`https://maps.google.com/maps?q=${entry.clock_out_gps_lat || entry.clock_out_latitude},${entry.clock_out_gps_lng || entry.clock_out_longitude}`}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 text-[9px] font-bold text-rose-700 hover:bg-rose-200 transition-colors"
+                                    >
+                                      <ExternalLink size={9} /> Location
+                                    </a>
+                                  )}
+                                  {entry.clock_out_verified === null && (
+                                    <>
+                                      <button
+                                        onClick={() => handleApproveClockOut(entry.id, true)}
+                                        disabled={actionLoading === entry.id}
+                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-[9px] font-bold transition-colors disabled:opacity-50"
+                                      >
+                                        {actionLoading === entry.id ? <Loader2 size={9} className="animate-spin" /> : 'Approve'}
+                                      </button>
+                                      <button
+                                        onClick={() => handleApproveClockOut(entry.id, false)}
+                                        disabled={actionLoading === entry.id}
+                                        className="px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-[9px] font-bold transition-colors disabled:opacity-50"
+                                      >
+                                        Reject
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
                           )}
 
