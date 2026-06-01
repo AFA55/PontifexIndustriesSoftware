@@ -24,9 +24,10 @@ const DEMO_ACCOUNTS = [
   { label: 'Supervisor', name: 'David',      email: 'supervisor@pontifex.com', password: 'PontifexDemo2026!', color: 'amber' },
   { label: 'Operator',   name: 'Zack',  email: 'zack@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
   { label: 'Operator',   name: 'Aiden', email: 'aiden@demopontifex.com', password: 'Patriot2026!', color: 'blue' },
+  { label: 'Operator',   name: 'Keon',  email: 'keon@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
   { label: 'Helper',     name: 'Lucas', email: 'lucas@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
   { label: 'Helper',     name: 'Javi',  email: 'javi@demopontifex.com',  password: 'Patriot2026!', color: 'emerald' },
-  { label: 'Shop Hand',  name: 'Mechanic', email: 'shophelp@pontifex.com', password: 'Help1234!', color: 'teal' },
+  { label: 'Shop Hand',  name: 'Joey', email: 'joey@pontifex.com', password: 'Help1234!', color: 'teal' },
 ];
 // per-color Tailwind classes (literal strings so Tailwind keeps them in the build)
 const DEMO_COLORS: Record<string, { wrap: string; text: string; badge: string }> = {
