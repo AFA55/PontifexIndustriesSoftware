@@ -390,6 +390,30 @@ function OperatorTimecardDetailPageInner() {
     used: number;
     callouts: number;
   } | null>(null);
+  const [ptoEditing, setPtoEditing] = useState(false);
+  const [ptoInput, setPtoInput] = useState('');
+  const [ptoSaving, setPtoSaving] = useState(false);
+
+  async function savePtoAllocation() {
+    const days = Number(ptoInput);
+    if (!Number.isFinite(days) || days < 0) return;
+    setPtoSaving(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/admin/operators/pto-balance', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({ operatorId, ptoDaysAllocated: days, year: new Date().getFullYear() }),
+      });
+      if (res.ok) {
+        setPtoBalance((prev) => (prev ? { ...prev, allocated: days } : { allocated: days, used: 0, callouts: 0 }));
+        setPtoEditing(false);
+      }
+    } finally {
+      setPtoSaving(false);
+    }
+  }
 
   const isRedirecting = useRef(false);
 
@@ -1296,9 +1320,9 @@ function OperatorTimecardDetailPageInner() {
           return null;
         })()}
 
-        {/* ── PTO Balance card ────────────────────────────── */}
+        {/* ── PTO Balance card (editable) ───────────────────── */}
         {ptoBalance && (
-          <div className="mb-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl p-4 text-white shadow-md">
+          <div className="mb-4 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl p-4 text-white shadow-md">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-widest text-white/75">PTO Balance · {new Date().getFullYear()}</p>
@@ -1306,21 +1330,59 @@ function OperatorTimecardDetailPageInner() {
                   {Math.max(0, ptoBalance.allocated - ptoBalance.used).toFixed(1)} <span className="text-sm font-medium text-white/80">days remaining</span>
                 </p>
               </div>
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <p className="text-xs text-white/75">Allocated</p>
-                  <p className="text-base font-bold tabular-nums">{ptoBalance.allocated}</p>
+              <div className="flex items-center gap-3">
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <p className="text-xs text-white/75">Allocated</p>
+                    <p className="text-base font-bold tabular-nums">{ptoBalance.allocated}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/75">Used</p>
+                    <p className="text-base font-bold tabular-nums">{ptoBalance.used.toFixed(1)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-white/75">Callouts</p>
+                    <p className="text-base font-bold tabular-nums">{ptoBalance.callouts}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-white/75">Used</p>
-                  <p className="text-base font-bold tabular-nums">{ptoBalance.used.toFixed(1)}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-white/75">Callouts</p>
-                  <p className="text-base font-bold tabular-nums">{ptoBalance.callouts}</p>
-                </div>
+                {!ptoEditing && (
+                  <button
+                    type="button"
+                    onClick={() => { setPtoInput(String(ptoBalance.allocated)); setPtoEditing(true); }}
+                    className="px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold transition-colors"
+                  >
+                    Edit
+                  </button>
+                )}
               </div>
             </div>
+            {ptoEditing && (
+              <div className="mt-3 pt-3 border-t border-white/20 flex items-center gap-2 flex-wrap">
+                <label className="text-xs font-semibold text-white/90">Allocated days for {new Date().getFullYear()}</label>
+                <input
+                  type="number" min="0" step="0.5" inputMode="decimal"
+                  value={ptoInput}
+                  onChange={(e) => setPtoInput(e.target.value)}
+                  className="w-24 px-3 py-1.5 rounded-lg bg-white text-gray-900 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-white/60"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={savePtoAllocation}
+                  disabled={ptoSaving}
+                  className="px-3 py-1.5 rounded-lg bg-white text-emerald-700 text-xs font-bold hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                >
+                  {ptoSaving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPtoEditing(false)}
+                  className="px-3 py-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -1846,23 +1908,23 @@ function OperatorTimecardDetailPageInner() {
       {showEditModal && selectedEntry && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 max-h-[90vh] overflow-y-auto">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between sticky top-0 bg-white z-10">
+            <div className="p-5 flex items-center justify-between sticky top-0 z-10 bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
               <div>
-                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
-                    <Edit size={14} className="text-purple-400" />
+                <h3 className="text-base font-bold flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
+                    <Edit size={15} className="text-white" />
                   </div>
-                  Edit Entry
+                  Edit Time Entry
                 </h3>
-                <p className="text-xs text-gray-500 mt-1 ml-9">
+                <p className="text-xs text-white/80 mt-1 ml-[42px]">
                   {operator?.full_name} &middot; {formatDate(selectedEntry.date)}
                 </p>
               </div>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
               >
-                <X size={18} className="text-gray-400" />
+                <X size={18} className="text-white" />
               </button>
             </div>
 

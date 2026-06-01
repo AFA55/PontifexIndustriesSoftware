@@ -87,6 +87,22 @@ function TimecardPage() {
   const [correctionReason, setCorrectionReason] = useState('');
   const [submittingCorrection, setSubmittingCorrection] = useState(false);
   const [correctionSuccess, setCorrectionSuccess] = useState(false);
+  // Operator's own PTO balance (read-only view)
+  const [pto, setPto] = useState<{ allocated: number; used: number; remaining: number; callouts: number } | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/operator/pto-balance?year=${new Date().getFullYear()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (res.ok) {
+        const j = await res.json();
+        if (j?.data) setPto(j.data);
+      }
+    })().catch(() => {});
+  }, []);
   const router = useRouter();
   const searchParams = useSearchParams();
   const isRedirecting = useRef(false);
@@ -783,6 +799,31 @@ function TimecardPage() {
             </div>
           ))}
         </div>
+
+        {/* ── Your PTO Balance (read-only) ──────────────────── */}
+        {pto && (
+          <div className="mb-4 rounded-2xl p-4 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/75">Your PTO Balance · {new Date().getFullYear()}</p>
+                <p className="text-2xl font-bold tabular-nums leading-tight mt-0.5">
+                  {pto.remaining.toFixed(1)} <span className="text-sm font-medium text-white/80">days remaining</span>
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-5 text-center">
+                <div>
+                  <p className="text-xs text-white/75">Allocated</p>
+                  <p className="text-base font-bold tabular-nums">{pto.allocated}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-white/75">Used</p>
+                  <p className="text-base font-bold tabular-nums">{pto.used.toFixed(1)}</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-[11px] text-white/70 mt-2">Need time off? Submit a request and your manager will review it.</p>
+          </div>
+        )}
 
         {/* ── OT Alerts ──────────────────────────────────── */}
         {weekData && weekData.weeklyOvertimeHours > 0 && (
