@@ -27,6 +27,7 @@ const DEMO_ACCOUNTS = [
   { label: 'Operator',   name: 'Keon',  email: 'keon@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
   { label: 'Helper',     name: 'Lucas', email: 'lucas@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
   { label: 'Helper',     name: 'Javi',  email: 'javi@demopontifex.com',  password: 'Patriot2026!', color: 'emerald' },
+  { label: 'Helper',     name: 'Javier', email: 'javier@demopontifex.com', password: 'Patriot2026!', color: 'emerald' },
   { label: 'Shop Hand',  name: 'Joey', email: 'joey@pontifex.com', password: 'Help1234!', color: 'teal' },
 ];
 // per-color Tailwind classes (literal strings so Tailwind keeps them in the build)
