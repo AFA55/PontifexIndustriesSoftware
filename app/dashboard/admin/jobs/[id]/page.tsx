@@ -402,6 +402,13 @@ export default function AdminJobDetailPage({
   const [operatorNotes, setOperatorNotes] = useState<OperatorNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
 
+  // Helper (apprentice) work logs — what the helper said they did on this job
+  const [helperLogs, setHelperLogs] = useState<Array<{
+    id: string; helper_name: string; work_description: string;
+    log_date: string; hours_worked: number | null; completed: boolean;
+  }>>([]);
+  const [helperLogsLoading, setHelperLogsLoading] = useState(false);
+
   // Live status
   const [liveStatus, setLiveStatus] = useState<LiveStatusData | null>(null);
   const [liveStatusFetchedAt, setLiveStatusFetchedAt] = useState<Date | null>(null);
@@ -596,6 +603,19 @@ export default function AdminJobDetailPage({
     }
   }, [jobId]);
 
+  const fetchHelperLogs = useCallback(async () => {
+    setHelperLogsLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${jobId}/helper-logs`);
+      if (res.ok) {
+        const json = await res.json();
+        setHelperLogs(json.data || []);
+      }
+    } catch { /* ignore */ } finally {
+      setHelperLogsLoading(false);
+    }
+  }, [jobId]);
+
   const fetchLiveStatus = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/admin/jobs/${jobId}/live-status`);
@@ -638,7 +658,7 @@ export default function AdminJobDetailPage({
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs(), fetchOperatorNotes()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs(), fetchOperatorNotes(), fetchHelperLogs()]);
       setLoading(false);
     };
     load();
@@ -2220,6 +2240,66 @@ export default function AdminJobDetailPage({
                         <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1.5">
                           {formatDateTime(note.created_at)}
                         </p>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Helper Work Log — what the apprentice did (separate from the operator's ticket) */}
+            <div className="
+              rounded-2xl p-5 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <div className="flex items-center gap-2 mb-4">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300">
+                  <HardHat className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Helper Work Log</h2>
+                {helperLogs.length > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
+                    {helperLogs.length}
+                  </span>
+                )}
+              </div>
+              {helperLogsLoading && helperLogs.length === 0 ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-300 dark:text-white/30" />
+                </div>
+              ) : helperLogs.length === 0 ? (
+                <div className="text-center py-6">
+                  <HardHat className="w-8 h-8 text-slate-200 dark:text-white/15 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400 dark:text-white/45">No helper logs yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {helperLogs.map((log) => {
+                    const initials = (log.helper_name || 'H').split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase();
+                    return (
+                      <div key={log.id} className="rounded-xl border p-3 text-sm border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-[10px] font-bold text-white bg-gradient-to-br from-emerald-500 to-teal-600">
+                            {initials}
+                          </span>
+                          <span className="font-semibold text-slate-800 dark:text-white text-xs">{log.helper_name}</span>
+                          <span className="ml-auto flex items-center gap-1.5">
+                            {log.hours_worked != null && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300">
+                                {Number(log.hours_worked).toFixed(1)}h
+                              </span>
+                            )}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-semibold ${log.completed ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300' : 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300'}`}>
+                              {log.completed ? 'complete' : 'draft'}
+                            </span>
+                          </span>
+                        </div>
+                        <p className="text-slate-600 dark:text-white/70 text-xs leading-relaxed whitespace-pre-line">
+                          {log.work_description || <span className="italic text-slate-400">No description provided.</span>}
+                        </p>
+                        <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1.5">{log.log_date}</p>
                       </div>
                     );
                   })}

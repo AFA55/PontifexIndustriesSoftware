@@ -120,9 +120,47 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Helpers/apprentices are read-only on the job ticket — they do not fill out
-      // work logs, so clock-out is never gated on a helper work log. Their hours
-      // come from the timecard (clock in/out). Any open helper log is auto-closed below.
+      // Helpers/apprentices complete a simple work log (what they did) per dispatched
+      // job — they do NOT fill the operator's work-performed ticket. Require that log
+      // before clock-out so the helper's contribution is captured.
+      if (userRole === 'apprentice') {
+        const { data: helperJobs } = await supabaseAdmin
+          .from('job_orders')
+          .select('id, job_number, customer_name')
+          .eq('helper_assigned_to', auth.userId)
+          .eq('scheduled_date', today)
+          .not('dispatched_at', 'is', null)
+          .neq('status', 'cancelled');
+
+        if (helperJobs && helperJobs.length > 0) {
+          // Check which jobs have work logs
+          const jobIds = helperJobs.map((j: any) => j.id);
+          const { data: workLogs } = await supabaseAdmin
+            .from('helper_work_logs')
+            .select('job_order_id')
+            .eq('helper_id', auth.userId)
+            .eq('log_date', today)
+            .in('job_order_id', jobIds);
+
+          const loggedJobIds = new Set((workLogs || []).map((l: any) => l.job_order_id));
+          const missingLogs = helperJobs.filter((j: any) => !loggedJobIds.has(j.id));
+
+          if (missingLogs.length > 0) {
+            return NextResponse.json(
+              {
+                error: 'You must submit a work log for all dispatched jobs before clocking out.',
+                block_type: 'helper_work_log_required',
+                incomplete_jobs: missingLogs.map((j: any) => ({
+                  id: j.id,
+                  job_number: j.job_number,
+                  customer_name: j.customer_name,
+                })),
+              },
+              { status: 403 }
+            );
+          }
+        }
+      }
     }
 
     // Find active timecard (clocked in but not clocked out)
