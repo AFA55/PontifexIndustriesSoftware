@@ -1,7 +1,44 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** May 30, 2026 | **Branch:** `main` | **HEAD:** `c1735cdc` (✅ pushed, prod deploying) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🟡 Build 5 submitted, awaiting Apple review
+**Last updated:** Jun 1, 2026 | **Branch:** `main` | **HEAD:** `2755d488` (✅ pushed, prod deploy READY) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🟡 Build 5 submitted, awaiting Apple review (status unverified — ASC session expired)
 
-> **💰 VERCEL BUDGET: ~$2–3 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$1 build credit remaining** (one ~$1–2 build consumed this session). Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. See `DEPLOYMENT_COST.md`.
+
+---
+
+## ⚡ START HERE (Jun 1, 2026 session) — Brand "P" logo + helper architecture + Team Profiles → DEPLOYED to prod
+
+Shipped a large UX/brand batch in **one push** (`3ede8fab..2755d488`, deploy `dpl_3bMcXajd…` → **READY**, ~68s build). All verified (tsc green per commit) and live on pontifexindustries.com.
+
+**New brand identity — purple→red "P" (bridge-builder):**
+- Final mark = single-stroke **bridge-P** (tower → arch span → landing), **purple→red journey gradient** `#7C3AED → #DB2777 → #EF4444`. Applied to `public/logo.svg`, `favicon.svg`, all PWA/touch PNGs (regenerated via `assets/logo-concepts/render-icons.mjs`), and `app/company-login` (white variant).
+- Launch-animation spec lives in **`assets/logo-concepts/splash-demo-v4.html`** (final): aurora bg + self-drawing bridge + data-pulse across the span + circuit nodes + blueprint grid = "tech building the bridge." Watch via a static server in that folder. Plan doc: `SPLASH_AND_LOGO_REVAMP.md`.
+- **Native iOS icon + splash are NOT changed** (still the old bridge) — those are native assets gated on App Store approval → ship as **Build 6** (`npx @capacitor/assets generate` from `assets/logo.png` + `splash.png`, then `npx cap sync ios`).
+
+**Login / demo:**
+- Demo-account dropdown now leads with **Admin** (`admin@pontifex.com`) + **Supervisor "David"** (`supervisor@pontifex.com`) — both `PontifexDemo2026!`. Header is password-agnostic; `DEMO_COLORS` map added. Reset David's auth password (handoff doc had it wrong) + renamed profile full_name → "David".
+
+**Admin:**
+- **Team Profiles** now visible to admin: enabled `can_manage_team = true` for admin role in `user_feature_flags` (PATRIOT). Link already existed in `DashboardSidebar` (flag-gated). New admins get it via the invite flow.
+
+**Supervisor visit report (`app/dashboard/admin/site-visits/new`):**
+- Date field now uses the shared **`CalendarPicker`** (matches Schedule Form); removed Arrival/Departure time.
+- Equipment issues now unify into the **Maintenance Inbox**: `maintenance_requests` gained `request_type` (`repair`/`replace`, migration `20260531_maintenance_request_type` — applied to prod). Supervisor hook converts BOTH maintenance AND replace; operator route tags `repair`; inbox shows a "Replace" badge. So operator + supervisor issues all land in one shop-manager inbox.
+
+**Helper (apprentice) architecture:**
+- Read-only on the OPERATOR's ticket: `jobsite` + `work-performed` pages redirect helpers back to the ticket (can't proceed / advance status). Address still gated until the operator confirms equipment (helper-specific locked message added).
+- Helper keeps their OWN simple **work log** (`HelperWorkLog`): "what did you help with today?" — type OR **mic dictate** (shared `useVoiceInput` hook). Clock-out still requires it. NOT the operator's work-performed ticket.
+- Management sees it: new `GET /api/admin/jobs/[id]/helper-logs` + a **"Helper Work Log" panel** in the admin job detail (active AND completed jobs), beside Operator Notes.
+
+**Operator dashboard:** "Daily Report" card + quick-action → disabled **"Reports — Coming soon"** (route kept; entry points removed). Field/Shop clock-in confirmed saving correctly (`is_shop_hours` + `work_location`; re-clock-in as Shop works). Equipment-issue card already → `/dashboard/maintenance/new` → Maintenance Inbox.
+
+**Other:** `GoogleMapsProvider` honors `NEXT_PUBLIC_DISABLE_GOOGLE_MAPS` (kills LAN dev console spam); timecard lunch de-dupe/modernize; schedule-board toolbar labels; admin back-office dashboard.
+
+**Apple review safety:** this was a **web-only** deploy — the in-review native binary, app icon, splash, and App Store screenshots/metadata are all untouched. (The iOS app loads `server.url` = prod, so the reviewer would only see the new login logo — harmless.)
+
+**Pending / next:**
+- 🔴 **Verify App Store review status** — couldn't read it (App Store Connect browser session expired). If approved → do **Build 6** (new "P" native icon + splash + the launch-animation/fade from `SPLASH_AND_LOGO_REVAMP.md`).
+- The brand concept/animation files in `assets/logo-concepts/` are design source (committed) — not served in prod.
+- Schedule-board still ~2,850 lines — extraction still on backlog.
 
 ---
 
