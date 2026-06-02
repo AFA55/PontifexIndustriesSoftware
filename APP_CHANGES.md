@@ -25,11 +25,16 @@ add it to the section **"Website Changes to Adopt"** at the bottom of this file.
 
 ## App Change Log
 
-### 2026-06-01 — Build 6: new purple→red "P" icon + seamless splash fade
-**Status:** ✅ Committed (`11ccb96a`), native-only — ready to archive in Xcode
-**Build:** `CURRENT_PROJECT_VERSION` 5 → **6** (MARKETING_VERSION stays `1.0.0`)
-**Context:** Apple **approved** the app ("Ready for Distribution"). This build replaces the old
-bridge icon with the new brand "P" and removes the white launch flash.
+### 2026-06-01 — Build 6 / v1.0.1: new purple "P" icon + splash fade → ✅ SUBMITTED TO APP REVIEW
+**Status:** ✅ **SUBMITTED — "1.0.1 Waiting for Review"** (Jun 1, 8:49 PM). Commits `11ccb96a` + `43ccb13c` (native-only, not pushed).
+**Version/Build:** `MARKETING_VERSION` 1.0.0 → **1.0.1**, `CURRENT_PROJECT_VERSION` 5 → **6**
+**Context:** Apple approved the app, then this build (new brand "P" icon + no-flash launch fade) was
+archived, delivered via Transporter, and submitted via App Store Connect — fully automated (Xcode CLI +
+Transporter via osascript/cliclick + Claude-in-Chrome). New icon confirmed in ASC "Included Assets".
+
+> ⚠️ **Had to bump to 1.0.1.** First delivery as 1.0.0 hit `409 Invalid Pre-Release Train — '1.0.0' is
+> closed for new build submissions` because 1.0.0 was already Ready for Sale. Apple locks a released
+> version against new builds → every future App Store change needs a new version number.
 
 **What changed:**
 - **App icon** (`AppIcon-512@2x.png`) — re-rendered from the single-stroke bridge-P:
