@@ -119,9 +119,9 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
     <div
       ref={overlayRef}
       onClick={handleOverlayClick}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 dark:bg-black/60 backdrop-blur-sm p-4"
     >
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-purple-600 to-indigo-700 px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
@@ -145,24 +145,24 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
         {/* Success state */}
         {success ? (
           <div className="p-8 flex flex-col items-center gap-4 text-center">
-            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Job Placeholder Created</h3>
-              <p className="text-gray-500 text-sm mt-1">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Job Placeholder Created</h3>
+              <p className="text-gray-500 dark:text-slate-400 text-sm mt-1">
                 Job number{' '}
-                <span className="font-mono font-bold text-purple-700">{success.jobNumber}</span>{' '}
+                <span className="font-mono font-bold text-purple-700 dark:text-purple-300">{success.jobNumber}</span>{' '}
                 is now on the schedule board.
               </p>
-              <p className="text-gray-400 text-xs mt-2">
+              <p className="text-gray-400 dark:text-slate-500 text-xs mt-2">
                 A follow-up notification has been sent to complete the full schedule form.
               </p>
             </div>
             <div className="flex gap-3 mt-2">
               <button
                 onClick={onClose}
-                className="px-5 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium text-sm transition-colors"
+                className="px-5 py-2 rounded-lg bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-slate-300 font-medium text-sm transition-colors"
               >
                 Close
               </button>
@@ -181,16 +181,16 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
           /* Form */
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-red-700 text-sm">
+              <div className="bg-red-50 dark:bg-red-900/40 border border-red-200 dark:border-red-700/50 rounded-lg px-4 py-3 text-red-700 dark:text-red-300 text-sm">
                 {error}
               </div>
             )}
 
             {/* Customer Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                 <span className="flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-gray-400" />
+                  <User className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                   Customer Name <span className="text-red-500">*</span>
                 </span>
               </label>
@@ -199,23 +199,23 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
                 value={form.customer_name}
                 onChange={e => setForm(f => ({ ...f, customer_name: e.target.value }))}
                 placeholder="e.g. Patriot Concrete Co."
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
                 autoFocus
               />
             </div>
 
             {/* Job Type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                 <span className="flex items-center gap-1.5">
-                  <Briefcase className="w-3.5 h-3.5 text-gray-400" />
+                  <Briefcase className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                   Job Type <span className="text-red-500">*</span>
                 </span>
               </label>
               <select
                 value={form.job_type}
                 onChange={e => setForm(f => ({ ...f, job_type: e.target.value }))}
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-white"
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-white dark:bg-slate-900 [&>option]:dark:bg-slate-800 [&>option]:dark:text-white"
               >
                 <option value="">Select job type...</option>
                 {JOB_TYPES.map(t => (
@@ -226,9 +226,9 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
 
             {/* Service Address */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                 <span className="flex items-center gap-1.5">
-                  <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                  <MapPin className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                   Service Address
                 </span>
               </label>
@@ -237,16 +237,16 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
                 value={form.address}
                 onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
                 placeholder="123 Main St, City, State"
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
               />
             </div>
 
             {/* Scheduled Date + Assigned Operator (side by side) */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                   <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    <Calendar className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                     Scheduled Date <span className="text-red-500">*</span>
                   </span>
                 </label>
@@ -254,21 +254,21 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
                   type="date"
                   value={form.scheduled_date}
                   onChange={e => setForm(f => ({ ...f, scheduled_date: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-900 dark:[color-scheme:dark] text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                   <span className="flex items-center gap-1.5">
-                    <User className="w-3.5 h-3.5 text-gray-400" />
+                    <User className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                     Assign Operator
                   </span>
                 </label>
                 <select
                   value={form.assigned_to}
                   onChange={e => setForm(f => ({ ...f, assigned_to: e.target.value }))}
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-white"
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition bg-white dark:bg-slate-900 [&>option]:dark:bg-slate-800 [&>option]:dark:text-white"
                 >
                   <option value="">Unassigned</option>
                   {operators.map(op => (
@@ -280,9 +280,9 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5">
                 <span className="flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-gray-400" />
+                  <FileText className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
                   Notes
                 </span>
               </label>
@@ -291,7 +291,7 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
                 onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                 placeholder="Brief description..."
                 rows={2}
-                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition resize-none"
+                className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 dark:bg-slate-900 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition resize-none"
               />
             </div>
 
@@ -300,7 +300,7 @@ export default function QuickAddModal({ isOpen, onClose }: QuickAddModalProps) {
               <button
                 type="button"
                 onClick={onClose}
-                className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 text-gray-700 font-medium text-sm hover:bg-gray-50 transition-colors"
+                className="flex-1 px-4 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 text-gray-700 dark:text-slate-300 font-medium text-sm hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
               >
                 Cancel
               </button>

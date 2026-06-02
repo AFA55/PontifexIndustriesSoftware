@@ -146,21 +146,21 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`w-full flex items-center gap-3 px-4 py-3.5 sm:py-4 bg-white border rounded-xl text-base transition-all duration-200 text-left ${
+        className={`w-full flex items-center gap-3 px-4 py-3.5 sm:py-4 bg-white dark:bg-slate-900 border rounded-xl text-base transition-all duration-200 text-left ${
           isOpen
             ? 'border-blue-500 ring-2 ring-blue-500/20 shadow-sm'
-            : 'border-slate-200 hover:border-slate-300'
+            : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 dark:hover:border-slate-500'
         }`}
       >
-        <IconComponent size={18} className="text-slate-400 flex-shrink-0" />
-        <span className={displayValue ? 'text-slate-800 font-medium' : 'text-slate-400'}>
+        <IconComponent size={18} className="text-slate-400 dark:text-slate-500 flex-shrink-0" />
+        <span className={displayValue ? 'text-slate-800 dark:text-white font-medium' : 'text-slate-400 dark:text-slate-500'}>
           {displayValue || 'Select a date...'}
         </span>
       </button>
 
       {/* Calendar Dropdown */}
       {isOpen && (
-        <div className="absolute z-50 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl p-4 w-full sm:w-80 animate-in fade-in slide-in-from-top-2 duration-150">
+        <div className="absolute z-50 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl p-4 w-full sm:w-80 animate-in fade-in slide-in-from-top-2 duration-150">
           {/* Month/Year Header */}
           <div className="flex items-center justify-between mb-4">
             <button
@@ -169,19 +169,19 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
               disabled={isPrevMonthDisabled}
               className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
                 isPrevMonthDisabled
-                  ? 'text-slate-300 cursor-not-allowed'
-                  : 'text-slate-600 hover:bg-slate-100 active:bg-slate-200'
+                  ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
+                  : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 active:bg-slate-200 dark:active:bg-white/20'
               }`}
             >
               <ChevronLeft size={20} />
             </button>
-            <h3 className="text-base font-bold text-slate-800">
+            <h3 className="text-base font-bold text-slate-800 dark:text-white">
               {MONTH_NAMES[viewMonth]} {viewYear}
             </h3>
             <button
               type="button"
               onClick={goToNextMonth}
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 hover:bg-slate-100 active:bg-slate-200 transition-all"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 active:bg-slate-200 dark:active:bg-white/20 transition-all"
             >
               <ChevronRight size={20} />
             </button>
@@ -190,7 +190,7 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
           {/* Day Names */}
           <div className="grid grid-cols-7 gap-1 mb-2">
             {DAY_NAMES.map(d => (
-              <div key={d} className="text-center text-[11px] font-bold text-slate-400 uppercase tracking-wider py-1">
+              <div key={d} className="text-center text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider py-1">
                 {d}
               </div>
             ))}
@@ -215,12 +215,12 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
                   onClick={() => selectDay(day)}
                   className={`aspect-square rounded-xl flex items-center justify-center text-sm font-semibold transition-all duration-150 ${
                     disabled
-                      ? 'text-slate-300 cursor-not-allowed'
+                      ? 'text-slate-300 dark:text-slate-600 cursor-not-allowed'
                       : selected
-                        ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-blue-200/50'
+                        ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white shadow-md shadow-blue-200/50 dark:shadow-blue-900/40'
                         : todayMark
-                          ? 'border-2 border-blue-400 text-blue-600 hover:bg-blue-50'
-                          : 'text-slate-700 hover:bg-slate-100 active:bg-slate-200'
+                          ? 'border-2 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10'
+                          : 'text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 active:bg-slate-200 dark:active:bg-white/20'
                   }`}
                 >
                   {day}
@@ -230,7 +230,7 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
           </div>
 
           {/* Quick Actions */}
-          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+          <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
             <button
               type="button"
               onClick={() => {
@@ -240,7 +240,7 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
                   setIsOpen(false);
                 }
               }}
-              className="flex-1 py-2 text-xs font-semibold text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              className="flex-1 py-2 text-xs font-semibold text-blue-600 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/10 rounded-lg transition-colors"
             >
               Today
             </button>
@@ -251,7 +251,7 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
                   onChange('');
                   setIsOpen(false);
                 }}
-                className="flex-1 py-2 text-xs font-semibold text-slate-500 hover:bg-slate-50 rounded-lg transition-colors"
+                className="flex-1 py-2 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 rounded-lg transition-colors"
               >
                 Clear
               </button>

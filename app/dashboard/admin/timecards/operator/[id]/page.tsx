@@ -160,13 +160,13 @@ const SEGMENT_COLORS: Record<string, { bg: string; label: string; icon: any }> =
 
 // Entry type badge styling
 const ENTRY_TYPE_STYLES: Record<string, { bg: string; text: string }> = {
-  regular: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
-  overtime: { bg: 'bg-orange-50', text: 'text-orange-700' },
-  double_time: { bg: 'bg-red-50', text: 'text-red-700' },
-  time_off: { bg: 'bg-purple-50', text: 'text-purple-700' },
-  holiday: { bg: 'bg-cyan-50', text: 'text-cyan-700' },
-  no_call_no_show: { bg: 'bg-red-50', text: 'text-red-700' },
-  late: { bg: 'bg-amber-50', text: 'text-amber-700' },
+  regular: { bg: 'bg-emerald-50 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300' },
+  overtime: { bg: 'bg-orange-50 dark:bg-orange-900/40', text: 'text-orange-700 dark:text-orange-300' },
+  double_time: { bg: 'bg-red-50 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300' },
+  time_off: { bg: 'bg-purple-50 dark:bg-purple-900/40', text: 'text-purple-700 dark:text-purple-300' },
+  holiday: { bg: 'bg-cyan-50 dark:bg-cyan-900/40', text: 'text-cyan-700 dark:text-cyan-300' },
+  no_call_no_show: { bg: 'bg-red-50 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300' },
+  late: { bg: 'bg-amber-50 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-300' },
 };
 
 // Pay type override options
@@ -268,9 +268,9 @@ function SplitDateTimePicker({
   accent?: 'blue' | 'emerald' | 'violet';
   allowEmpty?: boolean;
 }) {
-  const ring = accent === 'emerald' ? 'focus:ring-emerald-500/20 focus:border-emerald-400' :
-               accent === 'violet'  ? 'focus:ring-violet-500/20 focus:border-violet-400' :
-                                      'focus:ring-blue-500/20 focus:border-blue-400';
+  const ring = accent === 'emerald' ? 'focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400' :
+               accent === 'violet'  ? 'focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400' :
+                                      'focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400';
 
   // Parse local-date + local-time from the ISO string (in browser-local TZ).
   const [localDate, localTime] = useMemo(() => {
@@ -298,28 +298,40 @@ function SplitDateTimePicker({
     onChange(local.toISOString());
   }
 
+  const inputClass = `w-full px-4 py-3.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 hover:border-slate-300 dark:hover:border-white/20 focus:ring-2 transition-all duration-200 ${ring}`;
+
   return (
-    <div className="grid grid-cols-2 gap-2">
-      <input
-        type="date"
-        value={localDate}
-        onChange={(e) => pushChange(e.target.value, localTime || '08:00')}
-        className={`w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 transition-all ${ring}`}
-        aria-label="Date"
-      />
-      <input
-        type="time"
-        value={localTime}
-        step={60}
-        onChange={(e) => pushChange(localDate, e.target.value)}
-        className={`w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 transition-all ${ring}`}
-        aria-label="Time"
-      />
+    <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-1.5">
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          <Calendar size={12} /> Date
+        </label>
+        <input
+          type="date"
+          value={localDate}
+          onChange={(e) => pushChange(e.target.value, localTime || '08:00')}
+          className={inputClass}
+          aria-label="Date"
+        />
+      </div>
+      <div className="space-y-1.5">
+        <label className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+          <Clock size={12} /> Time
+        </label>
+        <input
+          type="time"
+          value={localTime}
+          step={60}
+          onChange={(e) => pushChange(localDate, e.target.value)}
+          className={inputClass}
+          aria-label="Time"
+        />
+      </div>
       {allowEmpty && value && (
         <button
           type="button"
           onClick={() => onChange('')}
-          className="col-span-2 text-xs text-gray-500 hover:text-rose-600 underline self-start"
+          className="col-span-2 text-xs text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 underline self-start"
         >
           Clear (still on shift)
         </button>
@@ -780,12 +792,12 @@ function OperatorTimecardDetailPageInner() {
   // ── Status badge helper ─────────────────────────────────────
   const getStatusBadge = (status: string) => {
     const styles: Record<string, { bg: string; text: string; icon: any; label: string }> = {
-      draft: { bg: 'bg-gray-100', text: 'text-gray-600', icon: Clock, label: 'Draft' },
-      pending: { bg: 'bg-amber-50', text: 'text-amber-700', icon: Clock, label: 'Pending' },
-      active: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: Clock, label: 'Active' },
-      submitted: { bg: 'bg-blue-50', text: 'text-blue-700', icon: Send, label: 'Submitted' },
-      approved: { bg: 'bg-emerald-50', text: 'text-emerald-700', icon: CheckCircle, label: 'Approved' },
-      rejected: { bg: 'bg-red-50', text: 'text-red-700', icon: XCircle, label: 'Rejected' },
+      draft: { bg: 'bg-gray-100 dark:bg-white/10', text: 'text-gray-600 dark:text-slate-300', icon: Clock, label: 'Draft' },
+      pending: { bg: 'bg-amber-50 dark:bg-amber-900/40', text: 'text-amber-700 dark:text-amber-300', icon: Clock, label: 'Pending' },
+      active: { bg: 'bg-emerald-50 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300', icon: Clock, label: 'Active' },
+      submitted: { bg: 'bg-blue-50 dark:bg-blue-900/40', text: 'text-blue-700 dark:text-blue-300', icon: Send, label: 'Submitted' },
+      approved: { bg: 'bg-emerald-50 dark:bg-emerald-900/40', text: 'text-emerald-700 dark:text-emerald-300', icon: CheckCircle, label: 'Approved' },
+      rejected: { bg: 'bg-red-50 dark:bg-red-900/40', text: 'text-red-700 dark:text-red-300', icon: XCircle, label: 'Rejected' },
     };
     const s = styles[status] || styles.draft;
     const Icon = s.icon;
@@ -814,8 +826,8 @@ function OperatorTimecardDetailPageInner() {
     return (
       <div className="mt-2">
         <div className="flex items-center gap-1.5 mb-1.5">
-          <span className="text-[10px] text-gray-500 tabular-nums">{formatTime(entry.clock_in_time)}</span>
-          <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden flex">
+          <span className="text-[10px] text-gray-500 dark:text-slate-400 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+          <div className="flex-1 h-3 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden flex">
             {segments.map((seg: any, idx: number) => {
               const segStart = new Date(seg.start).getTime();
               const segEnd = seg.end ? new Date(seg.end).getTime() : Date.now();
@@ -837,7 +849,7 @@ function OperatorTimecardDetailPageInner() {
               );
             })}
           </div>
-          <span className="text-[10px] text-gray-500 tabular-nums">
+          <span className="text-[10px] text-gray-500 dark:text-slate-400 tabular-nums">
             {entry.clock_out_time ? formatTime(entry.clock_out_time) : 'Active'}
           </span>
         </div>
@@ -847,7 +859,7 @@ function OperatorTimecardDetailPageInner() {
             {entry.segments.map((seg: any, idx: number) => {
               const colors = SEGMENT_COLORS[seg.type] || SEGMENT_COLORS.working;
               return (
-                <span key={idx} className="inline-flex items-center gap-1 text-[9px] text-gray-500">
+                <span key={idx} className="inline-flex items-center gap-1 text-[9px] text-gray-500 dark:text-slate-400">
                   <span className={`w-1.5 h-1.5 rounded-full ${colors.bg}`} />
                   {colors.label}
                 </span>
@@ -903,7 +915,7 @@ function OperatorTimecardDetailPageInner() {
         : formPayType === 'double_time' ? 2.0 : 1.0;
       return (
         <div className="space-y-1 text-[11px]">
-          <div className="flex justify-between text-gray-600">
+          <div className="flex justify-between text-gray-600 dark:text-slate-300">
             <span>{PAY_TYPE_OPTIONS.find(o => o.value === formPayType)?.label || formPayType}</span>
             <span className="font-bold">{totalHours.toFixed(2)} hrs × {mult}×{baseRate ? ` = $${(totalHours * baseRate * mult).toFixed(2)}` : ''}</span>
           </div>
@@ -917,19 +929,19 @@ function OperatorTimecardDetailPageInner() {
       return (
         <div className="space-y-1 text-[11px]">
           {nsHours > 0 && (
-            <div className="flex justify-between text-purple-600">
+            <div className="flex justify-between text-purple-600 dark:text-purple-300">
               <span>Night Shift Premium ({nightShiftMultiplier}×)</span>
               <span className="font-bold">{nsHours.toFixed(2)} hrs{baseRate ? ` = $${(nsHours * baseRate * nightShiftMultiplier).toFixed(2)}` : ''}</span>
             </div>
           )}
           {otHours > 0 && (
-            <div className="flex justify-between text-amber-600">
+            <div className="flex justify-between text-amber-600 dark:text-amber-300">
               <span>Overtime (1.5×) — 40hr crossover</span>
               <span className="font-bold">{otHours.toFixed(2)} hrs{baseRate ? ` = $${(otHours * baseRate * 1.5).toFixed(2)}` : ''}</span>
             </div>
           )}
           {baseRate && (
-            <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-1 mt-1">
+            <div className="flex justify-between text-gray-900 dark:text-white font-bold border-t border-gray-200 dark:border-white/10 pt-1 mt-1">
               <span>Total</span>
               <span>${((nsHours * baseRate * nightShiftMultiplier) + (otHours * baseRate * 1.5)).toFixed(2)}</span>
             </div>
@@ -943,19 +955,19 @@ function OperatorTimecardDetailPageInner() {
     return (
       <div className="space-y-1 text-[11px]">
         {regHours > 0 && (
-          <div className="flex justify-between text-emerald-600">
+          <div className="flex justify-between text-emerald-600 dark:text-emerald-300">
             <span>Regular (1.0×)</span>
             <span className="font-bold">{regHours.toFixed(2)} hrs{baseRate ? ` = $${(regHours * baseRate).toFixed(2)}` : ''}</span>
           </div>
         )}
         {otHours > 0 && (
-          <div className="flex justify-between text-amber-600">
+          <div className="flex justify-between text-amber-600 dark:text-amber-300">
             <span>Overtime (1.5×) — weekly OT</span>
             <span className="font-bold">{otHours.toFixed(2)} hrs{baseRate ? ` = $${(otHours * baseRate * 1.5).toFixed(2)}` : ''}</span>
           </div>
         )}
         {baseRate && totalHours > 0 && (
-          <div className="flex justify-between text-gray-900 font-bold border-t border-gray-200 pt-1 mt-1">
+          <div className="flex justify-between text-gray-900 dark:text-white font-bold border-t border-gray-200 dark:border-white/10 pt-1 mt-1">
             <span>Total</span>
             <span>${((regHours * baseRate) + (otHours * baseRate * 1.5)).toFixed(2)}</span>
           </div>
@@ -967,13 +979,13 @@ function OperatorTimecardDetailPageInner() {
   // ── Auth loading state ──────────────────────────────────────
   if (!user) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-white/10"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 dark:border-t-violet-500 animate-spin"></div>
           </div>
-          <p className="text-gray-500 text-sm font-medium">Loading...</p>
+          <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Loading...</p>
         </div>
       </div>
     );
@@ -982,26 +994,26 @@ function OperatorTimecardDetailPageInner() {
   // ── Error state ─────────────────────────────────────────────
   if (!loading && fetchError) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
+        <header className="sticky top-0 z-10 bg-white/80 dark:bg-[#12082a]/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/10 shadow-sm">
           <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center gap-3">
             <Link
               href="/dashboard/admin/timecards"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all text-sm font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm font-medium"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Timecards</span>
             </Link>
-            <div className="h-6 w-px bg-gray-200" />
-            <h1 className="text-sm font-bold text-gray-900">Operator Detail</h1>
+            <div className="h-6 w-px bg-gray-200 dark:bg-white/10" />
+            <h1 className="text-sm font-bold text-gray-900 dark:text-white">Operator Detail</h1>
           </div>
         </header>
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-16 text-center">
-          <div className="inline-flex w-16 h-16 rounded-2xl bg-red-50 items-center justify-center mb-4">
+          <div className="inline-flex w-16 h-16 rounded-2xl bg-red-50 dark:bg-red-900/30 items-center justify-center mb-4">
             <XCircle size={28} className="text-red-400" />
           </div>
-          <h2 className="text-lg font-bold text-gray-900 mb-2">Could not load operator</h2>
-          <p className="text-sm text-gray-500 mb-6 max-w-sm mx-auto">{fetchError}</p>
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-2">Could not load operator</h2>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mb-6 max-w-sm mx-auto">{fetchError}</p>
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <button
               onClick={() => fetchData()}
@@ -1012,7 +1024,7 @@ function OperatorTimecardDetailPageInner() {
             </button>
             <Link
               href="/dashboard/admin/timecards"
-              className="inline-flex items-center justify-center min-h-[44px] py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-semibold border border-gray-200 transition-colors"
+              className="inline-flex items-center justify-center min-h-[44px] py-3 px-4 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-semibold border border-gray-200 dark:border-white/10 transition-colors"
             >
               Back to Timecards
             </Link>
@@ -1023,20 +1035,20 @@ function OperatorTimecardDetailPageInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* ── Header ─────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-white/80 backdrop-blur-xl border-b border-gray-200 shadow-sm">
+      <header className="sticky top-0 z-10 bg-white/80 dark:bg-[#12082a]/80 backdrop-blur-xl border-b border-gray-200 dark:border-white/10 shadow-sm">
         <div className="max-w-[1400px] mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href="/dashboard/admin/timecards"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-all text-sm font-medium flex-shrink-0"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 text-gray-500 dark:text-slate-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm font-medium flex-shrink-0"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Timecards</span>
             </Link>
 
-            <div className="h-6 w-px bg-gray-200 flex-shrink-0" />
+            <div className="h-6 w-px bg-gray-200 dark:bg-white/10 flex-shrink-0" />
 
             {/* Operator avatar & name */}
             <div className="flex items-center gap-2.5 min-w-0">
@@ -1044,10 +1056,10 @@ function OperatorTimecardDetailPageInner() {
                 {operator?.full_name?.charAt(0) || '?'}
               </div>
               <div className="min-w-0">
-                <h1 className="text-sm font-bold text-gray-900 truncate">
+                <h1 className="text-sm font-bold text-gray-900 dark:text-white truncate">
                   {operator?.full_name || 'Loading...'}
                 </h1>
-                <p className="text-[10px] text-gray-500 truncate">
+                <p className="text-[10px] text-gray-500 dark:text-slate-400 truncate">
                   {operator ? `${operator.role.replace(/_/g, ' ')} ${operator.email ? `\u00b7 ${operator.email}` : ''}` : ''}
                 </p>
               </div>
@@ -1071,7 +1083,7 @@ function OperatorTimecardDetailPageInner() {
 
             <button
               onClick={() => setShowRejectModal(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg transition-all text-xs font-bold border border-gray-200"
+              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all text-xs font-bold border border-gray-200 dark:border-white/10"
             >
               <XCircle size={13} />
               Reject
@@ -1099,7 +1111,7 @@ function OperatorTimecardDetailPageInner() {
                   console.error('Error exporting PDF:', error);
                 }
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-all text-xs font-bold border border-gray-200"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 rounded-lg transition-all text-xs font-bold border border-gray-200 dark:border-white/10"
             >
               <FileText size={13} />
               <span className="hidden sm:inline">Export PDF</span>
@@ -1113,10 +1125,10 @@ function OperatorTimecardDetailPageInner() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-24">
             <div className="w-12 h-12 relative mb-4">
-              <div className="absolute inset-0 rounded-full border-4 border-gray-200" />
-              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-600 animate-spin" />
+              <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-white/10" />
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-600 dark:border-t-violet-500 animate-spin" />
             </div>
-            <p className="text-sm text-gray-500 font-medium">Loading timecard data...</p>
+            <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">Loading timecard data...</p>
           </div>
         )}
 
@@ -1126,17 +1138,17 @@ function OperatorTimecardDetailPageInner() {
         <div className="mb-5 flex items-center justify-between">
           <button
             onClick={() => navigateWeek(-1)}
-            className="flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 rounded-lg transition-all text-sm font-medium border border-gray-200 shadow-sm"
+            className="flex items-center gap-1.5 px-3 py-2 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 rounded-lg transition-all text-sm font-medium border border-gray-200 dark:border-white/10 shadow-sm"
           >
             <ChevronLeft size={16} />
             <span className="hidden sm:inline">Prev Week</span>
           </button>
 
           <div className="text-center">
-            <p className="text-base font-bold text-gray-900">
+            <p className="text-base font-bold text-gray-900 dark:text-white">
               {formatWeekRange(weekStart)}
             </p>
-            <p className="text-[11px] text-gray-500 mt-0.5">
+            <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-0.5">
               {isCurrentWeek ? 'Current Week' : `Week of ${weekStart}`}
             </p>
           </div>
@@ -1146,8 +1158,8 @@ function OperatorTimecardDetailPageInner() {
             disabled={isCurrentWeek}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-lg transition-all text-sm font-medium border ${
               isCurrentWeek
-                ? 'bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed'
-                : 'bg-white hover:bg-gray-50 text-gray-700 border-gray-200 shadow-sm'
+                ? 'bg-gray-50 dark:bg-white/[0.02] text-gray-300 dark:text-white/20 border-gray-100 dark:border-white/5 cursor-not-allowed'
+                : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 border-gray-200 dark:border-white/10 shadow-sm'
             }`}
           >
             <span className="hidden sm:inline">Next Week</span>
@@ -1174,67 +1186,67 @@ function OperatorTimecardDetailPageInner() {
             </div>
 
             {/* Regular Hours */}
-            <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
+            <div className="bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border border-gray-100 dark:border-white/10 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Regular</span>
+                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Regular</span>
                 <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                   <CheckCircle size={13} className="text-emerald-400" />
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">{stats.regularHours.toFixed(1)}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Mon-Fri, up to 40h</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.regularHours.toFixed(1)}</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">Mon-Fri, up to 40h</p>
             </div>
 
             {/* Overtime */}
-            <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
+            <div className="bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border border-gray-100 dark:border-white/10 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Overtime</span>
+                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Overtime</span>
                 <div className="w-7 h-7 rounded-lg bg-orange-500/10 flex items-center justify-center">
                   <TrendingUp size={13} className="text-orange-400" />
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">{stats.weeklyOTHours.toFixed(1)}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">Over 40h weekly</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.weeklyOTHours.toFixed(1)}</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">Over 40h weekly</p>
             </div>
 
             {/* Night Shift Premium */}
-            <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
+            <div className="bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border border-gray-100 dark:border-white/10 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Night Shift</span>
+                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Night Shift</span>
                 <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
                   <Moon size={13} className="text-purple-400" />
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">{(stats.nightShiftPremiumHours ?? stats.nightShiftHours ?? 0).toFixed(1)}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{nightShiftMultiplier}× premium hrs</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{(stats.nightShiftPremiumHours ?? stats.nightShiftHours ?? 0).toFixed(1)}</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">{nightShiftMultiplier}× premium hrs</p>
             </div>
 
             {/* Days Worked */}
-            <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
+            <div className="bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border border-gray-100 dark:border-white/10 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Days</span>
+                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Days</span>
                 <div className="w-7 h-7 rounded-lg bg-purple-500/10 flex items-center justify-center">
                   <Calendar size={13} className="text-purple-400" />
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">{stats.daysWorked}</p>
-              <p className="text-[10px] text-gray-400 mt-0.5">{stats.totalEntries} entries</p>
+              <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.daysWorked}</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">{stats.totalEntries} entries</p>
             </div>
 
             {/* Effective Total Pay */}
-            <div className="bg-white rounded-xl p-3.5 border border-gray-100 shadow-sm">
+            <div className="bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border border-gray-100 dark:border-white/10 shadow-sm">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Est. Pay</span>
+                <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Est. Pay</span>
                 <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center">
                   <DollarSign size={13} className="text-emerald-400" />
                 </div>
               </div>
-              <p className="text-xl font-bold text-gray-900">
+              <p className="text-xl font-bold text-gray-900 dark:text-white">
                 {stats.effectiveTotalPay != null
                   ? `$${stats.effectiveTotalPay.toFixed(0)}`
                   : '--'}
               </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">with multipliers</p>
+              <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">with multipliers</p>
             </div>
 
             {/* Punctuality — 30-day late arrivals */}
@@ -1242,14 +1254,14 @@ function OperatorTimecardDetailPageInner() {
               const p = stats.punctuality;
               const lateCount = p?.lateCountMonth ?? 0;
               const color = lateCount === 0
-                ? { iconBg: 'bg-emerald-500/10', icon: 'text-emerald-400', value: 'text-emerald-600', sub: 'text-emerald-400' }
+                ? { iconBg: 'bg-emerald-500/10', icon: 'text-emerald-400', value: 'text-emerald-600 dark:text-emerald-400', sub: 'text-emerald-400' }
                 : lateCount <= 2
-                  ? { iconBg: 'bg-amber-500/10', icon: 'text-amber-400', value: 'text-amber-600', sub: 'text-amber-400' }
-                  : { iconBg: 'bg-red-500/10', icon: 'text-red-400', value: 'text-red-600', sub: 'text-red-400' };
+                  ? { iconBg: 'bg-amber-500/10', icon: 'text-amber-400', value: 'text-amber-600 dark:text-amber-400', sub: 'text-amber-400' }
+                  : { iconBg: 'bg-red-500/10', icon: 'text-red-400', value: 'text-red-600 dark:text-red-400', sub: 'text-red-400' };
               return (
-                <div className={`bg-white rounded-xl p-3.5 border shadow-sm ${lateCount >= 3 ? 'border-red-200 ring-1 ring-red-100' : 'border-gray-100'}`}>
+                <div className={`bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border shadow-sm ${lateCount >= 3 ? 'border-red-200 dark:border-red-500/30 ring-1 ring-red-100 dark:ring-red-500/20' : 'border-gray-100 dark:border-white/10'}`}>
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Punctuality</span>
+                    <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Punctuality</span>
                     <div className={`w-7 h-7 rounded-lg ${color.iconBg} flex items-center justify-center`}>
                       <Timer size={13} className={color.icon} />
                     </div>
@@ -1257,11 +1269,11 @@ function OperatorTimecardDetailPageInner() {
                   <p className={`text-xl font-bold ${color.value}`}>
                     {lateCount === 0 ? '0' : `${lateCount}×`}
                   </p>
-                  <p className={`text-[10px] mt-0.5 ${lateCount === 0 ? 'text-gray-400' : color.sub}`}>
+                  <p className={`text-[10px] mt-0.5 ${lateCount === 0 ? 'text-gray-400 dark:text-slate-500' : color.sub}`}>
                     {lateCount === 0 ? 'On time (30 days)' : `${p?.avgMinutesLate ?? 0}m avg late`}
                   </p>
                   {lateCount > 0 && p?.lastLateDate && (
-                    <p className="text-[9px] text-gray-400 mt-0.5 truncate">
+                    <p className="text-[9px] text-gray-400 dark:text-slate-500 mt-0.5 truncate">
                       Last: {new Date(p.lastLateDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </p>
                   )}
@@ -1284,7 +1296,7 @@ function OperatorTimecardDetailPageInner() {
               <div key={label} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border ${border} ${bg}`}>
                 <Icon size={12} className={color} />
                 <span className={`text-xs font-bold ${color}`}>{value.toFixed(1)}h</span>
-                <span className="text-[10px] text-gray-500">{label}</span>
+                <span className="text-[10px] text-gray-500 dark:text-slate-400">{label}</span>
               </div>
             ))}
 
@@ -1303,7 +1315,7 @@ function OperatorTimecardDetailPageInner() {
 
             {/* Approval summary */}
             <div className="ml-auto flex items-center gap-2">
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-gray-500 dark:text-slate-400">
                 {stats.approvedCount}/{stats.totalEntries} approved
               </span>
               {stats.pendingCount > 0 && (
@@ -1322,9 +1334,9 @@ function OperatorTimecardDetailPageInner() {
           const hoursToOT = Math.max(0, 40 - totalHrs);
           if (totalHrs >= 40) {
             return (
-              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-500/30 rounded-lg">
                 <AlertTriangle size={16} className="text-orange-400 flex-shrink-0" />
-                <p className="text-sm text-orange-700">
+                <p className="text-sm text-orange-700 dark:text-orange-300">
                   <strong>{stats.weeklyOTHours.toFixed(1)} weekly overtime hours</strong> — 40hr threshold reached. Night shift premium stops; standard OT (1.5×) applies.
                 </p>
               </div>
@@ -1332,9 +1344,9 @@ function OperatorTimecardDetailPageInner() {
           }
           if (hoursToOT < 8 && hoursToOT > 0) {
             return (
-              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="mb-4 flex items-center gap-3 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30 rounded-lg">
                 <Clock size={16} className="text-amber-400 flex-shrink-0" />
-                <p className="text-sm text-amber-700">
+                <p className="text-sm text-amber-700 dark:text-amber-300">
                   Week total: {totalHrs.toFixed(1)} hrs — next shift triggers OT at 40 hrs ({hoursToOT.toFixed(1)} hrs remaining)
                 </p>
               </div>
@@ -1412,9 +1424,9 @@ function OperatorTimecardDetailPageInner() {
         {/* ── Daily Breakdown ──────────────────────────────── */}
         <div className="space-y-2 mb-5">
           {loading ? (
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-16 text-center">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600 mx-auto mb-3" />
-              <p className="text-gray-500 text-sm">Loading entries...</p>
+            <div className="bg-white dark:bg-slate-800/60 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm p-16 text-center">
+              <Loader2 className="w-8 h-8 animate-spin text-blue-600 dark:text-violet-500 mx-auto mb-3" />
+              <p className="text-gray-500 dark:text-slate-400 text-sm">Loading entries...</p>
             </div>
           ) : (
             Object.entries(entriesByDay).map(([date, dayEntries]) => {
@@ -1429,21 +1441,21 @@ function OperatorTimecardDetailPageInner() {
               return (
                 <div
                   key={date}
-                  className={`bg-white rounded-xl border shadow-sm overflow-hidden transition-all ${
-                    isToday ? 'border-blue-300 ring-2 ring-blue-100' : 'border-gray-200'
+                  className={`bg-white dark:bg-slate-800/60 rounded-xl border shadow-sm overflow-hidden transition-all ${
+                    isToday ? 'border-blue-300 dark:border-violet-500/40 ring-2 ring-blue-100 dark:ring-violet-500/20' : 'border-gray-200 dark:border-white/10'
                   }`}
                 >
                   {/* Day header row */}
                   <button
                     onClick={() => hasEntries && toggleDay(date)}
                     className={`w-full px-4 py-3 flex items-center gap-3 text-left transition-colors ${
-                      hasEntries ? 'hover:bg-gray-50 cursor-pointer' : 'cursor-default'
+                      hasEntries ? 'hover:bg-gray-50 dark:hover:bg-white/5 cursor-pointer' : 'cursor-default'
                     }`}
                   >
                     {/* Day indicator */}
                     <div className={`w-10 h-10 rounded-lg flex flex-col items-center justify-center flex-shrink-0 ${
-                      isToday ? 'bg-blue-100 text-blue-700' :
-                      hasEntries ? 'bg-gray-100 text-gray-700' : 'bg-gray-50 text-gray-400'
+                      isToday ? 'bg-blue-100 dark:bg-violet-500/20 text-blue-700 dark:text-violet-300' :
+                      hasEntries ? 'bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-slate-200' : 'bg-gray-50 dark:bg-white/[0.03] text-gray-400 dark:text-slate-500'
                     }`}>
                       <span className="text-[9px] font-bold uppercase leading-none">
                         {new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short' })}
@@ -1455,7 +1467,7 @@ function OperatorTimecardDetailPageInner() {
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={`text-sm font-semibold ${hasEntries ? 'text-gray-900' : 'text-gray-400'}`}>
+                        <span className={`text-sm font-semibold ${hasEntries ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-slate-500'}`}>
                           {formatDayName(date)}
                         </span>
                         {isToday && (
@@ -1481,7 +1493,7 @@ function OperatorTimecardDetailPageInner() {
                         )}
                       </div>
                       {hasEntries && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">
+                        <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">
                           {dayEntries.length} {dayEntries.length === 1 ? 'entry' : 'entries'}
                           {dayEntries[0].job_title ? ` \u00b7 ${dayEntries[0].job_title}` : ''}
                           {dayEntries[0].job_number ? ` (${dayEntries[0].job_number})` : ''}
@@ -1493,7 +1505,7 @@ function OperatorTimecardDetailPageInner() {
                     <div className="text-right flex-shrink-0">
                       {hasEntries ? (
                         <>
-                          <p className="text-base font-bold text-gray-900 tabular-nums">{dayTotal.toFixed(1)}<span className="text-[10px] text-gray-500 ml-0.5">hrs</span></p>
+                          <p className="text-base font-bold text-gray-900 dark:text-white tabular-nums">{dayTotal.toFixed(1)}<span className="text-[10px] text-gray-500 dark:text-slate-400 ml-0.5">hrs</span></p>
                           {dayEntries.some(e => e.hour_type === 'mandatory_overtime') && (
                             <span className="text-[9px] text-red-400 font-bold">MANDATORY OT</span>
                           )}
@@ -1502,14 +1514,14 @@ function OperatorTimecardDetailPageInner() {
                           )}
                         </>
                       ) : (
-                        <p className="text-sm text-gray-300">--</p>
+                        <p className="text-sm text-gray-300 dark:text-slate-600">--</p>
                       )}
                     </div>
 
                     {/* Expand arrow */}
                     {hasEntries && (
                       <div className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}>
-                        <ChevronDown size={16} className="text-gray-400" />
+                        <ChevronDown size={16} className="text-gray-400 dark:text-slate-500" />
                       </div>
                     )}
                   </button>
@@ -1518,16 +1530,16 @@ function OperatorTimecardDetailPageInner() {
                       manual hours for someone who didn't clock in.
                       Wired to POST /api/admin/timecards/manual. */}
                   {!hasEntries && (
-                    <div className="px-4 pb-3 pt-1 border-t border-gray-100 bg-gray-50/50">
-                      <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-2">
+                    <div className="px-4 pb-3 pt-1 border-t border-gray-100 dark:border-white/10 bg-gray-50/50 dark:bg-white/[0.02]">
+                      <p className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-2">
                         No clock-in for this day
                       </p>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                         {[
-                          { type: 'pto' as const, label: 'PTO', defaultHours: '8', tone: 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200' },
-                          { type: 'sick' as const, label: 'Sick', defaultHours: '8', tone: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border-rose-200' },
-                          { type: 'holiday' as const, label: 'Holiday', defaultHours: '8', tone: 'bg-violet-50 text-violet-700 hover:bg-violet-100 border-violet-200' },
-                          { type: 'manual' as const, label: 'Manual hrs', defaultHours: '8', tone: 'bg-amber-50 text-amber-700 hover:bg-amber-100 border-amber-200' },
+                          { type: 'pto' as const, label: 'PTO', defaultHours: '8', tone: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-500/30' },
+                          { type: 'sick' as const, label: 'Sick', defaultHours: '8', tone: 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border-rose-200 dark:border-rose-500/30' },
+                          { type: 'holiday' as const, label: 'Holiday', defaultHours: '8', tone: 'bg-violet-50 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/50 border-violet-200 dark:border-violet-500/30' },
+                          { type: 'manual' as const, label: 'Manual hrs', defaultHours: '8', tone: 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50 border-amber-200 dark:border-amber-500/30' },
                         ].map(({ type, label, defaultHours, tone }) => (
                           <button
                             key={type}
@@ -1551,7 +1563,7 @@ function OperatorTimecardDetailPageInner() {
 
                   {/* Expanded day detail */}
                   {isExpanded && hasEntries && (
-                    <div className="border-t border-gray-100">
+                    <div className="border-t border-gray-100 dark:border-white/10">
                       {dayEntries.map((entry, entryIdx) => {
                         const weekBefore = runningTotals[entry.id] ?? 0;
                         const hoursToOT = Math.max(0, 40 - weekBefore);
@@ -1559,7 +1571,7 @@ function OperatorTimecardDetailPageInner() {
                         return (
                         <div
                           key={entry.id}
-                          className={`px-4 py-3 ${entryIdx > 0 ? 'border-t border-gray-100' : ''} ${
+                          className={`px-4 py-3 ${entryIdx > 0 ? 'border-t border-gray-100 dark:border-white/10' : ''} ${
                             entry.hour_type === 'mandatory_overtime' ? 'border-l-2 border-l-red-500' :
                             entry.is_night_shift ? 'border-l-2 border-l-purple-400' : ''
                           }`}
@@ -1570,19 +1582,19 @@ function OperatorTimecardDetailPageInner() {
                               {/* Clock in/out times */}
                               <div className="flex items-center gap-3 flex-wrap">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-gray-500 w-12">Clock In</span>
-                                  <span className="text-sm font-bold text-gray-900 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+                                  <span className="text-[10px] text-gray-500 dark:text-slate-400 w-12">Clock In</span>
+                                  <span className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">{formatTime(entry.clock_in_time)}</span>
                                   {renderGpsLink(entry.clock_in_gps_lat || entry.clock_in_latitude, entry.clock_in_gps_lng || entry.clock_in_longitude, 'GPS')}
                                   {entry.nfc_clock_in && (
                                     <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-cyan-500/10 text-cyan-400">NFC</span>
                                   )}
                                 </div>
-                                <span className="text-gray-400">&rarr;</span>
+                                <span className="text-gray-400 dark:text-slate-500">&rarr;</span>
                                 <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] text-gray-500 w-14">Clock Out</span>
+                                  <span className="text-[10px] text-gray-500 dark:text-slate-400 w-14">Clock Out</span>
                                   {entry.clock_out_time ? (
                                     <>
-                                      <span className="text-sm font-bold text-gray-900 tabular-nums">{formatTime(entry.clock_out_time)}</span>
+                                      <span className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">{formatTime(entry.clock_out_time)}</span>
                                       {renderGpsLink(entry.clock_out_gps_lat || entry.clock_out_latitude, entry.clock_out_gps_lng || entry.clock_out_longitude, 'GPS')}
                                     </>
                                   ) : (
@@ -1599,10 +1611,10 @@ function OperatorTimecardDetailPageInner() {
 
                               {/* Running weekly total indicator */}
                               <div className="mt-1.5 flex items-center gap-2">
-                                <span className="text-[10px] text-gray-400">
-                                  Week before this entry: <span className="font-bold text-gray-600">{weekBefore.toFixed(1)} hrs</span>
+                                <span className="text-[10px] text-gray-400 dark:text-slate-500">
+                                  Week before this entry: <span className="font-bold text-gray-600 dark:text-slate-300">{weekBefore.toFixed(1)} hrs</span>
                                   {weekBefore < 40 && hoursToOT > 0 && (
-                                    <span className="text-gray-400"> — {hoursToOT.toFixed(1)} hrs until OT</span>
+                                    <span className="text-gray-400 dark:text-slate-500"> — {hoursToOT.toFixed(1)} hrs until OT</span>
                                   )}
                                   {weekBefore >= 40 && (
                                     <span className="text-amber-500 font-bold"> — OT applies</span>
@@ -1613,8 +1625,8 @@ function OperatorTimecardDetailPageInner() {
                               {/* Job info */}
                               {entry.job_title && (
                                 <div className="mt-1.5 flex items-center gap-1.5">
-                                  <Briefcase size={10} className="text-gray-400" />
-                                  <span className="text-[11px] text-gray-500">
+                                  <Briefcase size={10} className="text-gray-400 dark:text-slate-500" />
+                                  <span className="text-[11px] text-gray-500 dark:text-slate-400">
                                     {entry.job_title}
                                     {entry.job_number ? ` (${entry.job_number})` : ''}
                                     {entry.job_customer_name ? ` \u2014 ${entry.job_customer_name}` : ''}
@@ -1625,8 +1637,8 @@ function OperatorTimecardDetailPageInner() {
                               {/* Coworkers */}
                               {entry.found_coworkers && entry.found_coworkers.length > 0 && (
                                 <div className="mt-1 flex items-center gap-1.5">
-                                  <Users size={10} className="text-gray-400" />
-                                  <span className="text-[11px] text-gray-500">
+                                  <Users size={10} className="text-gray-400 dark:text-slate-500" />
+                                  <span className="text-[11px] text-gray-500 dark:text-slate-400">
                                     Worked with: {entry.found_coworkers.map(c => c.full_name).join(', ')}
                                   </span>
                                 </div>
@@ -1637,9 +1649,9 @@ function OperatorTimecardDetailPageInner() {
                             <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                               <div className="flex items-center gap-2">
                                 {entry.total_hours !== null && (
-                                  <span className="text-lg font-bold text-gray-900 tabular-nums">
+                                  <span className="text-lg font-bold text-gray-900 dark:text-white tabular-nums">
                                     {entry.total_hours.toFixed(2)}
-                                    <span className="text-[10px] text-gray-500 ml-0.5">hrs</span>
+                                    <span className="text-[10px] text-gray-500 dark:text-slate-400 ml-0.5">hrs</span>
                                   </span>
                                 )}
                               </div>
@@ -1649,10 +1661,10 @@ function OperatorTimecardDetailPageInner() {
                                 {/* Pay category badge (new system) */}
                                 {(entry as any).pay_category && (entry as any).pay_category !== 'regular' ? (
                                   <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
-                                    (entry as any).pay_category === 'night_shift' ? 'bg-indigo-100 text-indigo-700 border-indigo-200' :
-                                    (entry as any).pay_category === 'shop' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                                    (entry as any).pay_category === 'overtime' ? 'bg-rose-100 text-rose-700 border-rose-200' :
-                                    'bg-slate-100 text-slate-700 border-slate-200'
+                                    (entry as any).pay_category === 'night_shift' ? 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-500/30' :
+                                    (entry as any).pay_category === 'shop' ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30' :
+                                    (entry as any).pay_category === 'overtime' ? 'bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30' :
+                                    'bg-slate-100 dark:bg-slate-700/60 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10'
                                   }`}>
                                     {(entry as any).pay_category === 'night_shift' ? 'Night Shift' :
                                      (entry as any).pay_category === 'shop' ? 'Shop Time' :
@@ -1737,7 +1749,7 @@ function OperatorTimecardDetailPageInner() {
 
                                 <button
                                   onClick={() => openEditModal(entry)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold transition-colors"
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-violet-500/15 hover:bg-blue-100 dark:hover:bg-violet-500/25 text-blue-700 dark:text-violet-300 border border-blue-200 dark:border-violet-500/30 text-xs font-semibold transition-colors"
                                   title="Edit entry"
                                   aria-label="Edit entry"
                                 >
@@ -1777,9 +1789,9 @@ function OperatorTimecardDetailPageInner() {
                                 </div>
                               )}
                               {entry.notes && !entry.admin_notes && !entry.employee_notes && (
-                                <div className="flex items-start gap-1.5 px-2 py-1.5 bg-gray-50 rounded-md border border-gray-200">
-                                  <MessageSquare size={10} className="text-gray-400 mt-0.5 flex-shrink-0" />
-                                  <p className="text-[10px] text-gray-600">{entry.notes}</p>
+                                <div className="flex items-start gap-1.5 px-2 py-1.5 bg-gray-50 dark:bg-white/5 rounded-md border border-gray-200 dark:border-white/10">
+                                  <MessageSquare size={10} className="text-gray-400 dark:text-slate-500 mt-0.5 flex-shrink-0" />
+                                  <p className="text-[10px] text-gray-600 dark:text-slate-300">{entry.notes}</p>
                                 </div>
                               )}
                             </div>
@@ -1787,10 +1799,10 @@ function OperatorTimecardDetailPageInner() {
 
                           {/* GPS Remote map link — shown for remote clock-ins */}
                           {(entry.clock_in_method === 'gps_remote' || entry.clock_in_method === 'remote') && (entry.clock_in_latitude || entry.clock_in_gps_lat) && (
-                            <div className="mt-2 px-2 py-1.5 bg-amber-50 rounded-md border border-amber-200 flex items-center justify-between">
+                            <div className="mt-2 px-2 py-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-500/30 flex items-center justify-between">
                               <div className="flex items-center gap-1.5">
                                 <MapPin size={10} className="text-amber-500" />
-                                <span className="text-[9px] font-bold text-amber-700 uppercase">Remote Clock-In Location</span>
+                                <span className="text-[9px] font-bold text-amber-700 dark:text-amber-300 uppercase">Remote Clock-In Location</span>
                                 {entry.remote_verified === null && (
                                   <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-amber-500/20 text-amber-600 animate-pulse">Needs Review</span>
                                 )}
@@ -1799,7 +1811,7 @@ function OperatorTimecardDetailPageInner() {
                                 href={`https://maps.google.com/maps?q=${entry.clock_in_gps_lat || entry.clock_in_latitude},${entry.clock_in_gps_lng || entry.clock_in_longitude}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 text-[9px] font-bold text-amber-700 hover:bg-amber-200 transition-colors"
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-[9px] font-bold text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60 transition-colors"
                               >
                                 <ExternalLink size={9} />
                                 View on Maps
@@ -1810,24 +1822,24 @@ function OperatorTimecardDetailPageInner() {
                           {/* Verification photos — clock-in selfie + clock-out photo */}
                           {((entry.remote_photo_url && entry.remote_photo_url !== 'photo-upload-failed') ||
                             (entry.clock_out_photo_url && entry.clock_out_photo_url !== 'photo-upload-failed')) && (
-                            <div className="mt-2 px-2 py-1.5 bg-gray-50 rounded-md border border-gray-200">
+                            <div className="mt-2 px-2 py-1.5 bg-gray-50 dark:bg-white/5 rounded-md border border-gray-200 dark:border-white/10">
                               <div className="flex items-center gap-1.5 mb-1.5">
-                                <Camera size={10} className="text-gray-400" />
-                                <span className="text-[9px] font-bold text-gray-500 uppercase">Verification Photos</span>
+                                <Camera size={10} className="text-gray-400 dark:text-slate-500" />
+                                <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 uppercase">Verification Photos</span>
                               </div>
                               <div className="flex gap-3">
                                 {entry.remote_photo_url && entry.remote_photo_url !== 'photo-upload-failed' && (
                                   <a href={entry.remote_photo_url} target="_blank" rel="noopener noreferrer" className="block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={entry.remote_photo_url} alt="Clock-in photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
-                                    <span className="text-[8px] text-gray-400 block text-center mt-0.5">Clock-in</span>
+                                    <img src={entry.remote_photo_url} alt="Clock-in photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-white/10" />
+                                    <span className="text-[8px] text-gray-400 dark:text-slate-500 block text-center mt-0.5">Clock-in</span>
                                   </a>
                                 )}
                                 {entry.clock_out_photo_url && entry.clock_out_photo_url !== 'photo-upload-failed' && (
                                   <a href={entry.clock_out_photo_url} target="_blank" rel="noopener noreferrer" className="block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={entry.clock_out_photo_url} alt="Clock-out photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
-                                    <span className="text-[8px] text-gray-400 block text-center mt-0.5">Clock-out</span>
+                                    <img src={entry.clock_out_photo_url} alt="Clock-out photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-white/10" />
+                                    <span className="text-[8px] text-gray-400 dark:text-slate-500 block text-center mt-0.5">Clock-out</span>
                                   </a>
                                 )}
                               </div>
@@ -1836,11 +1848,11 @@ function OperatorTimecardDetailPageInner() {
 
                           {/* Out-of-radius clock-out — allowed, flagged for admin approval */}
                           {entry.clock_out_outside_radius && (
-                            <div className="mt-2 px-2 py-1.5 bg-rose-50 rounded-md border border-rose-200">
+                            <div className="mt-2 px-2 py-1.5 bg-rose-50 dark:bg-rose-900/20 rounded-md border border-rose-200 dark:border-rose-500/30">
                               <div className="flex items-center justify-between gap-2 flex-wrap">
                                 <div className="flex items-center gap-1.5">
                                   <AlertTriangle size={10} className="text-rose-500" />
-                                  <span className="text-[9px] font-bold text-rose-700 uppercase">Clocked out off-site</span>
+                                  <span className="text-[9px] font-bold text-rose-700 dark:text-rose-300 uppercase">Clocked out off-site</span>
                                   {entry.clock_out_verified === null && (
                                     <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-rose-500/20 text-rose-600 animate-pulse">Needs Review</span>
                                   )}
@@ -1848,7 +1860,7 @@ function OperatorTimecardDetailPageInner() {
                                     <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-emerald-500/15 text-emerald-600">Approved</span>
                                   )}
                                   {entry.clock_out_verified === false && (
-                                    <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-gray-300/50 text-gray-600">Rejected</span>
+                                    <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-gray-300/50 dark:bg-white/15 text-gray-600 dark:text-slate-300">Rejected</span>
                                   )}
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -1857,7 +1869,7 @@ function OperatorTimecardDetailPageInner() {
                                       href={`https://maps.google.com/maps?q=${entry.clock_out_gps_lat || entry.clock_out_latitude},${entry.clock_out_gps_lng || entry.clock_out_longitude}`}
                                       target="_blank"
                                       rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 text-[9px] font-bold text-rose-700 hover:bg-rose-200 transition-colors"
+                                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-rose-100 dark:bg-rose-900/40 text-[9px] font-bold text-rose-700 dark:text-rose-300 hover:bg-rose-200 dark:hover:bg-rose-900/60 transition-colors"
                                     >
                                       <ExternalLink size={9} /> Location
                                     </a>
@@ -1874,7 +1886,7 @@ function OperatorTimecardDetailPageInner() {
                                       <button
                                         onClick={() => handleApproveClockOut(entry.id, false)}
                                         disabled={actionLoading === entry.id}
-                                        className="px-2 py-0.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded text-[9px] font-bold transition-colors disabled:opacity-50"
+                                        className="px-2 py-0.5 bg-gray-200 dark:bg-white/10 hover:bg-gray-300 dark:hover:bg-white/20 text-gray-700 dark:text-slate-200 rounded text-[9px] font-bold transition-colors disabled:opacity-50"
                                       >
                                         Reject
                                       </button>
@@ -1887,10 +1899,10 @@ function OperatorTimecardDetailPageInner() {
 
                           {/* GPS breadcrumb trail (if logs exist) */}
                           {entry.gps_logs && entry.gps_logs.length > 0 && (
-                            <div className="mt-2 px-2 py-1.5 bg-gray-50 rounded-md border border-gray-200">
+                            <div className="mt-2 px-2 py-1.5 bg-gray-50 dark:bg-white/5 rounded-md border border-gray-200 dark:border-white/10">
                               <div className="flex items-center gap-1.5 mb-1">
-                                <MapPin size={10} className="text-gray-400" />
-                                <span className="text-[9px] font-bold text-gray-500 uppercase">GPS Trail ({entry.gps_logs.length} points)</span>
+                                <MapPin size={10} className="text-gray-400 dark:text-slate-500" />
+                                <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 uppercase">GPS Trail ({entry.gps_logs.length} points)</span>
                               </div>
                               <div className="flex flex-wrap gap-1">
                                 {entry.gps_logs.slice(0, 8).map((log: GpsLog) => (
@@ -1899,13 +1911,13 @@ function OperatorTimecardDetailPageInner() {
                                     href={getGoogleMapsLink(log.latitude, log.longitude)}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-100 text-[9px] text-gray-500 hover:text-blue-600 transition-colors"
+                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gray-100 dark:bg-white/10 text-[9px] text-gray-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-violet-400 transition-colors"
                                   >
                                     {log.event_type.replace(/_/g, ' ')} @ {new Date(log.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}
                                   </a>
                                 ))}
                                 {entry.gps_logs.length > 8 && (
-                                  <span className="text-[9px] text-gray-400">+{entry.gps_logs.length - 8} more</span>
+                                  <span className="text-[9px] text-gray-400 dark:text-slate-500">+{entry.gps_logs.length - 8} more</span>
                                 )}
                               </div>
                             </div>
@@ -1922,26 +1934,26 @@ function OperatorTimecardDetailPageInner() {
         </div>
 
         {/* ── Admin Notes Section ──────────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-5">
+        <div className="bg-white dark:bg-slate-800/60 rounded-xl border border-gray-200 dark:border-white/10 shadow-sm overflow-hidden mb-5">
           <button
             onClick={() => setNotesExpanded(!notesExpanded)}
-            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
           >
             <div className="flex items-center gap-2">
               <MessageSquare size={14} className="text-amber-400" />
-              <span className="text-sm font-bold text-gray-900">Admin Notes</span>
+              <span className="text-sm font-bold text-gray-900 dark:text-white">Admin Notes</span>
               {weekNotes && (
                 <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500/10 text-amber-400">Has Notes</span>
               )}
             </div>
             <div className={`transition-transform duration-200 ${notesExpanded ? 'rotate-180' : ''}`}>
-              <ChevronDown size={16} className="text-gray-400" />
+              <ChevronDown size={16} className="text-gray-400 dark:text-slate-500" />
             </div>
           </button>
 
           {notesExpanded && (
-            <div className="border-t border-gray-100 p-4">
-              <p className="text-[10px] text-gray-500 mb-2">
+            <div className="border-t border-gray-100 dark:border-white/10 p-4">
+              <p className="text-[10px] text-gray-500 dark:text-slate-400 mb-2">
                 Track late arrivals, no-call-no-show, performance notes, or any other observations for this week.
               </p>
               <textarea
@@ -1949,7 +1961,7 @@ function OperatorTimecardDetailPageInner() {
                 onChange={(e) => setWeekNotes(e.target.value)}
                 rows={4}
                 placeholder="Add admin notes for this week..."
-                className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none transition-all"
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 dark:focus:ring-violet-500/20 focus:border-blue-400 dark:focus:border-violet-400 resize-none transition-all"
               />
               <div className="flex justify-end mt-2">
                 <button
@@ -1978,7 +1990,7 @@ function OperatorTimecardDetailPageInner() {
             </button>
             <button
               onClick={() => setShowRejectModal(true)}
-              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white hover:bg-red-50 text-gray-500 hover:text-red-600 rounded-lg text-sm font-bold border border-gray-200"
+              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg text-sm font-bold border border-gray-200 dark:border-white/10"
             >
               <XCircle size={14} />
               Reject
@@ -1987,7 +1999,7 @@ function OperatorTimecardDetailPageInner() {
         )}
 
         {/* ── Legend ────────────────────────────────────────── */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-2 py-3 text-[10px] text-gray-500">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 px-2 py-3 text-[10px] text-gray-500 dark:text-slate-400">
           {[
             { color: 'bg-emerald-500', label: 'Regular (Mon-Fri, up to 40 hrs)' },
             { color: 'bg-orange-500', label: 'Weekly OT (Mon-Fri over 40 hrs)' },
@@ -2008,7 +2020,7 @@ function OperatorTimecardDetailPageInner() {
       {/* ── Edit Modal ─────────────────────────────────────── */}
       {showEditModal && selectedEntry && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full border border-gray-200 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 dark:border-white/10 max-h-[90vh] overflow-y-auto">
             <div className="p-5 flex items-center justify-between sticky top-0 z-10 bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
               <div>
                 <h3 className="text-base font-bold flex items-center gap-2.5">
@@ -2029,26 +2041,33 @@ function OperatorTimecardDetailPageInner() {
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="p-5 space-y-5">
               {/* Clock times — split date + time pickers (avoids the native
                   datetime-local wheel bug where tapping "6" registers as "10") */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Clock In Time</label>
-                <SplitDateTimePicker
-                  value={editFormData.clock_in_time}
-                  onChange={(iso) => setEditFormData({ ...editFormData, clock_in_time: iso })}
-                  accent="blue"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Clock Out Time</label>
-                <SplitDateTimePicker
-                  value={editFormData.clock_out_time}
-                  onChange={(iso) => setEditFormData({ ...editFormData, clock_out_time: iso })}
-                  accent="blue"
-                  allowEmpty
-                />
+              <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+                    <Clock size={14} className="text-violet-600 dark:text-violet-300" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-white">Clock In / Out</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Clock In</p>
+                  <SplitDateTimePicker
+                    value={editFormData.clock_in_time}
+                    onChange={(iso) => setEditFormData({ ...editFormData, clock_in_time: iso })}
+                    accent="emerald"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Clock Out</p>
+                  <SplitDateTimePicker
+                    value={editFormData.clock_out_time}
+                    onChange={(iso) => setEditFormData({ ...editFormData, clock_out_time: iso })}
+                    accent="violet"
+                    allowEmpty
+                  />
+                </div>
               </div>
 
               {/* Lunch Deduction (admin-only override) */}
@@ -2056,19 +2075,19 @@ function OperatorTimecardDetailPageInner() {
                 const roleDefault = defaultLunchMinutes(operator?.role);
                 const presets = Array.from(new Set([0, 30, 60, roleDefault])).sort((a, b) => a - b);
                 return (
-                  <div className="rounded-xl border border-gray-200 dark:border-slate-700 bg-gray-50 dark:bg-slate-800/50 p-3.5 space-y-2.5">
+                  <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 space-y-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center flex-shrink-0">
+                      <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center flex-shrink-0">
                         <Coffee size={14} className="text-violet-600 dark:text-violet-300" />
                       </div>
                       <div>
-                        <p className="text-xs font-semibold text-gray-800 dark:text-slate-100">Lunch Deduction</p>
-                        <p className="text-[10px] text-gray-500 dark:text-slate-400">
-                          Auto-deducts <span className="font-semibold">{roleDefault} min</span> for this role when a shift exceeds 6h. Set 0 if no lunch was taken.
+                        <p className="text-sm font-bold text-slate-800 dark:text-white">Lunch Deduction</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                          Auto-deducts <span className="font-semibold text-slate-600 dark:text-slate-300">{roleDefault} min</span> for this role when a shift exceeds 6h. Set 0 if no lunch was taken.
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <input
                         type="number"
                         min="0"
@@ -2076,10 +2095,10 @@ function OperatorTimecardDetailPageInner() {
                         step="5"
                         value={editFormData.lunch_duration_minutes}
                         onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
-                        className="w-20 px-3 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 text-sm text-gray-900 dark:text-white tabular-nums"
+                        className="w-20 px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 text-sm text-slate-800 dark:text-white tabular-nums transition-all"
                       />
-                      <span className="text-xs text-gray-500 dark:text-slate-400">min</span>
-                      <div className="flex gap-1.5 ml-auto">
+                      <span className="text-xs text-slate-500 dark:text-slate-400">min</span>
+                      <div className="flex gap-2 ml-auto">
                         {presets.map((m) => {
                           const active = editFormData.lunch_duration_minutes === m;
                           return (
@@ -2087,10 +2106,10 @@ function OperatorTimecardDetailPageInner() {
                               key={m}
                               type="button"
                               onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: m })}
-                              className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-lg border transition-all ${
+                              className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
                                 active
-                                  ? 'bg-violet-600 border-violet-600 text-white shadow-sm'
-                                  : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-violet-300'
+                                  ? 'bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-500/30'
+                                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-violet-300 dark:hover:border-violet-500/50'
                               }`}
                             >
                               {m === 0 ? 'None' : `${m}m`}
@@ -2104,125 +2123,148 @@ function OperatorTimecardDetailPageInner() {
                       placeholder="Reason for override (optional, e.g. 'doctor appt')"
                       value={editFormData.lunch_override_reason}
                       onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
-                      className="w-full px-3 py-2 bg-white dark:bg-slate-700 border border-gray-200 dark:border-slate-600 rounded-lg focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 text-xs text-gray-900 dark:text-white"
+                      className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 transition-all"
                     />
                   </div>
                 );
               })()}
 
-              {/* Pay Type Override */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Pay Type Override</label>
-                <select
-                  value={editFormData.pay_type_override}
-                  onChange={(e) => setEditFormData({ ...editFormData, pay_type_override: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 text-sm text-gray-900 transition-all"
-                >
-                  {PAY_TYPE_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                {editFormData.pay_type_override && (
-                  <p className="text-[10px] text-amber-600 mt-1 flex items-center gap-1">
-                    <Zap size={10} />
-                    Override locks this entry to {editFormData.pay_type_override.replace(/_/g, ' ')} ({getEffectiveRateLabel(editFormData.pay_type_override)}) regardless of weekly hours.
+              {/* Pay overrides */}
+              <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center flex-shrink-0">
+                    <DollarSign size={14} className="text-violet-600 dark:text-violet-300" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-800 dark:text-white">Pay Overrides</p>
+                </div>
+
+                {/* Pay Type Override */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Pay Type Override</label>
+                  <div className="relative">
+                    <select
+                      value={editFormData.pay_type_override}
+                      onChange={(e) => setEditFormData({ ...editFormData, pay_type_override: e.target.value })}
+                      className="w-full px-4 py-3.5 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 transition-all appearance-none cursor-pointer"
+                    >
+                      {PAY_TYPE_OPTIONS.map(opt => (
+                        <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">{opt.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                  {editFormData.pay_type_override && (
+                    <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1.5 flex items-center gap-1">
+                      <Zap size={11} />
+                      Override locks this entry to {editFormData.pay_type_override.replace(/_/g, ' ')} ({getEffectiveRateLabel(editFormData.pay_type_override)}) regardless of weekly hours.
+                    </p>
+                  )}
+                  {!editFormData.pay_type_override && (
+                    <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">Auto: system calculates based on night shift flag and weekly hours.</p>
+                  )}
+                </div>
+
+                {/* Pay Category (new system) */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Pay Category</label>
+                  <div className="relative">
+                    <select
+                      value={editFormData.pay_category}
+                      onChange={(e) => {
+                        const cat = e.target.value;
+                        setEditFormData({
+                          ...editFormData,
+                          pay_category: cat,
+                          // Auto-sync is_shop_time when shop is selected
+                          is_shop_time: cat === 'shop' ? true : editFormData.is_shop_time,
+                        });
+                      }}
+                      className="w-full px-4 py-3.5 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 transition-all appearance-none cursor-pointer"
+                    >
+                      <option value="regular" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">Regular — standard rate</option>
+                      <option value="night_shift" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">Night Shift — premium rate (field only)</option>
+                      <option value="shop" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">Shop Time — regular rate regardless of hour</option>
+                      <option value="overtime" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">Overtime — 1.5× rate</option>
+                    </select>
+                    <ChevronDown size={18} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  </div>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1.5">
+                    Auto-calculated based on clock-in time and weekly hours. Override here to lock the category.
                   </p>
-                )}
-                {!editFormData.pay_type_override && (
-                  <p className="text-[10px] text-gray-400 mt-1">Auto: system calculates based on night shift flag and weekly hours.</p>
-                )}
+                </div>
               </div>
 
-              {/* Pay Category (new system) */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Pay Category</label>
-                <select
-                  value={editFormData.pay_category}
-                  onChange={(e) => {
-                    const cat = e.target.value;
+              {/* Classification toggles */}
+              <div className="space-y-3">
+                {/* Shop Time toggle */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const checked = !editFormData.is_shop_time;
                     setEditFormData({
                       ...editFormData,
-                      pay_category: cat,
-                      // Auto-sync is_shop_time when shop is selected
-                      is_shop_time: cat === 'shop' ? true : editFormData.is_shop_time,
+                      is_shop_time: checked,
+                      pay_category: checked ? 'shop' : (editFormData.pay_category === 'shop' ? 'regular' : editFormData.pay_category),
                     });
                   }}
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 text-sm text-gray-900 transition-all"
+                  className={`w-full flex items-center justify-between gap-3 rounded-xl border p-4 transition-all text-left ${
+                    editFormData.is_shop_time
+                      ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-400/30'
+                      : 'bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10'
+                  }`}
                 >
-                  <option value="regular">Regular — standard rate</option>
-                  <option value="night_shift">Night Shift — premium rate (field only)</option>
-                  <option value="shop">Shop Time — regular rate regardless of hour</option>
-                  <option value="overtime">Overtime — 1.5× rate</option>
-                </select>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  Auto-calculated based on clock-in time and weekly hours. Override here to lock the category.
-                </p>
-              </div>
-
-              {/* Shop Time toggle */}
-              <div className="flex items-center justify-between px-3 py-2.5 bg-amber-50 rounded-lg border border-amber-100">
-                <div className="flex items-center gap-2">
-                  <Coffee size={14} className="text-amber-500" />
-                  <div>
-                    <p className="text-xs font-semibold text-gray-700">Shop Time</p>
-                    <p className="text-[10px] text-gray-500">No night shift premium — always regular rate</p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={editFormData.is_shop_time}
-                    onChange={(e) => {
-                      const checked = e.target.checked;
-                      setEditFormData({
-                        ...editFormData,
-                        is_shop_time: checked,
-                        pay_category: checked ? 'shop' : (editFormData.pay_category === 'shop' ? 'regular' : editFormData.pay_category),
-                      });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-amber-500"></div>
-                </label>
-              </div>
-
-              {/* Night Shift toggle — only when not overriding pay type */}
-              {!editFormData.pay_type_override && editFormData.pay_category !== 'shop' && (
-                <div className="flex items-center justify-between px-3 py-2.5 bg-purple-50 rounded-lg border border-purple-100">
-                  <div className="flex items-center gap-2">
-                    <Moon size={14} className="text-purple-500" />
-                    <div>
-                      <p className="text-xs font-semibold text-gray-700">Mark as Night Shift (legacy)</p>
-                      <p className="text-[10px] text-gray-500">Applies {nightShiftMultiplier}× premium (up to 40hr weekly threshold)</p>
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Coffee size={16} className="text-amber-500 flex-shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white">Shop Time</p>
+                      <p className="text-[11px] text-slate-500 dark:text-slate-400">No night shift premium — always regular rate</p>
                     </div>
                   </div>
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={editFormData.is_night_shift}
-                      onChange={(e) => setEditFormData({ ...editFormData, is_night_shift: e.target.checked })}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-purple-600"></div>
-                  </label>
-                </div>
-              )}
+                  <div className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${editFormData.is_shop_time ? 'bg-amber-500' : 'bg-slate-300 dark:bg-white/20'}`}>
+                    <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${editFormData.is_shop_time ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+
+                {/* Night Shift toggle — only when not overriding pay type */}
+                {!editFormData.pay_type_override && editFormData.pay_category !== 'shop' && (
+                  <button
+                    type="button"
+                    onClick={() => setEditFormData({ ...editFormData, is_night_shift: !editFormData.is_night_shift })}
+                    className={`w-full flex items-center justify-between gap-3 rounded-xl border p-4 transition-all text-left ${
+                      editFormData.is_night_shift
+                        ? 'bg-violet-50 dark:bg-violet-500/10 border-violet-200 dark:border-violet-400/30'
+                        : 'bg-white dark:bg-white/[0.03] border-slate-200 dark:border-white/10'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Moon size={16} className="text-violet-500 flex-shrink-0" />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-white">Mark as Night Shift (legacy)</p>
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">Applies {nightShiftMultiplier}× premium (up to 40hr weekly threshold)</p>
+                      </div>
+                    </div>
+                    <div className={`relative w-12 h-7 rounded-full transition-colors flex-shrink-0 ${editFormData.is_night_shift ? 'bg-violet-600' : 'bg-slate-300 dark:bg-white/20'}`}>
+                      <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform ${editFormData.is_night_shift ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                    </div>
+                  </button>
+                )}
+              </div>
 
               {/* Effective rate display */}
               {selectedEntry.labor_cost && selectedEntry.total_hours && (
-                <div className="px-3 py-2 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-[10px] font-semibold text-gray-500 mb-1 uppercase tracking-wide">Effective Pay Rate</p>
-                  <div className="flex items-center gap-2">
-                    <DollarSign size={12} className="text-gray-400" />
-                    <span className="text-sm font-bold text-gray-900">
+                <div className="px-4 py-3 bg-slate-50/80 dark:bg-white/[0.03] rounded-xl border border-slate-200/60 dark:border-white/10">
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Effective Pay Rate</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <DollarSign size={13} className="text-slate-400 dark:text-slate-500" />
+                    <span className="text-sm font-bold text-slate-800 dark:text-white">
                       ${(selectedEntry.labor_cost / selectedEntry.total_hours).toFixed(2)}/hr base
                     </span>
                     {editFormData.pay_type_override ? (
-                      <span className="text-xs text-purple-600 font-semibold">
+                      <span className="text-xs text-violet-600 dark:text-violet-300 font-semibold">
                         × {getEffectiveRateLabel(editFormData.pay_type_override)} = ${((selectedEntry.labor_cost / selectedEntry.total_hours) * parseFloat(getEffectiveRateLabel(editFormData.pay_type_override))).toFixed(2)}/hr
                       </span>
                     ) : editFormData.is_night_shift ? (
-                      <span className="text-xs text-purple-600 font-semibold">× {nightShiftMultiplier} night shift</span>
+                      <span className="text-xs text-violet-600 dark:text-violet-300 font-semibold">× {nightShiftMultiplier} night shift</span>
                     ) : null}
                   </div>
                 </div>
@@ -2230,37 +2272,37 @@ function OperatorTimecardDetailPageInner() {
 
               {/* Hours breakdown preview */}
               {selectedEntry.total_hours && (
-                <div className="px-3 py-2.5 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-[10px] font-semibold text-gray-500 mb-2 uppercase tracking-wide">Hours Breakdown Preview</p>
+                <div className="px-4 py-3 bg-slate-50/80 dark:bg-white/[0.03] rounded-xl border border-slate-200/60 dark:border-white/10">
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Hours Breakdown Preview</p>
                   {getHoursBreakdownPreview(selectedEntry, editFormData.pay_type_override, editFormData.is_night_shift)}
                 </div>
               )}
 
               {/* Notes */}
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Admin Notes</label>
+                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Admin Notes</label>
                 <textarea
                   value={editFormData.notes}
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
                   rows={3}
                   placeholder="Add notes for this entry..."
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 text-sm text-gray-900 resize-none placeholder-slate-600 transition-all"
+                  className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 hover:border-slate-300 dark:hover:border-white/20 text-base text-slate-800 dark:text-white resize-none placeholder-slate-400 dark:placeholder-white/30 transition-all duration-200"
                 />
               </div>
 
               <div className="flex gap-2.5 pt-1">
                 <button
                   onClick={() => setShowEditModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                  className="flex-1 px-4 py-3 bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-sm transition-colors min-h-[44px]"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpdateEntry}
                   disabled={editSaving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 disabled:opacity-60 text-white rounded-lg font-semibold text-sm transition-all shadow-lg shadow-purple-500/20"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-violet-500/20 min-h-[44px]"
                 >
-                  {editSaving ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {editSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
@@ -2293,7 +2335,7 @@ function OperatorTimecardDetailPageInner() {
 
         return (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200 overflow-hidden">
+            <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-white/10 overflow-hidden">
               {/* Hero gradient swaps based on type */}
               <div className={`bg-gradient-to-br ${meta.gradient} p-5 text-white`}>
                 <div className="flex items-center justify-between">
@@ -2315,7 +2357,7 @@ function OperatorTimecardDetailPageInner() {
               <div className="p-5 space-y-4">
                 {/* Type picker chips */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Type</label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Type</label>
                   <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                     {(Object.keys(TYPE_META) as Array<keyof typeof TYPE_META>).map(key => (
                       <button
@@ -2325,7 +2367,7 @@ function OperatorTimecardDetailPageInner() {
                         className={`px-2.5 py-2 rounded-lg text-xs font-semibold transition border ${
                           manualType === key
                             ? `bg-gradient-to-br ${TYPE_META[key].gradient} text-white border-transparent shadow-sm`
-                            : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                            : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-white/10 hover:border-gray-300 dark:hover:border-white/20'
                         }`}
                       >
                         {TYPE_META[key].label}
@@ -2337,40 +2379,40 @@ function OperatorTimecardDetailPageInner() {
                 {/* Hours — time pickers for manual/adjustment, hour input for leave types */}
                 {usesTimePicker ? (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Shift Times</label>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Shift Times</label>
                     <div className="flex items-center gap-2">
                       <div className="flex-1">
-                        <p className="text-[10px] text-gray-500 mb-1">Clock In</p>
+                        <p className="text-[10px] text-gray-500 dark:text-slate-400 mb-1">Clock In</p>
                         <input
                           type="time"
                           value={manualStartTime}
                           onChange={(e) => setManualStartTime(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
+                          className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-base font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
                         />
                       </div>
-                      <div className="text-gray-400 font-bold mt-4">→</div>
+                      <div className="text-gray-400 dark:text-slate-500 font-bold mt-4">→</div>
                       <div className="flex-1">
-                        <p className="text-[10px] text-gray-500 mb-1">Clock Out</p>
+                        <p className="text-[10px] text-gray-500 dark:text-slate-400 mb-1">Clock Out</p>
                         <input
                           type="time"
                           value={manualEndTime}
                           onChange={(e) => setManualEndTime(e.target.value)}
-                          className="w-full px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
+                          className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-base font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-400"
                         />
                       </div>
                     </div>
                     {validHours && (
-                      <p className="text-[11px] text-amber-700 mt-1.5">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 mt-1.5">
                         <strong>{hoursNum.toFixed(2)} hours</strong> computed from selected times
                       </p>
                     )}
                     {!validHours && manualStartTime && manualEndTime && (
-                      <p className="text-[11px] text-rose-600 mt-1.5">End time must be after start time (max 16 hrs)</p>
+                      <p className="text-[11px] text-rose-600 dark:text-rose-400 mt-1.5">End time must be after start time (max 16 hrs)</p>
                     )}
                   </div>
                 ) : (
                   <div>
-                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Hours</label>
+                    <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Hours</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="number"
@@ -2379,7 +2421,7 @@ function OperatorTimecardDetailPageInner() {
                         max={16}
                         value={manualHours}
                         onChange={(e) => setManualHours(e.target.value)}
-                        className="flex-1 px-3 py-2.5 bg-white border border-gray-300 rounded-lg text-base font-semibold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
+                        className="flex-1 px-3 py-2.5 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-base font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400"
                       />
                       <div className="flex gap-1.5">
                         {['4', '8'].map(h => (
@@ -2387,7 +2429,7 @@ function OperatorTimecardDetailPageInner() {
                             key={h}
                             type="button"
                             onClick={() => setManualHours(h)}
-                            className="px-3 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-semibold transition"
+                            className="px-3 py-2.5 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-700 dark:text-slate-200 rounded-lg text-sm font-semibold transition"
                           >
                             {h}h
                           </button>
@@ -2395,7 +2437,7 @@ function OperatorTimecardDetailPageInner() {
                       </div>
                     </div>
                     {manualType === 'pto' && validHours && ptoBalance && (
-                      <p className="text-[11px] text-emerald-700 mt-1.5">
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300 mt-1.5">
                         Will use <strong>{(hoursNum / 8).toFixed(2)} day(s)</strong> · {Math.max(0, ptoBalance.allocated - ptoBalance.used - hoursNum / 8).toFixed(1)} day(s) remaining after
                       </p>
                     )}
@@ -2404,18 +2446,18 @@ function OperatorTimecardDetailPageInner() {
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Notes (optional)</label>
+                  <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Notes (optional)</label>
                   <textarea
                     value={manualNotes}
                     onChange={(e) => setManualNotes(e.target.value)}
                     rows={2}
                     placeholder="e.g. doctor appointment, called out morning of, federal holiday"
-                    className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 text-sm text-gray-900 resize-none placeholder-gray-400"
+                    className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-400 text-sm text-gray-900 dark:text-white resize-none placeholder-gray-400 dark:placeholder-white/30"
                   />
                 </div>
 
                 {manualError && (
-                  <div className="rounded-lg bg-rose-50 border border-rose-200 p-3 text-sm text-rose-700">
+                  <div className="rounded-lg bg-rose-50 dark:bg-rose-900/30 border border-rose-200 dark:border-rose-500/30 p-3 text-sm text-rose-700 dark:text-rose-300">
                     {manualError}
                   </div>
                 )}
@@ -2424,7 +2466,7 @@ function OperatorTimecardDetailPageInner() {
                   <button
                     type="button"
                     onClick={() => setShowManualModal(false)}
-                    className="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                    className="flex-1 px-4 py-2.5 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 rounded-lg font-semibold text-sm transition-colors"
                   >
                     Cancel
                   </button>
@@ -2477,43 +2519,43 @@ function OperatorTimecardDetailPageInner() {
       {/* ── Reject Modal ───────────────────────────────────── */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full border border-gray-200">
-            <div className="p-5 border-b border-gray-200 flex items-center justify-between">
+          <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-white/10">
+            <div className="p-5 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
                   <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center">
                     <XCircle size={14} className="text-red-400" />
                   </div>
                   Reject Week
                 </h3>
-                <p className="text-xs text-gray-500 mt-1 ml-9">
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 ml-9">
                   {operator?.full_name} &middot; {formatWeekRange(weekStart)}
                 </p>
               </div>
               <button
                 onClick={() => setShowRejectModal(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
               >
-                <X size={18} className="text-gray-400" />
+                <X size={18} className="text-gray-400 dark:text-slate-500" />
               </button>
             </div>
 
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Rejection Reason</label>
+                <label className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">Rejection Reason</label>
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
                   rows={3}
                   placeholder="Explain why this week's timecard is being rejected..."
-                  className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500/20 focus:border-red-400 text-sm text-gray-900 resize-none placeholder-gray-400 transition-all"
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-red-500/20 focus:border-red-400 text-sm text-gray-900 dark:text-white resize-none placeholder-gray-400 dark:placeholder-white/30 transition-all"
                 />
               </div>
 
               <div className="flex gap-2.5 pt-1">
                 <button
                   onClick={() => setShowRejectModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-semibold text-sm transition-colors"
+                  className="flex-1 px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 rounded-lg font-semibold text-sm transition-colors"
                 >
                   Cancel
                 </button>
@@ -2536,13 +2578,13 @@ function OperatorTimecardDetailPageInner() {
 export default function OperatorTimecardDetailPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-gray-200"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-gray-200 dark:border-white/10"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-blue-600 dark:border-t-violet-500 animate-spin"></div>
           </div>
-          <p className="text-gray-500 text-sm font-medium">Loading timecard...</p>
+          <p className="text-gray-500 dark:text-slate-400 text-sm font-medium">Loading timecard...</p>
         </div>
       </div>
     }>

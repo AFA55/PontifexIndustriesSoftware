@@ -632,6 +632,272 @@ function QuickActionsSection({
   );
 }
 
+// ─── Edit Info Tab ────────────────────────────────────────────────────────────
+
+interface EditInfoForm {
+  full_name: string;
+  nickname: string;
+  phone_number: string;
+  date_of_birth: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  emergency_contact_relationship: string;
+  next_review_date: string;
+}
+
+function seedEditInfoForm(member: TeamMember): EditInfoForm {
+  return {
+    full_name: member.full_name ?? '',
+    nickname: member.nickname ?? '',
+    phone_number: member.phone_number ?? member.phone ?? '',
+    date_of_birth: member.date_of_birth ?? '',
+    emergency_contact_name: (member as any).emergency_contact_name ?? '',
+    emergency_contact_phone: (member as any).emergency_contact_phone ?? '',
+    emergency_contact_relationship: (member as any).emergency_contact_relationship ?? '',
+    next_review_date: member.next_review_date ?? '',
+  };
+}
+
+function EditInfoTab({
+  member,
+  canEditAdminFields,
+  getAuthHeaders,
+  onSaved,
+}: {
+  member: TeamMember;
+  canEditAdminFields: boolean;
+  getAuthHeaders: () => Promise<Record<string, string>>;
+  onSaved: (updated: Partial<TeamMember> & Record<string, any>) => void;
+}) {
+  const [form, setForm] = useState<EditInfoForm>(() => seedEditInfoForm(member));
+  const [initial, setInitial] = useState<EditInfoForm>(() => seedEditInfoForm(member));
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Re-seed when a different member is selected
+  useEffect(() => {
+    const seeded = seedEditInfoForm(member);
+    setForm(seeded);
+    setInitial(seeded);
+    setError(null);
+    setSavedAt(null);
+  }, [member.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const set = (key: keyof EditInfoForm, value: string) => {
+    setForm(prev => ({ ...prev, [key]: value }));
+  };
+
+  const dirty = (Object.keys(form) as Array<keyof EditInfoForm>).some(k => form[k] !== initial[k]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      // Build a patch containing only changed fields. Empty strings → null
+      // for nullable columns so cleared values persist correctly.
+      const payload: Record<string, any> = {};
+      const nullableKeys: Array<keyof EditInfoForm> = [
+        'nickname', 'phone_number', 'date_of_birth',
+        'emergency_contact_name', 'emergency_contact_phone',
+        'emergency_contact_relationship', 'next_review_date',
+      ];
+      (Object.keys(form) as Array<keyof EditInfoForm>).forEach(k => {
+        if (form[k] === initial[k]) return;
+        if (k === 'next_review_date' && !canEditAdminFields) return; // guard
+        const v = form[k].trim();
+        payload[k] = v === '' && nullableKeys.includes(k) ? null : v;
+      });
+
+      if (Object.keys(payload).length === 0) {
+        setSaving(false);
+        return;
+      }
+
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/profiles/${member.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (!res.ok || json.success === false) {
+        setError(json.error || 'Failed to save changes');
+        return;
+      }
+      // Commit new baseline + notify parent with the patched fields.
+      setInitial(form);
+      setSavedAt(Date.now());
+      setTimeout(() => setSavedAt(null), 2500);
+      onSaved({ ...payload, ...(json.data || {}) });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const inputCls = 'w-full px-4 py-3 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-600 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all';
+  const labelCls = 'text-sm font-medium text-gray-700 dark:text-slate-300 mb-1.5 block';
+
+  return (
+    <div className="space-y-5">
+      {error && (
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-900/50 dark:text-red-300">
+          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* Read-only identity */}
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-4">Account Identity</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <span className={labelCls}>Email <span className="text-gray-400 dark:text-slate-500 font-normal">(read-only)</span></span>
+            <p className="text-gray-900 dark:text-white break-all">{member.email}</p>
+          </div>
+          <div>
+            <span className={labelCls}>Role <span className="text-gray-400 dark:text-slate-500 font-normal">(read-only)</span></span>
+            <p className="text-gray-900 dark:text-white">{ROLE_LABEL[member.role] || member.role}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Personal info */}
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-4">Personal Information</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className={labelCls} htmlFor="ei-full-name">Full Name</label>
+            <input
+              id="ei-full-name"
+              type="text"
+              value={form.full_name}
+              onChange={e => set('full_name', e.target.value)}
+              className={inputCls}
+              placeholder="Full name"
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ei-nickname">Nickname</label>
+            <input
+              id="ei-nickname"
+              type="text"
+              value={form.nickname}
+              onChange={e => set('nickname', e.target.value)}
+              className={inputCls}
+              placeholder="e.g. Bones"
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ei-phone">Phone</label>
+            <input
+              id="ei-phone"
+              type="tel"
+              value={form.phone_number}
+              onChange={e => set('phone_number', e.target.value)}
+              className={inputCls}
+              placeholder="(555) 555-5555"
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ei-dob">Date of Birth</label>
+            <input
+              id="ei-dob"
+              type="date"
+              value={form.date_of_birth}
+              onChange={e => set('date_of_birth', e.target.value)}
+              className={inputCls}
+            />
+          </div>
+          {canEditAdminFields && (
+            <div>
+              <label className={labelCls} htmlFor="ei-review">Next Review Date</label>
+              <input
+                id="ei-review"
+                type="date"
+                value={form.next_review_date}
+                onChange={e => set('next_review_date', e.target.value)}
+                className={inputCls}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Emergency contact */}
+      <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-4">Emergency Contact</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="sm:col-span-2">
+            <label className={labelCls} htmlFor="ei-ec-name">Contact Name</label>
+            <input
+              id="ei-ec-name"
+              type="text"
+              value={form.emergency_contact_name}
+              onChange={e => set('emergency_contact_name', e.target.value)}
+              className={inputCls}
+              placeholder="Contact name"
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ei-ec-phone">Contact Phone</label>
+            <input
+              id="ei-ec-phone"
+              type="tel"
+              value={form.emergency_contact_phone}
+              onChange={e => set('emergency_contact_phone', e.target.value)}
+              className={inputCls}
+              placeholder="(555) 555-5555"
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ei-ec-rel">Relationship</label>
+            <input
+              id="ei-ec-rel"
+              type="text"
+              value={form.emergency_contact_relationship}
+              onChange={e => set('emergency_contact_relationship', e.target.value)}
+              className={inputCls}
+              placeholder="e.g. Spouse"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Save bar */}
+      <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent dark:from-slate-900 dark:via-slate-900 pt-4 pb-1 -mx-1 px-1">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 min-h-[28px]">
+            {dirty && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-900/50">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                Unsaved changes
+              </span>
+            )}
+            {!dirty && savedAt && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                <CheckCircle className="w-3.5 h-3.5" />
+                Saved
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!dirty || saving}
+            className="inline-flex items-center gap-2 px-5 py-3 min-h-[44px] rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold shadow-lg shadow-violet-500/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Skills & Proficiency Tab ─────────────────────────────────────────────────
 
 const CUTTING_SCOPES: Array<{ key: string; label: string }> = [
@@ -978,21 +1244,21 @@ function SkillSnapshotCard({
   if (cuttingItems.length === 0 && equipItems.length === 0) return null;
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Skill Snapshot</h3>
-        <span className="text-[10px] text-gray-400">out of 10 / 5</span>
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Skill Snapshot</h3>
+        <span className="text-[10px] text-gray-400 dark:text-slate-500">out of 10 / 5</span>
       </div>
       <div className="space-y-2">
         {cuttingItems.map(s => {
           const val = skillLevels[s.key] ?? 0;
           return (
             <div key={s.key} className="flex items-center gap-2">
-              <span className="text-xs text-gray-600 w-24 truncate">{s.label}</span>
-              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+              <span className="text-xs text-gray-600 dark:text-slate-400 w-24 truncate">{s.label}</span>
+              <div className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
                 <div className="bg-violet-500 h-1.5 rounded-full" style={{ width: `${(val / 10) * 100}%` }} />
               </div>
-              <span className="text-[11px] font-bold text-gray-700 w-4 text-right">{val}</span>
+              <span className="text-[11px] font-bold text-gray-700 dark:text-slate-200 w-4 text-right">{val}</span>
             </div>
           );
         })}
@@ -1000,11 +1266,11 @@ function SkillSnapshotCard({
           const val = skillLevels[s.key] ?? 0;
           return (
             <div key={s.key} className="flex items-center gap-2">
-              <span className="text-xs text-gray-600 w-24 truncate">{s.label}</span>
-              <div className="flex-1 bg-gray-100 rounded-full h-1.5">
+              <span className="text-xs text-gray-600 dark:text-slate-400 w-24 truncate">{s.label}</span>
+              <div className="flex-1 bg-gray-100 dark:bg-slate-700 rounded-full h-1.5">
                 <div className="bg-amber-500 h-1.5 rounded-full" style={{ width: `${(val / 5) * 100}%` }} />
               </div>
-              <span className="text-[11px] font-bold text-gray-700 w-4 text-right">{val}</span>
+              <span className="text-[11px] font-bold text-gray-700 dark:text-slate-200 w-4 text-right">{val}</span>
             </div>
           );
         })}
@@ -1020,9 +1286,9 @@ function ExpiryBadge({ dateStr }: { dateStr: string | null }) {
   const date = new Date(dateStr);
   const today = new Date();
   const diffDays = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">EXPIRED</span>;
-  if (diffDays <= 30) return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">Expires in {diffDays}d</span>;
-  return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">Valid</span>;
+  if (diffDays < 0) return <span className="text-xs font-semibold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-900/50">EXPIRED</span>;
+  if (diffDays <= 30) return <span className="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-900/50">Expires in {diffDays}d</span>;
+  return <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-900/50">Valid</span>;
 }
 
 interface CertEntry {
@@ -1130,23 +1396,23 @@ function CredentialsTab({
     );
   }
 
-  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full';
+  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full dark:bg-slate-900 dark:border-slate-600 dark:text-white';
 
   return (
     <div className="space-y-4">
       {error && (
-        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-900/50 dark:text-red-300">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
       )}
 
       {/* Medical Card */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Medical Card</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Medical Card</h3>
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex-1 min-w-[160px]">
-            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Expiry Date</label>
             <input
               type="date"
               value={creds.medical_card_expiry ?? ''}
@@ -1161,11 +1427,11 @@ function CredentialsTab({
       </div>
 
       {/* Driver's License */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Driver&apos;s License</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Driver&apos;s License</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Expiry Date</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Expiry Date</label>
             <div className="flex items-center gap-2">
               <input
                 type="date"
@@ -1179,7 +1445,7 @@ function CredentialsTab({
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">License Class</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">License Class</label>
             <input
               type="text"
               placeholder="e.g. Class A CDL"
@@ -1192,11 +1458,11 @@ function CredentialsTab({
       </div>
 
       {/* OSHA Certifications */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">OSHA Certifications</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">OSHA Certifications</h3>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">OSHA 10 Expiry</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">OSHA 10 Expiry</label>
             <div className="flex items-center gap-2">
               <input
                 type="date"
@@ -1210,7 +1476,7 @@ function CredentialsTab({
             </div>
           </div>
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">OSHA 30 Expiry</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">OSHA 30 Expiry</label>
             <div className="flex items-center gap-2">
               <input
                 type="date"
@@ -1227,19 +1493,19 @@ function CredentialsTab({
       </div>
 
       {/* Additional Certifications */}
-      <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Additional Certifications</h3>
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 p-4 shadow-sm">
+        <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-3">Additional Certifications</h3>
         {creds.certifications.length > 0 && (
           <div className="space-y-2 mb-4">
             {creds.certifications.map(cert => (
-              <div key={cert.id} className="flex items-start gap-3 bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-200">
+              <div key={cert.id} className="flex items-start gap-3 bg-gray-50 dark:bg-slate-900 rounded-lg px-3 py-2.5 border border-gray-200 dark:border-slate-700">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900 truncate">{cert.name}</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{cert.name}</p>
                   {cert.issued_by && (
-                    <p className="text-xs text-gray-500 mt-0.5">Issued by {cert.issued_by}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Issued by {cert.issued_by}</p>
                   )}
                   {cert.expiry_date && (
-                    <p className="text-xs text-gray-500 mt-0.5">Expires {cert.expiry_date}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5">Expires {cert.expiry_date}</p>
                   )}
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -1247,7 +1513,7 @@ function CredentialsTab({
                   <button
                     type="button"
                     onClick={() => removeCert(cert.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
+                    className="text-gray-400 dark:text-slate-500 hover:text-red-500 transition-colors"
                     title="Remove"
                   >
                     <X className="w-4 h-4" />
@@ -1258,8 +1524,8 @@ function CredentialsTab({
           </div>
         )}
         {/* Add new cert form */}
-        <div className="border border-dashed border-gray-300 rounded-lg p-3 space-y-2">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add Certification</p>
+        <div className="border border-dashed border-gray-300 dark:border-slate-600 rounded-lg p-3 space-y-2">
+          <p className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-2">Add Certification</p>
           <input
             type="text"
             placeholder="Certification name *"
@@ -1275,7 +1541,7 @@ function CredentialsTab({
             className={inputCls}
           />
           <div>
-            <label className="text-xs text-gray-500 mb-1 block">Expiry Date (optional)</label>
+            <label className="text-xs text-gray-500 dark:text-slate-400 mb-1 block">Expiry Date (optional)</label>
             <input
               type="date"
               value={newCert.expiry_date}
@@ -1287,7 +1553,7 @@ function CredentialsTab({
             type="button"
             onClick={addCert}
             disabled={!newCert.name.trim()}
-            className="w-full mt-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="w-full mt-1 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 text-sm font-semibold rounded-lg transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             + Add Certification
           </button>
@@ -1295,11 +1561,11 @@ function CredentialsTab({
       </div>
 
       {/* Save bar */}
-      <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent pt-4 pb-1 -mx-1 px-1">
+      <div className="sticky bottom-0 bg-gradient-to-t from-gray-50 via-gray-50 to-transparent dark:from-slate-900 dark:via-slate-900 pt-4 pb-1 -mx-1 px-1">
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2 min-h-[28px]">
             {!saving && savedAt && (
-              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
                 <CheckCircle className="w-3.5 h-3.5" />
                 Saved
               </span>
@@ -1334,14 +1600,14 @@ interface OperatorBadge {
 }
 
 function badgeStatus(expiryDate: string | null): { label: string; cls: string } {
-  if (!expiryDate) return { label: 'No Expiry', cls: 'bg-slate-100 text-slate-600 border-slate-200' };
+  if (!expiryDate) return { label: 'No Expiry', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:border-slate-600' };
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const exp = new Date(expiryDate);
   const diffDays = Math.ceil((exp.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-  if (diffDays < 0) return { label: 'Expired', cls: 'bg-rose-100 text-rose-700 border-rose-200' };
-  if (diffDays <= 60) return { label: `Expires ${exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, cls: 'bg-amber-100 text-amber-700 border-amber-200' };
-  return { label: 'Valid', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' };
+  if (diffDays < 0) return { label: 'Expired', cls: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-900/50' };
+  if (diffDays <= 60) return { label: `Expires ${exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`, cls: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-900/50' };
+  return { label: 'Valid', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-300 dark:border-emerald-900/50' };
 }
 
 function BadgesTab({
@@ -1448,7 +1714,7 @@ function BadgesTab({
     finally { setDeleting(null); }
   };
 
-  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full';
+  const inputCls = 'text-gray-900 bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-colors w-full dark:bg-slate-900 dark:border-slate-600 dark:text-white';
 
   if (loading) {
     return (
@@ -1463,8 +1729,8 @@ function BadgesTab({
       {/* Header row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-violet-600" />
-          <span className="text-sm font-semibold text-gray-700">Facility &amp; Site Badges</span>
+          <ShieldCheck className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+          <span className="text-sm font-semibold text-gray-700 dark:text-slate-200">Facility &amp; Site Badges</span>
         </div>
         <button
           type="button"
@@ -1477,7 +1743,7 @@ function BadgesTab({
       </div>
 
       {error && (
-        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700">
+        <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-700 dark:bg-red-950/40 dark:border-red-900/50 dark:text-red-300">
           <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>{error}</span>
         </div>
@@ -1485,35 +1751,35 @@ function BadgesTab({
 
       {/* Badge list */}
       {badges.length === 0 ? (
-        <div className="bg-white rounded-xl border border-dashed border-gray-300 p-8 text-center">
-          <ShieldCheck className="w-8 h-8 text-gray-300 mx-auto mb-3" />
-          <p className="text-sm text-gray-500 font-medium">No badges on file.</p>
-          <p className="text-xs text-gray-400 mt-1">Click + Add Badge to get started.</p>
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-dashed border-gray-300 dark:border-slate-600 p-8 text-center">
+          <ShieldCheck className="w-8 h-8 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
+          <p className="text-sm text-gray-500 dark:text-slate-400 font-medium">No badges on file.</p>
+          <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">Click + Add Badge to get started.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5">Badge Type</th>
-                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5 hidden sm:table-cell">Badge #</th>
-                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5 hidden sm:table-cell">Issued</th>
-                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5">Expires</th>
-                <th className="text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider px-4 py-2.5">Status</th>
+              <tr className="border-b border-gray-100 dark:border-slate-700 bg-gray-50 dark:bg-slate-900">
+                <th className="text-left text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider px-4 py-2.5">Badge Type</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider px-4 py-2.5 hidden sm:table-cell">Badge #</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider px-4 py-2.5 hidden sm:table-cell">Issued</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider px-4 py-2.5">Expires</th>
+                <th className="text-left text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5 w-10" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
               {badges.map(badge => {
                 const status = badgeStatus(badge.expiry_date);
                 return (
-                  <tr key={badge.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-4 py-3 font-semibold text-gray-900">{badge.badge_type}</td>
-                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">{badge.badge_number || '—'}</td>
-                    <td className="px-4 py-3 text-gray-500 hidden sm:table-cell">
+                  <tr key={badge.id} className="hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">{badge.badge_type}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-slate-400 hidden sm:table-cell">{badge.badge_number || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500 dark:text-slate-400 hidden sm:table-cell">
                       {badge.issued_date ? new Date(badge.issued_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
                     </td>
-                    <td className="px-4 py-3 text-gray-500">
+                    <td className="px-4 py-3 text-gray-500 dark:text-slate-400">
                       {badge.expiry_date ? new Date(badge.expiry_date).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—'}
                     </td>
                     <td className="px-4 py-3">
@@ -1526,7 +1792,7 @@ function BadgesTab({
                         type="button"
                         onClick={() => handleDelete(badge.id)}
                         disabled={deleting === badge.id}
-                        className="text-gray-400 hover:text-rose-500 transition-colors disabled:opacity-40"
+                        className="text-gray-400 dark:text-slate-500 hover:text-rose-500 transition-colors disabled:opacity-40"
                         title="Remove badge"
                       >
                         {deleting === badge.id
@@ -1546,20 +1812,20 @@ function BadgesTab({
       {/* Add Badge Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-xl w-full max-w-sm">
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 shadow-xl w-full max-w-sm">
+            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100 dark:border-slate-700">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-violet-600" />
-                <h3 className="text-base font-semibold text-gray-900">Add Badge</h3>
+                <ShieldCheck className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                <h3 className="text-base font-semibold text-gray-900 dark:text-white">Add Badge</h3>
               </div>
-              <button type="button" onClick={() => setShowModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <button type="button" onClick={() => setShowModal(false)} className="text-gray-400 dark:text-slate-500 hover:text-gray-600 dark:hover:text-slate-300 transition-colors">
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <div className="px-6 py-4 space-y-4">
               {error && (
-                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700 dark:bg-red-950/40 dark:border-red-900/50 dark:text-red-300">
                   <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </div>
@@ -1567,7 +1833,7 @@ function BadgesTab({
 
               {/* Badge type preset pills */}
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-2 block">Badge Type *</label>
+                <label className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-2 block">Badge Type *</label>
                 <div className="flex flex-wrap gap-1.5">
                   {BADGE_PRESETS.map(preset => (
                     <button
@@ -1577,7 +1843,7 @@ function BadgesTab({
                       className={`px-3 py-1 rounded-full text-xs font-semibold border transition-all ${
                         selectedPreset === preset
                           ? 'bg-violet-600 text-white border-violet-600'
-                          : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400 hover:text-violet-700'
+                          : 'bg-white text-gray-600 border-gray-300 hover:border-violet-400 hover:text-violet-700 dark:bg-slate-900 dark:text-slate-300 dark:border-slate-600 dark:hover:border-violet-500 dark:hover:text-violet-300'
                       }`}
                     >
                       {preset}
@@ -1598,7 +1864,7 @@ function BadgesTab({
 
               {/* Badge number */}
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Badge Number</label>
+                <label className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1 block">Badge Number</label>
                 <input
                   type="text"
                   placeholder="e.g. GE-12345"
@@ -1611,7 +1877,7 @@ function BadgesTab({
               {/* Dates */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Issued Date</label>
+                  <label className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1 block">Issued Date</label>
                   <input
                     type="date"
                     value={issuedDate}
@@ -1620,7 +1886,7 @@ function BadgesTab({
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 mb-1 block">Expiry Date *</label>
+                  <label className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1 block">Expiry Date *</label>
                   <input
                     type="date"
                     value={expiryDate}
@@ -1632,7 +1898,7 @@ function BadgesTab({
 
               {/* Notes */}
               <div>
-                <label className="text-xs font-semibold text-gray-600 mb-1 block">Notes</label>
+                <label className="text-xs font-semibold text-gray-600 dark:text-slate-300 mb-1 block">Notes</label>
                 <input
                   type="text"
                   placeholder="Optional notes..."
@@ -1648,7 +1914,7 @@ function BadgesTab({
                 type="button"
                 onClick={() => setShowModal(false)}
                 disabled={saving}
-                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl py-2.5 text-sm font-semibold transition-colors"
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-200 rounded-xl py-2.5 text-sm font-semibold transition-colors"
               >
                 Cancel
               </button>
@@ -1671,7 +1937,7 @@ function BadgesTab({
 
 // ─── Member Detail Panel ──────────────────────────────────────────────────────
 
-type DetailTab = 'info' | 'skills' | 'credentials' | 'badges' | 'permissions' | 'peer_ratings';
+type DetailTab = 'info' | 'edit_info' | 'skills' | 'credentials' | 'badges' | 'permissions' | 'peer_ratings';
 
 function MemberDetailPanel({
   member,
@@ -1683,6 +1949,7 @@ function MemberDetailPanel({
   onToggleActive,
   getAuthHeaders,
   onHireDateSaved,
+  onMemberUpdated,
 }: {
   member: TeamMember;
   isSuperAdmin: boolean;
@@ -1693,6 +1960,7 @@ function MemberDetailPanel({
   onToggleActive: (member: TeamMember) => void;
   getAuthHeaders: () => Promise<Record<string, string>>;
   onHireDateSaved: (memberId: string, isoDate: string) => void;
+  onMemberUpdated: (memberId: string, patch: Partial<TeamMember> & Record<string, any>) => void;
 }) {
   const [tab, setTab] = useState<DetailTab>('info');
   const [flags, setFlags] = useState<Partial<UserFeatureFlags> | null>(null);
@@ -1733,17 +2001,21 @@ function MemberDetailPanel({
   const isOwnProfile = member.id === currentUserId;
   const canGrant = isSuperAdmin && !isOwnProfile && member.role !== 'super_admin';
   const showPermissionsTab = member.role !== 'super_admin';
+  // Edit Info: management (admin / ops / super_admin) can edit any member's personal info.
+  const isManagement = isSuperAdmin || ['admin', 'operations_manager'].includes(currentUserRole ?? '');
+  const showEditInfoTab = isManagement;
   const showSkillsTab = member.role === 'operator' || member.role === 'apprentice';
   const showCredentialsTab = member.role === 'operator' || member.role === 'apprentice';
   // Peer ratings tab: visible to admin/ops/super when viewing operator or apprentice
   const showPeerRatingsTab = isSuperAdmin ||
     ['admin', 'operations_manager'].includes(currentUserRole ?? '') ||
     isOwnProfile;
-  const showTabBar = showPermissionsTab || showSkillsTab || showCredentialsTab || showBadgesTab || showPeerRatingsTab;
+  const showTabBar = showEditInfoTab || showPermissionsTab || showSkillsTab || showCredentialsTab || showBadgesTab || showPeerRatingsTab;
   const showSalesSettings = ['salesman', 'admin', 'operations_manager', 'super_admin'].includes(member.role);
 
   const visibleTabs: DetailTab[] = [
     'info',
+    ...(showEditInfoTab ? (['edit_info'] as DetailTab[]) : []),
     ...(showSkillsTab ? (['skills'] as DetailTab[]) : []),
     ...(showCredentialsTab ? (['credentials'] as DetailTab[]) : []),
     ...(showBadgesTab ? (['badges'] as DetailTab[]) : []),
@@ -1753,6 +2025,7 @@ function MemberDetailPanel({
 
   const tabLabel: Record<DetailTab, string> = {
     info: 'Profile Info',
+    edit_info: 'Edit Info',
     skills: 'Skills',
     credentials: 'Credentials',
     badges: 'Badges',
@@ -1861,6 +2134,15 @@ function MemberDetailPanel({
               </div>
             )}
           </>
+        )}
+
+        {tab === 'edit_info' && showEditInfoTab && (
+          <EditInfoTab
+            member={member}
+            canEditAdminFields={isManagement}
+            getAuthHeaders={getAuthHeaders}
+            onSaved={(patch) => onMemberUpdated(member.id, patch)}
+          />
         )}
 
         {tab === 'skills' && showSkillsTab && (
@@ -2482,6 +2764,10 @@ export default function TeamProfilesPage() {
                 onHireDateSaved={(memberId, isoDate) => {
                   setMembers(prev => prev.map(m => m.id === memberId ? { ...m, hire_date: isoDate } : m));
                   setSelectedMember(prev => prev && prev.id === memberId ? { ...prev, hire_date: isoDate } : prev);
+                }}
+                onMemberUpdated={(memberId, patch) => {
+                  setMembers(prev => prev.map(m => m.id === memberId ? { ...m, ...patch } : m));
+                  setSelectedMember(prev => prev && prev.id === memberId ? { ...prev, ...patch } : prev);
                 }}
               />
             </div>

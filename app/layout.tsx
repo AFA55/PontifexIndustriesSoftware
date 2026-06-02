@@ -88,7 +88,16 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <head />
+      <head>
+        {/* Blocking pre-paint theme sync to prevent flash-of-wrong-theme (FOUC).
+            Only ADDS the `dark` class when an explicit 'dark' preference is saved.
+            ThemeContext still owns removal + the 'theme.factory-reset=v1' sentinel on mount. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem('theme')==='dark'){document.documentElement.classList.add('dark')}}catch(e){}`,
+          }}
+        />
+      </head>
       <body className="transition-colors duration-200">
         <DevWarningFilter />
         <ThemeProvider>
