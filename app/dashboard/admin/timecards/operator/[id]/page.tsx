@@ -47,6 +47,9 @@ interface TimecardEntry {
   clock_in_time: string;
   clock_out_time: string | null;
   total_hours: number | null;
+  gross_hours?: number | null;
+  lunch_duration_minutes?: number | null;
+  auto_lunch_applied?: boolean | null;
   is_approved: boolean;
   is_shop_hours: boolean;
   is_night_shift: boolean;
@@ -1655,6 +1658,24 @@ function OperatorTimecardDetailPageInner() {
                                   </span>
                                 )}
                               </div>
+
+                              {/* Lunch deduction — visible breakdown of gross -> net */}
+                              {(() => {
+                                const lunchMin = Number((entry as any).lunch_duration_minutes ?? (entry as any).break_minutes ?? 0);
+                                if (!lunchMin || entry.total_hours === null) return null;
+                                const gross = (entry as any).gross_hours != null
+                                  ? Number((entry as any).gross_hours)
+                                  : Number(entry.total_hours) + lunchMin / 60;
+                                return (
+                                  <span
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-50 dark:bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30"
+                                    title={`Gross ${gross.toFixed(2)} hrs − ${lunchMin} min lunch = ${Number(entry.total_hours).toFixed(2)} hrs net`}
+                                  >
+                                    <Coffee size={10} />
+                                    {gross.toFixed(2)} gross − {lunchMin}m lunch
+                                  </span>
+                                );
+                              })()}
 
                               {/* Badges */}
                               <div className="flex items-center gap-1 flex-wrap justify-end">
