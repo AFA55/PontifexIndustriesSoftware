@@ -1,7 +1,27 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 1, 2026 | **Branch:** `main` | **HEAD:** `2755d488` (✅ pushed, prod deploy READY) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** 🟡 Build 5 submitted, awaiting Apple review (status unverified — ASC session expired)
+**Last updated:** Jun 1, 2026 | **Branch:** `main` | **HEAD:** `11ccb96a` (Build 6 native — **not pushed; native-only, no Vercel build needed**) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ App **APPROVED** by Apple. 🟡 **Build 6 committed locally — user must archive in Xcode & submit.**
 
-> **💰 VERCEL BUDGET: ~$1 build credit remaining** (one ~$1–2 build consumed this session). Every `git push origin main` = ~$1–2 billed build. BATCH all changes and push ONCE per session. See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$1 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH and push ONCE per session. The Build 6 commit is **native-only (ios/ + capacitor config)** → it does NOT need a Vercel deploy; the iOS reviewer still loads `server.url` = prod. See `DEPLOYMENT_COST.md`.
+
+---
+
+## ⚡ START HERE (Jun 1, 2026 — PART 2) — iOS Build 6 ready to archive
+
+Apple **approved** the app (email: "ready for distribution"). Build 6 is committed locally
+(`11ccb96a`, native-only — no push/deploy required). It carries the new brand:
+
+- **App icon** → dark `#120A24` tile + brightened purple→pink→rose bridge-P. **1024×1024, opaque** (verified `hasAlpha: false`).
+- **Splash** → white P on `#1e1b4b`. **Launch white-flash killed** (LaunchScreen + webview + splash all `#1e1b4b`).
+- **Smooth fade** → splash holds 1.2s then `launchFadeOutDuration: 600`; `launchAutoHide` stays true (no hang).
+- Build 5 → **6** in `project.pbxproj`. `cap sync ios` applied.
+- Render script: `assets/logo-concepts/render-native-assets.mjs`. Full log: `APP_CHANGES.md` (2026-06-01 entry).
+
+**🔴 USER ACTION — archive & submit (Claude can't drive Xcode/Apple):**
+1. `open ios/App/App.xcworkspace`
+2. Device → **Any iOS Device (arm64)** → **Product → Archive**
+3. Organizer → **Distribute App → App Store Connect → Upload**
+4. ASC → version → **+ Build → Build 6 → Save** → **Add for Review / Submit**
+5. Before archiving, launch once → confirm dark→white-P→fade→login, **no white flash**.
 
 ---
 

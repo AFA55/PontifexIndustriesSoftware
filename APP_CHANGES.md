@@ -25,6 +25,35 @@ add it to the section **"Website Changes to Adopt"** at the bottom of this file.
 
 ## App Change Log
 
+### 2026-06-01 — Build 6: new purple→red "P" icon + seamless splash fade
+**Status:** ✅ Committed (`11ccb96a`), native-only — ready to archive in Xcode
+**Build:** `CURRENT_PROJECT_VERSION` 5 → **6** (MARKETING_VERSION stays `1.0.0`)
+**Context:** Apple **approved** the app ("Ready for Distribution"). This build replaces the old
+bridge icon with the new brand "P" and removes the white launch flash.
+
+**What changed:**
+- **App icon** (`AppIcon-512@2x.png`) — re-rendered from the single-stroke bridge-P:
+  dark `#120A24` tile + brightened purple→pink→rose gradient stroke (`#8B5CF6 → #EC4899 → #F43F5E`).
+  **1024×1024, opaque (`hasAlpha: false`)** — verified, so no Apple alpha rejection.
+- **Splash** — white P centered on brand indigo `#1e1b4b` (`Splash.imageset/`, 2732×2732).
+- **No white launch flash** — `LaunchScreen.storyboard` bg changed from `systemBackgroundColor`
+  (white) to custom `#1e1b4b`; `capacitor.config.ts` got top-level + `ios` + `android`
+  `backgroundColor: '#1e1b4b'` (webview first-paint is dark too).
+- **Smooth fade** — `SplashScreen`: `launchShowDuration` 2000 → **1200**, added
+  `launchFadeOutDuration: 600`. `launchAutoHide` stays `true` (no hang risk — app loads remote prod).
+- `npx cap sync ios` applied → native `ios/App/App/capacitor.config.json` updated.
+
+**Render script:** `assets/logo-concepts/render-native-assets.mjs` (`node` it from repo root to regenerate).
+
+**How to ship (manual — Xcode + Apple login required):**
+1. `open ios/App/App.xcworkspace`
+2. Device selector → **Any iOS Device (arm64)**
+3. **Product → Archive** → Organizer → **Distribute App → App Store Connect → Upload**
+4. App Store Connect → version → **+ Build → Build 6 → Save** → **Add for Review / Submit**
+5. Sanity check before archiving: launch once and confirm dark `#1e1b4b` → white P → fade → login, **no white flash**.
+
+---
+
 ### 2026-05-21 — App Icon Update
 **Status:** ✅ Built & installed on iPhone 17 Pro simulator
 
