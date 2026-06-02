@@ -32,7 +32,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { clock_in, clock_out, pay_category, is_shop_time, admin_notes, lunch_duration_minutes, lunch_override_reason } = body;
+    const { clock_in, clock_out, pay_category, is_shop_time, is_night_shift, pay_type_override, admin_notes, lunch_duration_minutes, lunch_override_reason } = body;
 
     // Block self-approval: an admin cannot approve their own timecard.
     const isApprovingAction = body.is_approved === true || body.approval_status === 'approved';
@@ -174,6 +174,9 @@ export async function PATCH(
       // Keep is_shop_hours in sync with legacy column
       updates.is_shop_hours = is_shop_time;
     }
+    // Legacy "Mark as Night Shift" toggle + Pay Type Override (timecards table only).
+    if (is_night_shift !== undefined) updates.is_night_shift = is_night_shift;
+    if (pay_type_override !== undefined) updates.pay_type_override = pay_type_override || null;
     if (admin_notes !== undefined) updates.admin_notes = admin_notes;
 
     // Lunch override: legacy timecards table has the full audit trail.
@@ -213,6 +216,22 @@ export async function PATCH(
         const lunchHrs = effectiveLunchMin / 60;
         updates.total_hours = parseFloat(Math.max(0, grossHours - lunchHrs).toFixed(4));
       }
+    }
+
+    // Keep night-shift premium hours in sync with the legacy toggle so the hours
+    // breakdown and pay reflect it. Premium applies to the entry's net hours.
+    if (is_night_shift !== undefined) {
+      let effectiveTotal: number | null =
+        typeof updates.total_hours === 'number' ? (updates.total_hours as number) : null;
+      if (effectiveTotal === null) {
+        const { data: existingHours } = await supabaseAdmin
+          .from('timecards')
+          .select('total_hours')
+          .eq('id', entryId)
+          .single();
+        effectiveTotal = existingHours?.total_hours ?? 0;
+      }
+      updates.night_shift_premium_hours = is_night_shift ? effectiveTotal : 0;
     }
 
     const { data, error } = await supabaseAdmin

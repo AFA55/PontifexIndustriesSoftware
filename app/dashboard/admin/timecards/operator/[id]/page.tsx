@@ -687,6 +687,8 @@ function OperatorTimecardDetailPageInner() {
         admin_notes: editFormData.notes,
         pay_category: editFormData.pay_category,
         is_shop_time: editFormData.is_shop_time,
+        is_night_shift: editFormData.is_night_shift,
+        pay_type_override: editFormData.pay_type_override || null,
         lunch_duration_minutes: editFormData.lunch_duration_minutes,
         lunch_override_reason: editFormData.lunch_override_reason || undefined,
       };
