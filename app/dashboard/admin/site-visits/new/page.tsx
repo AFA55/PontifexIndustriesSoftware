@@ -387,7 +387,7 @@ export default function NewSiteVisitPage() {
                   value={operatorId}
                   onChange={(e) => setOperatorId(e.target.value)}
                   required
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full min-w-0 max-w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
                 >
                   <option value="">Select operator…</option>
                   {peopleOptions.map((p) => (
@@ -439,10 +439,10 @@ export default function NewSiteVisitPage() {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3 mb-0.5">
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                          <span className="text-sm font-semibold text-gray-900 dark:text-white truncate min-w-0">
                             {j.job_number || 'Job'} — {j.customer_name || 'Customer'}
                           </span>
-                          <span className="text-[10px] uppercase font-semibold tracking-wide text-violet-600 dark:text-violet-400">
+                          <span className="text-[10px] uppercase font-semibold tracking-wide text-violet-600 dark:text-violet-400 flex-shrink-0">
                             {j.status}
                           </span>
                         </div>

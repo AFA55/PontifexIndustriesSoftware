@@ -1008,11 +1008,11 @@ export default function AdminTimecardsPage() {
               </p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="hidden sm:block overflow-x-auto max-w-full">
               <table className="w-full min-w-[900px]">
                 <thead>
-                  <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/3">
-                    <th className="px-4 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider w-[220px]">
+                  <tr className="border-b border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-[#120a24]">
+                    <th className="sticky left-0 z-10 bg-gray-50 dark:bg-[#120a24] px-4 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider w-[160px] sm:w-[220px]">
                       Team Member
                     </th>
                     {DAY_NAMES.map((day, idx) => (
@@ -1048,7 +1048,7 @@ export default function AdminTimecardsPage() {
                         className="group cursor-pointer hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                       >
                         {/* Name + Avatar */}
-                        <td className="px-4 py-3">
+                        <td className="sticky left-0 z-10 bg-white dark:bg-[#0e0720] group-hover:bg-gray-50 dark:group-hover:bg-[#150c2a] transition-colors px-4 py-3">
                           <div className="flex items-center gap-3">
                             <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm ${
                               member.isClockedIn
@@ -1193,7 +1193,7 @@ export default function AdminTimecardsPage() {
 
                 {/* Footer totals row */}
                 <tfoot>
-                  <tr className="border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-white/3">
+                  <tr className="border-t border-gray-200 dark:border-white/10 bg-gray-50/80 dark:bg-[#120a24]">
                     <td className="px-4 py-3">
                       <span className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase">
                         Totals ({filteredMembers.length} members)
@@ -1234,6 +1234,93 @@ export default function AdminTimecardsPage() {
                   </tr>
                 </tfoot>
               </table>
+            </div>
+          )}
+
+          {/* ── Mobile: card per operator — fits the screen, NO horizontal scroll ── */}
+          {filteredMembers.length > 0 && (
+            <div className="sm:hidden space-y-3">
+              {filteredMembers.map((member) => {
+                const roleBadge = getRoleBadge(member.role);
+                const lateDays = DAY_NAMES.filter((d) => member.dailyHours[d]?.isLate).length;
+                return (
+                  <div
+                    key={member.userId}
+                    onClick={() => navigateToOperator(member.userId)}
+                    className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 p-4 active:bg-gray-50 dark:active:bg-white/10 transition-colors"
+                  >
+                    {/* Header: avatar + name + role + status */}
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm ${
+                        member.isClockedIn
+                          ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-2 ring-emerald-500/30'
+                          : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                      }`}>
+                        {member.fullName?.charAt(0) || '?'}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{member.fullName}</p>
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold border flex-shrink-0 ${roleBadge.color} dark:bg-white/10 dark:border-white/10 dark:text-white/70`}>
+                            {roleBadge.label}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400 dark:text-white/30 truncate">{member.email}</p>
+                      </div>
+                      {member.status === 'clocked_in' && (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30 flex-shrink-0">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                          Active
+                        </span>
+                      )}
+                    </div>
+
+                    {/* 7-day row — sized to fit, never scrolls */}
+                    <div className="grid grid-cols-7 gap-1 mt-3">
+                      {DAY_NAMES.map((day) => {
+                        const info = member.dailyHours[day];
+                        return (
+                          <div key={day} className="flex flex-col items-center min-w-0">
+                            <span className="text-[9px] font-bold text-gray-400 dark:text-white/30 uppercase">{day.charAt(0)}</span>
+                            <div className={`mt-1 w-full h-9 rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums ${getDayCellClasses(info)}`}>
+                              {info.hours > 0 ? info.hours.toFixed(1) : info.status === 'active' ? (
+                                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                              ) : (
+                                <span className="text-gray-300 dark:text-white/20">-</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Summary chips */}
+                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                      <span className="text-[11px] text-gray-500 dark:text-white/50">
+                        Total <span className="font-bold text-gray-900 dark:text-white tabular-nums">{member.weeklyTotal.toFixed(1)}h</span>
+                      </span>
+                      {member.overtimeHours > 0 && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 tabular-nums">
+                          OT {member.overtimeHours.toFixed(1)}
+                        </span>
+                      )}
+                      {lateDays > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300">
+                          <Timer size={9} /> {lateDays}d late
+                        </span>
+                      )}
+                      {member.pendingCount > 0 && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
+                          className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30"
+                        >
+                          <Shield size={11} /> Approve {member.pendingCount}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

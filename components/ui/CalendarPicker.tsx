@@ -153,7 +153,7 @@ export function CalendarPicker({ value, onChange, minDate, icon: Icon }: Calenda
         }`}
       >
         <IconComponent size={18} className="text-slate-400 dark:text-slate-500 flex-shrink-0" />
-        <span className={displayValue ? 'text-slate-800 dark:text-white font-medium' : 'text-slate-400 dark:text-slate-500'}>
+        <span className={`truncate min-w-0 ${displayValue ? 'text-slate-800 dark:text-white font-medium' : 'text-slate-400 dark:text-slate-500'}`}>
           {displayValue || 'Select a date...'}
         </span>
       </button>

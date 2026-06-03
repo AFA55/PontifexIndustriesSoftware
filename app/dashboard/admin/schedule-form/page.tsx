@@ -1926,8 +1926,8 @@ export default function ScheduleFormPage() {
             {/* Search + Add New */}
             {!form.customer_id && (
               <>
-                <div className="flex gap-3">
-                  <div className="flex-1 relative">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex-1 min-w-0 relative">
                     <InputField
                       icon={UserIcon}
                       placeholder="Search existing customers..."
@@ -1939,7 +1939,7 @@ export default function ScheduleFormPage() {
                   <button
                     type="button"
                     onClick={() => setShowNewCustomerModal(true)}
-                    className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm whitespace-nowrap"
+                    className="flex items-center justify-center gap-2 px-4 py-3.5 sm:py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm whitespace-nowrap flex-shrink-0"
                   >
                     <Plus className="w-4 h-4" />
                     New Customer
@@ -2006,9 +2006,9 @@ export default function ScheduleFormPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-base font-semibold text-slate-800 dark:text-white truncate">{c.company_name}</p>
-                        <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-white/40 mt-0.5">
-                          {c.primary_contact_name && <span>{c.primary_contact_name}</span>}
-                          {c.address && <span className="truncate">{c.address}</span>}
+                        <div className="flex items-center gap-3 text-xs text-slate-400 dark:text-white/40 mt-0.5 min-w-0">
+                          {c.primary_contact_name && <span className="truncate flex-shrink-0 max-w-[40%]">{c.primary_contact_name}</span>}
+                          {c.address && <span className="truncate min-w-0">{c.address}</span>}
                         </div>
                       </div>
                       <ChevronRight size={16} className="text-slate-300 dark:text-white/20 group-hover:text-blue-500 dark:group-hover:text-blue-400 transition-colors" />
@@ -4283,11 +4283,11 @@ export default function ScheduleFormPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 dark:from-[#0b0618] dark:via-[#0e0720] dark:to-[#0b0618]">
       {/* ── Header ─────────────────────────────────────── */}
       <header className="sticky top-0 z-10 bg-white/80 dark:bg-[#0b0618]/80 backdrop-blur-xl border-b border-slate-200/60 dark:border-white/10 shadow-sm">
-        <div className="max-w-[960px] mx-auto px-4 sm:px-8 h-16 sm:h-[72px] flex items-center justify-between">
-          <div className="flex items-center gap-4">
+        <div className="max-w-[960px] mx-auto px-4 sm:px-8 h-16 sm:h-[72px] flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 sm:gap-4 min-w-0">
             <Link
               href="/dashboard/admin"
-              className="flex items-center gap-2 px-3 py-1.5 text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm font-medium"
+              className="flex items-center gap-2 px-2 sm:px-3 py-1.5 text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-sm font-medium flex-shrink-0"
             >
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Dashboard</span>
@@ -4305,14 +4305,14 @@ export default function ScheduleFormPage() {
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <Link href="/dashboard/admin/schedule-form-history"
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-xs font-semibold">
               <FileText size={14} />
               Previous Forms
             </Link>
             <button onClick={handleSaveAndExit}
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-400/30 text-emerald-700 dark:text-emerald-300 rounded-lg transition-all text-xs font-bold">
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 border border-emerald-200 dark:border-emerald-400/30 text-emerald-700 dark:text-emerald-300 rounded-lg transition-all text-xs font-bold whitespace-nowrap flex-shrink-0">
               {draftSaved ? <CheckCircle size={14} /> : <ArrowLeft size={14} />}
               {draftSaved ? 'Saved!' : 'Save & Exit'}
             </button>

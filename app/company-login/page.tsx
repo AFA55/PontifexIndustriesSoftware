@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Building2, ArrowRight, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import SplashIntro from '@/components/SplashIntro';
 
 function PontifexLogo() {
   return (
@@ -72,6 +73,9 @@ function CompanyLoginContent() {
 
   return (
     <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+      {/* Premium launch intro — overlays once per app launch, then fades to reveal login */}
+      <SplashIntro />
+
       {/* Background blobs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl animate-pulse" />
@@ -127,7 +131,6 @@ function CompanyLoginContent() {
                 value={code}
                 onChange={e => { setCode(e.target.value.replace(/\s/g, '').toUpperCase()); setError(null); }}
                 placeholder="COMPANY CODE"
-                autoFocus
                 autoComplete="organization"
                 className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-500 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all uppercase"
                 required
