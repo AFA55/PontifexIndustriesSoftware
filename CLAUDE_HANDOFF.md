@@ -1,5 +1,7 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 3, 2026 | **Branch:** `main` | **HEAD:** `fecd216d` (+ uncommitted timecard date-bug fix) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + auto-released (new purple-P icon LIVE on App Store)** · **v1.0.2 (Build 7) SUBMITTED to App Review — "Waiting for Review"** (Jun 3, carries the clean, non-leaky screenshots).
+**Last updated:** Jun 3, 2026 | **Branch:** `main` | **HEAD:** `cefd3e85` (timecard date fix — **pushed + deploy READY/live**) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + auto-released (new purple-P icon LIVE on App Store)** · **v1.0.2 (Build 7) SUBMITTED to App Review — "Waiting for Review"** (Jun 3, carries the clean, non-leaky screenshots).
+
+> 🧰 **New:** `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev & prevent recurring bugs (date lib + Sentry + Zod + TanStack Query + RHF + shadcn + tests). Phased, additive, no big-bang. Phase A (date lib + Sentry) is the highest-ROI next step.
 
 > **💰 VERCEL BUDGET: ~$1 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH and push ONCE per session. See `DEPLOYMENT_COST.md`.
 
@@ -20,7 +22,7 @@
 - **Symptom (reported by operator Zack):** clocked in Jun 1/2/3 but the card showed entries as the **31st = Sunday** with weekdays mismatched.
 - **Root cause:** date-only strings (`'YYYY-MM-DD'`) parsed as **UTC** then rendered/compared in **local** time. In US (UTC-4/-5), `new Date('2026-06-01')` = May 31 evening local → "Sun, May 31". Plus `weekDays` mixed `toISOString()` (UTC) for entry-matching with `getDate()` (local) for display → entries shifted a day.
 - **Fix:** `app/dashboard/timecard/page.tsx` — added `toLocalDateStr(d)` (local Y-M-D), used it everywhere instead of `toISOString().split('T')[0]` (lines for the week-range query, today, weekDays `dateStr`, isToday, PDF mondayStr); `formatDate` now appends `'T00:00:00'` for bare dates so they parse local. `lib/timecard-utils.ts` — `getWeekDates` + `getMondayOfWeek` now emit LOCAL Y-M-D (were UTC). tsc green. **Single-tenant US: device-local == tenant TZ, so this fully resolves it.** (Future multi-TZ robustness: thread the tenant timezone to the client — not needed yet.)
-- **TODO:** `npm run build`, commit, push (one Vercel build) → live in the app immediately.
+- **DONE:** committed `cefd3e85`, pushed, Vercel deploy `dpl_6LibXxqV…` **READY** → **live on prod + in the app** (webview). Zack's dates now line up.
 
 ---
 

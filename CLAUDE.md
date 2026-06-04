@@ -40,6 +40,7 @@ Next.js 15 (App Router) + React 19 + TypeScript + Supabase (PostgreSQL) + Tailwi
 - Purple/dark theme aesthetic with Tailwind
 - Use lucide-react icons throughout
 - Mobile-first responsive design
+- **Dates (avoid the recurring timezone bug):** a DB `date` column comes back as a bare `'YYYY-MM-DD'` string. **NEVER** do `new Date('2026-06-01')` (parsed as UTC midnight → renders as the *previous day* in US timezones → "Sun, May 31") and **NEVER** use `d.toISOString().split('T')[0]` to get a *local* calendar date. To DISPLAY a bare date, parse local: `new Date(dateStr + 'T00:00:00')`. To EXTRACT a local YYYY-MM-DD from a Date, use local components (`getFullYear`/`getMonth`/`getDate`), not `toISOString()`. Helper `toLocalDateStr()` exists in `app/dashboard/timecard/page.tsx`; `lib/timecard-utils.ts` follows the same rule. (Future: a shared date lib — see `DEV_TOOLING_RECOMMENDATIONS.md`.)
 
 ## Database
 - Supabase project: `klatddoyncxidgqtcjnu`
@@ -72,6 +73,14 @@ npm run build      # Production build check (must pass with 0 errors)
 - `CLAUDE_SESSION_CONTEXT.md` — Detailed schema, patterns, business rules
 - `CLAUDE_HANDOFF.md` — Latest session handoff with pending work (ALWAYS update at end of session)
 - `DEPLOYMENT_COST.md` — Vercel cost discipline. Read before changing deploy behavior. **86% of last month's bill was build minutes — every push to main costs money.**
+- `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev + prevent recurring bugs (date lib, Sentry, Zod, TanStack Query, RHF, shadcn, tests). Phased & additive.
+- `APP_CHANGES.md` — native iOS-only changes tracked separately from web.
+
+## Engineering Playbooks (repeatable workflows — don't re-derive)
+- **iOS release (any App Store change needs a NEW version number):** bump `MARKETING_VERSION` + `CURRENT_PROJECT_VERSION` in `ios/App/App.xcodeproj/project.pbxproj` → `xcodebuild archive` + `-exportArchive` with `/tmp/ExportOptions.plist` (app-store-connect, manual signing, profile "Pontifex App Store Distribution") → deliver IPA via **Transporter.app** (signed in as andresafa55@icloud.com; drive with `osascript` + `cliclick` — System Events `click at` is blocked by assistive-access; for the DELIVER button compute coords from a full-screen `screencapture` scaled to screen points) → in **App Store Connect** (Claude-in-Chrome, user logs in) create the version, attach the build, fill What's New, **Add for Review → Submit**.
+- **App Store screenshots:** must be **6.9″ size (1320×2868)** and uploaded to the **iPhone 6.9″ Display** slot in Media Manager (6.5″/6.3″ inherit it; the 6.5″ slot rejects 6.9″ sizes with a "dimensions wrong" error). The ASC `file_upload` MCP tool only accepts session-attached files → drive the **native Choose File picker** (`osascript`: Cmd+Shift+G, paste a folder holding only the shots, Cmd+A, Open) with Chrome activated so the panel is frontmost.
+- **Deploy discipline:** verify `npm run build` green → commit → **push ONCE per session** (each `git push origin main` = ~$1–2 Vercel build). Web changes are live in the iOS app instantly via the webview (`server.url` = prod) — **no App Store resubmission needed** for web/UI fixes.
+- **Big agent jobs:** prefer worktree-isolated subagents for parallel work, but **clean up `.claude/worktrees/` after** — they accumulate full repo copies + build caches (hit 81 GB once and filled the disk). `git worktree remove` clean ones; strip `.next`/`node_modules` from any with unsaved changes.
 
 ---
 
@@ -320,7 +329,23 @@ For now, the auto-preview URL per branch is enough.
 - [x] `Info.plist` — added `NSLocationAlwaysAndWhenInUseUsageDescription` (Apple ITMS-90683 fix)
 - [ ] **PENDING:** Push both commits to main → rebuild iOS archive → increment Build to 4 → resubmit to App Store
 
+### Session — Jun 1, 2026 — Brand "P" + helper architecture + Build 6 submitted ✅ COMPLETE
+- [x] New brand mark (purple→red bridge-P) across web logos/favicon/PWA icons + company-login
+- [x] Helper (apprentice) architecture: read-only on operator ticket, own voice-enabled work log, management visibility
+- [x] Team Profiles enabled for admin; supervisor visit report → Maintenance Inbox unification
+- [x] **iOS Build 6 / v1.0.1** (new native icon + splash + smooth fade) archived → Transporter → ASC → **Submitted for Review**
+
+### Session — Jun 3, 2026 — 1.0.1 live, web batch, 1.0.2 submitted, disk, timecard date bug ✅ COMPLETE
+- [x] **iOS v1.0.1 APPROVED + auto-released** — new purple-P icon LIVE on App Store (verified via iTunes lookup)
+- [x] **Animated launch intro** (`components/SplashIntro.tsx`, ports splash-demo-v4) + removed company-login autoFocus (no keyboard pop)
+- [x] **Mobile responsiveness**: timecard payroll → card-per-operator (fits, no scroll) + dark header; visit-report & schedule-form customer step; CalendarPicker truncate
+- [x] **iOS v1.0.2 / Build 7 SUBMITTED** — swapped leaky screenshots (real "Harper General CONTRACTORS") for 3 clean demo shots in the 6.9″ Media Manager slot
+- [x] **Disk crisis fixed** — `.claude/worktrees/` had grown to 81 GB (filled disk); removed 89 clean worktrees + stripped caches → ~85 GB free
+- [x] **Operator timecard date bug** (Zack: Jun 1 showed as "Sun May 31") — UTC-vs-local parsing fixed in `timecard/page.tsx` + `lib/timecard-utils.ts`; pushed live (`cefd3e85`)
+- [x] **`DEV_TOOLING_RECOMMENDATIONS.md`** created — phased tooling plan to speed up dev + prevent bug classes
+
 ### Ongoing / As-Needed
+- [ ] **Tooling Phase A** (highest ROI) — add a date lib + `lib/dates.ts` + Sentry + first Vitest test. See `DEV_TOOLING_RECOMMENDATIONS.md`.
 - [ ] **🔴 iOS resubmission** — commit Info.plist fix, push, rebuild archive (Build 4), resubmit to App Store. See CLAUDE_HANDOFF.md top section.
 - [ ] **APNs push server logic** — `lib/send-push.ts` exists + Vercel vars set; wire to `/api/push/route.ts` to actually send notifications
 - [ ] Android app — after iOS approval: `npx cap add android`, $25 Google Play fee
