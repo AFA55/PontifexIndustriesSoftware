@@ -3,6 +3,19 @@
 
 > 🧰 **New:** `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev & prevent recurring bugs (date lib + Sentry + Zod + TanStack Query + RHF + shadcn + tests). Phased, additive, no big-bang. Phase A (date lib + Sentry) is the highest-ROI next step.
 
+---
+
+## 📋 NEXT SESSION — Fine-Tuning & Productization phase (READ THESE FIRST)
+We're shifting from feature-building to **fine-tuning + productizing**. The plan is split across detailed MD docs (created Jun 3) — execute in roughly this order:
+
+1. **`PHASE_A_KICKOFF.md`** ⭐ — date lib + `lib/dates.ts` (kills the date-bug class), Sentry (prod error visibility), the global mobile CSS fixes, first Vitest test. Highest ROI, lowest risk. **Do first.**
+2. **`MOBILE_RESPONSIVE_AUDIT.md`** — the "zoomed in" fix: global root cause (`-webkit-text-size-adjust` + 16px input floor + `pt-safe`/`pb-safe`) then per-page operator/admin fixes (worst: timecard table, day-complete signature scaling, `JobDetailView` max-w-6xl + dark mode, both NotificationBells). Global fixes overlap Phase A §A3.
+3. **`SEO_HOMEPAGE_PLAN.md`** (+ `SEO_PLAN.md`) — rewrite homepage to the **custom-software + agentic-automations** positioning (still says "concrete cutting"); add robots/sitemap/OG/JSON-LD; server-render the homepage; build the Patriot case-study page; pricing→consultation redirect.
+4. **`PRODUCTIZATION_PLAYBOOK.md`** — make the base **plug-and-play**: document feature modules (`FEATURE_CATALOG.md`), turn `tenants.features` into a per-tenant module switchboard, build a super-admin module toggle + `scripts/new-tenant.ts` onboarding. Patriot stays the proven base; new clients = config + branding + selected modules.
+5. **`BACKUP_AND_CLOUD_STRATEGY.md`** — never lose data: tag releases + branch-protect `main` + monthly repo bundle; **🔴 confirm/upgrade Supabase plan for daily backups/PITR**; weekly `pg_dump` + storage-bucket sync to offsite cloud (S3/B2/Drive); do a restore drill.
+
+**Founder action items surfaced:** Supabase backup plan (above); pick an offsite cloud target; later GBP/local-SEO setup.
+
 > **💰 VERCEL BUDGET: ~$1 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH and push ONCE per session. See `DEPLOYMENT_COST.md`.
 
 ---
