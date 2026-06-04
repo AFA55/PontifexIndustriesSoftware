@@ -86,7 +86,9 @@ export function getWeekDates(weekStart: string): string[] {
   for (let i = 0; i < 7; i++) {
     const d = new Date(start);
     d.setDate(d.getDate() + i);
-    dates.push(d.toISOString().split('T')[0]);
+    // Use LOCAL components, not toISOString() (UTC) — otherwise in a negative-offset
+    // timezone each day rolls back to the previous calendar date.
+    dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
   }
   return dates;
 }
@@ -112,7 +114,9 @@ export function getMondayOfWeek(dateStr?: string): string {
   const day = d.getDay();
   const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
   d.setDate(diff);
-  return d.toISOString().split('T')[0];
+  // Use LOCAL components, not toISOString() (UTC) — avoids the off-by-one-day shift
+  // (and the bad weekday) that made a Monday read back as the previous Sunday.
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /**

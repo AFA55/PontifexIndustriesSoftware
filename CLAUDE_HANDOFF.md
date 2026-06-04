@@ -1,7 +1,26 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 1, 2026 | **Branch:** `main` | **HEAD:** `43ccb13c` (Build 6 / v1.0.1 native — **not pushed; native-only, no Vercel build needed**) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) SUBMITTED to App Review — "Waiting for Review"** (Jun 1, 8:49 PM). New purple-P icon confirmed in ASC.
+**Last updated:** Jun 3, 2026 | **Branch:** `main` | **HEAD:** `fecd216d` (+ uncommitted timecard date-bug fix) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + auto-released (new purple-P icon LIVE on App Store)** · **v1.0.2 (Build 7) SUBMITTED to App Review — "Waiting for Review"** (Jun 3, carries the clean, non-leaky screenshots).
 
-> **💰 VERCEL BUDGET: ~$1 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH and push ONCE per session. The Build 6 commits are **native-only (ios/ + capacitor config)** → no Vercel deploy needed; the iOS reviewer loads `server.url` = prod. See `DEPLOYMENT_COST.md`.
+> **💰 VERCEL BUDGET: ~$1 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH and push ONCE per session. See `DEPLOYMENT_COST.md`.
+
+---
+
+## ⚡ START HERE (Jun 3, 2026) — 1.0.1 LIVE, web batch deployed, 1.0.2 submitted, disk fixed, timecard date bug
+
+**iOS:**
+- **v1.0.1 (Build 6) was APPROVED and auto-released** — the new dark purple-P icon + splash are **LIVE on the App Store** (verified via `itunes.apple.com/lookup?id=6772996692` → version 1.0.1, and the live 512px artwork is the purple-P).
+- **v1.0.2 (Build 7) SUBMITTED for review** — its only purpose was to swap the **leaky App Store screenshots** (old ones showed real customer "Harper General CONTRACTORS") for 3 clean demo-tenant shots (login · schedule board · dashboard). Flow: bumped `MARKETING_VERSION 1.0.1→1.0.2` + `CURRENT_PROJECT_VERSION 6→7`, archived/exported, delivered Build 7 via Transporter, created 1.0.2 in ASC, **deleted leaky shots in Media Manager → uploaded the 3 clean 1320×2868 (6.9″ master; all other sizes inherit)**, filled What's New, attached Build 7, **Submitted**. Status: **1.0.2 Waiting for Review**.
+  - **Screenshot gotcha:** the 3 shots are **1320×2868 = 6.9″ size**. They MUST go in the **iPhone 6.9″ Display** slot (Media Manager); the 6.5″ slot rejects them ("dimensions wrong" → 1242×2688/1284×2778). Once 6.9″ is set, 6.5″/6.3″ inherit automatically. **ASC `file_upload` MCP tool only accepts session-attached files** — had to drive the **native file picker** (Choose File → `osascript` Cmd+Shift+G + paste folder path + Cmd+A select-all + Open), with Chrome activated so the panel is frontmost. Clean shots live in `/tmp/appstore-0{1,2,3}-*.png`.
+
+**Web (deployed `fecd216d` → Vercel READY, live on prod + in the app via webview — no App Store action needed):**
+- **Animated launch intro** — new `components/SplashIntro.tsx` faithfully ports `splash-demo-v4.html` (self-drawing bridge-P, purple→red gradient, data pulse, wordmark), plays once per launch (sessionStorage) on `#1e1b4b`, then fades into `/company-login`. **Removed `autoFocus`** on the company-code input → no more keyboard auto-pop on launch.
+- **Mobile responsiveness** — timecards/payroll page: phone view now a **card-per-operator** (7-day row fits, no horizontal scroll) + fixed light-grey dark-mode header → `#120a24`; visit-report step 1 fields fit; schedule-form Customer step (search + New Customer stack, Save & Exit not clipped, long names truncate); CalendarPicker date truncates.
+
+**Operator timecard DATE BUG fixed (this session — ⚠️ UNCOMMITTED, needs commit+push):**
+- **Symptom (reported by operator Zack):** clocked in Jun 1/2/3 but the card showed entries as the **31st = Sunday** with weekdays mismatched.
+- **Root cause:** date-only strings (`'YYYY-MM-DD'`) parsed as **UTC** then rendered/compared in **local** time. In US (UTC-4/-5), `new Date('2026-06-01')` = May 31 evening local → "Sun, May 31". Plus `weekDays` mixed `toISOString()` (UTC) for entry-matching with `getDate()` (local) for display → entries shifted a day.
+- **Fix:** `app/dashboard/timecard/page.tsx` — added `toLocalDateStr(d)` (local Y-M-D), used it everywhere instead of `toISOString().split('T')[0]` (lines for the week-range query, today, weekDays `dateStr`, isToday, PDF mondayStr); `formatDate` now appends `'T00:00:00'` for bare dates so they parse local. `lib/timecard-utils.ts` — `getWeekDates` + `getMondayOfWeek` now emit LOCAL Y-M-D (were UTC). tsc green. **Single-tenant US: device-local == tenant TZ, so this fully resolves it.** (Future multi-TZ robustness: thread the tenant timezone to the client — not needed yet.)
+- **TODO:** `npm run build`, commit, push (one Vercel build) → live in the app immediately.
 
 ---
 

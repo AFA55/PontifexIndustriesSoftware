@@ -52,6 +52,17 @@ function getWeekBounds(offset: number) {
   return { monday, sunday };
 }
 
+// Format a Date as YYYY-MM-DD using LOCAL calendar components.
+// NEVER use toISOString().split('T')[0] for this: that converts to UTC, so in a
+// negative-offset timezone (e.g. US Eastern) local midnight rolls back to the
+// previous calendar day — which made a June 1 entry display/match as May 31.
+function toLocalDateStr(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export default function TimecardPageWrapper() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center"><div className="animate-spin w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full" /></div>}>
@@ -285,7 +296,7 @@ function TimecardPage() {
       if (error || !data.session) { redirectToLogin(); return; }
       const session = data.session;
 
-      const url = `/api/timecard/history?startDate=${monday.toISOString().split('T')[0]}&endDate=${sunday.toISOString().split('T')[0]}&limit=100`;
+      const url = `/api/timecard/history?startDate=${toLocalDateStr(monday)}&endDate=${toLocalDateStr(sunday)}&limit=100`;
       const response = await fetch(url, {
         headers: { 'Authorization': `Bearer ${session.access_token}` }
       });
@@ -328,7 +339,11 @@ function TimecardPage() {
   }, [user, fetchTimecards]);
 
   const formatDate = (dateString: string) =>
-    new Date(dateString).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    // A bare 'YYYY-MM-DD' is parsed as UTC midnight; append local time so the
+    // weekday/day render in the operator's local calendar (June 1 stays "Mon, Jun 1",
+    // not "Sun, May 31"). Full ISO timestamps (with 'T') are passed through unchanged.
+    new Date(dateString.length <= 10 ? dateString + 'T00:00:00' : dateString)
+      .toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   const formatTime = (dateString: string) =>
     new Date(dateString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -351,7 +366,7 @@ function TimecardPage() {
 
   // Build today's timeline segments from entries
   const todayEntries = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = toLocalDateStr(new Date());
     return (weekData?.entries || []).filter(e => e.date === today);
   }, [weekData]);
 
@@ -361,7 +376,7 @@ function TimecardPage() {
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(d.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = toLocalDateStr(d);
       const dayEntries = (weekData?.entries || []).filter(e => e.date === dateStr);
       const totalHrs = dayEntries.reduce((s, e) => s + (e.total_hours || 0), 0);
       days.push({
@@ -371,7 +386,7 @@ function TimecardPage() {
         dayNum: d.getDate(),
         entries: dayEntries,
         totalHrs,
-        isToday: dateStr === new Date().toISOString().split('T')[0],
+        isToday: dateStr === toLocalDateStr(new Date()),
         hasEntries: dayEntries.length > 0,
       });
     }
@@ -717,7 +732,7 @@ function TimecardPage() {
         <div className="mb-5 flex justify-end">
           <button
             onClick={() => {
-              const mondayStr = monday.toISOString().split('T')[0];
+              const mondayStr = toLocalDateStr(monday);
               window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
             }}
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-blue-700 dark:text-blue-400 rounded-lg transition-all text-sm font-medium border border-blue-200 dark:border-white/10 shadow-sm hover:shadow"
