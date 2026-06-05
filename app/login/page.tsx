@@ -74,12 +74,25 @@ function LoginPageInner() {
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { remember: true }, // "Remember me" checked by default
   });
 
   const onSubmit = async (data: FormData) => {
     console.log('🚀 Starting login process...');
     setLoading(true);
     setError(null);
+
+    // Persist the user's "Remember me" choice (default: true / persistent session).
+    // We intentionally do NOT reconfigure the global Supabase client here — the
+    // client persists sessions in localStorage as today. Unchecking just records
+    // the preference; a future enhancement can read this flag to clear the session
+    // on tab close (e.g. a sessionStorage-backed storage adapter) without touching
+    // the auth flow. The user-facing win is the reassuring UI + iOS Keychain save.
+    try {
+      localStorage.setItem('pontifex.rememberMe', data.remember === false ? 'false' : 'true');
+    } catch {
+      /* localStorage unavailable (private mode) — non-fatal */
+    }
 
     try {
       // Call our custom login API that bypasses RLS
@@ -207,10 +220,15 @@ function LoginPageInner() {
             <Mail className="absolute left-4 top-3.5 sm:top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
             <input
               type="email"
+              id="email"
               placeholder="Email"
               {...register('email')}
               className="w-full pl-12 pr-4 py-3 sm:py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
-              autoComplete="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="email"
               required
             />
           </motion.div>
@@ -224,6 +242,7 @@ function LoginPageInner() {
             <Lock className="absolute left-4 top-3.5 sm:top-4 text-blue-600 group-focus-within:text-blue-700 transition-colors" size={20} />
             <input
               type={showPassword ? 'text' : 'password'}
+              id="password"
               placeholder="Password"
               {...register('password')}
               className="w-full pl-12 pr-12 py-3 sm:py-4 rounded-xl bg-white border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all duration-200 text-gray-800 placeholder-gray-400"
@@ -246,8 +265,8 @@ function LoginPageInner() {
             transition={{ delay: 0.6 }}
             className="flex items-center justify-between text-sm"
           >
-            <label className="flex items-center gap-2 text-gray-600 cursor-pointer hover:text-gray-800 transition-colors">
-              <input type="checkbox" {...register('remember')} className="w-4 h-4 accent-blue-600 rounded" />
+            <label className="flex items-center gap-2 py-2 -my-2 text-gray-600 cursor-pointer hover:text-gray-800 transition-colors select-none">
+              <input type="checkbox" {...register('remember')} className="w-5 h-5 accent-blue-600 rounded" />
               <span>Remember me</span>
             </label>
             <Link href="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium transition-colors">

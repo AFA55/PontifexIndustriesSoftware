@@ -652,7 +652,7 @@ export default function DashboardSidebar() {
             <button
               onClick={() => setMobileOpen(false)}
               aria-label="Close navigation menu"
-              className="absolute top-3 right-3 p-1.5 rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-white dark:hover:bg-slate-700 transition-colors z-10"
+              className="absolute top-3 right-3 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-white dark:hover:bg-slate-700 transition-colors z-10"
               style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}
             >
               <X className="w-4 h-4" />

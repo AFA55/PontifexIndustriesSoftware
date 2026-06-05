@@ -598,8 +598,12 @@ export default function DayCompletePage() {
 
     setIsDrawing(true);
     const rect = canvas.getBoundingClientRect();
-    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = ('touches' in e) ? e.touches[0].clientX : e.clientX;
+    const clientY = ('touches' in e) ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     ctx.beginPath();
     ctx.moveTo(x, y);
   };
@@ -612,8 +616,12 @@ export default function DayCompletePage() {
     if (!ctx) return;
 
     const rect = canvas.getBoundingClientRect();
-    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
-    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = ('touches' in e) ? e.touches[0].clientX : e.clientX;
+    const clientY = ('touches' in e) ? e.touches[0].clientY : e.clientY;
+    const x = (clientX - rect.left) * scaleX;
+    const y = (clientY - rect.top) * scaleY;
     ctx.lineWidth = 2;
     ctx.lineCap = 'round';
     ctx.strokeStyle = '#1e293b';
@@ -900,7 +908,7 @@ export default function DayCompletePage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white dark:bg-white/[0.04] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-white/[0.04] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm pt-safe">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
@@ -1398,7 +1406,7 @@ export default function DayCompletePage() {
 
             <textarea
               placeholder="Any final notes for the supervisor? (optional)"
-              className="w-full border border-gray-300 dark:border-white/20 rounded-lg p-3 text-sm mb-4 h-24 focus:outline-none focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30 resize-none"
+              className="w-full border border-gray-300 dark:border-white/20 rounded-lg p-3 text-base sm:text-sm mb-4 h-24 focus:outline-none focus:border-emerald-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30 resize-none"
               value={completionNotes}
               onChange={(e) => setCompletionNotes(e.target.value)}
             />

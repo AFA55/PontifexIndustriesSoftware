@@ -1,7 +1,19 @@
 /**
  * Shared timecard calculation utilities.
  * Used by both PDF generation (server-side) and client pages.
+ *
+ * Date helpers below delegate to the centralized `lib/dates.ts` so there is a
+ * single source of truth for the local-vs-UTC rule (kills the off-by-one bug class).
+ * The wrapper names are kept for backward compatibility with existing imports.
  */
+import {
+  toLocalYMD,
+  parseYMDLocal,
+  weekDatesFrom,
+  mondayOf,
+  formatTime as formatTimeLocal,
+  formatDay,
+} from './dates';
 
 export interface TimecardEntry {
   id: string;
@@ -81,80 +93,42 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
  * Return an array of 7 date strings (YYYY-MM-DD) starting from weekStart (Monday).
  */
 export function getWeekDates(weekStart: string): string[] {
-  const dates: string[] = [];
-  const start = new Date(weekStart + 'T00:00:00');
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(start);
-    d.setDate(d.getDate() + i);
-    // Use LOCAL components, not toISOString() (UTC) — otherwise in a negative-offset
-    // timezone each day rolls back to the previous calendar date.
-    dates.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-  }
-  return dates;
+  return weekDatesFrom(weekStart);
 }
 
 /**
  * Format an ISO timestamp to a human-readable time string.
  */
 export function formatTime(isoString: string | null): string {
-  if (!isoString) return '\u2014';
-  const d = new Date(isoString);
-  return d.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
+  return formatTimeLocal(isoString);
 }
 
 /**
  * Get the Monday (YYYY-MM-DD) of the week containing the given date.
  */
 export function getMondayOfWeek(dateStr?: string): string {
-  const d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Monday
-  d.setDate(diff);
-  // Use LOCAL components, not toISOString() (UTC) — avoids the off-by-one-day shift
-  // (and the bad weekday) that made a Monday read back as the previous Sunday.
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return mondayOf(dateStr ?? new Date());
 }
 
-/**
- * Format a YYYY-MM-DD date into a display string like "Mon, Mar 23".
- */
+/** Format a YYYY-MM-DD date into a display string like "Mon, Mar 23". */
 export function formatDateShort(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatDay(dateStr, { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
-/**
- * Get day-of-week name from a YYYY-MM-DD string.
- */
+/** Get day-of-week name from a YYYY-MM-DD string. */
 export function getDayName(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'long' });
+  return formatDay(dateStr, { weekday: 'long' });
 }
 
-/**
- * Get short day-of-week name from a YYYY-MM-DD string.
- */
+/** Get short day-of-week name from a YYYY-MM-DD string. */
 export function getDayNameShort(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', { weekday: 'short' });
+  return formatDay(dateStr, { weekday: 'short' });
 }
 
-/**
- * Format YYYY-MM-DD to "March 23, 2026" style.
- */
+/** Format YYYY-MM-DD to "March 23, 2026" style. */
 export function formatDateLong(dateStr: string): string {
-  const d = new Date(dateStr + 'T00:00:00');
-  return d.toLocaleDateString('en-US', {
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return formatDay(dateStr, { month: 'long', day: 'numeric', year: 'numeric' });
 }
+
+// Re-export the canonical primitives so callers can migrate imports over time.
+export { toLocalYMD, parseYMDLocal };

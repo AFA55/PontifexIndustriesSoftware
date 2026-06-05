@@ -59,4 +59,21 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+// ── Sentry ───────────────────────────────────────────────────────────────────
+// withSentryConfig is build-safe with no env set: without SENTRY_AUTH_TOKEN it
+// skips source-map upload (no failure), and without a DSN the runtime init is a
+// no-op (see instrumentation*.ts). Founder sets SENTRY_DSN / _ORG / _PROJECT /
+// _AUTH_TOKEN in Vercel production to activate error reporting + source maps.
+const { withSentryConfig } = require('@sentry/nextjs')
+
+module.exports = withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  disableLogger: true,
+  // Only attempt source-map upload when an auth token is present.
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+  // Keep build output lean; tunnel disabled (no ad-blocker bypass needed yet).
+  tunnelRoute: undefined,
+})

@@ -144,9 +144,9 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="text-sm font-bold text-gray-900">Notifications</h3>
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-xl border border-gray-200 dark:border-slate-700 shadow-xl z-50 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-slate-700 flex items-center justify-between">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-slate-100">Notifications</h3>
             <div className="flex items-center gap-2">
               {unreadCount > 0 && (
                 <button
@@ -156,8 +156,8 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
                   Mark all read
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="p-1 hover:bg-gray-100 rounded">
-                <X className="w-3.5 h-3.5 text-gray-400" />
+              <button onClick={() => setOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-slate-800 rounded">
+                <X className="w-3.5 h-3.5 text-gray-400 dark:text-slate-500" />
               </button>
             </div>
           </div>
@@ -165,25 +165,25 @@ export default function NotificationBell({ className = '' }: NotificationBellPro
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-8 text-center">
-                <Bell className="w-8 h-8 text-gray-200 mx-auto mb-2" />
-                <p className="text-sm text-gray-400">No new notifications</p>
+                <Bell className="w-8 h-8 text-gray-200 dark:text-slate-700 mx-auto mb-2" />
+                <p className="text-sm text-gray-400 dark:text-slate-500">No new notifications</p>
               </div>
             ) : (
               notifications.map(notif => (
                 <div
                   key={notif.id}
-                  className="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer flex items-start gap-3"
+                  className="px-4 py-3 border-b border-gray-50 dark:border-slate-800 hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors cursor-pointer flex items-start gap-3"
                   onClick={() => markRead([notif.id])}
                 >
                   <div className="flex-shrink-0 mt-0.5">{getIcon(notif.type)}</div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-gray-900 truncate">{notif.title}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-slate-100 truncate">{notif.title}</p>
                     {notif.message && (
-                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{notif.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-slate-400 mt-0.5 line-clamp-2">{notif.message}</p>
                     )}
-                    <p className="text-[10px] text-gray-400 mt-1">{timeAgo(notif.created_at)}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">{timeAgo(notif.created_at)}</p>
                   </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-gray-300 flex-shrink-0 mt-1" />
+                  <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-slate-600 flex-shrink-0 mt-1" />
                 </div>
               ))
             )}

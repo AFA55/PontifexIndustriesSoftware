@@ -148,7 +148,7 @@ function StatusTimeline({ data }: { data: FullJobData }) {
   const isDoneForDay = data.done_for_day_at && !data.work_completed_at;
 
   return (
-    <div className="flex items-center gap-1 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 mb-4 overflow-x-auto">
+    <div className="flex items-center gap-1 px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 mb-4 overflow-x-auto">
       {steps.map((step, idx) => {
         const isComplete = idx <= activeIdx;
         const isCurrent = idx === activeIdx;
@@ -159,11 +159,11 @@ function StatusTimeline({ data }: { data: FullJobData }) {
             )}
             <div className="flex flex-col items-center">
               <div className={`w-3 h-3 rounded-full ${isComplete ? step.color : 'bg-gray-200'} ${isCurrent ? 'ring-2 ring-offset-1 ring-purple-400' : ''}`} />
-              <span className={`text-[9px] font-bold mt-0.5 whitespace-nowrap ${isComplete ? 'text-gray-700' : 'text-gray-400'}`}>
+              <span className={`text-[9px] font-bold mt-0.5 whitespace-nowrap ${isComplete ? 'text-gray-700 dark:text-slate-200' : 'text-gray-400 dark:text-slate-500'}`}>
                 {step.label}
               </span>
               {step.time && (
-                <span className="text-[8px] text-gray-400">{step.time}</span>
+                <span className="text-[8px] text-gray-400 dark:text-slate-500">{step.time}</span>
               )}
             </div>
           </div>
@@ -174,8 +174,8 @@ function StatusTimeline({ data }: { data: FullJobData }) {
           <div className="w-6 h-0.5 bg-emerald-300" />
           <div className="flex flex-col items-center">
             <div className="w-3 h-3 rounded-full bg-emerald-400 ring-2 ring-offset-1 ring-emerald-300" />
-            <span className="text-[9px] font-bold mt-0.5 text-emerald-600 whitespace-nowrap">Done Today</span>
-            <span className="text-[8px] text-gray-400">{formatTimestamp(data.done_for_day_at)}</span>
+            <span className="text-[9px] font-bold mt-0.5 text-emerald-600 dark:text-emerald-400 whitespace-nowrap">Done Today</span>
+            <span className="text-[8px] text-gray-400 dark:text-slate-500">{formatTimestamp(data.done_for_day_at)}</span>
           </div>
         </div>
       )}
@@ -445,7 +445,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
 
       {/* Full-page overlay */}
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-2 sm:p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="bg-white dark:bg-[#1a0f35] text-slate-900 dark:text-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
 
           {/* Header */}
           <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 p-5 text-white flex-shrink-0">
@@ -530,13 +530,13 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
           </div>
 
           {/* Tab Bar */}
-          <div className="flex border-b border-gray-200 px-5 bg-gray-50 flex-shrink-0">
+          <div className="flex border-b border-gray-200 dark:border-white/10 px-5 bg-gray-50 dark:bg-white/5 flex-shrink-0">
             <button
               onClick={() => setActiveTab('details')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'details'
-                  ? 'border-purple-600 text-purple-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-purple-600 text-purple-700 dark:text-purple-300'
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
               <FileText className="w-4 h-4 inline mr-1.5" />
@@ -546,8 +546,8 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
               onClick={() => setActiveTab('history')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'history'
-                  ? 'border-purple-600 text-purple-700'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-purple-600 text-purple-700 dark:text-purple-300'
+                  : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
               <History className="w-4 h-4 inline mr-1.5" />
@@ -560,7 +560,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
-                <span className="ml-3 text-gray-500 font-medium">Loading job details...</span>
+                <span className="ml-3 text-gray-500 dark:text-slate-400 font-medium">Loading job details...</span>
               </div>
             ) : activeTab === 'history' ? (
               <div className="p-5">
@@ -720,7 +720,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       ) : (
                         <>
                           {(d?.description || job.description) ? (
-                            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed mb-3">
+                            <p className="text-sm text-gray-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed mb-3">
                               {d?.description || job.description}
                             </p>
                           ) : null}
@@ -771,19 +771,19 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                 );
 
                                 return (
-                                  <div key={serviceKey} className="rounded-lg border border-gray-200 overflow-hidden">
+                                  <div key={serviceKey} className="rounded-lg border border-gray-200 dark:border-white/10 overflow-hidden">
                                     {/* Service header */}
-                                    <div className="px-3 py-2 bg-emerald-50 border-b border-gray-200">
-                                      <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">{serviceLabel}</span>
+                                    <div className="px-3 py-2 bg-emerald-50 dark:bg-emerald-500/10 border-b border-gray-200 dark:border-white/10">
+                                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">{serviceLabel}</span>
                                     </div>
 
                                     <div className="px-3 py-2 space-y-3">
                                       {/* Cuts table */}
                                       {cutsArr && cutsArr.length > 0 && (
-                                        <div>
+                                        <div className="overflow-x-auto">
                                           <table className="w-full text-xs">
                                             <thead>
-                                              <tr className="text-gray-500 border-b border-gray-200">
+                                              <tr className="text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-white/10">
                                                 <th className="text-left py-1 pr-3 font-bold uppercase"># Cuts</th>
                                                 <th className="text-left py-1 pr-3 font-bold uppercase">Linear Feet</th>
                                                 <th className="text-left py-1 font-bold uppercase">Depth</th>
@@ -792,14 +792,14 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                             <tbody>
                                               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                               {cutsArr.map((cut: any, ci: number) => (
-                                                <tr key={ci} className="border-b border-gray-100 last:border-0">
-                                                  <td className="py-1.5 pr-3 text-gray-900 font-semibold">
+                                                <tr key={ci} className="border-b border-gray-100 dark:border-white/5 last:border-0">
+                                                  <td className="py-1.5 pr-3 text-gray-900 dark:text-white font-semibold">
                                                     {cut.num_cuts ? Number(cut.num_cuts).toLocaleString() : '--'}
                                                   </td>
-                                                  <td className="py-1.5 pr-3 text-gray-900">
+                                                  <td className="py-1.5 pr-3 text-gray-900 dark:text-slate-200">
                                                     {cut.linear_feet ? Number(cut.linear_feet).toLocaleString() : '--'}
                                                   </td>
-                                                  <td className="py-1.5 text-gray-900">
+                                                  <td className="py-1.5 text-gray-900 dark:text-slate-200">
                                                     {cut.depth ? `${cut.depth}"` : '--'}
                                                   </td>
                                                 </tr>
@@ -811,10 +811,10 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
 
                                       {/* Holes table */}
                                       {holesArr && holesArr.length > 0 && (
-                                        <div>
+                                        <div className="overflow-x-auto">
                                           <table className="w-full text-xs">
                                             <thead>
-                                              <tr className="text-gray-500 border-b border-gray-200">
+                                              <tr className="text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-white/10">
                                                 <th className="text-left py-1 pr-3 font-bold uppercase">Qty</th>
                                                 <th className="text-left py-1 pr-3 font-bold uppercase">Diameter</th>
                                                 <th className="text-left py-1 font-bold uppercase">Depth</th>
@@ -823,12 +823,12 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                             <tbody>
                                               {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                               {holesArr.map((hole: any, hi: number) => (
-                                                <tr key={hi} className="border-b border-gray-100 last:border-0">
-                                                  <td className="py-1.5 pr-3 text-gray-900 font-semibold">{hole.qty || '--'}</td>
-                                                  <td className="py-1.5 pr-3 text-gray-900">
+                                                <tr key={hi} className="border-b border-gray-100 dark:border-white/5 last:border-0">
+                                                  <td className="py-1.5 pr-3 text-gray-900 dark:text-white font-semibold">{hole.qty || '--'}</td>
+                                                  <td className="py-1.5 pr-3 text-gray-900 dark:text-slate-200">
                                                     {hole.bit_size ? `${hole.bit_size}"` : '--'}
                                                   </td>
-                                                  <td className="py-1.5 text-gray-900">
+                                                  <td className="py-1.5 text-gray-900 dark:text-slate-200">
                                                     {hole.depth ? `${hole.depth}"` : '--'}
                                                   </td>
                                                 </tr>
@@ -856,8 +856,8 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                             };
                                             return (
                                               <div key={k} className="flex gap-2 text-xs">
-                                                <span className="text-gray-500 font-semibold min-w-[80px]">{humanize(k)}:</span>
-                                                <span className="text-gray-900">{formatVal(v)}</span>
+                                                <span className="text-gray-500 dark:text-slate-400 font-semibold min-w-[80px]">{humanize(k)}:</span>
+                                                <span className="text-gray-900 dark:text-slate-200">{formatVal(v)}</span>
                                               </div>
                                             );
                                           })}
@@ -913,7 +913,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               </span>
                             ))}
                             {(d?.equipment_needed || job.equipment_needed || []).length === 0 && (
-                              <span className="text-sm text-gray-400 italic">No equipment specified</span>
+                              <span className="text-sm text-gray-400 dark:text-slate-500 italic">No equipment specified</span>
                             )}
                           </div>
 
@@ -969,7 +969,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                             <select
                               value={editFields.jobsite_conditions?.inside_outside || ''}
                               onChange={(e) => setEditFields(f => ({ ...f, jobsite_conditions: { ...f.jobsite_conditions, inside_outside: e.target.value } }))}
-                              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-amber-300 focus:border-amber-500 text-sm text-gray-900 bg-amber-50/30"
+                              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-amber-300 dark:border-amber-500/40 focus:border-amber-500 text-sm text-gray-900 dark:text-white bg-amber-50/30 dark:bg-white/5"
                             >
                               <option value="">Not specified</option>
                               <option value="Inside">Inside</option>
@@ -999,8 +999,8 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                   key={cond.key}
                                   className={`flex items-center gap-2 px-3 py-2 rounded-lg border cursor-pointer transition-colors ${
                                     isChecked
-                                      ? (cond.warning ? 'bg-red-50 border-red-300' : 'bg-amber-50 border-amber-300')
-                                      : 'bg-white border-gray-200 hover:border-amber-200'
+                                      ? (cond.warning ? 'bg-red-50 dark:bg-red-500/10 border-red-300 dark:border-red-500/40' : 'bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-500/40')
+                                      : 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-amber-200'
                                   }`}
                                 >
                                   <input
@@ -1012,7 +1012,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                     }))}
                                     className="accent-amber-500"
                                   />
-                                  <span className={`text-xs font-semibold flex-1 ${cond.warning ? 'text-red-700' : 'text-gray-700'}`}>
+                                  <span className={`text-xs font-semibold flex-1 ${cond.warning ? 'text-red-700 dark:text-red-300' : 'text-gray-700 dark:text-slate-200'}`}>
                                     {cond.label}
                                   </span>
                                   {cond.footageKey && isChecked && (
@@ -1023,7 +1023,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                         ...f,
                                         jobsite_conditions: { ...f.jobsite_conditions, [cond.footageKey!]: e.target.value }
                                       }))}
-                                      className="w-16 px-1.5 py-0.5 text-xs border-2 border-amber-300 rounded text-gray-900 focus:border-amber-500"
+                                      className="w-16 px-1.5 py-0.5 text-xs border-2 border-amber-300 dark:border-amber-500/40 rounded text-gray-900 dark:text-white dark:bg-white/5 focus:border-amber-500"
                                       placeholder="ft"
                                       onClick={(e) => e.stopPropagation()}
                                     />
@@ -1036,8 +1036,8 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       ) : (
                         <>
                           {conditions?.inside_outside ? (
-                            <div className="mb-2 text-xs font-bold text-gray-600 uppercase">
-                              Work Area: <span className="text-gray-900">{String(conditions.inside_outside)}</span>
+                            <div className="mb-2 text-xs font-bold text-gray-600 dark:text-slate-300 uppercase">
+                              Work Area: <span className="text-gray-900 dark:text-white">{String(conditions.inside_outside)}</span>
                             </div>
                           ) : null}
                           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1046,8 +1046,8 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                 key={cond.label}
                                 className={`flex items-center justify-between px-3 py-2 rounded-lg text-xs font-semibold ${
                                   cond.warning
-                                    ? 'bg-red-50 text-red-700 border border-red-200'
-                                    : 'bg-white text-gray-700 border border-gray-200'
+                                    ? 'bg-red-50 dark:bg-red-500/10 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30'
+                                    : 'bg-white dark:bg-white/5 text-gray-700 dark:text-slate-200 border border-gray-200 dark:border-white/10'
                                 }`}
                               >
                                 <span>{cond.label}</span>
@@ -1073,7 +1073,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       {isEditing ? (
                         <div className="space-y-3">
                           {/* Orientation toggle */}
-                          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors bg-white border-gray-200 hover:border-blue-300">
+                          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-blue-300">
                             <input
                               type="checkbox"
                               checked={!!editFields.site_compliance?.orientation_required}
@@ -1084,7 +1084,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               className="accent-blue-600"
                             />
                             <HardHat className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-semibold text-gray-800">Orientation Required</span>
+                            <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">Orientation Required</span>
                           </label>
                           {editFields.site_compliance?.orientation_required && (
                             <div>
@@ -1096,13 +1096,13 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                   ...f,
                                   site_compliance: { ...f.site_compliance, orientation_datetime: e.target.value }
                                 }))}
-                                className="w-full px-3 py-1.5 rounded-lg border-2 border-blue-300 focus:border-blue-500 text-sm text-gray-900"
+                                className="w-full px-3 py-1.5 rounded-lg border-2 border-blue-300 dark:border-blue-500/40 focus:border-blue-500 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                               />
                             </div>
                           )}
 
                           {/* Badging toggle */}
-                          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors bg-white border-gray-200 hover:border-blue-300">
+                          <label className="flex items-center gap-3 px-3 py-2.5 rounded-lg border cursor-pointer transition-colors bg-white dark:bg-white/5 border-gray-200 dark:border-white/10 hover:border-blue-300">
                             <input
                               type="checkbox"
                               checked={!!editFields.site_compliance?.badging_required}
@@ -1113,7 +1113,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               className="accent-blue-600"
                             />
                             <Shield className="w-4 h-4 text-blue-600" />
-                            <span className="text-sm font-semibold text-gray-800">Badging Required</span>
+                            <span className="text-sm font-semibold text-gray-800 dark:text-slate-200">Badging Required</span>
                           </label>
                           {editFields.site_compliance?.badging_required && (
                             <div>
@@ -1125,7 +1125,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                   ...f,
                                   site_compliance: { ...f.site_compliance, badging_type: e.target.value }
                                 }))}
-                                className="w-full px-3 py-1.5 rounded-lg border-2 border-blue-300 focus:border-blue-500 text-sm text-gray-900"
+                                className="w-full px-3 py-1.5 rounded-lg border-2 border-blue-300 dark:border-blue-500/40 focus:border-blue-500 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                                 placeholder="e.g. TWIC, site badge..."
                               />
                             </div>
@@ -1140,7 +1140,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                                 ...f,
                                 site_compliance: { ...f.site_compliance, special_instructions: e.target.value }
                               }))}
-                              className="w-full px-3 py-2 rounded-lg border-2 border-blue-300 focus:border-blue-500 text-sm text-gray-900"
+                              className="w-full px-3 py-2 rounded-lg border-2 border-blue-300 dark:border-blue-500/40 focus:border-blue-500 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                               rows={3}
                               placeholder="Any special site instructions..."
                             />
@@ -1149,31 +1149,31 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       ) : (
                         <div className="space-y-2">
                           {compliance?.orientation_required ? (
-                            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
-                              <HardHat className="w-4 h-4 text-blue-600" />
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 rounded-lg border border-blue-200 dark:border-blue-500/30">
+                              <HardHat className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               <div>
-                                <div className="text-xs font-bold text-blue-900">Orientation Required</div>
+                                <div className="text-xs font-bold text-blue-900 dark:text-blue-200">Orientation Required</div>
                                 {compliance.orientation_datetime ? (
-                                  <div className="text-[10px] text-blue-600">{new Date(String(compliance.orientation_datetime)).toLocaleString()}</div>
+                                  <div className="text-[10px] text-blue-600 dark:text-blue-300">{new Date(String(compliance.orientation_datetime)).toLocaleString()}</div>
                                 ) : null}
                               </div>
                             </div>
                           ) : null}
                           {compliance?.badging_required ? (
-                            <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
-                              <Shield className="w-4 h-4 text-blue-600" />
+                            <div className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 rounded-lg border border-blue-200 dark:border-blue-500/30">
+                              <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                               <div>
-                                <div className="text-xs font-bold text-blue-900">Badging Required</div>
+                                <div className="text-xs font-bold text-blue-900 dark:text-blue-200">Badging Required</div>
                                 {compliance.badging_type ? (
-                                  <div className="text-[10px] text-blue-600">{String(compliance.badging_type)}</div>
+                                  <div className="text-[10px] text-blue-600 dark:text-blue-300">{String(compliance.badging_type)}</div>
                                 ) : null}
                               </div>
                             </div>
                           ) : null}
                           {compliance?.special_instructions ? (
-                            <div className="px-3 py-2 bg-white rounded-lg border border-blue-200">
-                              <div className="text-[10px] font-bold text-blue-500 uppercase mb-1">Special Instructions</div>
-                              <p className="text-xs text-blue-900">{String(compliance.special_instructions)}</p>
+                            <div className="px-3 py-2 bg-white dark:bg-white/5 rounded-lg border border-blue-200 dark:border-blue-500/30">
+                              <div className="text-[10px] font-bold text-blue-500 dark:text-blue-400 uppercase mb-1">Special Instructions</div>
+                              <p className="text-xs text-blue-900 dark:text-blue-200">{String(compliance.special_instructions)}</p>
                             </div>
                           ) : null}
                         </div>
@@ -1183,10 +1183,10 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
 
                   {/* ---- Difficulty Bar ---- */}
                   {difficulty > 0 && (
-                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 rounded-xl border border-gray-200">
-                      <Gauge className="w-5 h-5 text-gray-500" />
+                    <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
+                      <Gauge className="w-5 h-5 text-gray-500 dark:text-slate-400" />
                       <div className="flex-1">
-                        <div className="text-[10px] font-bold text-gray-400 uppercase">Job Difficulty</div>
+                        <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase">Job Difficulty</div>
                         <div className="flex items-center gap-2 mt-1">
                           <div className="flex gap-0.5">
                             {Array.from({ length: 10 }, (_, i) => (
@@ -1252,7 +1252,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               <textarea
                                 value={editFields.additional_info}
                                 onChange={(e) => setEditFields(f => ({ ...f, additional_info: e.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
+                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                                 rows={3}
                                 placeholder="Additional job notes..."
                               />
@@ -1262,7 +1262,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               <textarea
                                 value={editFields.directions}
                                 onChange={(e) => setEditFields(f => ({ ...f, directions: e.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
+                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                                 rows={3}
                                 placeholder="Directions to the job site..."
                               />
@@ -1272,14 +1272,14 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                           <>
                             {d?.additional_info && (
                               <div className="mb-3">
-                                <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Notes</div>
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.additional_info}</p>
+                                <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase mb-1">Notes</div>
+                                <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{d.additional_info}</p>
                               </div>
                             )}
                             {d?.directions && (
                               <div>
-                                <div className="text-[10px] font-bold text-gray-400 uppercase mb-1">Directions</div>
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">{d.directions}</p>
+                                <div className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase mb-1">Directions</div>
+                                <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap">{d.directions}</p>
                               </div>
                             )}
                           </>
@@ -1290,11 +1290,11 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                 </div>
 
                 {/* Right column — 30% notes sidebar */}
-                <div className="lg:w-[30%] lg:border-l border-gray-200 p-5 bg-gray-50/50">
+                <div className="lg:w-[30%] lg:border-l border-gray-200 dark:border-white/10 p-5 bg-gray-50/50 dark:bg-white/5">
                   <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare className="w-4 h-4 text-purple-600" />
-                    <h3 className="text-sm font-bold text-gray-900">Notes</h3>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-700 rounded-full font-bold">
+                    <MessageSquare className="w-4 h-4 text-purple-600 dark:text-purple-300" />
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white">Notes</h3>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 rounded-full font-bold">
                       {jobNotes.length}
                     </span>
                   </div>
@@ -1307,7 +1307,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       onChange={(e) => setNewNote(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
                       placeholder="Add a note..."
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 text-sm text-gray-900 bg-white"
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                     />
                     <button
                       onClick={handleAddNote}
@@ -1322,21 +1322,21 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   <div className="space-y-2 max-h-[60vh] overflow-y-auto">
                     {jobNotes.length === 0 ? (
                       <div className="text-center py-6">
-                        <MessageSquare className="w-6 h-6 text-gray-300 mx-auto mb-1" />
-                        <p className="text-xs text-gray-400">No notes yet</p>
+                        <MessageSquare className="w-6 h-6 text-gray-300 dark:text-slate-600 mx-auto mb-1" />
+                        <p className="text-xs text-gray-400 dark:text-slate-500">No notes yet</p>
                       </div>
                     ) : (
                       jobNotes.map((note) => (
-                        <div key={note.id} className="bg-white rounded-lg border border-gray-200 p-3">
+                        <div key={note.id} className="bg-white dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 p-3">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-bold text-purple-600">{note.author_name}</span>
-                            <span className="text-[10px] text-gray-400">
+                            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-300">{note.author_name}</span>
+                            <span className="text-[10px] text-gray-400 dark:text-slate-500">
                               {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               {' '}
                               {new Date(note.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
                             </span>
                           </div>
-                          <p className="text-xs text-gray-700">{note.content}</p>
+                          <p className="text-xs text-gray-700 dark:text-slate-200">{note.content}</p>
                         </div>
                       ))
                     )}
@@ -1370,24 +1370,24 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className={`rounded-xl border overflow-hidden ${headerColor}`}>
+    <div className={`rounded-xl border overflow-hidden dark:bg-white/5 dark:border-white/10 ${headerColor}`}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
       >
         <div className="flex items-center gap-2">
           {icon}
-          <span className="text-sm font-bold text-gray-900">{title}</span>
+          <span className="text-sm font-bold text-gray-900 dark:text-white">{title}</span>
           {badge && (
-            <span className="text-[10px] px-1.5 py-0.5 bg-white/70 text-gray-600 rounded-full font-bold border border-gray-200">
+            <span className="text-[10px] px-1.5 py-0.5 bg-white/70 dark:bg-white/10 text-gray-600 dark:text-slate-300 rounded-full font-bold border border-gray-200 dark:border-white/10">
               {badge}
             </span>
           )}
         </div>
-        {expanded ? <ChevronUp className="w-4 h-4 text-gray-500" /> : <ChevronDown className="w-4 h-4 text-gray-500" />}
+        {expanded ? <ChevronUp className="w-4 h-4 text-gray-500 dark:text-slate-400" /> : <ChevronDown className="w-4 h-4 text-gray-500 dark:text-slate-400" />}
       </button>
       {expanded && (
-        <div className="px-4 pb-4 bg-white">
+        <div className="px-4 pb-4 bg-white dark:bg-[#1a0f35]">
           {children}
         </div>
       )}
@@ -1399,8 +1399,8 @@ function SectionCard({
 function FieldRow({ label, value, bold }: { label: string; value?: string | null; bold?: boolean }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-xs font-bold text-gray-400 uppercase w-28 flex-shrink-0">{label}</span>
-      <span className={`text-sm ${bold ? 'font-bold text-gray-900' : 'text-gray-700'}`}>{value || '--'}</span>
+      <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase w-28 flex-shrink-0">{label}</span>
+      <span className={`text-sm ${bold ? 'font-bold text-gray-900 dark:text-white' : 'text-gray-700 dark:text-slate-300'}`}>{value || '--'}</span>
     </div>
   );
 }
@@ -1409,12 +1409,12 @@ function FieldRow({ label, value, bold }: { label: string; value?: string | null
 function EditFieldRow({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <div className="flex items-baseline gap-2">
-      <span className="text-xs font-bold text-gray-400 uppercase w-28 flex-shrink-0">{label}</span>
+      <span className="text-xs font-bold text-gray-400 dark:text-slate-500 uppercase w-28 flex-shrink-0">{label}</span>
       <input
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 px-2 py-1 rounded-lg border-2 border-purple-300 focus:border-purple-500 focus:ring-1 focus:ring-purple-200 text-sm font-medium text-gray-900 bg-purple-50/30"
+        className="flex-1 px-2 py-1 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 focus:ring-1 focus:ring-purple-200 text-sm font-medium text-gray-900 dark:text-white bg-purple-50/30 dark:bg-white/5"
       />
     </div>
   );
@@ -1520,7 +1520,7 @@ function ScopeEditor({
         <textarea
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900"
+          className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 dark:text-white dark:bg-white/5"
           rows={3}
         />
       </div>
@@ -1539,7 +1539,7 @@ function ScopeEditor({
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
                   isActive
                     ? 'bg-emerald-600 text-white border-emerald-700 hover:bg-emerald-700'
-                    : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400 hover:text-emerald-700'
+                    : 'bg-white dark:bg-white/5 text-gray-600 dark:text-slate-300 border-gray-300 dark:border-white/10 hover:border-emerald-400 hover:text-emerald-700'
                 }`}
               >
                 {svc}
@@ -1556,10 +1556,10 @@ function ScopeEditor({
         const isDrilling = DRILL_SERVICES.includes(svc as ServiceType);
 
         return (
-          <div key={svc} className="rounded-lg border border-emerald-200 overflow-hidden">
+          <div key={svc} className="rounded-lg border border-emerald-200 dark:border-emerald-500/30 overflow-hidden">
             {/* Service header */}
-            <div className="px-3 py-2 bg-emerald-50 border-b border-emerald-200 flex items-center justify-between">
-              <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">
+            <div className="px-3 py-2 bg-emerald-50 dark:bg-emerald-500/10 border-b border-emerald-200 dark:border-emerald-500/30 flex items-center justify-between">
+              <span className="text-xs font-bold text-emerald-700 dark:text-emerald-300 uppercase tracking-wide">
                 {SERVICE_LABELS[svc] ?? svc}
               </span>
               <button
@@ -1579,7 +1579,7 @@ function ScopeEditor({
                   <div className="text-[10px] font-bold text-gray-400 uppercase mb-1.5">Cuts</div>
                   <table className="w-full text-xs mb-2">
                     <thead>
-                      <tr className="text-gray-500 border-b border-gray-200">
+                      <tr className="text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-white/10">
                         <th className="text-left py-1 pr-2 font-bold uppercase"># Cuts</th>
                         <th className="text-left py-1 pr-2 font-bold uppercase">Linear Feet</th>
                         <th className="text-left py-1 pr-2 font-bold uppercase">Depth</th>
@@ -1589,13 +1589,13 @@ function ScopeEditor({
                     <tbody>
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       {(svcData.cuts || []).map((cut: any, ci: number) => (
-                        <tr key={ci} className="border-b border-gray-100 last:border-0">
+                        <tr key={ci} className="border-b border-gray-100 dark:border-white/5 last:border-0">
                           <td className="py-1 pr-2">
                             <input
                               type="number"
                               value={cut.num_cuts}
                               onChange={(e) => updateCutRow(svc, ci, 'num_cuts', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder="0"
                             />
                           </td>
@@ -1604,7 +1604,7 @@ function ScopeEditor({
                               type="number"
                               value={cut.linear_feet}
                               onChange={(e) => updateCutRow(svc, ci, 'linear_feet', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder="0"
                             />
                           </td>
@@ -1613,7 +1613,7 @@ function ScopeEditor({
                               type="text"
                               value={cut.depth}
                               onChange={(e) => updateCutRow(svc, ci, 'depth', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder='e.g. 6"'
                             />
                           </td>
@@ -1646,7 +1646,7 @@ function ScopeEditor({
                   <div className="text-[10px] font-bold text-gray-400 uppercase mb-1.5">Holes</div>
                   <table className="w-full text-xs mb-2">
                     <thead>
-                      <tr className="text-gray-500 border-b border-gray-200">
+                      <tr className="text-gray-500 dark:text-slate-400 border-b border-gray-200 dark:border-white/10">
                         <th className="text-left py-1 pr-2 font-bold uppercase">Qty</th>
                         <th className="text-left py-1 pr-2 font-bold uppercase">Diameter</th>
                         <th className="text-left py-1 pr-2 font-bold uppercase">Depth</th>
@@ -1656,13 +1656,13 @@ function ScopeEditor({
                     <tbody>
                       {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                       {(svcData.holes || []).map((hole: any, hi: number) => (
-                        <tr key={hi} className="border-b border-gray-100 last:border-0">
+                        <tr key={hi} className="border-b border-gray-100 dark:border-white/5 last:border-0">
                           <td className="py-1 pr-2">
                             <input
                               type="number"
                               value={hole.qty}
                               onChange={(e) => updateHoleRow(svc, hi, 'qty', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder="0"
                             />
                           </td>
@@ -1671,7 +1671,7 @@ function ScopeEditor({
                               type="text"
                               value={hole.bit_size}
                               onChange={(e) => updateHoleRow(svc, hi, 'bit_size', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder='e.g. 4"'
                             />
                           </td>
@@ -1680,7 +1680,7 @@ function ScopeEditor({
                               type="text"
                               value={hole.depth}
                               onChange={(e) => updateHoleRow(svc, hi, 'depth', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder='e.g. 8"'
                             />
                           </td>
@@ -1715,7 +1715,7 @@ function ScopeEditor({
                     <textarea
                       value={svcData.description || ''}
                       onChange={(e) => updateServiceField(svc, 'description', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                      className="w-full px-3 py-2 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                       rows={2}
                       placeholder={`${svc} details...`}
                     />
@@ -1726,7 +1726,7 @@ function ScopeEditor({
                       type="text"
                       value={svcData.method || ''}
                       onChange={(e) => updateServiceField(svc, 'method', e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900"
+                      className="w-full px-3 py-1.5 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
                       placeholder="e.g. flat_sawing, wire_sawing..."
                     />
                   </div>
@@ -1809,7 +1809,7 @@ function EquipmentEditor({
             <select
               defaultValue=""
               onChange={(e) => { addEquipment(e.target.value); e.target.value = ''; }}
-              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-purple-300 focus:border-purple-500 text-xs text-gray-900 bg-white"
+              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white bg-white dark:bg-white/5"
             >
               <option value="" disabled>+ Add equipment...</option>
               {availableToAdd.map(p => (
@@ -1850,7 +1850,7 @@ function EquipmentEditor({
             onChange={(e) => setRentalInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addRental())}
             placeholder="e.g. Scissor Lift, Generator..."
-            className="flex-1 px-2 py-1.5 rounded-lg border-2 border-red-200 focus:border-red-400 text-xs text-gray-900"
+            className="flex-1 px-2 py-1.5 rounded-lg border-2 border-red-200 dark:border-red-500/30 focus:border-red-400 text-xs text-gray-900 dark:text-white dark:bg-white/5"
           />
           <button
             type="button"

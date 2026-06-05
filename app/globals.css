@@ -352,6 +352,14 @@ select {
 
 html {
   scroll-behavior: smooth;
+  /* ── iOS text inflation ──────────────────────────────────────────────────
+   * Without this, iOS WebKit runs its "auto text-size adjustment" and enlarges
+   * body text inconsistently page-to-page — the root cause of the app feeling
+   * "zoomed in" on iPhone. Locking it to 100% makes the device render text at
+   * the size we set. (No effect on Android / desktop.)
+   * ──────────────────────────────────────────────────────────────────────── */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* ── Scrollbar gutter ────────────────────────────────────────────────────
    * Reserves space for the scrollbar even when it is not visible.
    * This prevents the 15px horizontal layout shift that occurs when
@@ -366,6 +374,36 @@ html {
 body {
   /* Prevent any accidental horizontal overflow from escaping the viewport. */
   overflow-x: hidden;
+}
+
+/* ── iOS focus-zoom guard ──────────────────────────────────────────────────
+ * iOS auto-zooms the whole viewport when you focus an input whose font-size is
+ * < 16px, and frequently doesn't zoom back out → the app gets "stuck zoomed."
+ * This sets a 16px DEFAULT for form controls. It is a low-specificity element
+ * selector, so a Tailwind utility (e.g. text-lg on the scope inputs) still wins
+ * where a larger size is intentional — we only fix the bare/un-sized inputs.
+ * Inputs that explicitly use text-sm/text-xs are bumped to `text-base sm:text-sm`
+ * per-page (the maintenance/new pattern) so desktop keeps its smaller text.
+ * ──────────────────────────────────────────────────────────────────────── */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+/* The rule above is a low-specificity DEFAULT — a Tailwind `text-sm` utility
+ * (specificity 0,1,0) still beats it (0,0,1), so inputs like the company-code
+ * field would stay 14px and STILL trigger iOS focus-zoom. On phones we force a
+ * 16px floor with !important inside a mobile media query: it defeats text-sm/
+ * text-xs on form controls (killing the zoom universally) while leaving DESKTOP
+ * untouched — so `sm:text-sm` styling still applies at ≥640px. Clamping a phone
+ * input to 16px is exactly the anti-zoom behavior we want; larger fonts are rare
+ * on mobile inputs and 16px stays perfectly readable. */
+@media (max-width: 639px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }
 
 /* ─── iOS / Capacitor safe-area utilities ──────────────────────────────────
@@ -388,6 +426,12 @@ body {
   padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
 }
 .pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+/* Alias: some call sites (e.g. daily-report) used `safe-area-pb`, which was
+ * never defined → zero home-indicator clearance. Map it to pb-safe so those
+ * bottom bars clear the iOS home indicator. */
+.safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .pl-safe {

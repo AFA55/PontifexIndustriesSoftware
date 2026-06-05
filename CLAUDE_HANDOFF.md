@@ -1,5 +1,5 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 3, 2026 | **Branch:** `main` | **HEAD:** `cefd3e85` (timecard date fix — **pushed + deploy READY/live**) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + auto-released (new purple-P icon LIVE on App Store)** · **v1.0.2 (Build 7) SUBMITTED to App Review — "Waiting for Review"** (Jun 3, carries the clean, non-leaky screenshots).
+**Last updated:** Jun 4, 2026 | **Branch:** `main` | **HEAD:** `cefd3e85` + **UNCOMMITTED Phase A + mobile + auth-UX batch (build green, awaiting single push)** | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + live** · **v1.0.2 (Build 7) — "Waiting for Review."**
 
 > 🧰 **New:** `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev & prevent recurring bugs (date lib + Sentry + Zod + TanStack Query + RHF + shadcn + tests). Phased, additive, no big-bang. Phase A (date lib + Sentry) is the highest-ROI next step.
 
@@ -17,6 +17,34 @@ We're shifting from feature-building to **fine-tuning + productizing**. The plan
 **Founder action items surfaced:** Supabase backup plan (above); pick an offsite cloud target; later GBP/local-SEO setup.
 
 > **💰 VERCEL BUDGET: ~$1 build credit remaining.** Every `git push origin main` = ~$1–2 billed build. BATCH and push ONCE per session. See `DEPLOYMENT_COST.md`.
+
+---
+
+## ⚡ START HERE (Jun 4, 2026) — Phase A foundation + mobile responsive + web Face ID/Remember-Me — ⚠️ UNCOMMITTED, build green, ONE push pending
+
+Fine-tuning batch. Everything additive, behavior-preserving. **`npm run build` green (33.8s, 91 pages), `tsc --noEmit` exit 0, 12 date tests pass.** Verified the headline "zoomed in" fix in a live browser at 390px. **Not committed/pushed yet — awaiting the single Vercel push.**
+
+**Phase A foundation (from `PHASE_A_KICKOFF.md`):**
+- **`lib/dates.ts`** (NEW) — centralized date module that kills the recurring UTC/local off-by-one bug class (the "Zack: Jun 1 → Sun May 31" class). Exports `toLocalYMD`, `parseYMDLocal`, `formatDay`/`formatDayLong`/`dayName`/`dayNameShort`, `mondayOf`, `weekDatesFrom`, `weekDatesMonSun`, `formatTime`. `dayjs` (already installed) wired with utc+timezone plugins for future use. `lib/timecard-utils.ts` now **delegates** its date helpers to `lib/dates.ts` (single source of truth; all existing imports preserved).
+- **`lib/dates.test.ts`** (NEW) — 12 Jest tests locking "2026-06-01 = Monday, shows 'Mon, Jun 1'" + Mon–Sun week ranges + previous-week offset. **NOTE: we use the EXISTING Jest setup (6 prior test files) — did NOT add Vitest (PHASE_A_KICKOFF.md was wrong that there were "zero tests").**
+- **Sentry** — `@sentry/nextjs@^9` installed; `instrumentation.ts` (server/edge) + `instrumentation-client.ts` (client) + `withSentryConfig` wrapper in `next.config.js`. **FULLY GATED**: no DSN = complete no-op (zero behavior change); source-map upload gated on `SENTRY_AUTH_TOKEN`. Build stays green with nothing set. **🔴 FOUNDER: set `SENTRY_DSN` + `NEXT_PUBLIC_SENTRY_DSN` (+ optional `SENTRY_ORG`/`SENTRY_PROJECT`/`SENTRY_AUTH_TOKEN`) in Vercel production to switch on prod error visibility.**
+
+**Global mobile CSS (`app/globals.css`) — the actual fix for "looks zoomed in on smaller iPhone":**
+- Added `-webkit-text-size-adjust:100%` to `html` (stops iOS auto text-inflation). **Verified live: computes to 100%.**
+- iOS focus-zoom guard: base `input,textarea,select{font-size:16px}` PLUS a **mobile `@media (max-width:639px){ ... !important }`** floor. The `!important` is REQUIRED — a bare element selector loses to Tailwind `text-sm` (specificity), so the company-code input (first field everyone touches) was still 14px and still zoomed. **Verified live at 390px: now 16px on mobile, keeps `text-sm` (14px) on desktop ≥640px.**
+- Added `.safe-area-pb` alias (was a dead class at daily-report:488 → zero home-indicator clearance).
+
+**Per-page mobile fixes (4 parallel agents, disjoint files — real paths, audit doc had stale paths missing `admin/`):**
+- **`app/dashboard/timecard/page.tsx`** — the 2nd wide `<table>` now `hidden sm:block` with a new `sm:hidden` card-per-entry block (no side-scroll at 390px); ~22 sub-14px text classes bumped to ≥`text-xs` (table body `text-sm`); Request-Correction button `min-h-[44px]`.
+- **Operator safe-area** — `pt-safe`/`pt-safe-3` added to sticky headers on `job-schedule/[id]/day-complete`, `job-schedule/[id]/work-performed`, `my-jobs/[id]/jobsite`, `my-jobs/page`, `my-profile`, `daily-report`; bottom CTAs `pb-6`→`pb-safe`; `text-sm` textareas → `text-base sm:text-sm`.
+- **`day-complete` signature canvas (functional, customer-facing)** — draw handlers now SCALE pointer coords to the 600×160 backing buffer (`scaleX=canvas.width/rect.width`, etc.) in both start + move; ink now tracks the finger 1:1 (was offset/compressed).
+- **Admin dark/light + reflow** — `JobDetailView.tsx` got full `dark:` pairs (was white-only in dark) + `flex-col sm:flex-row` reflow + cut/hole tables wrapped in `overflow-x-auto`; **both** NotificationBells fixed (admin one was white-only in dark; `components/NotificationBell.tsx` was dark-only on the now-light shell → inverted to light-base + `dark:`); scope inputs `grid-cols-4`→`grid-cols-2 sm:grid-cols-4` + `text-base sm:text-lg` w/ suffix padding; `ScheduleDatePicker` width `w-[min(340px,calc(100vw-2rem))]` + dark pairs; `DashboardSidebar` drawer close button → 44px tap target.
+
+**Auth UX — web Face ID + Remember Me (NO native build, App-Store-safe):** `app/login/page.tsx` already used react-hook-form with a real `<form>` + a remember checkbox. Hardened for **iOS Password AutoFill** (the key icon → Face ID → fills saved password): email now `autoComplete="username"` + `id`/`autoCapitalize=none`/`autoCorrect=off`/`inputMode=email`; password `id="password"` + `current-password`; "Remember me" defaults CHECKED, persisted to `localStorage['pontifex.rememberMe']`. **Supabase client config UNTOUCHED.** `company-login` needs no change. **A true native Face-ID launch-gate (Capacitor biometric plugin → new iOS build) was deliberately deferred** to a later App-Store-gated batch.
+
+**Architecture-safety decisions made this session:** used existing Jest (not Vitest); dayjs was already installed; Sentry fully DSN-gated; agents ran in the MAIN repo (not worktrees) on disjoint files → no 81GB disk risk this session. **Pre-existing: 85 stale `locked` agent worktrees (377MB) with uncommitted changes from prior sessions remain — left untouched (don't nuke unmerged work); clean up when convenient via per-tree `git worktree unlock`+`remove` after verifying each is abandoned.**
+
+**🔴 PENDING: the single `git push origin main`** (batch all of the above into ONE ~$1–2 Vercel build) — user to confirm. Commit only the 24 intended files; do NOT `git add -A` (untracked `.claude-flow/`, `agentdb.rvf`, `ruvector.db`, `.claire/` are tooling junk).
 
 ---
 

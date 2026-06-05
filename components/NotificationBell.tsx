@@ -179,11 +179,11 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-slate-900 rounded-2xl border border-white/10 shadow-2xl z-50 overflow-hidden">
+        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-white/10 shadow-2xl z-50 overflow-hidden">
           {/* Header */}
-          <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between bg-slate-800/50">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Bell className="w-4 h-4 text-purple-400" />
+          <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-slate-800/50">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+              <Bell className="w-4 h-4 text-purple-600 dark:text-purple-400" />
               Notifications
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 bg-purple-600 text-white text-[10px] font-bold rounded-full">
@@ -196,13 +196,13 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                 <button
                   onClick={markAllRead}
                   disabled={loading}
-                  className="text-xs text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                  className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold transition-colors"
                 >
                   Mark all read
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
-                <X className="w-3.5 h-3.5 text-gray-400" />
+              <button onClick={() => setOpen(false)} className="p-1 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
+                <X className="w-3.5 h-3.5 text-gray-400 dark:text-gray-400" />
               </button>
             </div>
           </div>
@@ -211,25 +211,25 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
           <div className="max-h-80 overflow-y-auto">
             {notifications.length === 0 ? (
               <div className="py-10 text-center">
-                <BellOff className="w-8 h-8 text-gray-600 mx-auto mb-2" />
-                <p className="text-sm text-gray-500">No notifications yet</p>
+                <BellOff className="w-8 h-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
+                <p className="text-sm text-gray-400 dark:text-gray-500">No notifications yet</p>
               </div>
             ) : (
               notifications.map(notif => (
                 <div
                   key={notif.id}
-                  className={`px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors cursor-pointer flex items-start gap-3 ${
-                    !notif.is_read ? 'bg-purple-500/5' : ''
+                  className={`px-4 py-3 border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-start gap-3 ${
+                    !notif.is_read ? 'bg-purple-50 dark:bg-purple-500/5' : ''
                   }`}
                   onClick={() => handleNotificationClick(notif)}
                 >
-                  <div className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center">
+                  <div className="flex-shrink-0 mt-0.5 w-8 h-8 rounded-lg bg-gray-100 dark:bg-white/5 flex items-center justify-center">
                     {getIcon(notif.type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className={`text-sm font-semibold truncate ${
-                        !notif.is_read ? 'text-white' : 'text-gray-300'
+                        !notif.is_read ? 'text-gray-900 dark:text-white' : 'text-gray-600 dark:text-gray-300'
                       }`}>
                         {notif.title}
                       </p>
@@ -238,17 +238,17 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                       )}
                     </div>
                     {notif.message && (
-                      <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{notif.message}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 line-clamp-2">{notif.message}</p>
                     )}
                     <div className="flex items-center gap-2 mt-1">
-                      <p className="text-[10px] text-gray-500">{timeAgo(notif.created_at)}</p>
+                      <p className="text-[10px] text-gray-400 dark:text-gray-500">{timeAgo(notif.created_at)}</p>
                       {notif.action_url && (
-                        <span className="text-[10px] text-purple-400 font-semibold">View</span>
+                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">View</span>
                       )}
                     </div>
                   </div>
                   {notif.action_url && (
-                    <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0 mt-2" />
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 flex-shrink-0 mt-2" />
                   )}
                 </div>
               ))
@@ -257,13 +257,13 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
 
           {/* Footer */}
           {notifications.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-white/10 bg-slate-800/50">
+            <div className="px-4 py-2.5 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-slate-800/50">
               <button
                 onClick={() => {
                   setOpen(false);
                   router.push('/dashboard/notifications');
                 }}
-                className="w-full text-center text-xs text-purple-400 hover:text-purple-300 font-semibold transition-colors"
+                className="w-full text-center text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold transition-colors"
               >
                 View all notifications
               </button>

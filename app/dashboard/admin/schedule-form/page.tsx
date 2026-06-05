@@ -2347,7 +2347,7 @@ export default function ScheduleFormPage() {
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
-                                    <div className="grid grid-cols-3 gap-3 flex-1">
+                                    <div className="grid grid-cols-3 gap-2 sm:gap-3 flex-1">
                                       <input
                                         type="number"
                                         placeholder="0"
@@ -2357,7 +2357,7 @@ export default function ScheduleFormPage() {
                                           updated[idx] = { ...updated[idx], qty: e.target.value };
                                           updateHoles(updated);
                                         }}
-                                        className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        className="w-full px-2.5 sm:px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                       />
                                       <div className="relative">
                                         <input
@@ -2370,7 +2370,7 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], bit_size: e.target.value };
                                             updateHoles(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-2.5 sm:px-3 py-3 pr-6 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">&quot;</span>
                                       </div>
@@ -2384,9 +2384,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], depth: e.target.value };
                                             updateHoles(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-2.5 sm:px-3 py-3 pr-9 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">in.</span>
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
                                     </div>
                                     {holes.length > 1 && (
@@ -2733,7 +2733,7 @@ export default function ScheduleFormPage() {
                               {areas.map((area, idx) => (
                                 <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {idx === 0 && (
-                                    <div className="grid grid-cols-4 gap-3 mb-1.5">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-1.5">
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Length</label>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Width</label>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Thickness</label>
@@ -2741,7 +2741,7 @@ export default function ScheduleFormPage() {
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
-                                    <div className="grid grid-cols-4 gap-3 flex-1">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 flex-1">
                                       <div className="relative">
                                         <input
                                           type="number"
@@ -2752,9 +2752,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], length: e.target.value };
                                             updateAreas(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-2.5 sm:px-3 py-3 pr-7 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
                                       <div className="relative">
                                         <input
@@ -2766,9 +2766,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], width: e.target.value };
                                             updateAreas(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-2.5 sm:px-3 py-3 pr-7 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
                                       <div className="relative">
                                         <input
@@ -2781,9 +2781,9 @@ export default function ScheduleFormPage() {
                                             updated[idx] = { ...updated[idx], thickness: e.target.value };
                                             updateAreas(updated);
                                           }}
-                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                          className="w-full px-2.5 sm:px-3 py-3 pr-9 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                         />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">in.</span>
+                                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
                                       <input
                                         type="number"
@@ -2794,7 +2794,7 @@ export default function ScheduleFormPage() {
                                           updated[idx] = { ...updated[idx], qty: e.target.value };
                                           updateAreas(updated);
                                         }}
-                                        className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        className="w-full px-2.5 sm:px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base sm:text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                                       />
                                     </div>
                                     {areas.length > 1 && (

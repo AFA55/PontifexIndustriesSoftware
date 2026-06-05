@@ -191,7 +191,7 @@ export default function MyProfilePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0b0618] dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0b0618]">
-      <div className="container mx-auto px-4 md:px-6 py-6 max-w-2xl">
+      <div className="container mx-auto px-4 md:px-6 py-6 max-w-2xl pt-safe">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
           <Link href="/dashboard" className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
@@ -274,7 +274,7 @@ export default function MyProfilePage() {
               <div>
                 <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">
                   Phone Number
-                  <span className="ml-2 text-[10px] font-normal text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full">
+                  <span className="ml-2 text-xs font-normal text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full">
                     Used for SMS job notifications
                   </span>
                 </label>
@@ -303,7 +303,7 @@ export default function MyProfilePage() {
                     type="date"
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
                   />
                 </div>
               </div>

@@ -188,7 +188,7 @@ export default function JobsitePage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-[#0b0618] dark:to-[#0e0720]">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl">
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl pt-safe">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
@@ -420,7 +420,7 @@ export default function JobsitePage() {
         )}
 
         {/* Arrived on Job Site Button */}
-        <div className="pt-2 pb-6">
+        <div className="pt-2 pb-safe">
           <button
             onClick={handleArrivedOnJobSite}
             className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"

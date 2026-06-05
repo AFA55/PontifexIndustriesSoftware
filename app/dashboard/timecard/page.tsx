@@ -522,7 +522,7 @@ function TimecardPage() {
               </div>
               <div className="text-right">
                 <p className="text-sm font-semibold text-gray-800 dark:text-white leading-tight">{user?.name}</p>
-                <p className="text-[11px] text-gray-400 dark:text-white/40 font-medium capitalize">{user?.role}</p>
+                <p className="text-xs text-gray-400 dark:text-white/40 font-medium capitalize">{user?.role}</p>
               </div>
             </div>
           </div>
@@ -591,7 +591,7 @@ function TimecardPage() {
                       })}
                     </div>
                   </div>
-                  <div className="flex justify-between text-[10px] text-gray-400 dark:text-white/40">
+                  <div className="flex justify-between text-xs text-gray-400 dark:text-white/40">
                     <span>0h</span>
                     <span>4h</span>
                     <span>8h</span>
@@ -702,18 +702,18 @@ function TimecardPage() {
                     : 'border-gray-100 dark:border-white/5 opacity-60'
               }`}
             >
-              <p className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-gray-400 dark:text-white/40'}`}>
+              <p className={`text-xs font-bold uppercase tracking-wider ${day.isToday ? 'text-blue-600' : 'text-gray-400 dark:text-white/40'}`}>
                 {day.dayName}
               </p>
               <p className={`text-sm sm:text-lg font-bold ${day.isToday ? 'text-blue-700' : 'text-gray-800 dark:text-white'}`}>
                 {day.dayNum}
               </p>
               {day.hasEntries ? (
-                <p className={`text-[9px] sm:text-xs font-bold mt-0.5 sm:mt-1 ${day.totalHrs > 8 ? 'text-orange-600' : 'text-emerald-600'}`}>
+                <p className={`text-xs font-bold mt-0.5 sm:mt-1 ${day.totalHrs > 8 ? 'text-orange-600' : 'text-emerald-600'}`}>
                   {day.totalHrs.toFixed(1)}h
                 </p>
               ) : (
-                <p className="text-[9px] text-gray-300 dark:text-white/20 mt-0.5 sm:mt-1">&mdash;</p>
+                <p className="text-xs text-gray-300 dark:text-white/20 mt-0.5 sm:mt-1">&mdash;</p>
               )}
               {/* Tiny bar */}
               <div className="h-1 bg-gray-100 dark:bg-white/10 rounded-full mt-1 overflow-hidden">
@@ -759,7 +759,7 @@ function TimecardPage() {
                 style={{ width: `${Math.min(((weekData?.totalHours || 0) / 60) * 100, 100)}%` }}
               />
             </div>
-            <p className="text-[10px] text-blue-300 mt-1">
+            <p className="text-xs text-blue-300 mt-1">
               {(weekData?.weeklyOvertimeHours || 0) > 0
                 ? `${weekData?.weeklyOvertimeHours.toFixed(1)} hrs weekly OT`
                 : `${(40 - ((weekData?.totalHours || 0) - (weekData?.mandatoryOvertimeHours || 0))).toFixed(1)} hrs to OT`}
@@ -774,7 +774,7 @@ function TimecardPage() {
               </div>
             </div>
             <p className="text-2xl font-bold text-gray-900 dark:text-white">{weekData?.daysWorked || 0}</p>
-            <p className="text-[11px] text-gray-400 dark:text-white/40 mt-0.5">{weekData?.entries.length || 0} entries</p>
+            <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">{weekData?.entries.length || 0} entries</p>
           </div>
 
           <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200/60 dark:border-white/10 shadow-sm">
@@ -788,7 +788,7 @@ function TimecardPage() {
               {weekData?.entries.filter(e => e.is_approved).length || 0}
               <span className="text-sm font-normal text-gray-400 dark:text-white/40 ml-1">/ {weekData?.entries.length || 0}</span>
             </p>
-            <p className="text-[11px] text-gray-400 dark:text-white/40 mt-0.5">
+            <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">
               {(weekData?.entries.filter(e => !e.is_approved).length || 0) > 0
                 ? `${weekData?.entries.filter(e => !e.is_approved).length} pending`
                 : 'All approved'}
@@ -808,8 +808,8 @@ function TimecardPage() {
             <div key={label} className={`flex items-center gap-3 px-3.5 py-2.5 rounded-lg border ${border} ${bg}`}>
               <div className={color}>{icon}</div>
               <div>
-                <p className={`text-sm font-bold ${color}`}>{value}<span className="text-[10px] font-normal ml-0.5">hrs</span></p>
-                <p className="text-[10px] text-gray-500 dark:text-white/60 font-medium">{label}</p>
+                <p className={`text-sm font-bold ${color}`}>{value}<span className="text-xs font-normal ml-0.5">hrs</span></p>
+                <p className="text-xs text-gray-500 dark:text-white/60 font-medium">{label}</p>
               </div>
             </div>
           ))}
@@ -820,7 +820,7 @@ function TimecardPage() {
           <div className="mb-4 rounded-2xl p-4 bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-md">
             <div className="flex items-center justify-between gap-4 flex-wrap">
               <div>
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-white/75">Your PTO Balance · {new Date().getFullYear()}</p>
+                <p className="text-xs font-semibold uppercase tracking-widest text-white/75">Your PTO Balance · {new Date().getFullYear()}</p>
                 <p className="text-2xl font-bold tabular-nums leading-tight mt-0.5">
                   {pto.remaining.toFixed(1)} <span className="text-sm font-medium text-white/80">days remaining</span>
                 </p>
@@ -836,7 +836,7 @@ function TimecardPage() {
                 </div>
               </div>
             </div>
-            <p className="text-[11px] text-white/70 mt-2">Need time off? Submit a request and your manager will review it.</p>
+            <p className="text-xs text-white/70 mt-2">Need time off? Submit a request and your manager will review it.</p>
           </div>
         )}
 
@@ -885,17 +885,95 @@ function TimecardPage() {
               <p className="text-gray-400 dark:text-white/40 text-sm mt-1">Clock in from the dashboard to start tracking</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <>
+            {/* Mobile: stacked card-per-entry (no horizontal scroll on phones) */}
+            <div className="sm:hidden divide-y divide-gray-100 dark:divide-white/10">
+              {weekData.entries.map((entry) => {
+                const badges = getEntryBadges(entry);
+                const isMandatoryOT = entry.hour_type === 'mandatory_overtime';
+                return (
+                  <div
+                    key={entry.id}
+                    className={`p-4 bg-white dark:bg-white/5 ${
+                      isMandatoryOT ? 'border-l-[3px] border-l-red-400' : 'border-l-[3px] border-l-transparent'
+                    }`}
+                  >
+                    {/* Row 1: date + status */}
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">{formatDate(entry.date)}</span>
+                      {entry.is_approved ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
+                          <CheckCircle size={12} /> Approved
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50">
+                          <Clock size={12} /> Pending
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Row 2: In / Out / Hrs label:value */}
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 dark:text-white/40 uppercase tracking-wider mb-0.5">In</p>
+                        <p className="text-sm font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_in_time)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 dark:text-white/40 uppercase tracking-wider mb-0.5">Out</p>
+                        {entry.clock_out_time ? (
+                          <p className="text-sm font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_out_time)}</p>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
+                            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" /> Active
+                          </span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-gray-400 dark:text-white/40 uppercase tracking-wider mb-0.5">Hrs</p>
+                        {entry.total_hours !== null ? (
+                          <p className="text-sm font-bold tabular-nums text-gray-800 dark:text-white">{entry.total_hours.toFixed(2)}</p>
+                        ) : (
+                          <p className="text-sm text-gray-300">&mdash;</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Row 3: category badges */}
+                    <div className="flex flex-wrap items-center gap-1 mb-3">
+                      {badges.length > 0 ? badges.map((badge, bidx) => (
+                        <span key={bidx} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-semibold border ${badge.color}`}>
+                          {badge.icon}{badge.label}
+                        </span>
+                      )) : (
+                        <span className="text-xs text-gray-400 dark:text-white/40 font-medium">Regular</span>
+                      )}
+                    </div>
+
+                    {/* Row 4: correct action (full-width, ≥44px tap target) */}
+                    <button
+                      onClick={() => openCorrectionModal(entry)}
+                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 transition-colors"
+                      title="Request a time correction"
+                    >
+                      <Edit2 size={14} /> Request Correction
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop/tablet: full table */}
+            <div className="hidden sm:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-gray-50/80 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Date</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">In</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Out</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Hrs</th>
-                    <th className="hidden sm:table-cell px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Category</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Status</th>
-                    <th className="px-3 py-3 text-left text-[10px] font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Action</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Date</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">In</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Out</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Hrs</th>
+                    <th className="hidden sm:table-cell px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Category</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Status</th>
+                    <th className="px-3 py-3 text-left text-xs font-bold text-gray-500 dark:text-white/60 uppercase tracking-wider">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-white/5">
@@ -910,16 +988,16 @@ function TimecardPage() {
                         }`}
                       >
                         <td className="px-3 py-3 whitespace-nowrap">
-                          <span className="text-xs font-medium text-gray-700 dark:text-white/80">{formatDate(entry.date)}</span>
+                          <span className="text-sm font-medium text-gray-700 dark:text-white/80">{formatDate(entry.date)}</span>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
-                          <span className="text-xs font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_in_time)}</span>
+                          <span className="text-sm font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_in_time)}</span>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           {entry.clock_out_time ? (
-                            <span className="text-xs font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_out_time)}</span>
+                            <span className="text-sm font-medium text-gray-700 dark:text-white/80 tabular-nums">{formatTime(entry.clock_out_time)}</span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
                               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                               <span className="hidden sm:inline">Active</span>
                             </span>
@@ -927,30 +1005,30 @@ function TimecardPage() {
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           {entry.total_hours !== null ? (
-                            <span className="text-xs font-bold tabular-nums text-gray-800 dark:text-white">{entry.total_hours.toFixed(2)}</span>
+                            <span className="text-sm font-bold tabular-nums text-gray-800 dark:text-white">{entry.total_hours.toFixed(2)}</span>
                           ) : (
-                            <span className="text-xs text-gray-300">&mdash;</span>
+                            <span className="text-sm text-gray-300">&mdash;</span>
                           )}
                         </td>
                         <td className="hidden sm:table-cell px-3 py-3">
                           <div className="flex flex-wrap gap-1">
                             {badges.length > 0 ? badges.map((badge, bidx) => (
-                              <span key={bidx} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold border ${badge.color}`}>
+                              <span key={bidx} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-xs font-semibold border ${badge.color}`}>
                                 {badge.icon}{badge.label}
                               </span>
                             )) : (
-                              <span className="text-[10px] text-gray-400 dark:text-white/40 font-medium">Regular</span>
+                              <span className="text-xs text-gray-400 dark:text-white/40 font-medium">Regular</span>
                             )}
                           </div>
                         </td>
                         <td className="px-3 py-3 whitespace-nowrap">
                           {entry.is_approved ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-700/50">
                               <CheckCircle size={10} />
                               <span className="hidden sm:inline">Approved</span>
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-700/50">
                               <Clock size={10} />
                               <span className="hidden sm:inline">Pending</span>
                             </span>
@@ -959,7 +1037,7 @@ function TimecardPage() {
                         <td className="px-3 py-3 whitespace-nowrap">
                           <button
                             onClick={() => openCorrectionModal(entry)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 transition-colors"
                             title="Request a time correction"
                           >
                             <Edit2 size={10} />
@@ -972,6 +1050,7 @@ function TimecardPage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
 
@@ -987,7 +1066,7 @@ function TimecardPage() {
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-gray-900 dark:text-white">Request Time Correction</h3>
-                    <p className="text-[10px] text-gray-500 dark:text-white/40">
+                    <p className="text-xs text-gray-500 dark:text-white/40">
                       {formatDate(correctionTarget.date)} &mdash; your manager will review this
                     </p>
                   </div>
@@ -1130,7 +1209,7 @@ function TimecardPage() {
         )}
 
         {/* ── Legend ──────────────────────────────────────── */}
-        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 py-3 text-[11px] text-gray-500 dark:text-white/60">
+        <div className="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 px-2 py-3 text-xs text-gray-500 dark:text-white/60">
           {[
             { color: 'bg-emerald-500', label: 'Regular (Mon-Fri, up to 40 hrs)' },
             { color: 'bg-orange-500', label: 'Weekly OT (Mon-Fri over 40 hrs)' },

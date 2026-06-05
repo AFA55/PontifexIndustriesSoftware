@@ -1519,7 +1519,7 @@ export default function WorkPerformed() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm">
+      <div className="bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm pt-safe">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <button
@@ -1633,7 +1633,7 @@ export default function WorkPerformed() {
                       onChange={(e) => setNoteContent(e.target.value)}
                       placeholder="Leave a note for your supervisor..."
                       rows={4}
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
                     />
                     <button
                       onClick={handleSubmitNote}
@@ -2266,7 +2266,7 @@ export default function WorkPerformed() {
 
         {/* Submit Button */}
         {selectedItems.length > 0 && !dayAlreadySubmitted && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-6 z-50">
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-safe z-50">
             <div className="container mx-auto max-w-lg flex gap-3">
               <button
                 onClick={goBack}
@@ -2900,7 +2900,7 @@ export default function WorkPerformed() {
                                   value={currentArea.steelEncountered || ''}
                                   onChange={(e) => setCurrentArea(prev => ({ ...prev, steelEncountered: e.target.value }))}
                                   placeholder="e.g., #4 rebar, angle iron, etc..."
-                                  className="w-full px-3 py-2 text-sm border-2 border-red-300 dark:border-red-500/30 rounded-xl focus:border-red-500 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
+                                  className="w-full px-3 py-2 text-base sm:text-sm border-2 border-red-300 dark:border-red-500/30 rounded-xl focus:border-red-500 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   rows={2}
                                 />
                               </div>

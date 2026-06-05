@@ -356,7 +356,7 @@ function DailyReportPage() {
     return (
       <div className="min-h-screen bg-[#0b0618] text-white flex flex-col">
         {/* Header */}
-        <header className="sticky top-0 z-20 bg-[#0b0618]/90 backdrop-blur border-b border-white/10 px-4 py-3 flex items-center gap-3">
+        <header className="sticky top-0 z-20 bg-[#0b0618]/90 backdrop-blur border-b border-white/10 px-4 py-3 pt-safe-3 flex items-center gap-3">
           <button
             onClick={() => router.back()}
             className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-colors"
@@ -404,7 +404,7 @@ function DailyReportPage() {
   return (
     <div className="min-h-screen bg-[#0b0618] text-white flex flex-col">
       {/* Sticky header */}
-      <header className="sticky top-0 z-20 bg-[#0b0618]/90 backdrop-blur border-b border-white/10 px-4 py-3 flex items-center gap-3">
+      <header className="sticky top-0 z-20 bg-[#0b0618]/90 backdrop-blur border-b border-white/10 px-4 py-3 pt-safe-3 flex items-center gap-3">
         <button
           onClick={() => router.back()}
           className="p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10 transition-colors"
