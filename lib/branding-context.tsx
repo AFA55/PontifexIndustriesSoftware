@@ -39,6 +39,12 @@ export interface TenantBranding {
   show_inventory_module: boolean;
   show_nfc_module: boolean;
   show_customer_crm: boolean;
+  /**
+   * Per-tenant module switchboard map ({ [ModuleKey]: boolean }). Absent/empty
+   * ⇒ every module default-ON (see isModuleEnabled in lib/features.ts). Cached
+   * with the rest of branding (5 min) — acceptable latency for module gating.
+   */
+  features: Record<string, unknown>;
 }
 
 const DEFAULT_BRANDING: TenantBranding = {
@@ -78,6 +84,7 @@ const DEFAULT_BRANDING: TenantBranding = {
   show_inventory_module: true,
   show_nfc_module: true,
   show_customer_crm: true,
+  features: {},
 };
 
 const CACHE_KEY = 'patriot-branding';

@@ -64,8 +64,31 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Additive: also surface the tenant's module `features` map (for per-tenant
+    // module gating on the client). Best-effort + fail-soft — never let this
+    // block the branding response. Absence ⇒ {} ⇒ default-ON everywhere.
+    let features: Record<string, unknown> = {};
+    const brandingTenantId = (data as { tenant_id?: string | null }).tenant_id;
+    if (brandingTenantId) {
+      try {
+        const { data: tenantRow } = await withTimeout(
+          supabaseAdmin
+            .from('tenants')
+            .select('features')
+            .eq('id', brandingTenantId)
+            .maybeSingle(),
+          10_000
+        );
+        if (tenantRow?.features && typeof tenantRow.features === 'object') {
+          features = tenantRow.features as Record<string, unknown>;
+        }
+      } catch {
+        // Non-fatal — leave features as {} (default-ON).
+      }
+    }
+
     return NextResponse.json(
-      { success: true, data },
+      { success: true, data: { ...data, features } },
       {
         status: 200,
         headers: { 'Cache-Control': 'public, max-age=300' },

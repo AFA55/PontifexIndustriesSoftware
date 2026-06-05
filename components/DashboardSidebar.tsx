@@ -41,6 +41,7 @@ import { useBranding } from '@/lib/branding-context';
 import { supabase } from '@/lib/supabase';
 import { useFeatureFlags, type UserFeatureFlags } from '@/lib/feature-flags';
 import { isNativeApp } from '@/lib/is-native';
+import { isModuleEnabled, type ModuleKey } from '@/lib/features';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -60,6 +61,13 @@ interface NavItem {
   roles?: string[];
   /** If set, users with one of these roles see this item HIDDEN even if they'd otherwise pass. */
   excludeRoles?: string[];
+  /**
+   * If set, this item is hidden when the tenant has EXPLICITLY disabled this
+   * module in their switchboard (tenants.features[key] === false). ONLY set on
+   * non-core, toggleable items. Absent/unknown/core ⇒ never gated (default-ON).
+   * AND-ed with the existing flagKey/role checks — all must pass to show.
+   */
+  moduleKey?: ModuleKey;
 }
 
 interface NavSection {
@@ -78,9 +86,10 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-blue-400',
     items: [
       { label: 'Dashboard', href: '/dashboard/admin', icon: LayoutDashboard },
-      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board' },
+      { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board', moduleKey: 'scheduling' },
+      // Active Jobs is CORE (operator/job spine) — never gated.
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
-      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms' },
+      { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms', moduleKey: 'scheduling' },
     ],
   },
   {
@@ -89,20 +98,20 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       // Admin can review operators via Previous Visits but does NOT create reports
       // (site_visits = 'view' in RBAC). Only supervisors (+ senior oversight) create.
-      { label: 'New Visit Report', href: '/dashboard/admin/site-visits/new', icon: ClipboardCheck, roles: ['supervisor', 'super_admin', 'operations_manager'] },
-      { label: 'Previous Visits', href: '/dashboard/admin/site-visits', icon: ClipboardList, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'New Visit Report', href: '/dashboard/admin/site-visits/new', icon: ClipboardCheck, roles: ['supervisor', 'super_admin', 'operations_manager'], moduleKey: 'supervisor_visits' },
+      { label: 'Previous Visits', href: '/dashboard/admin/site-visits', icon: ClipboardList, roles: ['supervisor', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'supervisor_visits' },
     ],
   },
   {
     label: 'SHOP',
     accent: 'text-cyan-400',
     items: [
-      { label: 'Equipment', href: '/dashboard/admin/equipment', icon: Package, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
-      { label: 'Fleet', href: '/dashboard/admin/fleet', icon: Truck, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Equipment', href: '/dashboard/admin/equipment', icon: Package, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'equipment_fleet' },
+      { label: 'Fleet', href: '/dashboard/admin/fleet', icon: Truck, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'equipment_fleet' },
       // Unified Inventory Control replaces the 3 separate items: Pull Equipment, Voice Check-Out, Returned Equipment.
       // One page with 4 tabs (Inventory / Checkout / Check-In / History) + voice layer (Phase B-ii) on top.
-      { label: 'Inventory Control', href: '/dashboard/admin/inventory-control', icon: RotateCcw, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'] },
-      { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'] },
+      { label: 'Inventory Control', href: '/dashboard/admin/inventory-control', icon: RotateCcw, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'inventory_control' },
+      { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'maintenance' },
       // 'Shop Tasks' removed — it had no page (404) and is redundant with the
       // Maintenance Inbox, which is where equipment/maintenance requests land.
       // The /shop-tasks route now redirects to the Maintenance Inbox as a safety net.
@@ -121,21 +130,22 @@ const NAV_SECTIONS: NavSection[] = [
     accent: 'text-purple-400',
     items: [
       // Timecards + Time Off here are TEAM-wide views — hide from shop_manager/shop_help so they only see their own (via MY ACCOUNT above).
-      { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards', flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'] },
-      { label: 'Time Off', href: '/dashboard/admin/time-off', icon: CalendarOff, flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'] },
+      { label: 'Timecards', href: '/dashboard/admin/timecards', icon: Clock, badgeKey: 'timecards', flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'], moduleKey: 'timecards' },
+      { label: 'Time Off', href: '/dashboard/admin/time-off', icon: CalendarOff, flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'], moduleKey: 'timecards' },
+      // Team Profiles is CORE (team_management) — never gated.
       { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users, flagKey: 'can_manage_team' },
-      { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2, flagKey: 'can_view_customers' },
-      { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard, flagKey: 'can_view_invoicing' },
-      { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs', icon: CheckCircle2, flagKey: 'can_view_completed_jobs' },
+      { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2, flagKey: 'can_view_customers', moduleKey: 'customer_crm' },
+      { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard, flagKey: 'can_view_invoicing', moduleKey: 'billing' },
+      { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs', icon: CheckCircle2, flagKey: 'can_view_completed_jobs', moduleKey: 'completed_jobs' },
     ],
   },
   {
     label: 'TOOLS',
     accent: 'text-emerald-400',
     items: [
-      { label: 'Facilities', href: '/dashboard/admin/facilities', icon: Building2, flagKey: 'can_view_facilities' },
-      { label: 'NFC Tags', href: '/dashboard/admin/settings/nfc-tags', icon: Wifi, flagKey: 'can_view_nfc_tags' },
-      { label: 'Form Builder', href: '/dashboard/admin/form-builder', icon: Layout, flagKey: 'can_view_form_builder' },
+      { label: 'Facilities', href: '/dashboard/admin/facilities', icon: Building2, flagKey: 'can_view_facilities', moduleKey: 'facilities_badging' },
+      { label: 'NFC Tags', href: '/dashboard/admin/settings/nfc-tags', icon: Wifi, flagKey: 'can_view_nfc_tags', moduleKey: 'nfc' },
+      { label: 'Form Builder', href: '/dashboard/admin/form-builder', icon: Layout, flagKey: 'can_view_form_builder', moduleKey: 'customer_portal' },
     ],
   },
   {
@@ -144,7 +154,7 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings, flagKey: 'can_manage_settings' },
       { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
-      { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics' },
+      { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics', moduleKey: 'analytics' },
       { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard, superAdminOnly: true },
     ],
   },
@@ -313,7 +323,7 @@ interface SidebarContentProps {
   collapsed: boolean;
   onToggleCollapse?: () => void;
   user: User | null;
-  branding: { company_name: string; company_short_name: string };
+  branding: { company_name: string; company_short_name: string; features: Record<string, unknown> };
   badgeCounts: BadgeCounts;
   pathname: string;
   onNavClick?: () => void;
@@ -406,6 +416,9 @@ function SidebarContent({
                 if (item.excludeRoles && userRole && item.excludeRoles.includes(userRole)) return false;
                 // App Store 3.1.1: hide Billing in the native app (purchasing is web-only)
                 if (isNativeApp() && item.href === '/dashboard/admin/subscription') return false;
+                // Per-tenant module gating (AND-ed): only fires when the tenant
+                // EXPLICITLY disabled this module. Core/absent/unknown ⇒ shown.
+                if (item.moduleKey && !isModuleEnabled(item.moduleKey, branding.features)) return false;
                 return true;
               })
             : section.items.filter(item => {
@@ -414,6 +427,9 @@ function SidebarContent({
                 if (item.excludeRoles && userRole && item.excludeRoles.includes(userRole)) return false;
                 // App Store 3.1.1: hide Billing in the native app (purchasing is web-only)
                 if (isNativeApp() && item.href === '/dashboard/admin/subscription') return false;
+                // Per-tenant module gating (AND-ed): only fires when the tenant
+                // EXPLICITLY disabled this module. Core/absent/unknown ⇒ shown.
+                if (item.moduleKey && !isModuleEnabled(item.moduleKey, branding.features)) return false;
                 if (!item.flagKey) return true; // no flag = always visible
                 return flags[item.flagKey] !== false;
               });
@@ -599,6 +615,7 @@ export default function DashboardSidebar() {
     branding: {
       company_name: branding.company_name,
       company_short_name: branding.company_short_name,
+      features: branding.features,
     },
     badgeCounts,
     pathname,

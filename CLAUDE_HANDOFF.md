@@ -20,7 +20,18 @@ We're shifting from feature-building to **fine-tuning + productizing**. The plan
 
 ---
 
-## ⚡ START HERE (Jun 5, 2026 — PART 2) — Pontifex Platform Console + Subsistence nights — ⚠️ build green, 2 guardians PASS, ONE push pending
+## ⚡ START HERE (Jun 5, 2026 — PART 3) — Module gating ACTIVATED (sidebar, default-ON) — ⚠️ build green, guardian PASS, ONE push pending
+
+The productization switchboard now actually DOES something — but safely (the "gentle first step": UI/sidebar gating before API gating). Builder + guardian (guardian caught a blocking tsc bug — fixed). `tsc` clean, build green, 846 tests pass. **Verified against live data: nothing hides for Patriot/Apex.** Not pushed yet.
+- **`lib/require-module.ts`** (NEW) — opt-in SERVER guard for FUTURE/new routes (resolves tenant → reads `tenants.features` → `isModuleEnabled`). **Currently UNUSED** (applied to no existing route) and **fails OPEN** on any error (never locks a tenant out on a DB hiccup). Apply to NEW non-core routes only, later.
+- **Client gets `tenants.features`** — `/api/admin/branding` now additively returns the caller's tenant `features` (best-effort, fail-safe `{}`); `lib/branding-context.tsx` exposes `branding.features` (5-min cached).
+- **Sidebar gating** — `DashboardSidebar.tsx` nav items gained an optional `moduleKey`; an item hides only when `item.moduleKey && !isModuleEnabled(moduleKey, branding.features)` — i.e. ONLY when an admin has explicitly set that module `false` in the switchboard. AND-ed with the existing per-user `flagKey`/role checks. **17 non-core items mapped** (Schedule Board/Form→scheduling, Timecards/TimeOff→timecards, Customers→customer_crm, Invoicing→billing, Completed Jobs→completed_jobs, Facilities→facilities_badging, NFC→nfc, Form Builder→customer_portal, Equipment/Fleet→equipment_fleet, Inventory→inventory_control, Maintenance→maintenance, Site Visits→supervisor_visits, Analytics→analytics). **Core items NEVER gated** (Active Jobs, Team Profiles, Settings, Notifications, subscription Billing, PLATFORM section, My-Account).
+- **Why safe:** `isModuleEnabled` default-ON (absent/unknown/core ⇒ true); Patriot/Apex have ZERO `false` values (their stored keys are all `true`, and canonical keys for unmapped modules are absent ⇒ default-on). So every item still shows until someone toggles. The switchboard writes CANONICAL keys, which the sidebar reads (canonical-first lookup), so toggles work going forward.
+- **Still NOT done (next phase, separately reviewed):** API enforcement (apply `requireModule` to new non-core routes); per-page `<ModuleGuard>` so a deep-link to a disabled module shows "not enabled" (sidebar-only gating means a direct URL still loads the page). No migrations.
+
+---
+
+## ⚡ START HERE (Jun 5, 2026 — PART 2) — Pontifex Platform Console + Subsistence nights — ✅ DEPLOYED
 
 Parallel agents (4 builders) + TWO architecture-guardians (platform-security + payroll). **`tsc` clean, build green, 846 tests pass.** Platform guardian caught a blocking bug (fixed). Plans: `PLATFORM_CONSOLE_PLAN.md`, `SUBSISTENCE_NIGHTS_PLAN.md`. Not pushed yet.
 
