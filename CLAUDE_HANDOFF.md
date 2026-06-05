@@ -1,5 +1,5 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 4, 2026 | **Branch:** `main` | **HEAD:** `cefd3e85` + **UNCOMMITTED Phase A + mobile + auth-UX batch (build green, awaiting single push)** | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + live** · **v1.0.2 (Build 7) — "Waiting for Review."**
+**Last updated:** Jun 4, 2026 | **Branch:** `main` | **HEAD:** `5dc04f77` — **Phase A + mobile + auth-UX + password-reset fix PUSHED → deploy `dpl_7spEQmZv…` READY/live** | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + live** · **v1.0.2 (Build 7) — "Waiting for Review."**
 
 > 🧰 **New:** `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev & prevent recurring bugs (date lib + Sentry + Zod + TanStack Query + RHF + shadcn + tests). Phased, additive, no big-bang. Phase A (date lib + Sentry) is the highest-ROI next step.
 
@@ -50,7 +50,7 @@ Fine-tuning batch. Everything additive, behavior-preserving. **`npm run build` g
 - **VERIFIED end-to-end locally** against real Supabase: POST `"  Admin@Pontifex.com  "` → normalized → `✅ Reset link generated` → `✅ Email sent successfully via Resend! (Email ID …)`. **So Resend IS configured + working** — the prod failure was purely the email-normalization bug, NOT a missing key. Bogus email → enumeration-safe early return. `npm run build` green.
 - **🔴 FOUNDER must verify (I can't from here):** (1) `RESEND_API_KEY` set in **Vercel prod** (confirmed working locally; prod env may differ); (2) Resend sending domain `pontifexindustries.com` **verified** (SPF/DKIM/DMARC) — else mail lands in spam/bounces; (3) **Supabase Auth → URL Configuration → Redirect URLs** includes `https://www.pontifexindustries.com/update-password` (or `https://www.pontifexindustries.com/**`) — otherwise Supabase ignores `redirectTo` and the reset link lands on the homepage with no session → "Invalid Reset Link." This is the next thing a user would hit after the email starts arriving.
 
-**🔴 PENDING: the single `git push origin main`** (batch all of the above into ONE ~$1–2 Vercel build) — user to confirm. Commit only the intended files; do NOT `git add -A` (untracked `.claude-flow/`, `agentdb.rvf`, `ruvector.db`, `.claire/` are tooling junk).
+**✅ DEPLOYED Jun 4** — commits `3bbf2704` (Phase A + mobile + auth-UX) + `5dc04f77` (password-reset fix) pushed to origin/main → Vercel `dpl_7spEQmZv…` **READY/live** (~116s build; longer than usual because Sentry's webpack plugin instruments the build). Live on prod + in the iOS app via webview.
 
 ---
 
