@@ -33,6 +33,8 @@ import {
   Mic,
   RotateCcw,
   Wrench,
+  Crown,
+  Database,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -144,6 +146,14 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
       { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics' },
       { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard, superAdminOnly: true },
+    ],
+  },
+  {
+    label: 'PLATFORM',
+    accent: 'text-amber-400',
+    items: [
+      { label: 'Tenants', href: '/dashboard/platform/tenants', icon: Crown, superAdminOnly: true },
+      { label: 'Backups', href: '/dashboard/platform/backups', icon: Database, superAdminOnly: true },
     ],
   },
 ];

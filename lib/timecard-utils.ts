@@ -39,6 +39,15 @@ export interface WeekSummary {
   holidayHours: number;
   totalHours: number;
   daysWorked: number;
+  /**
+   * Subsistence (per-diem) nights away. SURFACED field only — it is NOT derived
+   * from `entries` (subsistence lives in the separate `subsistence_nights` table)
+   * and is OT-EXEMPT: it never enters the 40-hr weekly-OT base. `calculateWeekSummary`
+   * defaults it to 0; callers that have the count populate it alongside.
+   */
+  subsistenceNights?: number;
+  /** Derived pay = subsistenceNights × tenant rate. Only set when a rate is configured. */
+  subsistencePay?: number;
 }
 
 /**
@@ -99,6 +108,9 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
     holidayHours: Number(holidayHours.toFixed(2)),
     totalHours: Number(totalHours.toFixed(2)),
     daysWorked,
+    // Surfaced, not derived here: subsistence comes from a separate table and is
+    // OT-exempt. Default 0 keeps this function's hour/OT math behavior-preserving.
+    subsistenceNights: 0,
   };
 }
 

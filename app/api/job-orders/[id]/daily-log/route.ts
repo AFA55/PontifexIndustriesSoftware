@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { toLocalYMD } from '@/lib/dates';
 
 export async function POST(
   request: NextRequest,
@@ -46,7 +47,8 @@ export async function POST(
       signatureData,
       continueNextDay,
       latitude,
-      longitude
+      longitude,
+      stayed_overnight
     } = body;
 
     // Get job order (scoped to tenant)
@@ -113,6 +115,40 @@ export async function POST(
 
     const now = new Date().toISOString();
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // ─── Subsistence (out-of-town overnight) — fire-and-forget side effect ───
+    // Never trust the client for the out-of-town gate: re-derive from the DB job.
+    // This MUST NOT block or fail the operator's day-complete flow.
+    const jobIsOutOfTown = job?.scheduling_flexibility?.out_of_town === true;
+    if (jobIsOutOfTown && typeof stayed_overnight === 'boolean') {
+      // Local calendar date (NEVER the UTC `today` above — date-rule compliant).
+      const nightDate = toLocalYMD();
+      if (stayed_overnight === true) {
+        // Idempotent: one subsistence night per operator per calendar date.
+        Promise.resolve(
+          supabaseAdmin.from('subsistence_nights').upsert(
+            {
+              tenant_id: tenantId,
+              operator_id: user.id,
+              night_date: nightDate,
+              job_order_id: jobId,
+              job_number: job.job_number ?? null,
+              source: 'operator',
+            },
+            { onConflict: 'operator_id,night_date' }
+          )
+        ).then(() => {}).catch(() => {});
+      } else {
+        // Operator corrected an earlier "yes" → remove the night for this date.
+        Promise.resolve(
+          supabaseAdmin
+            .from('subsistence_nights')
+            .delete()
+            .eq('operator_id', user.id)
+            .eq('night_date', nightDate)
+        ).then(() => {}).catch(() => {});
+      }
+    }
 
     // Calculate hours worked today.
     // Prefer the operator's timecard for the day (clock_in / clock_out / total_hours)

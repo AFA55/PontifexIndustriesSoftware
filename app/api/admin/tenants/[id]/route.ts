@@ -3,6 +3,27 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSuperAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { FEATURE_MODULE_MAP, LEGACY_ALIASES } from '@/lib/features';
+import { PROTECTED_TENANT_IDS } from '@/lib/tenant-onboarding';
+
+/** Tenant statuses that revoke access (block if last active tenant / Patriot). */
+const DEACTIVATING_STATUSES = ['suspended', 'cancelled'];
+
+/**
+ * Drop any module key that resolves to a `core: true` module from an incoming
+ * `features` map. Core modules must NEVER be stored/disabled (disabling breaks
+ * the app). Legacy aliases are normalized before the core check.
+ */
+function stripCoreFeatureKeys(features: Record<string, unknown>): Record<string, unknown> {
+  const cleaned: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(features)) {
+    const canonical = (LEGACY_ALIASES[key] ?? key) as string;
+    const mod = FEATURE_MODULE_MAP[canonical];
+    if (mod?.core) continue; // never store a core key
+    cleaned[key] = value;
+  }
+  return cleaned;
+}
 
 /**
  * GET /api/admin/tenants/[id] — Get tenant details with users
@@ -74,6 +95,40 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
+    // Guard rail (a): never store/disable a core module. Strip any core key
+    // from an incoming features map.
+    if (updates.features && typeof updates.features === 'object') {
+      updates.features = stripCoreFeatureKeys(updates.features as Record<string, unknown>);
+    }
+
+    // Guard rail (b): a status change that revokes access (suspended/cancelled)
+    // is blocked for the protected tenant (Patriot) and may not leave zero
+    // active tenants.
+    if (typeof updates.status === 'string' && DEACTIVATING_STATUSES.includes(updates.status)) {
+      if (PROTECTED_TENANT_IDS.includes(id)) {
+        return NextResponse.json(
+          { error: 'This tenant is protected and cannot be suspended or cancelled.' },
+          { status: 403 }
+        );
+      }
+
+      // Count currently-active tenants. If this tenant is one of them and it's
+      // the last active tenant, refuse (would lock everyone out).
+      const { data: activeTenants } = await supabaseAdmin
+        .from('tenants')
+        .select('id')
+        .eq('status', 'active');
+
+      const activeIds = (activeTenants || []).map((t) => t.id);
+      const targetIsActive = activeIds.includes(id);
+      if (targetIsActive && activeIds.length <= 1) {
+        return NextResponse.json(
+          { error: 'Refusing to deactivate the last active tenant.' },
+          { status: 409 }
+        );
+      }
+    }
+
     const { data, error } = await supabaseAdmin
       .from('tenants')
       .update(updates)
@@ -91,6 +146,7 @@ export async function PATCH(
         action: 'update_tenant',
         resource_type: 'tenant',
         resource_id: id,
+        tenant_id: id,
         details: updates,
       })
     ).catch(() => {});
@@ -111,6 +167,27 @@ export async function DELETE(
   const { id } = await params;
 
   try {
+    // Same guard rails as PATCH's deactivating-status path: DELETE soft-cancels a
+    // tenant, which revokes access exactly like suspend/cancel — so it must NOT be
+    // able to cancel the protected tenant (Patriot) or leave zero active tenants.
+    if (PROTECTED_TENANT_IDS.includes(id)) {
+      return NextResponse.json(
+        { error: 'This tenant is protected and cannot be cancelled.' },
+        { status: 403 }
+      );
+    }
+    const { data: activeTenants } = await supabaseAdmin
+      .from('tenants')
+      .select('id')
+      .eq('status', 'active');
+    const activeIds = (activeTenants || []).map((t) => t.id);
+    if (activeIds.includes(id) && activeIds.length <= 1) {
+      return NextResponse.json(
+        { error: 'Refusing to deactivate the last active tenant.' },
+        { status: 409 }
+      );
+    }
+
     // Soft delete — set status to cancelled
     const { data, error } = await supabaseAdmin
       .from('tenants')
@@ -128,6 +205,7 @@ export async function DELETE(
         action: 'delete_tenant',
         resource_type: 'tenant',
         resource_id: id,
+        tenant_id: id,
         details: { soft_delete: true },
       })
     ).catch(() => {});

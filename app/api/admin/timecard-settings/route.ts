@@ -39,6 +39,7 @@ const DEFAULT_SETTINGS = {
   break_threshold_hours: 6,
   break_is_paid: false,
   late_grace_minutes: 15,
+  subsistence_rate: 0,
 };
 
 // Sensible defaults for required NOT NULL v2 columns when inserting a fresh row.
@@ -52,6 +53,7 @@ const V2_INSERT_DEFAULTS = {
   break_is_paid: false,
   overtime_threshold_weekly: 40,
   late_grace_minutes: 15,
+  subsistence_rate: 0,
 };
 
 // Map a v2 row → page-facing field names for GET responses.
@@ -66,6 +68,7 @@ function v2ToPage(row: Record<string, unknown>) {
     break_threshold_hours: row.break_threshold_hours,
     break_is_paid: row.break_is_paid,
     late_grace_minutes: row.late_grace_minutes,
+    subsistence_rate: row.subsistence_rate ?? 0,
     // Page fields with no v2 column — keep returning defaults so the UI doesn't break.
     allow_remote: DEFAULT_SETTINGS.allow_remote,
     night_shift_start: DEFAULT_SETTINGS.night_shift_start,
@@ -85,6 +88,7 @@ const PAGE_TO_V2_COLUMN: Record<string, string> = {
   break_threshold_hours: 'break_threshold_hours',
   break_is_paid: 'break_is_paid',
   late_grace_minutes: 'late_grace_minutes',
+  subsistence_rate: 'subsistence_rate',
 };
 
 export async function GET(request: NextRequest) {

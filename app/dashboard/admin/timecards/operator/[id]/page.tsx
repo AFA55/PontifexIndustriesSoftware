@@ -9,7 +9,7 @@ import {
   Briefcase, AlertTriangle, TrendingUp, Loader2, MapPin,
   ExternalLink, Users, Shield, MessageSquare, Send, Coffee,
   Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
-  RefreshCw, DollarSign, Zap, Timer, Camera
+  RefreshCw, DollarSign, Zap, Timer, Camera, Plus, Minus
 } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -391,6 +391,12 @@ function OperatorTimecardDetailPageInner() {
   // Night shift multiplier (fetched from settings for display)
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
 
+  // Subsistence (per-diem) nights for the displayed week + tenant rate.
+  // Nights are sourced from the separate subsistence_nights table (OT-exempt).
+  const [subsistenceNights, setSubsistenceNights] = useState<string[]>([]); // night_date list (YYYY-MM-DD)
+  const [subsistenceRate, setSubsistenceRate] = useState(0);
+  const [subsistenceSaving, setSubsistenceSaving] = useState(false);
+
   // Manual entry (PTO / sick / holiday / manual / called-out) — for days
   // with no clock-in. Wired to POST /api/admin/timecards/manual.
   const [showManualModal, setShowManualModal] = useState(false);
@@ -529,20 +535,64 @@ function OperatorTimecardDetailPageInner() {
     if (user) fetchData();
   }, [user, fetchData]);
 
-  // ── Fetch night shift multiplier from settings ──────────────
+  // ── Fetch night shift multiplier + subsistence rate from settings ──
   useEffect(() => {
     const loadSettings = async () => {
       const { data } = await supabase
         .from('timecard_settings_v2')
-        .select('night_shift_multiplier')
+        .select('night_shift_multiplier, subsistence_rate')
         .limit(1)
         .single();
       if (data?.night_shift_multiplier) {
         setNightShiftMultiplier(Number(data.night_shift_multiplier));
       }
+      setSubsistenceRate(Number(data?.subsistence_rate) || 0);
     };
     loadSettings().catch(() => {});
   }, []);
+
+  // ── Subsistence nights for the displayed week (admin route, owned elsewhere) ──
+  const fetchSubsistenceNights = useCallback(async () => {
+    const token = await getSessionToken();
+    if (!token) return;
+    try {
+      const res = await fetch(
+        `/api/admin/subsistence-nights?operatorId=${operatorId}&weekStart=${weekStart}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (!res.ok) return;
+      const json = await res.json();
+      const rows = (json?.data ?? json?.nights ?? []) as Array<{ night_date: string }>;
+      setSubsistenceNights(rows.map(r => r.night_date).filter(Boolean));
+    } catch {
+      // Route/table may not be live yet — leave at 0 nights.
+    }
+  }, [operatorId, weekStart, getSessionToken]);
+
+  useEffect(() => {
+    if (user) fetchSubsistenceNights();
+  }, [user, fetchSubsistenceNights]);
+
+  // Admin override: add (+) or remove (-) a subsistence night for a given date.
+  const adjustSubsistenceNight = async (action: 'add' | 'remove', nightDate: string) => {
+    const token = await getSessionToken();
+    if (!token) return;
+    setSubsistenceSaving(true);
+    try {
+      const res = await fetch('/api/admin/subsistence-nights', {
+        method: action === 'add' ? 'POST' : 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operator_id: operatorId, night_date: nightDate }),
+      });
+      if (res.ok) {
+        await fetchSubsistenceNights();
+      }
+    } catch {
+      // ignore — non-blocking override
+    } finally {
+      setSubsistenceSaving(false);
+    }
+  };
 
   // ── Week navigation ─────────────────────────────────────────
   const navigateWeek = (direction: -1 | 1) => {
@@ -1307,6 +1357,55 @@ function OperatorTimecardDetailPageInner() {
                       Last: {new Date(p.lastLateDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                     </p>
                   )}
+                </div>
+              );
+            })()}
+
+            {/* Subsistence Nights — count of overnight stays this week (OT-exempt) */}
+            {(() => {
+              const nights = subsistenceNights.length;
+              // Target date for inline +/-: add to the last day of the week,
+              // remove the most recent recorded night.
+              const addDate = getWeekEnd(weekStart);
+              const removeDate = nights > 0 ? [...subsistenceNights].sort().slice(-1)[0] : null;
+              return (
+                <div className="bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border border-gray-100 dark:border-white/10 shadow-sm">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Subsistence</span>
+                    <div className="w-7 h-7 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+                      <Moon size={13} className="text-indigo-400" />
+                    </div>
+                  </div>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">
+                    {nights}
+                    {subsistenceRate > 0 && nights > 0 && (
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 ml-1.5">
+                        ${(nights * subsistenceRate).toFixed(0)}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-0.5">
+                    {nights === 1 ? '1 night away' : `${nights} nights away`}
+                    {subsistenceRate > 0 && ` · $${subsistenceRate}/night`}
+                  </p>
+                  <div className="flex items-center gap-1.5 mt-2">
+                    <button
+                      onClick={() => removeDate && adjustSubsistenceNight('remove', removeDate)}
+                      disabled={subsistenceSaving || nights === 0}
+                      className="w-7 h-7 rounded-md border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-600 dark:text-slate-300 disabled:opacity-40 hover:bg-gray-50 dark:hover:bg-white/5"
+                      title="Remove most recent subsistence night"
+                    >
+                      <Minus size={13} />
+                    </button>
+                    <button
+                      onClick={() => adjustSubsistenceNight('add', addDate)}
+                      disabled={subsistenceSaving}
+                      className="w-7 h-7 rounded-md border border-indigo-200 dark:border-indigo-400/30 bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-300 disabled:opacity-40 hover:bg-indigo-100 dark:hover:bg-indigo-500/20"
+                      title={`Add a subsistence night (${addDate})`}
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
                 </div>
               );
             })()}

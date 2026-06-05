@@ -30,8 +30,13 @@
  * =============================================================================
  */
 
-import { supabaseAdmin } from '../lib/supabase-admin';
-import { FEATURE_MODULES } from '../lib/features'; // see PRODUCTIZATION_SWITCHBOARD_PLAN.md §2 (create this first)
+import {
+  buildFeaturesMap,
+  createTenantRow as onboardCreateTenantRow,
+  seedBranding as onboardSeedBranding,
+  createAdminUser as onboardCreateAdminUser,
+  type TenantOnboardingConfig,
+} from '../lib/tenant-onboarding'; // single source of truth shared with POST /api/admin/tenants
 
 // =============================================================================
 // CONFIG — edit per new client, then run with --dry-run, then --commit
@@ -88,7 +93,9 @@ const CONFIG: NewTenantConfig = {
 // =============================================================================
 const PROTECTED_COMPANY_CODES = ['PATRIOT'];     // never create/overwrite these
 const PROTECTED_SLUGS = ['patriot'];
-const PROTECTED_TENANT_IDS = ['ee3d8081-cec2-47f3-ac23-bdc0bb2d142d']; // Patriot (verified live)
+// NOTE: PROTECTED_TENANT_IDS now lives in lib/tenant-onboarding.ts and is enforced
+// inside createTenantRow(); the CLI's company_code/slug guards below cover the
+// pre-flight refusal so a placeholder run aborts before any DB call.
 
 const COMPANY_CODE_RE = /^[A-Z0-9_]{3,20}$/;     // matches DB CHECK constraint
 const SLUG_RE = /^[a-z0-9-]+$/;                   // matches POST /api/admin/tenants
@@ -116,112 +123,47 @@ function validateEnvironment(): void {
 }
 
 // =============================================================================
-// Module-feature normalization (uses the canonical registry from lib/features.ts)
+// Onboarding steps — thin wrappers over the shared lib/tenant-onboarding.ts so
+// the CLI and POST /api/admin/tenants run the SAME battle-tested logic. The CLI
+// keeps its own guards (PROTECTED ids, validateConfig, --dry-run/--commit) in
+// run(); the shared functions also defend against protected code/slug/id.
 // =============================================================================
-function buildFeaturesMap(enabledModules: Record<string, boolean> | undefined): Record<string, boolean> {
-  const map: Record<string, boolean> = {};
-  for (const m of FEATURE_MODULES) {
-    if (m.core) continue;                                  // core modules are always-on; never stored as toggleable
-    const requested = enabledModules?.[m.key];
-    map[m.key] = requested === undefined ? m.defaultOn : requested;
-  }
-  return map;
-}
 
-// =============================================================================
-// STEP 1 — create the tenant row (idempotent on company_code)
-// =============================================================================
-async function createTenantRow(cfg: NewTenantConfig) {
-  // Hard stop if a tenant with this code/slug already exists (don't clobber).
-  const { data: existing } = await supabaseAdmin
-    .from('tenants')
-    .select('id, company_code, slug')
-    .or(`company_code.eq.${cfg.companyCode},slug.eq.${cfg.slug}`)
-    .maybeSingle();
-  if (existing) {
-    assert(!PROTECTED_TENANT_IDS.includes(existing.id), 'Matched a PROTECTED tenant — aborting.');
-    throw new Error(`[new-tenant] Tenant already exists (id=${existing.id}, code=${existing.company_code}). Aborting to avoid overwrite.`);
-  }
-
-  const features = buildFeaturesMap(cfg.enabledModules);
-
-  const insert = {
+/** Map the CLI's NewTenantConfig onto the shared TenantOnboardingConfig. */
+function toOnboardingConfig(cfg: NewTenantConfig): TenantOnboardingConfig {
+  return {
     name: cfg.name,
     slug: cfg.slug,
+    companyCode: cfg.companyCode,
     domain: cfg.domain ?? null,
-    company_code: cfg.companyCode,
-    status: 'active',
-    plan: cfg.plan ?? 'professional',
-    max_users: cfg.maxUsers ?? 50,
-    max_jobs_per_month: cfg.maxJobsPerMonth ?? 500,
-    primary_color: cfg.primaryColor ?? '#7c3aed',
-    logo_url: cfg.logoUrl ?? null,
-    features,
+    plan: cfg.plan,
+    maxUsers: cfg.maxUsers,
+    maxJobsPerMonth: cfg.maxJobsPerMonth,
+    primaryColor: cfg.primaryColor,
+    logoUrl: cfg.logoUrl ?? null,
+    enabledModules: cfg.enabledModules,
   };
-
-  const { data, error } = await supabaseAdmin.from('tenants').insert(insert).select().single();
-  if (error) throw new Error(`[new-tenant] tenant insert failed: ${error.message}`);
-  return data as { id: string; company_code: string };
 }
 
-// =============================================================================
-// STEP 2 — seed a branding row (so the login page is white-labeled day one)
-// =============================================================================
+async function createTenantRow(cfg: NewTenantConfig) {
+  return onboardCreateTenantRow(toOnboardingConfig(cfg));
+}
+
 async function seedBranding(tenantId: string, cfg: NewTenantConfig) {
-  // tenant_branding is keyed by tenant_id; only set the safe, known columns.
-  const { error } = await supabaseAdmin
-    .from('tenant_branding')
-    .upsert(
-      {
-        tenant_id: tenantId,
-        company_name: cfg.name,
-        primary_color: cfg.primaryColor ?? '#7c3aed',
-      },
-      { onConflict: 'tenant_id' }
-    );
-  if (error) {
-    // Non-fatal: branding has app-level DEFAULT_BRANDING fallback (lib/branding-context.tsx).
-    console.warn(`[new-tenant] branding seed warning (non-fatal): ${error.message}`);
-  }
+  return onboardSeedBranding(tenantId, { name: cfg.name, primaryColor: cfg.primaryColor });
 }
 
-// =============================================================================
-// STEP 3 — create the first admin user (auth + profile + tenant_id)
-// =============================================================================
 async function createAdminUser(tenantId: string, cfg: NewTenantConfig) {
-  const role = cfg.admin.role ?? 'admin';
-
-  // Create the auth user. If no tempPassword, create unconfirmed + send invite.
-  const { data: created, error: authErr } = await supabaseAdmin.auth.admin.createUser({
-    email: cfg.admin.email,
-    password: cfg.admin.tempPassword, // undefined => Supabase generates; we then send a reset/invite
-    email_confirm: Boolean(cfg.admin.tempPassword),
-    user_metadata: { full_name: cfg.admin.fullName },
-    // NOTE: authorization role lives in profiles.role, NOT user_metadata (CLAUDE.md rule).
-  });
-  if (authErr) throw new Error(`[new-tenant] auth.createUser failed: ${authErr.message}`);
-  const userId = created.user.id;
-
-  // Upsert the profile row scoped to the new tenant.
-  const { error: profErr } = await supabaseAdmin.from('profiles').upsert(
-    { id: userId, email: cfg.admin.email, full_name: cfg.admin.fullName, role, tenant_id: tenantId },
-    { onConflict: 'id' }
+  const { userId } = await onboardCreateAdminUser(
+    tenantId,
+    {
+      email: cfg.admin.email,
+      fullName: cfg.admin.fullName,
+      tempPassword: cfg.admin.tempPassword,
+      role: cfg.admin.role ?? 'admin',
+    },
+    { tenantUserRole: 'owner' }
   );
-  if (profErr) throw new Error(`[new-tenant] profile upsert failed: ${profErr.message}`);
-
-  // Link via tenant_users (mirrors POST /api/admin/tenants behavior).
-  await supabaseAdmin
-    .from('tenant_users')
-    .insert({ tenant_id: tenantId, user_id: userId, role: 'owner' })
-    .then(() => undefined, () => undefined); // table may not gate onboarding — best-effort
-
-  // If no password was set, send the invite/recovery email so they can set one.
-  if (!cfg.admin.tempPassword) {
-    await supabaseAdmin.auth.admin
-      .inviteUserByEmail(cfg.admin.email)
-      .then(() => undefined, (e) => console.warn(`[new-tenant] invite email warning: ${e?.message}`));
-  }
-
   return userId;
 }
 

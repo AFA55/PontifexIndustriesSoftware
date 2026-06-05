@@ -20,7 +20,30 @@ We're shifting from feature-building to **fine-tuning + productizing**. The plan
 
 ---
 
-## ⚡ START HERE (Jun 5, 2026) — Timecard: configurable late + no-show + holidays (+ settings-persistence bug fix) — ⚠️ build green, guardian PASS, ONE push pending
+## ⚡ START HERE (Jun 5, 2026 — PART 2) — Pontifex Platform Console + Subsistence nights — ⚠️ build green, 2 guardians PASS, ONE push pending
+
+Parallel agents (4 builders) + TWO architecture-guardians (platform-security + payroll). **`tsc` clean, build green, 846 tests pass.** Platform guardian caught a blocking bug (fixed). Plans: `PLATFORM_CONSOLE_PLAN.md`, `SUBSISTENCE_NIGHTS_PLAN.md`. Not pushed yet.
+
+**PONTIFEX PLATFORM CONSOLE** (super-admin control plane for the platform owner, distinct from a client's admin dashboard) — activates the productization scaffold.
+- New area **`/dashboard/platform/*`** (super_admin-only, slate/amber "PONTIFEX PLATFORM" shell), reachable from a new sidebar PLATFORM section. Old `/dashboard/admin/tenant-management` now redirects there.
+- **Tenants list** (per-card #users + #modules + drill-in) → **Tenant detail** tabs: Overview (branding/plan/limits/status; company_code+slug READ-ONLY), **Users** (list/add-invite/role-change/deactivate per client), **Modules** (the switchboard), Billing (deep-link). **Create tenant** flow (company_code validated, modules, optional first-admin).
+- New cross-tenant APIs: `GET/POST /api/admin/platform/tenants/[id]/users`, `PATCH /[userId]`. **Security invariant: every platform write takes an EXPLICIT target tenantId (path param), never the caller's tenant; user PATCH re-asserts target.tenant_id===[id].** `lib/tenant-onboarding.ts` extracted (shared by the create API + `scripts/new-tenant.ts`).
+- **Guard rails (server-side):** Patriot (`ee3d8081…`) can't be suspended/cancelled (PATCH **and** DELETE — the DELETE gap was the guardian's blocking catch, now fixed); can't zero out the last active tenant; can't disable `core` modules (stripped from features PATCH); can't demote/deactivate the last admin or yourself.
+- **MODULE SWITCHBOARD IS WRITE-ONLY** — toggling records intent in `tenants.features`; **nothing gates on it yet** (Patriot/Apex keep everything). Activating `requireModule()` gating on NEW routes only is the deliberate next phase (`lib/features.ts` still scaffold). **No migrations** for v1.
+- Known: `grant-super-admin` route's audit insert uses wrong columns (`actor_id`/`target_id` vs real `user_id`/`resource_*`) — pre-existing, silently failing, spun off as a background task. New routes use the correct columns.
+
+**SUBSISTENCE NIGHTS** (per-diem for out-of-town overnight stays).
+- Operator self-reports at **day-complete** — a one-tap "Did you stay overnight?" shown ONLY on out-of-town jobs (`job.scheduling_flexibility->>'out_of_town'`; the answer rides the existing daily-log POST, fire-and-forget so it can't fail day-complete; server re-derives out_of_town, never trusts client).
+- New table `subsistence_nights` `UNIQUE(operator_id, night_date)` (one night/operator/day; idempotent upsert; "No" deletes a prior yes). tenant_id + RLS. **OT-EXEMPT** — separate table, `calculateWeekSummary` hour/OT math untouched.
+- **Configurable rate:** `timecard_settings_v2.subsistence_rate` (default 0 = count-only) on the timecard settings page; payroll auto-shows nights × rate when > 0.
+- Surfaces: Team Payroll per-operator chip (count + $), operator-detail "Subsistence" tile with admin +/- override (`/api/admin/subsistence-nights` GET/POST/DELETE, requireAdmin).
+- Note (guardian nit, pre-existing): `operator/[id]/page.tsx` `getWeekStart/getWeekEnd` use UTC `toISOString().split` (recurring date-bug class) — low impact, migrate to `lib/dates` in a follow-up.
+
+**⚠️ NO App Store resubmission** — all web/server-side. Migrations applied (additive): `subsistence_nights` + `timecard_settings_v2.subsistence_rate`.
+
+---
+
+## ⚡ START HERE (Jun 5, 2026) — Timecard: configurable late + no-show + holidays (+ settings-persistence bug fix) — ✅ DEPLOYED
 
 Parallel agents + architecture-guardian (the guardian caught a real blocking bug — see below). **`tsc` clean, build green, 846 tests pass, guardian VERDICT: PASS** (after the 1 fix). Not pushed yet. Plan: `TIMECARD_SETTINGS_PLAN.md`. Decisions: late = grace-minutes-after-scheduled-start; holiday pay = hourly field+shop roles, OT-exempt.
 

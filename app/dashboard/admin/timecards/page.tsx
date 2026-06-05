@@ -43,6 +43,8 @@ interface TeamMember {
   isClockedIn: boolean;
   hasNoEntries: boolean;
   status: 'all_approved' | 'has_pending' | 'clocked_in' | 'no_entries';
+  subsistenceNights?: number;
+  subsistencePay?: number | null;
 }
 
 interface TeamTotals {
@@ -150,6 +152,8 @@ export default function AdminTimecardsPage() {
   const [showNightShiftSettings, setShowNightShiftSettings] = useState(false);
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
   const [savingNightShiftSettings, setSavingNightShiftSettings] = useState(false);
+  // Tenant subsistence ($/night) rate; 0 = count-only (no dollar amounts shown).
+  const [subsistenceRate, setSubsistenceRate] = useState(0);
 
   // Corrections panel state
   const [showCorrections, setShowCorrections] = useState(false);
@@ -222,6 +226,7 @@ export default function AdminTimecardsPage() {
       if (result.success) {
         setTeamMembers(result.data.teamMembers);
         setTotals(result.data.totals);
+        setSubsistenceRate(Number(result.data.subsistenceRate) || 0);
       } else {
         setLoadError(true);
       }
@@ -1099,6 +1104,12 @@ export default function AdminTimecardsPage() {
                                 </span>
                               </div>
                               <p className="text-[11px] text-gray-400 dark:text-white/30 truncate">{member.email}</p>
+                              {(member.subsistenceNights ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-0.5 mt-1 px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 text-[9px] font-bold border border-indigo-200 dark:border-indigo-400/30">
+                                  <Moon size={9} /> Subsistence: {member.subsistenceNights} night{member.subsistenceNights === 1 ? '' : 's'}
+                                  {subsistenceRate > 0 && ` · $${((member.subsistenceNights ?? 0) * subsistenceRate).toFixed(0)}`}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1372,6 +1383,12 @@ export default function AdminTimecardsPage() {
                       {noShowDays > 0 && (
                         <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300">
                           <UserX size={9} /> {noShowDays} no-show
+                        </span>
+                      )}
+                      {(member.subsistenceNights ?? 0) > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 dark:bg-indigo-500/15 text-indigo-700 dark:text-indigo-300">
+                          <Moon size={9} /> {member.subsistenceNights} night{member.subsistenceNights === 1 ? '' : 's'}
+                          {subsistenceRate > 0 && ` · $${((member.subsistenceNights ?? 0) * subsistenceRate).toFixed(0)}`}
                         </span>
                       )}
                       <button

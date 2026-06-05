@@ -121,6 +121,36 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch timecards' }, { status: 500 });
     }
 
+    // 2b. Fetch subsistence (per-diem) nights for this week + the tenant's rate.
+    //     Subsistence is a flat per-night add, OT-EXEMPT — it never enters the
+    //     hours/OT math below. We only count nights per operator and (if a rate
+    //     is configured) derive pay = nights × rate. Fire-tolerant: a failure
+    //     here must not break the payroll grid.
+    let subsistenceRate = 0;
+    const subsistenceNightsByUser: Record<string, number> = {};
+    try {
+      const { data: rateRow } = await supabaseAdmin
+        .from('timecard_settings_v2')
+        .select('subsistence_rate')
+        .eq('tenant_id', tenantId)
+        .limit(1)
+        .maybeSingle();
+      subsistenceRate = Number(rateRow?.subsistence_rate) || 0;
+
+      const { data: nights } = await supabaseAdmin
+        .from('subsistence_nights')
+        .select('operator_id, night_date')
+        .eq('tenant_id', tenantId)
+        .gte('night_date', mondayStr)
+        .lte('night_date', sundayStr);
+
+      (nights || []).forEach((n: { operator_id: string }) => {
+        subsistenceNightsByUser[n.operator_id] = (subsistenceNightsByUser[n.operator_id] || 0) + 1;
+      });
+    } catch {
+      // Table may not exist yet (migration pending) — degrade to 0 nights / no pay.
+    }
+
     // 3. Group timecards by user
     const tcByUser: Record<string, typeof timecards> = {};
     (timecards || []).forEach((tc) => {
@@ -237,6 +267,9 @@ export async function GET(request: NextRequest) {
           d => dailyHours[d].hours > 0
         ).length;
 
+        // Subsistence: OT-exempt flat per-night count for this operator/week.
+        const subsistenceNights = subsistenceNightsByUser[profile.id] || 0;
+
         return {
           userId: profile.id,
           fullName: profile.full_name || profile.email,
@@ -254,6 +287,11 @@ export async function GET(request: NextRequest) {
           hasNoEntries,
           status,
           weekendDaysWorked,
+          subsistenceNights,
+          // Only surface a dollar amount when the tenant has configured a rate.
+          subsistencePay: subsistenceRate > 0
+            ? parseFloat((subsistenceNights * subsistenceRate).toFixed(2))
+            : null,
         };
       })
       // Sort: active first, then by hours descending, no_entries last
@@ -265,10 +303,13 @@ export async function GET(request: NextRequest) {
         return b.weeklyTotal - a.weeklyTotal;
       });
 
+    const totalSubsistenceNights = teamMembers.reduce((s, m) => s + (m.subsistenceNights || 0), 0);
+
     return NextResponse.json({
       success: true,
       data: {
         teamMembers,
+        subsistenceRate,
         totals: {
           totalPayrollHours: parseFloat(totalPayrollHours.toFixed(2)),
           totalRegularHours: parseFloat(totalRegularHours.toFixed(2)),
@@ -277,6 +318,11 @@ export async function GET(request: NextRequest) {
           pendingApprovals,
           activeClockins,
           lateArrivalsThisWeek,
+          totalSubsistenceNights,
+          // OT-exempt flat add; null while no rate is configured.
+          totalSubsistencePay: subsistenceRate > 0
+            ? parseFloat((totalSubsistenceNights * subsistenceRate).toFixed(2))
+            : null,
         },
       },
     });

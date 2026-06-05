@@ -36,6 +36,9 @@ interface TimecardSettings {
   // Attendance & Punctuality
   lateGraceMinutes: number;
 
+  // Subsistence (per-diem) — $/night away on out-of-town jobs. 0 = count nights only.
+  subsistenceRate: number;
+
   // Limits
   maxHoursPerDay: number;
   autoClockOutAfter: number; // hours
@@ -63,6 +66,7 @@ const DEFAULT_SETTINGS: TimecardSettings = {
   requireAdminApproval: true,
   allowRemoteClockIn: true,
   lateGraceMinutes: 15,
+  subsistenceRate: 0,
   maxHoursPerDay: 16,
   autoClockOutAfter: 14,
   lockTimecardAfterDays: 7,
@@ -161,6 +165,7 @@ export default function TimecardSettingsPage() {
               weeklyOTThreshold: d.overtime_threshold ?? prev.weeklyOTThreshold,
               autoClockOutAfter: d.auto_clock_out ?? prev.autoClockOutAfter,
               lateGraceMinutes: d.late_grace_minutes ?? prev.lateGraceMinutes,
+              subsistenceRate: d.subsistence_rate ?? prev.subsistenceRate,
             }));
           }
         }
@@ -200,6 +205,7 @@ export default function TimecardSettingsPage() {
           overtime_threshold: settings.weeklyOTThreshold,
           auto_clock_out: settings.autoClockOutAfter,
           late_grace_minutes: settings.lateGraceMinutes,
+          subsistence_rate: settings.subsistenceRate,
         }),
       });
       if (!res.ok) {
@@ -481,15 +487,26 @@ export default function TimecardSettingsPage() {
             </div>
           </div>
           <div className="p-6">
-            <NumberInput
-              label="Late grace period"
-              description="Minutes past scheduled start before an operator is flagged late"
-              value={settings.lateGraceMinutes}
-              onChange={(v) => updateSetting('lateGraceMinutes', v)}
-              unit="minutes"
-              min={0}
-              max={60}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              <NumberInput
+                label="Late grace period"
+                description="Minutes past scheduled start before an operator is flagged late"
+                value={settings.lateGraceMinutes}
+                onChange={(v) => updateSetting('lateGraceMinutes', v)}
+                unit="minutes"
+                min={0}
+                max={60}
+              />
+              <NumberInput
+                label="Subsistence rate ($/night)"
+                description="Per-diem pay per night away on out-of-town jobs. 0 = count nights only (no auto-computed pay)."
+                value={settings.subsistenceRate}
+                onChange={(v) => updateSetting('subsistenceRate', v)}
+                unit="$ / night"
+                min={0}
+                step={5}
+              />
+            </div>
           </div>
         </div>
 

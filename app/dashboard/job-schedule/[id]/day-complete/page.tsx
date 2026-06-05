@@ -77,6 +77,14 @@ export default function DayCompletePage() {
   // ─── Smart last-day detection ────────────────────────────────────────────
   const [isLastScheduledDay, setIsLastScheduledDay] = useState<boolean | null>(null);
 
+  // ─── Subsistence (out-of-town overnight) ─────────────────────────────────
+  // Only relevant when the job is flagged out_of_town in scheduling_flexibility.
+  // null = unanswered (blocks terminal actions on out-of-town jobs only).
+  const [stayedOvernight, setStayedOvernight] = useState<boolean | null>(null);
+  const isOutOfTown = job?.scheduling_flexibility?.out_of_town === true;
+  // Out-of-town jobs require an answer before the operator can wrap up.
+  const subsistenceUnanswered = isOutOfTown && stayedOvernight === null;
+
   // ─── Completion request modal state ──────────────────────────────────────
   const [showCompletionModal, setShowCompletionModal] = useState(false);
   const [completionNotes, setCompletionNotes] = useState('');
@@ -303,6 +311,7 @@ export default function DayCompletePage() {
           continueNextDay: true,
           latitude: null,
           longitude: null,
+          stayed_overnight: stayedOvernight,
         })
       });
 
@@ -391,6 +400,7 @@ export default function DayCompletePage() {
           continueNextDay: false,
           latitude: null,
           longitude: null,
+          stayed_overnight: stayedOvernight,
         })
       }).catch(() => {});
 
@@ -535,6 +545,7 @@ export default function DayCompletePage() {
           continueNextDay: false,
           latitude: null,
           longitude: null,
+          stayed_overnight: stayedOvernight,
         }),
       }).catch(() => {});
 
@@ -988,6 +999,53 @@ export default function DayCompletePage() {
           />
         </div>
 
+        {/* ── Subsistence (out-of-town overnight) ───────────────────────────── */}
+        {isOutOfTown && (
+          <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-5 shadow-sm">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="p-2 bg-violet-100 dark:bg-violet-900/40 rounded-xl">
+                <MapPin className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Out-of-Town Job</h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Did you stay overnight away from home tonight?</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setStayedOvernight(true)}
+                className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                  stayedOvernight === true
+                    ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/30 ring-1 ring-violet-400/30'
+                    : 'bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
+                }`}
+              >
+                {stayedOvernight === true && <CheckCircle2 className="w-4 h-4" />}
+                Yes, I stayed
+              </button>
+              <button
+                type="button"
+                onClick={() => setStayedOvernight(false)}
+                className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold transition-all ${
+                  stayedOvernight === false
+                    ? 'bg-slate-700 dark:bg-white/20 text-white shadow-md ring-1 ring-slate-500/30'
+                    : 'bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
+                }`}
+              >
+                {stayedOvernight === false && <CheckCircle2 className="w-4 h-4" />}
+                No
+              </button>
+            </div>
+            {subsistenceUnanswered && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                Please answer before wrapping up.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ── Main Decision ─────────────────────────────────────────────────── */}
         {!showSignature ? (
           <div className="space-y-4">
@@ -1001,7 +1059,7 @@ export default function DayCompletePage() {
             {isLastScheduledDay !== true && (
               <button
                 onClick={handleDoneForToday}
-                disabled={submitting}
+                disabled={submitting || subsistenceUnanswered}
                 className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 text-left shadow-lg shadow-amber-500/30 ring-1 ring-amber-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-amber-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
@@ -1018,7 +1076,7 @@ export default function DayCompletePage() {
             {/* Option 2 — Complete Job (on-site signature) */}
             <button
               onClick={() => setShowSignature(true)}
-              disabled={submitting}
+              disabled={submitting || subsistenceUnanswered}
               className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 text-left shadow-lg shadow-emerald-500/30 ring-1 ring-emerald-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
@@ -1033,7 +1091,7 @@ export default function DayCompletePage() {
             {/* Option 3 — Send remote link */}
             <button
               onClick={() => setShowRemotePanel(true)}
-              disabled={submitting}
+              disabled={submitting || subsistenceUnanswered}
               className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-left shadow-lg shadow-violet-500/30 ring-1 ring-violet-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-violet-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
