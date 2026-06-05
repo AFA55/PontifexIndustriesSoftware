@@ -2,108 +2,122 @@ export const dynamic = 'force-dynamic';
 
 /**
  * API Route: POST /api/auth/forgot-password
- * Send password reset email to user
+ * Send password reset email to user.
+ *
+ * Flow: look up the (active) profile → mint a Supabase recovery link via
+ * admin.generateLink → email it ourselves via Resend (better deliverability than
+ * Supabase's default SMTP). For security we ALWAYS return the same generic
+ * message so the client can't enumerate which emails exist — but real failures
+ * are surfaced to Sentry so we actually find out when delivery breaks (this route
+ * used to swallow every failure as success, which is how "no email arrives" went
+ * unnoticed).
+ *
+ * HARDENING (Jun 2026): email is normalized + matched case-insensitively with
+ * .maybeSingle() (a mobile user typing "Zack@..." auto-capitalized no longer
+ * misses the lowercase stored value and silently gets no email), and the recovery
+ * link now carries an explicit redirectTo → /update-password.
+ *
+ * ⚠️ Requires (founder/dashboard): RESEND_API_KEY set in Vercel, the Resend
+ * sending domain verified, AND `${APP_URL}/update-password` present in Supabase
+ * Auth → URL Configuration → Redirect URLs (else Supabase ignores redirectTo).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail, generatePasswordResetEmail } from '@/lib/email';
+
+// Generic response so the client can never tell whether an email exists.
+const GENERIC_OK = {
+  success: true,
+  message: 'If an account exists with that email, a password reset link has been sent.',
+};
+
+const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com').replace(/\/$/, '');
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email } = body;
+    const rawEmail = typeof body?.email === 'string' ? body.email : '';
+    // Normalize: trim + lowercase. Supabase stores auth emails lowercased and our
+    // profiles are all lowercase, so this is the canonical form for matching.
+    const email = rawEmail.trim().toLowerCase();
 
     if (!email) {
-      return NextResponse.json(
-        { error: 'Email is required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
 
     console.log(`🔑 Password reset requested for: ${email}`);
 
-    // Check if user exists in profiles
+    // Case-insensitive lookup; .maybeSingle() returns null (no throw) on 0 rows.
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, active')
-      .eq('email', email)
-      .single();
+      .ilike('email', email)
+      .maybeSingle();
 
-    if (profileError || !profile) {
-      // For security, don't reveal if the email exists or not
-      console.log(`⚠️ Email not found: ${email}`);
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'If an account exists with that email, a password reset link has been sent.',
-        },
-        { status: 200 }
-      );
+    if (profileError) {
+      // A real DB error (not "no rows") — log it, but still return generic OK.
+      console.error('❌ profiles lookup error in forgot-password:', profileError.message);
+      Sentry.captureException(profileError, { tags: { route: 'forgot-password', step: 'profile-lookup' } });
+      return NextResponse.json(GENERIC_OK, { status: 200 });
     }
 
-    // Check if user is active
+    if (!profile) {
+      console.log(`⚠️ Email not found: ${email}`);
+      return NextResponse.json(GENERIC_OK, { status: 200 });
+    }
+
     if (!profile.active) {
       console.log(`⚠️ Inactive account: ${email}`);
-      return NextResponse.json(
-        {
-          success: true,
-          message: 'If an account exists with that email, a password reset link has been sent.',
-        },
-        { status: 200 }
-      );
+      return NextResponse.json(GENERIC_OK, { status: 200 });
     }
 
-    // Generate password reset link using Supabase
+    // Mint a recovery link. redirectTo MUST be allow-listed in Supabase Auth →
+    // URL Configuration → Redirect URLs, or Supabase falls back to the Site URL
+    // and the link won't land on /update-password with a session.
     const { data: resetData, error: resetError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
-      email: email,
+      email: profile.email || email,
+      options: { redirectTo: `${APP_URL}/update-password` },
     });
 
-    if (resetError || !resetData) {
-      console.error('❌ Error generating reset link:', resetError);
-      return NextResponse.json(
-        { error: 'Failed to generate reset link' },
-        { status: 500 }
-      );
+    if (resetError || !resetData?.properties?.action_link) {
+      console.error('❌ Error generating reset link:', resetError?.message);
+      Sentry.captureException(resetError ?? new Error('generateLink returned no action_link'), {
+        tags: { route: 'forgot-password', step: 'generate-link' },
+      });
+      // Still generic to the client (don't reveal existence), but we now KNOW.
+      return NextResponse.json(GENERIC_OK, { status: 200 });
     }
 
     console.log('✅ Reset link generated');
 
-    // Get the recovery link from the data
-    const resetLink = resetData.properties?.action_link || '';
-
-    // Send password reset email
     const resetEmailHtml = generatePasswordResetEmail(
-      profile.full_name,
-      resetLink
+      profile.full_name || 'there',
+      resetData.properties.action_link
     );
 
     const emailSent = await sendEmail({
-      to: email,
+      to: profile.email || email,
       subject: 'Password Reset Request - Patriot Concrete Cutting',
       html: resetEmailHtml,
     });
 
     if (!emailSent) {
-      console.warn('⚠️ Could not send password reset email');
+      // The profile EXISTS and is active, so this is a genuine delivery failure
+      // (missing RESEND_API_KEY, unverified domain, Resend API error). Surface it.
+      console.error('❌ Password reset email failed to send for an existing user');
+      Sentry.captureMessage('Password reset email failed to send (Resend)', {
+        level: 'error',
+        tags: { route: 'forgot-password', step: 'send-email' },
+      });
     }
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'If an account exists with that email, a password reset link has been sent.',
-        data: {
-          emailSent: emailSent,
-        },
-      },
-      { status: 200 }
-    );
+    return NextResponse.json(GENERIC_OK, { status: 200 });
   } catch (error: any) {
     console.error('💥 Unexpected error in forgot-password route:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    Sentry.captureException(error, { tags: { route: 'forgot-password', step: 'unexpected' } });
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
