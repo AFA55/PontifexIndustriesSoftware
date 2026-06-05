@@ -47,14 +47,24 @@ export async function GET(request: NextRequest) {
       const today = todayInTz(tz);
       const nowMin = nowMinutesInTz(tz);
 
-      // 1. Jobs scheduled for the operator today (direct assignment)
+      // Tenant-wide default start time fallback (for operators scheduled today
+      // but with no resolved arrival_time on any of their jobs).
+      const { data: tenantRow } = await supabaseAdmin
+        .from('tenants')
+        .select('default_start_time')
+        .eq('id', tenant.id)
+        .maybeSingle();
+      const defaultStartMin = parseHHMM((tenantRow as { default_start_time: string | null } | null)?.default_start_time ?? null) ?? parseHHMM('07:00')!;
+
+      // 1. Jobs scheduled for the operator today (direct assignment).
+      //    No longer drops null arrival_time — those operators fall back to the
+      //    tenant default start time below so they still get reminded.
       const { data: jobs } = await supabaseAdmin
         .from('job_orders')
         .select('id, assigned_to, helper_assigned_to, arrival_time, scheduled_date, status')
         .eq('tenant_id', tenant.id)
         .eq('scheduled_date', today)
-        .in('status', ACTIVE_STATUSES)
-        .not('arrival_time', 'is', null);
+        .in('status', ACTIVE_STATUSES);
 
       // 2. Per-day assignment overrides for today
       const { data: dailyAssignments } = await supabaseAdmin
@@ -62,10 +72,14 @@ export async function GET(request: NextRequest) {
         .select('operator_id, helper_id, job_order_id, job_orders(arrival_time)')
         .eq('assignment_date', today);
 
-      // Build operator -> earliest start (minutes)
+      // Build operator -> earliest start (minutes). Track who is scheduled today
+      // (even without a resolved arrival_time) so they can fall back to the
+      // tenant default start time.
       const earliestStart = new Map<string, number>();
+      const scheduledOps = new Set<string>();
       const consider = (opId: string | null | undefined, arrival: string | null) => {
         if (!opId) return;
+        scheduledOps.add(opId);
         const mins = parseHHMM(arrival);
         if (mins == null) return;
         const cur = earliestStart.get(opId);
@@ -82,6 +96,27 @@ export async function GET(request: NextRequest) {
         consider(a.operator_id, arrival);
         consider(a.helper_id, arrival);
       }
+
+      // Operators scheduled today with no resolved start time → tenant default.
+      for (const opId of scheduledOps) {
+        if (!earliestStart.has(opId)) earliestStart.set(opId, defaultStartMin);
+      }
+
+      if (earliestStart.size === 0) continue;
+
+      // PTO / time-off skip — drop any operator who has an operator_time_off row
+      // for today (covers pto / sick / unpaid / worked_last_night night-shift
+      // recovery / other). Tenant-scoped.
+      const { data: timeOff } = await supabaseAdmin
+        .from('operator_time_off')
+        .select('operator_id')
+        .eq('tenant_id', tenant.id)
+        .eq('date', today)
+        .in('operator_id', Array.from(earliestStart.keys()));
+      const offToday = new Set(
+        (timeOff || []).map((r: { operator_id: string }) => r.operator_id)
+      );
+      for (const opId of offToday) earliestStart.delete(opId);
 
       if (earliestStart.size === 0) continue;
 

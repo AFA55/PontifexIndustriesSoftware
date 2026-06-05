@@ -20,7 +20,32 @@ We're shifting from feature-building to **fine-tuning + productizing**. The plan
 
 ---
 
-## ⚡ START HERE (Jun 4, 2026) — Phase A foundation + mobile responsive + web Face ID/Remember-Me — ⚠️ UNCOMMITTED, build green, ONE push pending
+## ⚡ START HERE (Jun 4–5, 2026) — Smart clock reminders + productization scaffold + backup — ⚠️ build green, guardian PASS, ONE push pending
+
+Executive-engineer batch using parallel agents + an **architecture-guardian** review (the user's requested oversight agent). Backup taken first. **`npm run build` green, `tsc` clean, 846 Jest tests pass, guardian VERDICT: PASS (0 blocking).** Not pushed yet.
+
+**Safety backup (founder's "make a duplicate"):** `~/Documents/Pontifex-Backups/pontifex-platform-2026-06-04.bundle` (288 MB, full history, `git bundle verify` OK, no secrets — `.env.local` is gitignored). Restore: `git clone <bundle> restored-repo`.
+
+**SMART CLOCK-IN/OUT REMINDERS (deploys this batch).** Big finding: ~90% already existed (a `*/5` `clock-in-reminders` cron, `sendReminderOnce` dedup via `reminder_log`, tz window math in `lib/reminder-timing.ts`). We did NOT rebuild it — we closed 4 gaps. See `SMART_CLOCK_REMINDERS_PLAN.md`.
+- **Start-time source:** the schedule FORM now writes `job_orders.arrival_time` (the cron already read it; the form previously buried the time in `scheduling_flexibility` JSON the cron couldn't see). New "Crew Start Time" `<input type=time>` in Step 5 of `schedule-form/page.tsx` → payload + edit PATCH → persisted in `schedule-form/route.ts`. `arrival_time` is **TEXT** (verified) — write "HH:MM", never `ALTER TYPE`.
+- **Clock-IN cron smarter** (`app/api/cron/clock-in-reminders/route.ts`): added PTO/time-off skip (`operator_time_off`) + default-start-time fallback (`tenants.default_start_time`, new col, default `'07:00'`) so a job with no time still reminds. Existing pre/post (±5 min) windows for jobs WITH a time are unchanged → founder's "remind 5 min after start" works once a start time is set.
+- **Clock-OUT cron NEW** (`app/api/cron/clock-out-reminders/route.ts`, `*/15` in `vercel.json`): 10h/12h/15h after clock-in. "Highest threshold crossed" + `reminder_log` dedup keyed `clock_out_<10h|12h|15h>:<clock-in date>` → never spams, survives a missed tick + midnight on night shifts. Reuses APNs/in-app via `sendReminderOnce`.
+- **Migration** `supabase/migrations/20260604_clock_reminders.sql` (applied to prod via MCP): `tenants.default_start_time time default '07:00'` + partial index on `job_orders(tenant_id, scheduled_date) where arrival_time is not null`. Additive only.
+- **Scope decisions (executive):** default 07:00 (tenant-configurable), helpers still get reminders, no quiet-hours v1, reuse `clock_in_reminder` pref toggle, **deferred** the night-shift form toggle (clock-out uses `timecards.is_night_shift` which already exists). 7 founder open-questions are in the plan §7.
+- **Guardian nits (non-blocking, dormant):** clock-out shares the `clock_in_reminder` pref toggle; the PTO-skip's `.eq('tenant_id')` would miss a PTO row with NULL tenant_id (table is empty today); clock-out selects `timezone` but doesn't use it. None block.
+- **⚠️ NO App Store resubmission needed** — this is server-side cron + existing APNs push; it ships via the WEB deploy and reaches the iOS app automatically.
+
+**PRODUCTIZATION SCAFFOLD (additive, nothing activated — sell-to-other-companies foundation).** Chosen approach: feature-catalog + per-tenant switchboard, NO file moves. See `FEATURE_CATALOG.md` (24 modules mapped → files/tables/gating) + `PRODUCTIZATION_SWITCHBOARD_PLAN.md`.
+- Key finding: 4 gating layers exist but only 2 are live (`user_feature_flags` nav gate + `lib/rbac.ts` cards). **`tenants.features` jsonb is stored/editable (`PATCH /api/admin/tenants/[id]` already allows it) but read by NO gate today** → the switchboard activates it with zero behavior change. A 2nd tenant (`APEX`) already exists.
+- **`lib/features.ts`** (NEW, data-only, nothing gates on it yet): canonical 24-module registry + `ModuleKey` + `LEGACY_ALIASES` + a provided-but-unwired `isModuleEnabled()`. `defaultOn:true` everywhere + 5 `core` modules (jobs, notifications, team_management, subscription_billing, daily_reports) → Patriot keeps everything.
+- **`scripts/new-tenant.ts`** (NEW, NOT wired to run): onboarding scaffold — inserts tenant + branding + first admin; hard guards refuse to touch PATRIOT (code/slug/id). Review before first use.
+- **Next to ACTIVATE productization (separate session):** build the super-admin Module Switchboard UI that reads/writes `tenants.features` via the existing PATCH, then opt-in `requireModule()` on NEW non-core routes only. Default-ON rollout. See the plan's risk section.
+
+**⚠️ Stale worktrees:** `.claude/worktrees/` still has ~95 locked trees inflating Jest (71 suites incl. dupes) — clean when convenient (don't nuke unmerged ones blindly).
+
+---
+
+## ⚡ START HERE (Jun 4, 2026) — Phase A foundation + mobile responsive + web Face ID/Remember-Me — ✅ DEPLOYED
 
 Fine-tuning batch. Everything additive, behavior-preserving. **`npm run build` green (33.8s, 91 pages), `tsc --noEmit` exit 0, 12 date tests pass.** Verified the headline "zoomed in" fix in a live browser at 390px. **Not committed/pushed yet — awaiting the single Vercel push.**
 

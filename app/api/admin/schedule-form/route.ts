@@ -119,6 +119,7 @@ export async function POST(request: NextRequest) {
       // ── Step 5: Scheduling Details ──────────────────────────
       scheduled_date: body.scheduled_date,
       end_date: body.end_date || null,
+      arrival_time: body.arrival_time || null,
       scheduling_flexibility: body.scheduling_flexibility || {},
 
       // ── Step 2 additions ───────────────────────────────────

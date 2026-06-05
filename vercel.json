@@ -25,7 +25,8 @@
     "app/api/cron/invoice-30d-reminders/route.ts": { "maxDuration": 60 },
     "app/api/cron/auto-clockout/route.ts": { "maxDuration": 60 },
     "app/api/cron/clock-in-reminders/route.ts": { "maxDuration": 60 },
-    "app/api/cron/work-performed-reminders/route.ts": { "maxDuration": 60 }
+    "app/api/cron/work-performed-reminders/route.ts": { "maxDuration": 60 },
+    "app/api/cron/clock-out-reminders/route.ts": { "maxDuration": 60 }
   },
   "crons": [
     {
@@ -50,6 +51,10 @@
     },
     {
       "path": "/api/cron/work-performed-reminders",
+      "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/clock-out-reminders",
       "schedule": "*/15 * * * *"
     }
   ],

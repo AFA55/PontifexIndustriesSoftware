@@ -417,6 +417,7 @@ interface FormData {
   end_date: string;
   special_arrival: boolean;
   special_arrival_time: string;
+  arrival_time: string;
   can_work_fridays: boolean;
   can_work_weekends: boolean;
   outside_hours: boolean;
@@ -502,6 +503,7 @@ const initialFormData: FormData = {
   end_date: '',
   special_arrival: false,
   special_arrival_time: '',
+  arrival_time: '',
   can_work_fridays: true,
   can_work_weekends: false,
   outside_hours: false,
@@ -1647,6 +1649,7 @@ export default function ScheduleFormPage() {
         // Step 5
         scheduled_date: form.start_date,
         end_date: form.end_date || null,
+        arrival_time: form.arrival_time || form.special_arrival_time || null,
         scheduling_flexibility: {
           special_arrival: form.special_arrival,
           special_arrival_time: form.special_arrival_time || null,
@@ -1722,6 +1725,7 @@ export default function ScheduleFormPage() {
             equipment_selections: payload.equipment_selections,
             special_equipment: payload.special_equipment,
             ppe_required: payload.ppe_required,
+            arrival_time: form.arrival_time || form.special_arrival_time || null,
           }),
         });
         result = await res.json();
@@ -3599,6 +3603,16 @@ export default function ScheduleFormPage() {
 
             <SectionCard>
               <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Scheduling Flexibility</p>
+              <div className="space-y-2">
+                <Label>Crew Start Time (on-site arrival)</Label>
+                <InputField
+                  icon={Clock}
+                  type="time"
+                  value={form.arrival_time}
+                  onChange={e => updateForm({ arrival_time: e.target.value })}
+                />
+                <p className="text-xs text-slate-500 dark:text-white/40">Used to remind the crew to clock in.</p>
+              </div>
               <Toggle
                 checked={form.special_arrival}
                 onChange={v => updateForm({ special_arrival: v })}
