@@ -576,6 +576,31 @@ function OperatorTimecardDetailPageInner() {
     }
   };
 
+  // Record a no-call/no-show for a specific empty day. Writes a zero-hour
+  // no-show row to the timecard + the schedule/availability callout ledger via
+  // the dedicated no-show API (NOT /manual, which forces 0.25–16 hrs).
+  const handleNoShow = async (dateStr: string) => {
+    const pretty = new Date(dateStr + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (!window.confirm(`Mark a NO-SHOW for ${pretty}?\n\nThis records a zero-hour no-show on the timecard and counts as a callout.`)) return;
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/timecards/no-show', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ user_id: operatorId, date: dateStr }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        window.alert(j.error || 'Failed to record no-show.');
+        return;
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Error recording no-show:', error);
+    }
+  };
+
   // Approve / reject an out-of-radius (or remote) clock-out.
   const handleApproveClockOut = async (entryId: string, approved: boolean) => {
     setActionLoading(entryId);
@@ -1539,7 +1564,7 @@ function OperatorTimecardDetailPageInner() {
                       <p className="text-[11px] font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wide mb-2">
                         No clock-in for this day
                       </p>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
                         {[
                           { type: 'pto' as const, label: 'PTO', defaultHours: '8', tone: 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 border-emerald-200 dark:border-emerald-500/30' },
                           { type: 'sick' as const, label: 'Sick', defaultHours: '8', tone: 'bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border-rose-200 dark:border-rose-500/30' },
@@ -1562,6 +1587,16 @@ function OperatorTimecardDetailPageInner() {
                             + {label}
                           </button>
                         ))}
+                        {/* No-Show — records a zero-hour no-show on the timecard +
+                            callout ledger for THIS day. Calls the dedicated no-show API
+                            (not /manual, which forces 0.25–16 hrs). */}
+                        <button
+                          type="button"
+                          onClick={() => handleNoShow(date)}
+                          className="px-2.5 py-2 rounded-lg border text-xs font-semibold transition bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border-rose-200 dark:border-rose-500/30"
+                        >
+                          + No-Show
+                        </button>
                       </div>
                     </div>
                   )}

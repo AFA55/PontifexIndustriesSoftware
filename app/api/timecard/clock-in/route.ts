@@ -106,34 +106,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // --- Read tenant timecard settings (v2 — the active table clock-in reads) ---
+    // Hoisted out of the GPS-only block: late detection runs for ALL clock-in
+    // methods, so the late grace period must be available regardless of method.
+    let tcSettings: { require_nfc?: boolean; late_grace_minutes?: number } | null = null;
+    try {
+      if (auth.tenantId) {
+        const { data: v2 } = await supabaseAdmin
+          .from('timecard_settings_v2')
+          // NOTE: the column is `require_nfc_clock_in`; alias it to require_nfc so
+          // the downstream check + late_grace_minutes both resolve (the un-aliased
+          // name 42703-errors and nulls the whole row — that bug killed both reads).
+          .select('require_nfc:require_nfc_clock_in, late_grace_minutes')
+          .eq('tenant_id', auth.tenantId)
+          .limit(1)
+          .maybeSingle();
+        tcSettings = v2 ?? null;
+      }
+    } catch {
+      // If settings table doesn't exist, fall back to defaults below
+    }
+    // Late grace period (minutes past scheduled start before flagged late). Default 15.
+    const graceMinutes = tcSettings?.late_grace_minutes ?? 15;
+
     // --- Server-side bypass_nfc verification ---
     // If NFC is required by settings but user is using GPS method, verify they have
     // an admin-issued bypass notification (prevents manual URL param bypass)
     // gps_remote, pin, and field bypass the NFC requirement by design
     if (clock_in_method === 'gps') {
       try {
-        // Query timecard_settings_v2 first (active table), fall back to legacy timecard_settings.
-        let tcSettings: { require_nfc?: boolean } | null = null;
-        if (auth.tenantId) {
-          const { data: v2 } = await supabaseAdmin
-            .from('timecard_settings_v2')
-            .select('require_nfc')
-            .eq('tenant_id', auth.tenantId)
-            .limit(1)
-            .maybeSingle();
-          if (v2) {
-            tcSettings = v2;
-          } else {
-            const { data: v1 } = await supabaseAdmin
-              .from('timecard_settings')
-              .select('require_nfc')
-              .eq('tenant_id', auth.tenantId)
-              .limit(1)
-              .maybeSingle();
-            tcSettings = v1 ?? null;
-          }
-        }
-
         if (tcSettings?.require_nfc) {
           // NFC is required — check for a valid bypass notification from an admin
           const { data: bypassNotification } = await supabaseAdmin
@@ -162,7 +163,7 @@ export async function POST(request: NextRequest) {
           ).catch(() => {});
         }
       } catch {
-        // If settings table doesn't exist, NFC is not required
+        // NFC requirement check is non-critical
       }
     }
 
@@ -470,7 +471,7 @@ export async function POST(request: NextRequest) {
           const lateMs = now.getTime() - expectedTime.getTime();
           const lateMinutes = Math.floor(lateMs / 60000);
 
-          if (lateMinutes >= 15) {
+          if (lateMinutes >= graceMinutes) {
             // Mark the timecard as late
             await supabaseAdmin
               .from('timecards')

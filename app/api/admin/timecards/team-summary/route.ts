@@ -53,6 +53,7 @@ interface DayInfo {
   entryCount: number;
   isLate: boolean;
   lateMinutes: number;
+  isNoShow: boolean;
   firstTimecardId: string | null;
   firstClockIn: string | null;
 }
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
     // 2. Fetch all timecards for this week
     let timecardsQuery = supabaseAdmin
       .from('timecards')
-      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, break_minutes, notes, is_late, late_minutes')
+      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, entry_type, break_minutes, notes, is_late, late_minutes')
       .gte('date', mondayStr)
       .lte('date', sundayStr)
       .order('date', { ascending: true });
@@ -144,7 +145,7 @@ export async function GET(request: NextRequest) {
         // Build daily hours map
         const dailyHours: Record<string, DayInfo> = {};
         DAY_NAMES.forEach(day => {
-          dailyHours[day] = { hours: 0, status: 'none', entryCount: 0, isLate: false, lateMinutes: 0, firstTimecardId: null, firstClockIn: null };
+          dailyHours[day] = { hours: 0, status: 'none', entryCount: 0, isLate: false, lateMinutes: 0, isNoShow: false, firstTimecardId: null, firstClockIn: null };
         });
 
         let weeklyTotal = 0;
@@ -162,6 +163,12 @@ export async function GET(request: NextRequest) {
 
           dailyHours[dayName].hours += hours;
           dailyHours[dayName].entryCount += 1;
+
+          // No-show: zero-hour record (entry_type='no_call_no_show'). Flag the day so
+          // the grid renders a chip. Doesn't touch hours/OT math (no-show is 0 hours).
+          if ((tc as any).entry_type === 'no_call_no_show') {
+            dailyHours[dayName].isNoShow = true;
+          }
           weeklyTotal += hours;
           breakMinutesTotal += tc.break_minutes || 0;
 

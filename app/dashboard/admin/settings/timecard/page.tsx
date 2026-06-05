@@ -33,6 +33,9 @@ interface TimecardSettings {
   requireAdminApproval: boolean;
   allowRemoteClockIn: boolean;
 
+  // Attendance & Punctuality
+  lateGraceMinutes: number;
+
   // Limits
   maxHoursPerDay: number;
   autoClockOutAfter: number; // hours
@@ -59,6 +62,7 @@ const DEFAULT_SETTINGS: TimecardSettings = {
   requireGps: true,
   requireAdminApproval: true,
   allowRemoteClockIn: true,
+  lateGraceMinutes: 15,
   maxHoursPerDay: 16,
   autoClockOutAfter: 14,
   lockTimecardAfterDays: 7,
@@ -156,6 +160,7 @@ export default function TimecardSettingsPage() {
               allowRemoteClockIn: d.allow_remote ?? prev.allowRemoteClockIn,
               weeklyOTThreshold: d.overtime_threshold ?? prev.weeklyOTThreshold,
               autoClockOutAfter: d.auto_clock_out ?? prev.autoClockOutAfter,
+              lateGraceMinutes: d.late_grace_minutes ?? prev.lateGraceMinutes,
             }));
           }
         }
@@ -194,6 +199,7 @@ export default function TimecardSettingsPage() {
           allow_remote: settings.allowRemoteClockIn,
           overtime_threshold: settings.weeklyOTThreshold,
           auto_clock_out: settings.autoClockOutAfter,
+          late_grace_minutes: settings.lateGraceMinutes,
         }),
       });
       if (!res.ok) {
@@ -459,6 +465,30 @@ export default function TimecardSettingsPage() {
               onChange={(v) => updateSetting('allowRemoteClockIn', v)}
               label="Allow Remote Clock-In"
               description="Operators out of town can clock in with a selfie + GPS instead of NFC."
+            />
+          </div>
+        </div>
+
+        {/* ── Section: Attendance & Punctuality ──────── */}
+        <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center">
+              <Timer size={16} className="text-sky-600" />
+            </div>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800">Attendance & Punctuality</h2>
+              <p className="text-xs text-slate-400">Control when an operator is flagged late at clock-in</p>
+            </div>
+          </div>
+          <div className="p-6">
+            <NumberInput
+              label="Late grace period"
+              description="Minutes past scheduled start before an operator is flagged late"
+              value={settings.lateGraceMinutes}
+              onChange={(v) => updateSetting('lateGraceMinutes', v)}
+              unit="minutes"
+              min={0}
+              max={60}
             />
           </div>
         </div>

@@ -681,6 +681,31 @@ export default function SettingsPage() {
           </div>
 
           {/* ══════════════════════════════════════════════
+              COMPANY HOLIDAYS
+             ══════════════════════════════════════════════ */}
+          <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Calendar className="w-5 h-5" />
+                Company Holidays
+              </h2>
+              <p className="text-purple-200 text-sm mt-1">Mark paid holidays and auto-apply holiday pay to eligible staff</p>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-600 dark:text-white/60 mb-4">
+                Configure company holidays with per-day pay hours. Eligible hourly field and shop staff
+                receive an overtime-exempt holiday-pay entry on their timecard with one click.
+              </p>
+              <Link
+                href="/dashboard/admin/settings/holidays"
+                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
+              >
+                Manage Holidays →
+              </Link>
+            </div>
+          </div>
+
+          {/* ══════════════════════════════════════════════
               DATA BACKUPS
              ══════════════════════════════════════════════ */}
           <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">

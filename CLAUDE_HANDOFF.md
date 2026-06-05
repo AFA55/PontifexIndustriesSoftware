@@ -20,7 +20,25 @@ We're shifting from feature-building to **fine-tuning + productizing**. The plan
 
 ---
 
-## ⚡ START HERE (Jun 4–5, 2026) — Smart clock reminders + productization scaffold + backup — ⚠️ build green, guardian PASS, ONE push pending
+## ⚡ START HERE (Jun 5, 2026) — Timecard: configurable late + no-show + holidays (+ settings-persistence bug fix) — ⚠️ build green, guardian PASS, ONE push pending
+
+Parallel agents + architecture-guardian (the guardian caught a real blocking bug — see below). **`tsc` clean, build green, 846 tests pass, guardian VERDICT: PASS** (after the 1 fix). Not pushed yet. Plan: `TIMECARD_SETTINGS_PLAN.md`. Decisions: late = grace-minutes-after-scheduled-start; holiday pay = hourly field+shop roles, OT-exempt.
+
+**Migrations applied to prod (additive, files in `supabase/migrations/20260605_*`):** `timecard_settings_v2.late_grace_minutes int default 15`; partial unique indexes `timecards_one_no_show_per_day` + `timecards_one_holiday_per_day`; new RLS table `company_holidays`.
+
+**🔴 IMPORTANT infra finding — settings-persistence bug FIXED.** There are TWO settings tables: `timecard_settings` (legacy key/value, 20 rows) and **`timecard_settings_v2` (flat columns, the ACTIVE store clock-in/out read).** The dedicated settings page (`settings/timecard/page.tsx`) was saving flat fields to the key/value table → **writes silently failed → settings only lived in localStorage and never affected clock-in.** Fixed: `timecard-settings/route.ts` repointed to v2 with a page↔v2 column mapping (`require_nfc`→`require_nfc_clock_in`, `overtime_threshold`→`overtime_threshold_weekly`, `auto_clock_out`→`auto_clock_out_hours`, rest 1:1). Now the settings page actually persists. **Guardian-caught blocking bug:** clock-in selected `require_nfc` (nonexistent col) from v2 → 42703 → whole row null → late_grace never read; fixed by aliasing `require_nfc:require_nfc_clock_in` in the select (`clock-in/route.ts:117`).
+
+**Feature 1 — configurable LATE threshold:** `late_grace_minutes` setting (default 15) on the timecard settings page ("Attendance & Punctuality" card). Clock-in flags late when `clockIn − scheduledStart ≥ grace` (scheduled start = `job_orders.shop_arrival_time`/`arrival_time`, same source as reminders). Writes existing `is_late`/`late_minutes`; management dashboard + punctuality tile already render them.
+
+**Feature 2 — NO-SHOW button:** new `POST/DELETE /api/admin/timecards/no-show`. Writes a 0-hour timecard row (`entry_type='no_call_no_show'`, `hour_type='no_show'`) so it shows on the payroll grid + operator detail, AND idempotently upserts `operator_time_off` (no_show) so it converges with the schedule-board "Mark Out" (one row per operator/day, callout_count bumped once). Buttons: Team Payroll row action + day-cell chip (desktop + mobile card) + operator-detail empty-day quick action. Idempotent (pre-check + partial unique index).
+
+**Feature 3 — HOLIDAY settings:** new `company_holidays` table + `/api/admin/company-holidays` (GET/POST/PATCH/DELETE) + `[id]/apply` (idempotent). New `settings/holidays` page (add/edit dates, per-day pay hours, applies_to all/field/shop, per-row "Apply"). "Apply" creates holiday-pay timecard rows (`entry_type='holiday'`, hours=pay_hours) for eligible roles only — **field=operator/apprentice, shop=shop_manager/shop_help, all=both** (role-based; `profiles.work_location` doesn't exist). **OT-exempt:** `lib/timecard-utils.calculateWeekSummary` now excludes holiday hours from the 40-hr OT base (+ a `holidayHours` bucket); holiday-only, behavior-preserving (0 holiday rows today). Settings-hub link added on `settings/page.tsx`.
+
+**⚠️ NO App Store resubmission** — all server-side/web. Founder open items from the plan (`TIMECARD_SETTINGS_PLAN.md §5`): later consolidate the two settings tables onto v2 (the key/value one is now bypassed); optional holiday-apply cron; whether schedule-board Mark-Out should also create the timecard no-show row.
+
+---
+
+## ⚡ START HERE (Jun 4–5, 2026) — Smart clock reminders + productization scaffold + backup — ✅ DEPLOYED
 
 Executive-engineer batch using parallel agents + an **architecture-guardian** review (the user's requested oversight agent). Backup taken first. **`npm run build` green, `tsc` clean, 846 Jest tests pass, guardian VERDICT: PASS (0 blocking).** Not pushed yet.
 

@@ -22,6 +22,7 @@ export interface TimecardEntry {
   clock_out_time: string | null;
   total_hours: number | null;
   hour_type: string | null;
+  entry_type?: string | null;
   is_shop_hours: boolean;
   is_night_shift: boolean;
   is_approved: boolean;
@@ -35,6 +36,7 @@ export interface WeekSummary {
   mandatoryOvertimeHours: number;
   nightShiftHours: number;
   shopHours: number;
+  holidayHours: number;
   totalHours: number;
   daysWorked: number;
 }
@@ -53,6 +55,7 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
   let mandatoryOvertimeHours = 0;
   let nightShiftHours = 0;
   let shopHours = 0;
+  let holidayHours = 0;
   let totalHours = 0;
   const daysWorked = new Set(
     entries.filter((e) => e.total_hours && e.total_hours > 0).map((e) => e.date)
@@ -61,6 +64,14 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
   for (const entry of entries) {
     const hours = entry.total_hours || 0;
     totalHours += hours;
+
+    // Holiday pay is paid (counts in totalHours) but is OT-EXEMPT — it must not
+    // push the operator past the 40-hr weekly OT threshold. Tracked separately
+    // and excluded from the weekday/OT base below. Only `holiday` is special-
+    // cased here; pto/sick/other types are intentionally unchanged.
+    if (entry.entry_type === 'holiday') {
+      holidayHours += hours;
+    }
 
     if (entry.hour_type === 'mandatory_overtime') {
       mandatoryOvertimeHours += hours;
@@ -73,8 +84,9 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
     }
   }
 
-  // Weekly OT = weekday hours (non-mandatory) that exceed 40
-  const weekdayHours = totalHours - mandatoryOvertimeHours;
+  // Weekly OT = weekday hours (non-mandatory, non-holiday) that exceed 40.
+  // Holiday hours are excluded from the OT base so holiday pay never triggers OT.
+  const weekdayHours = totalHours - mandatoryOvertimeHours - holidayHours;
   const weeklyOvertimeHours = Math.max(0, weekdayHours - 40);
   const regularHours = Math.min(weekdayHours, 40);
 
@@ -84,6 +96,7 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
     mandatoryOvertimeHours: Number(mandatoryOvertimeHours.toFixed(2)),
     nightShiftHours: Number(nightShiftHours.toFixed(2)),
     shopHours: Number(shopHours.toFixed(2)),
+    holidayHours: Number(holidayHours.toFixed(2)),
     totalHours: Number(totalHours.toFixed(2)),
     daysWorked,
   };

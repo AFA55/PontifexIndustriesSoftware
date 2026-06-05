@@ -11,7 +11,7 @@ import {
   ChevronLeft, ChevronRight, AlertTriangle,
   Search, TrendingUp, Users, Loader2, Shield, Zap,
   Bell, DollarSign, Coffee, Eye, ChevronDown, Moon, Settings, Save, X,
-  Edit2, AlertCircle, Timer, Plus, ClipboardEdit, CheckSquare, XSquare, RefreshCw
+  Edit2, AlertCircle, Timer, Plus, ClipboardEdit, CheckSquare, XSquare, RefreshCw, UserX
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -22,6 +22,7 @@ interface DayInfo {
   entryCount: number;
   isLate?: boolean;
   lateMinutes?: number;
+  isNoShow?: boolean;
   firstTimecardId?: string | null;
   firstClockIn?: string | null;
 }
@@ -340,6 +341,39 @@ export default function AdminTimecardsPage() {
       fetchTeamSummary();
     } catch (error) {
       console.error('Error approving user timecards:', error);
+    }
+  };
+
+  // ── Record a no-show ───────────────────────────────────────
+  // Records a no-call/no-show ON the operator's timecard (zero-hour) + the
+  // schedule/availability ledger. Defaults the date to today when today falls
+  // inside the displayed week, otherwise the week's Monday.
+  const handleNoShow = async (userId: string, fullName: string) => {
+    // Local YYYY-MM-DD for today (NEVER toISOString — that's UTC).
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const sundayStr = `${sunday.getFullYear()}-${String(sunday.getMonth() + 1).padStart(2, '0')}-${String(sunday.getDate()).padStart(2, '0')}`;
+    const targetDate = (todayStr >= mondayStr && todayStr <= sundayStr) ? todayStr : mondayStr;
+
+    const pretty = new Date(targetDate + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    if (!window.confirm(`Mark ${fullName} as a NO-SHOW for ${pretty}?\n\nThis records a zero-hour no-show on their timecard and counts as a callout.`)) return;
+
+    try {
+      const token = await getSessionToken();
+      if (!token) return;
+      const res = await fetch('/api/admin/timecards/no-show', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ user_id: userId, date: targetDate }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        window.alert(j.error || 'Failed to record no-show.');
+        return;
+      }
+      fetchTeamSummary();
+    } catch (error) {
+      console.error('Error recording no-show:', error);
     }
   };
 
@@ -1089,6 +1123,12 @@ export default function AdminTimecardsPage() {
                                     ⏰ {info.lateMinutes}m late
                                   </span>
                                 )}
+                                {info.isNoShow && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-rose-100 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 rounded text-[9px] font-bold border border-rose-200 dark:border-rose-500/30">
+                                    <UserX size={9} />
+                                    No-Show
+                                  </span>
+                                )}
                               </div>
                             </td>
                           );
@@ -1114,20 +1154,31 @@ export default function AdminTimecardsPage() {
                           )}
                         </td>
 
-                        {/* Punctuality — late days this week */}
+                        {/* Punctuality — late days + no-shows this week */}
                         <td className="px-3 py-3 text-center">
                           {(() => {
                             const lateDays = DAY_NAMES.filter(d => member.dailyHours[d]?.isLate).length;
-                            if (lateDays === 0) return <span className="text-sm text-gray-300 dark:text-white/20">-</span>;
+                            const noShowDays = DAY_NAMES.filter(d => member.dailyHours[d]?.isNoShow).length;
+                            if (lateDays === 0 && noShowDays === 0) return <span className="text-sm text-gray-300 dark:text-white/20">-</span>;
                             return (
-                              <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                                lateDays >= 3
-                                  ? 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30'
-                                  : 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
-                              }`}>
-                                <Timer size={9} />
-                                {lateDays}d
-                              </span>
+                              <div className="inline-flex items-center gap-1">
+                                {lateDays > 0 && (
+                                  <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                                    lateDays >= 3
+                                      ? 'bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border-red-200 dark:border-red-500/30'
+                                      : 'bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-500/30'
+                                  }`}>
+                                    <Timer size={9} />
+                                    {lateDays}d
+                                  </span>
+                                )}
+                                {noShowDays > 0 && (
+                                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold border bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-500/30">
+                                    <UserX size={9} />
+                                    {noShowDays}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })()}
                         </td>
@@ -1184,6 +1235,14 @@ export default function AdminTimecardsPage() {
                                 Approve
                               </button>
                             )}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); handleNoShow(member.userId, member.fullName); }}
+                              className="flex items-center gap-1 px-2 py-1 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 rounded-md text-[11px] font-semibold border border-rose-200 dark:border-rose-400/30 transition-all"
+                              aria-label="Record no-show"
+                            >
+                              <UserX size={11} />
+                              No-Show
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1243,6 +1302,7 @@ export default function AdminTimecardsPage() {
               {filteredMembers.map((member) => {
                 const roleBadge = getRoleBadge(member.role);
                 const lateDays = DAY_NAMES.filter((d) => member.dailyHours[d]?.isLate).length;
+                const noShowDays = DAY_NAMES.filter((d) => member.dailyHours[d]?.isNoShow).length;
                 return (
                   <div
                     key={member.userId}
@@ -1309,6 +1369,17 @@ export default function AdminTimecardsPage() {
                           <Timer size={9} /> {lateDays}d late
                         </span>
                       )}
+                      {noShowDays > 0 && (
+                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300">
+                          <UserX size={9} /> {noShowDays} no-show
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleNoShow(member.userId, member.fullName); }}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-400/30"
+                      >
+                        <UserX size={11} /> No-Show
+                      </button>
                       {member.pendingCount > 0 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
