@@ -25,6 +25,7 @@ import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
 // Equipment presets no longer displayed as grid; now using SERVICE_EQUIPMENT config
 import PhotoUploader from '@/components/PhotoUploader';
 import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 // Dynamic-imported modals — only loaded when their state flag flips true.
 // AISmartFillModal pulls in framer-motion; CustomerForm is a large dialog used for the new-customer flow.
@@ -778,6 +779,7 @@ function CreateFacilityModal({ onClose, onSaved }: { onClose: () => void; onSave
 // MAIN COMPONENT
 // ══════════════════════════════════════════════════════════════
 export default function ScheduleFormPage() {
+  const moduleGate = useModuleGate('scheduling');
   const [user, setUser] = useState<User | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
   const [form, setForm] = useState<FormData>(initialFormData);
@@ -1853,6 +1855,8 @@ export default function ScheduleFormPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   // ── Success screen ─────────────────────────────────────────
   if (submitted) {

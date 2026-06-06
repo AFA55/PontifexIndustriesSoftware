@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 
 interface OperatorOpt {
@@ -52,6 +53,7 @@ function todayStr() {
 }
 
 export default function NewSiteVisitPage() {
+  const moduleGate = useModuleGate('supervisor_visits');
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -303,6 +305,8 @@ export default function NewSiteVisitPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   if (success) {
     return (

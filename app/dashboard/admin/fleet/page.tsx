@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 interface VehicleRow {
   id: string;
@@ -50,6 +51,7 @@ function isExpiring(dateStr: string | null | undefined, days = 30): boolean {
 }
 
 export default function FleetListPage() {
+  const moduleGate = useModuleGate('equipment_fleet');
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -90,6 +92,8 @@ export default function FleetListPage() {
   if (authLoading) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>;
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">

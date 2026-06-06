@@ -39,6 +39,7 @@ import NextAvailableBanner from './_components/NextAvailableBanner';
 import { OPERATOR_COLORS, SALESMEN } from './_components/constants';
 import { parseLocalDate, toDateString, formatDisplayDate, daysAgo, apiFetch, toJobCard } from './_components/helpers';
 import type { ConflictData, RowChangeConflict } from './_components/types';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 // ─── Heavy components — dynamic-imported (rendered conditionally) ─────────
 const PendingQueueSidebar = dynamic(() => import('./_components/PendingQueueSidebar'), { ssr: false, loading: () => null });
@@ -58,6 +59,7 @@ const MarkOutModal = dynamic(() => import('./_components/MarkOutModal'), { ssr: 
 
 // ─── Main Component ─────────────────────────────────────────────────────
 export default function ScheduleBoardPage() {
+  const moduleGate = useModuleGate('scheduling');
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
   const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
@@ -1649,6 +1651,8 @@ export default function ScheduleBoardPage() {
   if (loading && Object.keys(operatorJobs).length === 0 && unassignedJobs.length === 0) {
     return <BoardLoadingSkeleton />;
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">

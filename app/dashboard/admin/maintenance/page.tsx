@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -291,6 +292,7 @@ function RequestCard({
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function MaintenanceInboxPage() {
+  const moduleGate = useModuleGate('maintenance');
   const router = useRouter();
   const [authChecked, setAuthChecked] = useState(false);
   const [activeTab, setActiveTab] = useState('open');
@@ -353,6 +355,8 @@ export default function MaintenanceInboxPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-4xl mx-auto">

@@ -9,6 +9,7 @@ import {
   Power, PowerOff, RefreshCw
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 import NfcProgrammer from '@/components/NfcProgrammer';
 
 interface NfcTag {
@@ -40,6 +41,7 @@ const TAG_TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; co
 };
 
 export default function NfcTagsPage() {
+  const moduleGate = useModuleGate('nfc');
   const router = useRouter();
   const [tags, setTags] = useState<NfcTag[]>([]);
   const [operators, setOperators] = useState<OperatorProfile[]>([]);
@@ -263,6 +265,8 @@ export default function NfcTagsPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gray-50">

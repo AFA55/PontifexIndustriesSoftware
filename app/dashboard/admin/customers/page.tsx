@@ -14,6 +14,7 @@ import CustomerCard from './_components/CustomerCard';
 import CustomerForm from './_components/CustomerForm';
 import CustomersSkeleton from './_skeleton';
 import { RevealSection } from '@/components/ui/Skeleton';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 interface Customer {
   id: string;
@@ -43,6 +44,7 @@ async function apiFetch(url: string, opts?: RequestInit) {
 }
 
 export default function CustomersPage() {
+  const moduleGate = useModuleGate('customer_crm');
   const router = useRouter();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +105,8 @@ export default function CustomersPage() {
   if (loading && customers.length === 0 && !search) {
     return <CustomersSkeleton />;
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">

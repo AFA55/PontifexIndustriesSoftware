@@ -11,6 +11,7 @@ import {
   Loader2, X, ToggleLeft, ToggleRight, Trash2, Edit2, Users
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 // ============================================================
 // Types
@@ -649,6 +650,7 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
 // ============================================================
 
 export default function FacilitiesPage() {
+  const moduleGate = useModuleGate('facilities_badging');
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'facilities' | 'badges'>('facilities');
   const [facilities, setFacilities] = useState<Facility[]>([]);
@@ -766,6 +768,8 @@ export default function FacilitiesPage() {
   const activeBadges = badges.filter(b => b.status === 'active');
   const expiringBadges = badges.filter(b => b.expiry_status === 'expiring_soon');
   const expiredBadges = badges.filter(b => b.expiry_status === 'expired' && b.status === 'active');
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">

@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import CreateInvoiceForm from './_components/CreateInvoiceForm';
 import BillingSkeleton from './_skeleton';
 import { RevealSection } from '@/components/ui/Skeleton';
+import { useModuleGate } from '@/components/ModuleGuard';
 import {
   ArrowLeft,
   RefreshCw,
@@ -177,6 +178,7 @@ async function apiFetch(url: string, opts?: RequestInit) {
 }
 
 export default function BillingPage() {
+  const moduleGate = useModuleGate('billing');
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -801,6 +803,8 @@ export default function BillingPage() {
   if (loading && invoices.length === 0 && completedJobs.length === 0) {
     return <BillingSkeleton />;
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   // Count confirmed invoices from the loaded list (stats from server may not include it yet)
   const confirmedCount = invoices.filter(i => i.status === 'confirmed').length;

@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 interface Equipment {
   id: string;
@@ -103,6 +104,7 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default function EquipmentListPage() {
+  const moduleGate = useModuleGate('equipment_fleet');
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -175,6 +177,8 @@ export default function EquipmentListPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">

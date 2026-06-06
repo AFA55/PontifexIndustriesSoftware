@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { useModuleGate } from '@/components/ModuleGuard';
 import {
   FileText,
   Clock,
@@ -88,6 +89,7 @@ interface JobDetails {
 }
 
 export default function CompletedJobsArchivePage() {
+  const moduleGate = useModuleGate('completed_jobs');
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -387,6 +389,8 @@ export default function CompletedJobsArchivePage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">

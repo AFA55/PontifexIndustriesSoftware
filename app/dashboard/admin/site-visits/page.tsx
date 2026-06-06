@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 interface VisitRow {
   id: string;
@@ -38,6 +39,7 @@ function formatVisitDate(dateStr: string): string {
 }
 
 export default function SiteVisitsListPage() {
+  const moduleGate = useModuleGate('supervisor_visits');
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -97,6 +99,8 @@ export default function SiteVisitsListPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">

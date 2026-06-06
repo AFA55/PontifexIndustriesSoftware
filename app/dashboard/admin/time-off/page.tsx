@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { useModuleGate } from '@/components/ModuleGuard';
 import LogTimeOffModal from './_components/LogTimeOffModal';
 
 // ---------------------------------------------------------------------------
@@ -677,6 +678,7 @@ function CalendarTab() {
 type Tab = 'scorecards' | 'requests' | 'calendar';
 
 export default function TimeOffPage() {
+  const moduleGate = useModuleGate('timecards');
   const [tab, setTab] = useState<Tab>('scorecards');
   const [token, setToken] = useState('');
   const [authReady, setAuthReady] = useState(false);
@@ -704,6 +706,8 @@ export default function TimeOffPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   const tabs: { id: Tab; label: string; icon: React.ElementType }[] = [
     { id: 'scorecards', label: 'Operator Metrics', icon: Users },

@@ -14,6 +14,7 @@ import {
 import NewInventoryModal from './_components/NewInventoryModal';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 const ALLOWED_ROLES = ['shop_manager','admin','super_admin','operations_manager','supervisor'];
 
@@ -70,6 +71,7 @@ const TAB_META: Record<Tab, { label: string; icon: React.ElementType; gradient: 
 };
 
 export default function InventoryControlPage() {
+  const moduleGate = useModuleGate('inventory_control');
   const router = useRouter();
   const searchParams = useSearchParams();
   const [user, setUser] = useState<User | null>(null);
@@ -226,6 +228,8 @@ export default function InventoryControlPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   const currentMeta = TAB_META[tab];
 

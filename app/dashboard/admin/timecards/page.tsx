@@ -14,6 +14,7 @@ import {
   Edit2, AlertCircle, Timer, Plus, ClipboardEdit, CheckSquare, XSquare, RefreshCw, UserX
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useModuleGate } from '@/components/ModuleGuard';
 
 // ── Types ────────────────────────────────────────────────────
 interface DayInfo {
@@ -134,6 +135,7 @@ function getDayCellClasses(info: DayInfo): string {
 // ══════════════════════════════════════════════════════════════
 
 export default function AdminTimecardsPage() {
+  const moduleGate = useModuleGate('timecards');
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
@@ -631,6 +633,8 @@ export default function AdminTimecardsPage() {
       </div>
     );
   }
+
+  if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
