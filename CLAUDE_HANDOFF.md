@@ -1,5 +1,5 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 4, 2026 | **Branch:** `main` | **HEAD:** `5dc04f77` — **Phase A + mobile + auth-UX + password-reset fix PUSHED → deploy `dpl_7spEQmZv…` READY/live** | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.1 (Build 6) APPROVED + live** · **v1.0.2 (Build 7) — "Waiting for Review."**
+**Last updated:** Jun 7, 2026 | **Branch:** `main` | **HEAD:** `c0eec8fe` — **module gating (sidebar + per-page ModuleGuard) PUSHED → deploy `dpl_2hEoMU5w…` READY/live** | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.2 LIVE on App Store** (approved + released Jun 3; latest native build). All web work reaches the app via the webview — **no App Store resubmission needed** unless a NATIVE change ships. **Testing tickets begin week of Jun 8.**
 
 > 🧰 **New:** `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev & prevent recurring bugs (date lib + Sentry + Zod + TanStack Query + RHF + shadcn + tests). Phased, additive, no big-bang. Phase A (date lib + Sentry) is the highest-ROI next step.
 
