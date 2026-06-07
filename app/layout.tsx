@@ -18,45 +18,46 @@ import NetworkMonitor from '@/components/NetworkMonitor';
 import DevWarningFilter from '@/components/DevWarningFilter';
 
 export const metadata: Metadata = {
-  title: 'Pontifex Industries - Field Operations Platform',
-  description: 'Complete field operations platform for concrete cutting and construction crews. GPS time tracking, digital signatures, job scheduling, and automated documentation. Setup in 5 minutes.',
+  title: {
+    default: 'Custom Software & AI Automations | Pontifex Industries',
+    template: '%s | Pontifex Industries',
+  },
+  description:
+    'Pontifex Industries builds adaptable custom software and AI automations around how construction, trades, and field-service companies actually work — so you own the digital tools that run your business. Based in Upstate South Carolina.',
   keywords: [
-    'concrete cutting software',
-    'field operations platform',
-    'construction management software',
-    'OSHA compliance',
-    'job tracking software',
-    'contractor software',
-    'GPS time tracking',
-    'construction profitability tracking',
-    'job management system',
-    'crew management',
+    'custom software development',
+    'custom business software',
+    'bespoke software development',
+    'operations software',
+    'workflow software',
+    'field service software',
+    'construction software',
+    'AI workflow automation',
+    'agentic automation',
+    'custom software developer Upstate SC',
+    'custom software development Greenville SC',
   ],
   authors: [{ name: 'Pontifex Industries' }],
   creator: 'Pontifex Industries',
   publisher: 'Pontifex Industries',
   metadataBase: new URL('https://www.pontifexindustries.com'),
+  alternates: {
+    canonical: 'https://www.pontifexindustries.com',
+  },
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: 'https://www.pontifexindustries.com',
-    title: 'Pontifex Industries - Field Operations Platform',
-    description: 'Run your field crew like a Fortune 500 company. Track jobs, profitability, and OSHA compliance in real-time.',
+    title: 'Custom Software & AI Automations | Pontifex Industries',
+    description:
+      'You already own the tools and skills that get the job done — now own the digital tools too. Adaptable software built around how you work.',
     siteName: 'Pontifex Industries',
-    images: [
-      {
-        url: '/icon-512.png',
-        width: 512,
-        height: 512,
-        alt: 'Pontifex Industries - Field Operations Platform',
-      },
-    ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Pontifex Industries - Field Operations Platform',
-    description: 'Complete field operations platform for concrete cutting and construction crews.',
-    images: ['/icon-512.png'],
+    title: 'Custom Software & AI Automations | Pontifex Industries',
+    description:
+      'Adaptable custom software and AI automations built around how your company already works.',
   },
   robots: {
     index: true,
