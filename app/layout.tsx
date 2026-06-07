@@ -10,7 +10,6 @@ export const viewport: Viewport = {
   viewportFit: 'cover',
 };
 import { ThemeProvider } from '@/contexts/ThemeContext';
-import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 import { BrandingProvider } from '@/lib/branding-context';
 import { NotificationProvider } from '@/contexts/NotificationContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -106,7 +105,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <NotificationProvider>
               <ErrorBoundary>
                 <NetworkMonitor />
-                <GoogleMapsProvider>{children}</GoogleMapsProvider>
+                {children}
               </ErrorBoundary>
             </NotificationProvider>
           </BrandingProvider>

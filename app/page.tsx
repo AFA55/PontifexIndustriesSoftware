@@ -124,7 +124,7 @@ export default function HomePage() {
             </h1>
 
             <p className="text-lg sm:text-xl md:text-2xl text-zinc-400 leading-relaxed max-w-3xl mx-auto">
-              You already own the trucks, the saws, and the skills that get the job done. Stop renting
+              You already own the trucks, the equipment, and the skills that get the job done. Stop renting
               rigid, generic software you can&apos;t control. Pontifex builds{' '}
               <span className="text-white font-medium">
                 adaptable digital tools around how you already work
@@ -236,7 +236,7 @@ export default function HomePage() {
           <div className="relative z-10 max-w-4xl mx-auto text-center space-y-8">
             <Eyebrow>The Shift</Eyebrow>
             <h2 className="text-3xl sm:text-5xl font-black leading-tight">
-              You own the saws, the trucks, and the crews.{' '}
+              You own the equipment, the trucks, and the crews.{' '}
               <span className="bg-gradient-to-r from-violet-400 via-fuchsia-400 to-rose-400 bg-clip-text text-transparent">
                 Now own the software that runs the business.
               </span>
@@ -249,7 +249,7 @@ export default function HomePage() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
               {[
-                { icon: Truck, label: 'Trucks & saws — yours' },
+                { icon: Truck, label: 'Trucks & equipment — yours' },
                 { icon: Users, label: 'Crews & skills — yours' },
                 { icon: Server, label: 'Digital tools — now yours too' },
               ].map((c) => (

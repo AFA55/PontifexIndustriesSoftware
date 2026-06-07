@@ -2,6 +2,7 @@
 
 import PushRegistration from '@/components/PushRegistration';
 import SubscriptionGate from '@/components/SubscriptionGate';
+import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 
 /**
  * Dashboard layout — wraps every authenticated dashboard route.
@@ -20,10 +21,10 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <>
+    <GoogleMapsProvider>
       <PushRegistration />
       <SubscriptionGate />
       {children}
-    </>
+    </GoogleMapsProvider>
   );
 }
