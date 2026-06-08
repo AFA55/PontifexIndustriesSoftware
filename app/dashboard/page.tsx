@@ -101,6 +101,14 @@ export default function Dashboard() {
       return;
     }
 
+    // Platform owner (super_admin) lands in the Platform Hub by default.
+    // They can still navigate INTO client dashboards explicitly — this only
+    // changes the DEFAULT landing at /dashboard. Keep before the admin block.
+    if (currentUser.role === 'super_admin') {
+      router.replace('/dashboard/platform');
+      return;
+    }
+
     // Redirect management roles to their admin dashboard.
     // Keep this in sync with ADMIN_DASHBOARD_ROLES in lib/rbac.ts.
     const ADMIN_ROLES = ['super_admin', 'admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'];

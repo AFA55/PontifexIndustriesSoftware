@@ -35,6 +35,8 @@ import {
   Wrench,
   Crown,
   Database,
+  Home,
+  MessageSquareWarning,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -123,6 +125,9 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       { label: 'My Timecard', href: '/dashboard/timecard', icon: Clock, roles: ['shop_manager', 'shop_help', 'supervisor'] },
       { label: 'Request Time Off', href: '/dashboard/request-time-off', icon: CalendarOff, roles: ['shop_manager', 'shop_help', 'supervisor'] },
+      // Field-facing issue reporting — operators/apprentices + field/shop roles
+      // can report a bug or request a feature. (Page built by the feedback agent.)
+      { label: 'Report an Issue', href: '/dashboard/feedback/new', icon: MessageSquareWarning, roles: ['operator', 'apprentice', 'shop_manager', 'shop_help', 'supervisor', 'inventory_manager'] },
     ],
   },
   {
@@ -162,6 +167,8 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'PLATFORM',
     accent: 'text-amber-400',
     items: [
+      // Hub is the owner's home cockpit — placed above Tenants.
+      { label: 'Hub', href: '/dashboard/platform', icon: Home, superAdminOnly: true },
       { label: 'Tenants', href: '/dashboard/platform/tenants', icon: Crown, superAdminOnly: true },
       { label: 'Backups', href: '/dashboard/platform/backups', icon: Database, superAdminOnly: true },
     ],
@@ -462,10 +469,11 @@ function SidebarContent({
                       ? badgeCounts.notifications
                       : 0;
 
-                  // Exact match for dashboard root, prefix match for sub-pages
+                  // Exact match for index routes (dashboard root + platform Hub),
+                  // prefix match for sub-pages.
                   const isActive =
-                    item.href === '/dashboard/admin'
-                      ? pathname === '/dashboard/admin'
+                    item.href === '/dashboard/admin' || item.href === '/dashboard/platform'
+                      ? pathname === item.href
                       : pathname.startsWith(item.href);
 
                   return (
