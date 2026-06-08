@@ -636,6 +636,7 @@ function QuickActionsSection({
 
 interface EditInfoForm {
   full_name: string;
+  email: string;
   nickname: string;
   phone_number: string;
   date_of_birth: string;
@@ -648,6 +649,7 @@ interface EditInfoForm {
 function seedEditInfoForm(member: TeamMember): EditInfoForm {
   return {
     full_name: member.full_name ?? '',
+    email: member.email ?? '',
     nickname: member.nickname ?? '',
     phone_number: member.phone_number ?? member.phone ?? '',
     date_of_birth: member.date_of_birth ?? '',
@@ -702,12 +704,30 @@ function EditInfoTab({
         'emergency_contact_name', 'emergency_contact_phone',
         'emergency_contact_relationship', 'next_review_date',
       ];
+      let emailError: string | null = null;
       (Object.keys(form) as Array<keyof EditInfoForm>).forEach(k => {
         if (form[k] === initial[k]) return;
         if (k === 'next_review_date' && !canEditAdminFields) return; // guard
+        if (k === 'email') {
+          // Email is the login identity — management-only, never nulled, validated + normalized.
+          if (!canEditAdminFields) return; // guard: non-management cannot change email
+          const normalized = form.email.trim().toLowerCase();
+          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+            emailError = 'Please enter a valid email address.';
+            return;
+          }
+          payload.email = normalized;
+          return;
+        }
         const v = form[k].trim();
         payload[k] = v === '' && nullableKeys.includes(k) ? null : v;
       });
+
+      if (emailError) {
+        setError(emailError);
+        setSaving(false);
+        return;
+      }
 
       if (Object.keys(payload).length === 0) {
         setSaving(false);
@@ -753,9 +773,30 @@ function EditInfoTab({
       <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-2xl p-5">
         <h3 className="text-xs font-semibold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-4">Account Identity</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <span className={labelCls}>Email <span className="text-gray-400 dark:text-slate-500 font-normal">(read-only)</span></span>
-            <p className="text-gray-900 dark:text-white break-all">{member.email}</p>
+          <div className="min-w-0">
+            {canEditAdminFields ? (
+              <>
+                <label className={labelCls} htmlFor="ei-email">Email</label>
+                <input
+                  id="ei-email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="off"
+                  value={form.email}
+                  onChange={e => set('email', e.target.value)}
+                  className={`${inputCls} break-all`}
+                  placeholder="name@company.com"
+                />
+                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1.5">
+                  Changing this changes the person&apos;s login email.
+                </p>
+              </>
+            ) : (
+              <>
+                <span className={labelCls}>Email <span className="text-gray-400 dark:text-slate-500 font-normal">(read-only)</span></span>
+                <p className="text-gray-900 dark:text-white break-all">{member.email}</p>
+              </>
+            )}
           </div>
           <div>
             <span className={labelCls}>Role <span className="text-gray-400 dark:text-slate-500 font-normal">(read-only)</span></span>

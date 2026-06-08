@@ -77,7 +77,10 @@ async function sendInviteEmail(opts: {
 }) {
   const setupUrl = `${baseUrl(opts.request)}/setup-account?token=${opts.token}`;
   return getResend().emails.send({
-    from: process.env.RESEND_FROM_EMAIL || 'noreply@admin.pontifexindustries.com',
+    // Must be a VERIFIED Resend domain. admin.pontifexindustries.com is NOT verified
+    // (only pontifexindustries.com is) — using it makes every invite send fail. Match
+    // the shared sendEmail() helper's verified sender.
+    from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <noreply@pontifexindustries.com>',
     to: opts.to,
     subject: `You're invited to join ${opts.tenantName}`,
     html: `

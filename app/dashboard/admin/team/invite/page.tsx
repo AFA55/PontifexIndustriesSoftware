@@ -164,8 +164,8 @@ export default function InviteUsersPage() {
 
   if (!authChecked) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
+        <Loader2 className="w-8 h-8 text-violet-500 dark:text-violet-400 animate-spin" />
       </div>
     );
   }
@@ -173,52 +173,52 @@ export default function InviteUsersPage() {
   const statusChip = (status: Invitation['status']) => {
     if (status === 'accepted')
       return (
-        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
           <CheckCircle2 className="w-3 h-3" /> Accepted
         </span>
       );
     if (status === 'expired')
       return (
-        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30">
           <AlertTriangle className="w-3 h-3" /> Expired
         </span>
       );
     return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
+      <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30">
         <Clock className="w-3 h-3" /> Pending
       </span>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white text-slate-900 dark:from-[#0b0618] dark:to-[#0e0720] dark:text-white">
       <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
         {/* Header */}
         <Link
           href="/dashboard/admin"
-          className="inline-flex items-center gap-1.5 text-gray-400 hover:text-gray-200 text-sm mb-5 min-h-[44px]"
+          className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-700 dark:text-white/60 dark:hover:text-white text-sm mb-5 min-h-[44px]"
         >
           <ArrowLeft className="w-4 h-4" /> Back to dashboard
         </Link>
 
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-11 h-11 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center flex-shrink-0">
-            <UserPlus className="w-5 h-5 text-purple-300" />
+          <div className="w-11 h-11 rounded-xl bg-violet-50 border border-violet-200 dark:bg-violet-500/15 dark:border-violet-500/30 flex items-center justify-center flex-shrink-0">
+            <UserPlus className="w-5 h-5 text-violet-600 dark:text-violet-300" />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold">Invite Team Members</h1>
-            <p className="text-gray-400 text-sm">Send a setup link so your crew can onboard themselves.</p>
+            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Invite Team Members</h1>
+            <p className="text-slate-500 dark:text-white/60 text-sm">Send a setup link so your crew can onboard themselves.</p>
           </div>
         </div>
 
         {/* Invite form */}
         <form
           onSubmit={handleSubmit}
-          className="bg-gray-900 border border-gray-800 rounded-2xl p-5 sm:p-6 mb-8 space-y-4"
+          className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-5 sm:p-6 mb-8 space-y-4 dark:bg-white/[0.04] dark:ring-white/10"
         >
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-sm text-gray-400 mb-1.5 flex items-center gap-1.5">
+              <label className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" /> Email
               </label>
               <input
@@ -227,11 +227,15 @@ export default function InviteUsersPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="crew.member@company.com"
                 autoComplete="off"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors min-h-[44px]"
+                className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
+                  bg-white border border-slate-200 text-slate-900 placeholder-slate-400
+                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
+                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
               />
             </div>
             <div>
-              <label className="text-sm text-gray-400 mb-1.5 flex items-center gap-1.5">
+              <label className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
                 <UserIcon className="w-3.5 h-3.5" /> Full name
               </label>
               <input
@@ -239,17 +243,25 @@ export default function InviteUsersPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Jordan Smith"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors min-h-[44px]"
+                className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
+                  bg-white border border-slate-200 text-slate-900 placeholder-slate-400
+                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
+                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
               />
             </div>
             <div>
-              <label className="text-sm text-gray-400 mb-1.5 flex items-center gap-1.5">
+              <label className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
                 <Shield className="w-3.5 h-3.5" /> Role
               </label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-purple-500 transition-colors min-h-[44px]"
+                className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
+                  bg-white border border-slate-200 text-slate-900
+                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white
+                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
               >
                 {invitableRoles.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -258,14 +270,14 @@ export default function InviteUsersPage() {
                 ))}
               </select>
               {role && (
-                <p className="text-xs text-gray-500 mt-1.5">
+                <p className="text-xs text-slate-400 dark:text-white/40 mt-1.5">
                   {invitableRoles.find((r) => r.value === role)?.description}
                 </p>
               )}
             </div>
             <div>
-              <label className="text-sm text-gray-400 mb-1.5 flex items-center gap-1.5">
-                <Phone className="w-3.5 h-3.5" /> Phone <span className="text-gray-600">(optional)</span>
+              <label className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5" /> Phone <span className="text-slate-400 dark:text-white/30">(optional)</span>
               </label>
               <input
                 type="tel"
@@ -273,18 +285,22 @@ export default function InviteUsersPage() {
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="(555) 123-4567"
                 autoComplete="off"
-                className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors min-h-[44px]"
+                className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
+                  bg-white border border-slate-200 text-slate-900 placeholder-slate-400
+                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
+                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
               />
             </div>
           </div>
 
           {formError && (
-            <p className="text-rose-400 text-sm bg-rose-500/10 border border-rose-500/20 rounded-lg px-3 py-2">
+            <p className="text-rose-700 dark:text-rose-300 text-sm bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-500/20 rounded-lg px-3 py-2">
               {formError}
             </p>
           )}
           {formSuccess && (
-            <p className="text-emerald-400 text-sm bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+            <p className="text-emerald-700 dark:text-emerald-300 text-sm bg-emerald-50 border border-emerald-200 dark:bg-emerald-500/10 dark:border-emerald-500/20 rounded-lg px-3 py-2">
               {formSuccess}
             </p>
           )}
@@ -292,7 +308,7 @@ export default function InviteUsersPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 font-semibold transition-colors min-h-[44px]"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 font-semibold transition-colors min-h-[44px]"
           >
             {submitting ? (
               <>
@@ -308,10 +324,10 @@ export default function InviteUsersPage() {
 
         {/* Invitations list */}
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">Invitations</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Invitations</h2>
           <button
             onClick={() => loadInvitations()}
-            className="inline-flex items-center gap-1.5 text-gray-400 hover:text-gray-200 text-sm min-h-[44px] px-2"
+            className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-700 dark:text-white/60 dark:hover:text-white text-sm min-h-[44px] px-2"
           >
             <RefreshCw className="w-3.5 h-3.5" /> Refresh
           </button>
@@ -319,10 +335,10 @@ export default function InviteUsersPage() {
 
         {loadingList ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+            <Loader2 className="w-6 h-6 text-violet-500 dark:text-violet-400 animate-spin" />
           </div>
         ) : invitations.length === 0 ? (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 text-center text-gray-500">
+          <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">
             No invitations yet. Send your first one above.
           </div>
         ) : (
@@ -330,17 +346,17 @@ export default function InviteUsersPage() {
             {invitations.map((inv) => (
               <div
                 key={inv.id}
-                className="bg-gray-900 border border-gray-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+                className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center gap-3 dark:bg-white/[0.04] dark:ring-white/10"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-white truncate">
+                    <span className="font-semibold text-slate-900 dark:text-white truncate">
                       {inv.name || inv.email}
                     </span>
                     {statusChip(inv.status)}
                   </div>
-                  <div className="text-sm text-gray-400 truncate">{inv.email}</div>
-                  <div className="text-xs text-gray-500 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
+                  <div className="text-sm text-slate-500 dark:text-white/60 truncate">{inv.email}</div>
+                  <div className="text-xs text-slate-400 dark:text-white/40 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                     <span>{getRoleLabel(inv.role)}</span>
                     <span>Invited {fmtDate(inv.invited_at)}</span>
                     {inv.status === 'accepted'
@@ -352,7 +368,7 @@ export default function InviteUsersPage() {
                   <button
                     onClick={() => handleResend(inv.id)}
                     disabled={resendingId === inv.id}
-                    className="inline-flex items-center justify-center gap-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-60 text-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors min-h-[44px] flex-shrink-0"
+                    className="inline-flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-60 text-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium transition-colors min-h-[44px] flex-shrink-0 dark:bg-white/10 dark:hover:bg-white/20 dark:text-white/80"
                   >
                     {resendingId === inv.id ? (
                       <Loader2 className="w-4 h-4 animate-spin" />

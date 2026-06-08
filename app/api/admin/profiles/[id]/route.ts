@@ -9,6 +9,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, ADMIN_ROLES } from '@/lib/api-auth';
+import { getRoleRank } from '@/lib/rbac';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // GET: Single profile with project history
 export async function GET(
@@ -83,7 +86,7 @@ export async function PATCH(
     // Resolve the target to enforce tenant isolation + role-grant caps before updating.
     const { data: target } = await supabaseAdmin
       .from('profiles')
-      .select('tenant_id, role')
+      .select('tenant_id, role, email')
       .eq('id', id)
       .single();
     if (!target) {
@@ -101,9 +104,80 @@ export async function PATCH(
       return NextResponse.json({ error: 'Forbidden: insufficient privilege for super_admin role' }, { status: 403 });
     }
 
+    // ── Email change handling (login identity — auth-sensitive) ───────────────
+    // When the PATCH body includes `email`, enforce management authZ + tenant +
+    // rank guards, global uniqueness, then sync auth.users FIRST and profiles
+    // SECOND. We resolve the new email up-front so we can apply the auth update
+    // AFTER the profiles update below (auth first, profiles second per spec).
+    let emailChange: { newEmail: string } | null = null;
+    if (body.email !== undefined && body.email !== null) {
+      const isManagement = ADMIN_ROLES.includes(auth.role);
+      // 1. AuthZ: only admin / operations_manager / super_admin may change ANY email.
+      if (!isManagement) {
+        return NextResponse.json(
+          { error: 'Forbidden: you cannot change a login email.' },
+          { status: 403 }
+        );
+      }
+
+      // 3. Rank guard: a caller may not edit the email of a profile whose role
+      //    outranks OR EQUALS theirs — unless they are super_admin, or it's their
+      //    own profile. (Tenant isolation already enforced above.)
+      const isSelf = id === auth.userId;
+      if (auth.role !== 'super_admin' && !isSelf) {
+        if (getRoleRank(target.role) >= getRoleRank(auth.role)) {
+          return NextResponse.json(
+            { error: 'Forbidden: you cannot change the email of a user at or above your access level.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // 4. Normalize + validate.
+      const newEmail = String(body.email).trim().toLowerCase();
+      if (!EMAIL_RE.test(newEmail)) {
+        return NextResponse.json({ error: 'Please enter a valid email address.' }, { status: 400 });
+      }
+
+      const currentEmail = (target.email || '').trim().toLowerCase();
+      if (newEmail !== currentEmail) {
+        // 5. Global uniqueness — auth.users is GLOBAL (one row per email
+        //    platform-wide). Reject if ANY other profile OR auth user (in ANY
+        //    tenant) already uses this email. Mirrors the invite cross-tenant guard.
+        const { data: clashProfile } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .ilike('email', newEmail)
+          .neq('id', id)
+          .maybeSingle();
+        if (clashProfile) {
+          return NextResponse.json(
+            { error: 'A user with this email already exists.' },
+            { status: 409 }
+          );
+        }
+        const { data: authUsersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+        const emailTakenInAuth = authUsersPage?.users?.some(
+          (u) => u.id !== id && u.email?.toLowerCase() === newEmail
+        );
+        if (emailTakenInAuth) {
+          return NextResponse.json(
+            { error: 'A user with this email already exists.' },
+            { status: 409 }
+          );
+        }
+        emailChange = { newEmail };
+      }
+      // If unchanged, fall through and let it be a no-op (stripped below).
+    }
+
     // Non-admins editing their own profile cannot change role or active status.
+    // NOTE: `email` is deliberately EXCLUDED from this generic field loop. It is
+    // the login identity and is handled exclusively via the `emailChange` path
+    // above (management-only, rank-guarded, globally-unique, auth.users-synced).
+    // Letting it through here would desync auth.users ↔ profiles.
     const selfOnlyFields = [
-      'full_name', 'nickname', 'email', 'phone', 'phone_number',
+      'full_name', 'nickname', 'phone', 'phone_number',
       'date_of_birth', 'profile_picture_url',
       'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
     ];
@@ -119,6 +193,26 @@ export async function PATCH(
       }
     }
 
+    // ── Sync auth.users FIRST when the email is changing ──────────────────────
+    // Update the auth identity before touching profiles so (a) login works with
+    // the new email and (b) no confirmation email is sent (email_confirm: true).
+    // If this fails, we DO NOT touch the profile and return the error.
+    if (emailChange) {
+      const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(id, {
+        email: emailChange.newEmail,
+        email_confirm: true,
+      });
+      if (authErr) {
+        console.error('[profiles PATCH] auth.users email update failed (profile untouched):', authErr);
+        return NextResponse.json(
+          { error: 'Failed to update login email. No changes were saved.' },
+          { status: 500 }
+        );
+      }
+      // Auth update succeeded — mirror into profiles.email below.
+      updateData.email = emailChange.newEmail;
+    }
+
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
       .update(updateData)
@@ -128,6 +222,33 @@ export async function PATCH(
 
     if (error) {
       console.error('Error updating profile:', error);
+      // If we already moved the auth email but the profile write failed, the two
+      // stores are desynced. Log loudly and attempt to revert auth.users back to
+      // the prior email so login + records stay consistent.
+      if (emailChange) {
+        const priorEmail = (target.email || '').trim().toLowerCase();
+        console.error(
+          `[profiles PATCH] DESYNC: auth.users email for ${id} was changed to ` +
+          `"${emailChange.newEmail}" but profiles update FAILED. Attempting auth revert to "${priorEmail}".`
+        );
+        if (priorEmail) {
+          const { error: revertErr } = await supabaseAdmin.auth.admin.updateUserById(id, {
+            email: priorEmail,
+            email_confirm: true,
+          });
+          if (revertErr) {
+            console.error(
+              `[profiles PATCH] CRITICAL: failed to revert auth.users email for ${id}. ` +
+              `auth="${emailChange.newEmail}" profiles="${priorEmail}" are now DESYNCED. Manual fix required.`,
+              revertErr
+            );
+          }
+        }
+        return NextResponse.json(
+          { error: 'Failed to update profile. Login email change was rolled back.' },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
     }
 

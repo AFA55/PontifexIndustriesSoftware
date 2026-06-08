@@ -155,10 +155,10 @@ function SetupAccountInner() {
   // ── Loading state ──────────────────────────────────────────────────────────
   if (step === 0) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
-          <p className="text-gray-400 text-sm">Validating invitation...</p>
+          <Loader2 className="w-8 h-8 text-violet-500 dark:text-violet-400 animate-spin" />
+          <p className="text-slate-500 dark:text-white/60 text-sm">Validating invitation...</p>
         </div>
       </div>
     );
@@ -167,14 +167,14 @@ function SetupAccountInner() {
   // ── Error state ────────────────────────────────────────────────────────────
   if (step === -1) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 rounded-2xl p-8 max-w-md w-full text-center border border-red-500/20">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center p-4">
+        <div className="bg-white/90 ring-1 ring-red-200 shadow-sm rounded-2xl p-8 max-w-md w-full text-center dark:bg-white/[0.04] dark:ring-red-500/30">
+          <div className="w-16 h-16 bg-red-50 dark:bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
             <span className="text-3xl">⚠️</span>
           </div>
-          <h1 className="text-xl font-bold text-white mb-2">Invitation Problem</h1>
-          <p className="text-gray-400 mb-6">{error}</p>
-          <a href="/company-login" className="text-purple-400 hover:text-purple-300 text-sm underline">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Invitation Problem</h1>
+          <p className="text-slate-500 dark:text-white/60 mb-6">{error}</p>
+          <a href="/company-login" className="text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 text-sm underline">
             Go to sign in →
           </a>
         </div>
@@ -185,24 +185,24 @@ function SetupAccountInner() {
   // ── Success state ──────────────────────────────────────────────────────────
   if (step === 4) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
-        <div className="bg-gray-900 rounded-2xl p-8 max-w-md w-full text-center border border-green-500/20">
-          <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <CheckCircle className="w-8 h-8 text-green-400" />
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center p-4">
+        <div className="bg-white/90 ring-1 ring-emerald-200 shadow-sm rounded-2xl p-8 max-w-md w-full text-center dark:bg-white/[0.04] dark:ring-emerald-500/30">
+          <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-2">Account Ready!</h1>
-          <p className="text-gray-400 mb-4">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Account Ready!</h1>
+          <p className="text-slate-500 dark:text-white/60 mb-4">
             Your account has been set up successfully. Redirecting you to sign in...
           </p>
           {invitation?.companyCode && (
-            <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm mb-4">
-              <span className="text-gray-400">Your company code: </span>
-              <strong className="text-purple-300">{invitation.companyCode}</strong>
+            <div className="bg-slate-50 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10 rounded-xl px-4 py-3 text-sm mb-4">
+              <span className="text-slate-500 dark:text-white/60">Your company code: </span>
+              <strong className="text-violet-600 dark:text-violet-300">{invitation.companyCode}</strong>
             </div>
           )}
           <a
             href="/company-login"
-            className="inline-block w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors"
+            className="inline-block w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl py-3 font-semibold transition-colors"
           >
             Go to Sign In
           </a>
@@ -216,18 +216,18 @@ function SetupAccountInner() {
   const stepIcons = [Camera, FileText, Bell];
 
   return (
-    <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center p-4">
       <div className="max-w-lg w-full">
 
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-2 mb-4">
-            <span className="text-purple-300 text-sm font-medium">{invitation?.tenantName}</span>
+          <div className="inline-flex items-center gap-2 bg-violet-50 border border-violet-200 dark:bg-violet-500/10 dark:border-violet-500/20 rounded-full px-4 py-2 mb-4">
+            <span className="text-violet-600 dark:text-violet-300 text-sm font-medium">{invitation?.tenantName}</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
             {invitation?.name ? `Welcome, ${invitation.name.split(' ')[0]}!` : 'Complete Your Account Setup'}
           </h1>
-          <p className="text-gray-400 mt-2 text-sm">
+          <p className="text-slate-500 dark:text-white/60 mt-2 text-sm">
             Just a few steps to get your account ready.
           </p>
         </div>
@@ -238,46 +238,46 @@ function SetupAccountInner() {
             <div key={s} className={`flex items-center ${s < 3 ? 'flex-1' : ''}`}>
               <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold transition-all
                 ${step === s
-                  ? 'bg-purple-600 text-white ring-2 ring-purple-400 ring-offset-2 ring-offset-gray-950'
+                  ? 'bg-violet-600 text-white ring-2 ring-violet-300 ring-offset-2 ring-offset-slate-50 dark:ring-violet-400 dark:ring-offset-[#0b0618]'
                   : step > s
-                  ? 'bg-green-500 text-white'
-                  : 'bg-gray-800 text-gray-500'}`}>
+                  ? 'bg-emerald-500 text-white'
+                  : 'bg-slate-200 text-slate-500 dark:bg-white/10 dark:text-white/40'}`}>
                 {step > s ? '✓' : s}
               </div>
               {s < 3 && (
-                <div className={`flex-1 h-0.5 mx-2 transition-colors ${step > s ? 'bg-green-500' : 'bg-gray-800'}`} />
+                <div className={`flex-1 h-0.5 mx-2 transition-colors ${step > s ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-white/10'}`} />
               )}
             </div>
           ))}
         </div>
 
-        <div className="bg-gray-900 rounded-2xl p-6 border border-gray-800 shadow-xl">
+        <div className="bg-white/90 ring-1 ring-slate-200 rounded-2xl p-6 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
 
           {/* ── Step 1: Photo + Password ─────────────────────────────────── */}
           {step === 1 && (
             <div className="space-y-5">
-              <div className="flex items-center gap-3 pb-2 border-b border-gray-800">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Camera className="w-5 h-5 text-purple-400" />
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-white/10">
+                <div className="w-10 h-10 bg-violet-50 dark:bg-violet-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Camera className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Profile &amp; Password</h2>
-                  <p className="text-gray-400 text-sm">Add a photo and create your password</p>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Profile &amp; Password</h2>
+                  <p className="text-slate-500 dark:text-white/60 text-sm">Add a photo and create your password</p>
                 </div>
               </div>
 
               {/* Avatar upload */}
               <div className="flex flex-col items-center gap-3">
-                <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-800 border-2 border-purple-500/30 flex items-center justify-center flex-shrink-0">
+                <div className="w-24 h-24 rounded-full overflow-hidden bg-slate-100 dark:bg-white/10 border-2 border-violet-200 dark:border-violet-500/30 flex items-center justify-center flex-shrink-0">
                   {avatarPreview ? (
                     <img src={avatarPreview} alt="Profile preview" className="w-full h-full object-cover" />
                   ) : (
-                    <span className="text-3xl font-bold text-gray-500">
+                    <span className="text-3xl font-bold text-slate-400 dark:text-white/40">
                       {invitation?.email?.charAt(0)?.toUpperCase() || '?'}
                     </span>
                   )}
                 </div>
-                <label className="cursor-pointer flex items-center gap-2 bg-gray-800 hover:bg-gray-700 text-gray-300 px-4 py-2 rounded-lg text-sm transition-colors border border-gray-700">
+                <label className="cursor-pointer flex items-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm transition-colors border border-slate-200 min-h-[44px] dark:bg-white/10 dark:hover:bg-white/20 dark:text-white/80 dark:border-white/10">
                   <Upload className="w-4 h-4" />
                   {avatarPreview ? 'Change Photo' : 'Upload Photo (optional)'}
                   <input
@@ -287,46 +287,54 @@ function SetupAccountInner() {
                     onChange={handleAvatarChange}
                   />
                 </label>
-                <p className="text-xs text-gray-500">JPG, PNG, WEBP up to 5 MB</p>
+                <p className="text-xs text-slate-400 dark:text-white/40">JPG, PNG, WEBP up to 5 MB</p>
               </div>
 
               {/* Account info (read-only) */}
-              <div className="bg-gray-800/50 rounded-xl p-3 text-sm">
-                <span className="text-gray-500">Account: </span>
-                <span className="text-gray-300">{invitation?.email}</span>
+              <div className="bg-slate-50 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10 rounded-xl p-3 text-sm">
+                <span className="text-slate-500 dark:text-white/50">Account: </span>
+                <span className="text-slate-700 dark:text-white/80">{invitation?.email}</span>
               </div>
 
               {/* Password fields */}
               <div className="space-y-3">
                 <div>
-                  <label className="text-sm text-gray-400 mb-1.5 block">Create Password</label>
+                  <label className="text-sm text-slate-500 dark:text-white/60 mb-1.5 block">Create Password</label>
                   <input
                     type="password"
                     value={password}
                     onChange={e => { setPassword(e.target.value); setError(''); }}
                     placeholder="At least 8 characters"
                     autoComplete="new-password"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                    className="w-full rounded-xl px-4 py-3 transition-colors min-h-[44px]
+                      bg-white border border-slate-200 text-slate-900 placeholder-slate-400
+                      focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
+                      dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-400 mb-1.5 block">Confirm Password</label>
+                  <label className="text-sm text-slate-500 dark:text-white/60 mb-1.5 block">Confirm Password</label>
                   <input
                     type="password"
                     value={confirmPassword}
                     onChange={e => { setConfirmPassword(e.target.value); setError(''); }}
                     placeholder="Repeat your password"
                     autoComplete="new-password"
-                    className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors"
+                    className="w-full rounded-xl px-4 py-3 transition-colors min-h-[44px]
+                      bg-white border border-slate-200 text-slate-900 placeholder-slate-400
+                      focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
+                      dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
                   />
                 </div>
               </div>
 
-              {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+              {error && <p className="text-red-700 dark:text-red-300 text-sm bg-red-50 dark:bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
 
               <button
                 onClick={handleStep1Next}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors"
+                className="w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl py-3 font-semibold transition-colors min-h-[44px]"
               >
                 Next: Review Agreement →
               </button>
@@ -336,37 +344,37 @@ function SetupAccountInner() {
           {/* ── Step 2: Liability Waiver ─────────────────────────────────── */}
           {step === 2 && (
             <div className="space-y-5">
-              <div className="flex items-center gap-3 pb-2 border-b border-gray-800">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <FileText className="w-5 h-5 text-purple-400" />
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-white/10">
+                <div className="w-10 h-10 bg-violet-50 dark:bg-violet-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Platform Agreement</h2>
-                  <p className="text-gray-400 text-sm">Please read and sign to continue</p>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Platform Agreement</h2>
+                  <p className="text-slate-500 dark:text-white/60 text-sm">Please read and sign to continue</p>
                 </div>
               </div>
 
-              <div className="bg-gray-800 rounded-xl p-4 h-64 overflow-y-auto text-sm text-gray-300 leading-relaxed space-y-4 border border-gray-700">
-                <h3 className="text-white font-semibold text-base">Platform User Agreement &amp; Liability Waiver</h3>
+              <div className="bg-slate-50 rounded-xl p-4 h-64 overflow-y-auto text-sm text-slate-600 leading-relaxed space-y-4 border border-slate-200 dark:bg-white/5 dark:text-white/70 dark:border-white/10">
+                <h3 className="text-slate-900 dark:text-white font-semibold text-base">Platform User Agreement &amp; Liability Waiver</h3>
                 <p>By using the {invitation?.tenantName} operations platform ("Platform"), you agree to the following terms:</p>
 
-                <p><strong className="text-white">1. Authorized Use.</strong> This Platform is provided solely for authorized business operations. You agree to use it only for lawful purposes related to your employment or contracted work with {invitation?.tenantName}.</p>
+                <p><strong className="text-slate-900 dark:text-white">1. Authorized Use.</strong> This Platform is provided solely for authorized business operations. You agree to use it only for lawful purposes related to your employment or contracted work with {invitation?.tenantName}.</p>
 
-                <p><strong className="text-white">2. Data Accuracy.</strong> You are responsible for the accuracy of all information you enter, including job progress logs, timecard entries, and work performed records. Falsification of records may result in immediate termination and possible legal action.</p>
+                <p><strong className="text-slate-900 dark:text-white">2. Data Accuracy.</strong> You are responsible for the accuracy of all information you enter, including job progress logs, timecard entries, and work performed records. Falsification of records may result in immediate termination and possible legal action.</p>
 
-                <p><strong className="text-white">3. GPS &amp; Location Data.</strong> The Platform may collect GPS coordinates during clock-in, job start/end, and NFC scan events. This data is used solely for payroll verification and job site confirmation. You consent to this collection as a condition of Platform access.</p>
+                <p><strong className="text-slate-900 dark:text-white">3. GPS &amp; Location Data.</strong> The Platform may collect GPS coordinates during clock-in, job start/end, and NFC scan events. This data is used solely for payroll verification and job site confirmation. You consent to this collection as a condition of Platform access.</p>
 
-                <p><strong className="text-white">4. Confidentiality.</strong> Customer information, pricing, job details, and all Platform data are confidential. You agree not to share, reproduce, or distribute any Platform data outside of authorized business use.</p>
+                <p><strong className="text-slate-900 dark:text-white">4. Confidentiality.</strong> Customer information, pricing, job details, and all Platform data are confidential. You agree not to share, reproduce, or distribute any Platform data outside of authorized business use.</p>
 
-                <p><strong className="text-white">5. Account Security.</strong> You are responsible for maintaining the confidentiality of your login credentials. You agree to notify your supervisor immediately if you suspect unauthorized access to your account.</p>
+                <p><strong className="text-slate-900 dark:text-white">5. Account Security.</strong> You are responsible for maintaining the confidentiality of your login credentials. You agree to notify your supervisor immediately if you suspect unauthorized access to your account.</p>
 
-                <p><strong className="text-white">6. Liability Limitation.</strong> The Platform operator is not liable for any indirect, incidental, or consequential damages arising from Platform use. Your use of the Platform is at your own risk subject to applicable law.</p>
+                <p><strong className="text-slate-900 dark:text-white">6. Liability Limitation.</strong> The Platform operator is not liable for any indirect, incidental, or consequential damages arising from Platform use. Your use of the Platform is at your own risk subject to applicable law.</p>
 
-                <p><strong className="text-white">7. Modifications.</strong> These terms may be updated periodically with notice. Continued use of the Platform after notice constitutes acceptance of any revised terms.</p>
+                <p><strong className="text-slate-900 dark:text-white">7. Modifications.</strong> These terms may be updated periodically with notice. Continued use of the Platform after notice constitutes acceptance of any revised terms.</p>
 
-                <p><strong className="text-white">8. Governing Law.</strong> This agreement is governed by applicable state and federal law. Any disputes shall be resolved in the jurisdiction where {invitation?.tenantName} is primarily located.</p>
+                <p><strong className="text-slate-900 dark:text-white">8. Governing Law.</strong> This agreement is governed by applicable state and federal law. Any disputes shall be resolved in the jurisdiction where {invitation?.tenantName} is primarily located.</p>
 
-                <p className="text-gray-500 text-xs pt-2 border-t border-gray-700">Last updated: April 2026 — Pontifex Platform</p>
+                <p className="text-slate-400 dark:text-white/40 text-xs pt-2 border-t border-slate-200 dark:border-white/10">Last updated: April 2026 — Pontifex Platform</p>
               </div>
 
               <label className="flex items-start gap-3 cursor-pointer group">
@@ -378,27 +386,27 @@ function SetupAccountInner() {
                     className="sr-only"
                   />
                   <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
-                    ${waiverSigned ? 'bg-purple-600 border-purple-600' : 'bg-gray-800 border-gray-600 group-hover:border-purple-500'}`}>
+                    ${waiverSigned ? 'bg-violet-600 border-violet-600' : 'bg-white border-slate-300 group-hover:border-violet-400 dark:bg-white/5 dark:border-white/20 dark:group-hover:border-violet-500'}`}>
                     {waiverSigned && <span className="text-white text-xs font-bold">✓</span>}
                   </div>
                 </div>
-                <span className="text-sm text-gray-300 leading-relaxed">
+                <span className="text-sm text-slate-600 dark:text-white/70 leading-relaxed">
                   I have read and agree to the Platform User Agreement &amp; Liability Waiver. I understand my use of this platform is subject to these terms.
                 </span>
               </label>
 
-              {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+              {error && <p className="text-red-700 dark:text-red-300 text-sm bg-red-50 dark:bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
 
               <div className="flex gap-3">
                 <button
                   onClick={() => { setError(''); setStep(1); }}
-                  className="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-3 px-4 font-semibold transition-colors"
+                  className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-3 px-4 font-semibold transition-colors min-h-[44px] dark:bg-white/10 dark:hover:bg-white/20 dark:text-white/80"
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button
                   onClick={handleStep2Next}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors"
+                  className="flex-1 bg-violet-600 hover:bg-violet-700 text-white rounded-xl py-3 font-semibold transition-colors min-h-[44px]"
                 >
                   Next: Preferences →
                 </button>
@@ -409,18 +417,18 @@ function SetupAccountInner() {
           {/* ── Step 3: Communication Preferences ───────────────────────── */}
           {step === 3 && (
             <div className="space-y-5">
-              <div className="flex items-center gap-3 pb-2 border-b border-gray-800">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                  <Bell className="w-5 h-5 text-purple-400" />
+              <div className="flex items-center gap-3 pb-2 border-b border-slate-200 dark:border-white/10">
+                <div className="w-10 h-10 bg-violet-50 dark:bg-violet-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-5 h-5 text-violet-600 dark:text-violet-400" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Communication Preferences</h2>
-                  <p className="text-gray-400 text-sm">How would you like to be notified?</p>
+                  <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Communication Preferences</h2>
+                  <p className="text-slate-500 dark:text-white/60 text-sm">How would you like to be notified?</p>
                 </div>
               </div>
 
               <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer bg-gray-800 hover:bg-gray-750 rounded-xl p-4 border border-gray-700 hover:border-purple-500/40 transition-colors group">
+                <label className="flex items-start gap-3 cursor-pointer bg-slate-50 hover:bg-slate-100 rounded-xl p-4 border border-slate-200 hover:border-violet-300 transition-colors group dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 dark:hover:border-violet-500/40">
                   <div className="relative flex-shrink-0 mt-0.5">
                     <input
                       type="checkbox"
@@ -429,19 +437,19 @@ function SetupAccountInner() {
                       className="sr-only"
                     />
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
-                      ${emailConsent ? 'bg-purple-600 border-purple-600' : 'bg-gray-700 border-gray-600 group-hover:border-purple-500'}`}>
+                      ${emailConsent ? 'bg-violet-600 border-violet-600' : 'bg-white border-slate-300 group-hover:border-violet-400 dark:bg-white/5 dark:border-white/20 dark:group-hover:border-violet-500'}`}>
                       {emailConsent && <span className="text-white text-xs font-bold">✓</span>}
                     </div>
                   </div>
                   <div>
-                    <p className="text-white font-medium text-sm">Email Notifications</p>
-                    <p className="text-gray-400 text-xs mt-1">
+                    <p className="text-slate-900 dark:text-white font-medium text-sm">Email Notifications</p>
+                    <p className="text-slate-500 dark:text-white/60 text-xs mt-1">
                       Job assignments, schedule updates, approval notifications, and important platform updates via email.
                     </p>
                   </div>
                 </label>
 
-                <label className="flex items-start gap-3 cursor-pointer bg-gray-800 hover:bg-gray-750 rounded-xl p-4 border border-gray-700 hover:border-purple-500/40 transition-colors group">
+                <label className="flex items-start gap-3 cursor-pointer bg-slate-50 hover:bg-slate-100 rounded-xl p-4 border border-slate-200 hover:border-violet-300 transition-colors group dark:bg-white/5 dark:hover:bg-white/10 dark:border-white/10 dark:hover:border-violet-500/40">
                   <div className="relative flex-shrink-0 mt-0.5">
                     <input
                       type="checkbox"
@@ -450,36 +458,36 @@ function SetupAccountInner() {
                       className="sr-only"
                     />
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-colors
-                      ${smsConsent ? 'bg-purple-600 border-purple-600' : 'bg-gray-700 border-gray-600 group-hover:border-purple-500'}`}>
+                      ${smsConsent ? 'bg-violet-600 border-violet-600' : 'bg-white border-slate-300 group-hover:border-violet-400 dark:bg-white/5 dark:border-white/20 dark:group-hover:border-violet-500'}`}>
                       {smsConsent && <span className="text-white text-xs font-bold">✓</span>}
                     </div>
                   </div>
                   <div>
-                    <p className="text-white font-medium text-sm">SMS Notifications</p>
-                    <p className="text-gray-400 text-xs mt-1">
+                    <p className="text-slate-900 dark:text-white font-medium text-sm">SMS Notifications</p>
+                    <p className="text-slate-500 dark:text-white/60 text-xs mt-1">
                       Time-sensitive alerts via text message. Message and data rates may apply. You can opt out at any time.
                     </p>
                   </div>
                 </label>
               </div>
 
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-slate-400 dark:text-white/40">
                 You can update notification preferences at any time from your profile settings.
               </p>
 
-              {error && <p className="text-red-400 text-sm bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
+              {error && <p className="text-red-700 dark:text-red-300 text-sm bg-red-50 dark:bg-red-500/10 rounded-lg px-3 py-2">{error}</p>}
 
               <div className="flex gap-3">
                 <button
                   onClick={() => { setError(''); setStep(2); }}
-                  className="flex items-center gap-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-3 px-4 font-semibold transition-colors"
+                  className="flex items-center gap-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl py-3 px-4 font-semibold transition-colors min-h-[44px] dark:bg-white/10 dark:hover:bg-white/20 dark:text-white/80"
                 >
                   <ArrowLeft className="w-4 h-4" /> Back
                 </button>
                 <button
                   onClick={handleComplete}
                   disabled={submitting}
-                  className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2"
+                  className="flex-1 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2 min-h-[44px]"
                 >
                   {submitting ? (
                     <>
@@ -498,9 +506,9 @@ function SetupAccountInner() {
           )}
         </div>
 
-        <p className="text-center text-xs text-gray-600 mt-6">
+        <p className="text-center text-xs text-slate-400 dark:text-white/40 mt-6">
           Already have an account?{' '}
-          <a href="/company-login" className="text-purple-400 hover:text-purple-300 underline">Sign in here</a>
+          <a href="/company-login" className="text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 underline">Sign in here</a>
         </p>
       </div>
     </div>
@@ -511,8 +519,8 @@ function SetupAccountInner() {
 export default function SetupAccountPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-400 animate-spin" />
+      <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-violet-500 dark:text-violet-400 animate-spin" />
       </div>
     }>
       <SetupAccountInner />
