@@ -15,15 +15,40 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Missing token' }, { status: 400 });
     }
 
-    const { data: inv, error } = await supabaseAdmin
+    interface InvRow {
+      id: string;
+      email: string;
+      role: string;
+      tenant_id: string;
+      invited_name?: string | null;
+      tenants?: { name?: string; company_code?: string } | { name?: string; company_code?: string }[] | null;
+    }
+
+    let inv: InvRow | null = null;
+
+    const full = await supabaseAdmin
       .from('user_invitations')
-      .select('id, email, role, tenant_id, tenants(name, company_code)')
+      .select('id, email, role, tenant_id, invited_name, tenants(name, company_code)')
       .eq('token', token)
       .is('accepted_at', null)
       .gt('expires_at', new Date().toISOString())
       .single();
 
-    if (error || !inv) {
+    if (full.error && full.error.code === '42703') {
+      // invited_name column not present yet — retry without it.
+      const fallback = await supabaseAdmin
+        .from('user_invitations')
+        .select('id, email, role, tenant_id, tenants(name, company_code)')
+        .eq('token', token)
+        .is('accepted_at', null)
+        .gt('expires_at', new Date().toISOString())
+        .single();
+      inv = (fallback.data as unknown as InvRow) ?? null;
+    } else {
+      inv = (full.data as unknown as InvRow) ?? null;
+    }
+
+    if (!inv) {
       return NextResponse.json(
         { error: 'Invalid or expired invitation link. Please contact your administrator.' },
         { status: 404 }
@@ -34,16 +59,17 @@ export async function GET(request: NextRequest) {
     const { data: existingProfile } = await supabaseAdmin
       .from('profiles')
       .select('id, setup_completed')
-      .eq('email', inv.email)
+      .ilike('email', inv.email)
       .eq('tenant_id', inv.tenant_id)
-      .single();
+      .maybeSingle();
 
-    const tenant = inv.tenants as any;
+    const tenant = Array.isArray(inv.tenants) ? inv.tenants[0] : inv.tenants;
 
     return NextResponse.json({
       success: true,
       data: {
         email: inv.email,
+        name: inv.invited_name ?? null,
         role: inv.role,
         tenantId: inv.tenant_id,
         tenantName: tenant?.name || 'Pontifex Industries',

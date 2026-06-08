@@ -284,6 +284,52 @@ export const ROLES_WITH_LABELS: RoleOption[] = [
 // Roles that can access the admin dashboard
 export const ADMIN_DASHBOARD_ROLES = ['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'];
 
+// ============================================================
+// Role rank (privilege order) — used to gate invitations so an inviter
+// can never create a user with a role >= their own. Higher number = more
+// privilege. Mirrors the priority order in CLAUDE.md. supervisor/shop_help
+// are slotted alongside their nearest-equivalent tier.
+// ============================================================
+export const ROLE_RANK: Record<string, number> = {
+  super_admin: 8,
+  operations_manager: 7,
+  admin: 6,
+  supervisor: 5,
+  salesman: 5,
+  shop_manager: 4,
+  inventory_manager: 3,
+  operator: 2,
+  shop_help: 2,
+  apprentice: 1,
+};
+
+export function getRoleRank(role: string): number {
+  return ROLE_RANK[role] ?? 0;
+}
+
+/**
+ * Roles a given inviter is allowed to assign when inviting a new user.
+ *
+ * Rule: an inviter may only invite users to a role STRICTLY BELOW their own
+ * rank — never equal or higher. The single exception is super_admin, who may
+ * invite anyone EXCEPT another super_admin (granting super_admin is reserved
+ * and handled separately, never via the invite flow).
+ */
+export function getInvitableRoles(inviterRole: string): RoleOption[] {
+  const inviterRank = getRoleRank(inviterRole);
+  return ROLES_WITH_LABELS.filter((r) => {
+    if (r.value === 'super_admin') return false; // never invitable via this flow
+    return getRoleRank(r.value) < inviterRank;
+  });
+}
+
+/** Server-side check: can `inviterRole` assign `targetRole` via the invite flow? */
+export function canInviteRole(inviterRole: string, targetRole: string): boolean {
+  if (targetRole === 'super_admin') return false;
+  if (!ROLE_RANK[targetRole]) return false; // unknown target role
+  return getRoleRank(targetRole) < getRoleRank(inviterRole);
+}
+
 // Roles that bypass all permission checks (always full access)
 export const BYPASS_ROLES = ['super_admin', 'operations_manager'];
 

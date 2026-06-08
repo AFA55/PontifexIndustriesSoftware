@@ -40,14 +40,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (!isAuthorized && invitationToken) {
-      // Invitation-based auth: validate token matches userId
+      // Invitation-based auth for the in-flow avatar upload during setup.
+      //
+      // The setup-account/complete route ROTATES the invitation token to a
+      // fresh, short-lived (10-minute) value and returns it as `avatarToken`.
+      // The client passes THAT here. So this path only authenticates within the
+      // brief post-onboarding grace window: the original 7-day setup link is
+      // already dead (token rotated), and this avatar link dies after 10 min
+      // (expires_at). The token must still exist, be unexpired, and its email
+      // must match the target profile — so an attacker can't overwrite an
+      // arbitrary user's avatar without that fresh, short-lived token.
       const { data: inv, error: invError } = await supabaseAdmin
         .from('user_invitations')
         .select('email')
         .eq('token', invitationToken)
-        .is('accepted_at', null)
         .gt('expires_at', new Date().toISOString())
-        .single();
+        .maybeSingle();
 
       if (!invError && inv) {
         // Verify the userId matches the invitee's profile
@@ -55,8 +63,8 @@ export async function POST(request: NextRequest) {
           .from('profiles')
           .select('id')
           .eq('id', userId)
-          .eq('email', inv.email)
-          .single();
+          .ilike('email', inv.email)
+          .maybeSingle();
         if (profile) isAuthorized = true;
       }
     }
@@ -96,10 +104,14 @@ export async function POST(request: NextRequest) {
 
     const { data: { publicUrl } } = supabaseAdmin.storage.from(BUCKET).getPublicUrl(path);
 
-    // Persist URL to profile
+    // Persist URL to profile (keep both canonical columns in sync)
     await supabaseAdmin
       .from('profiles')
-      .update({ profile_picture_url: publicUrl, updated_at: new Date().toISOString() })
+      .update({
+        profile_picture_url: publicUrl,
+        avatar_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', userId);
 
     return NextResponse.json({ success: true, data: { url: publicUrl } });

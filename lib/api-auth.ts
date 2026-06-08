@@ -320,8 +320,10 @@ export async function requireOpsManager(request: NextRequest): Promise<AuthResul
  *
  * - For non-super-admins: returns their own `auth.tenantId` (guaranteed non-null
  *   by the guards).
- * - For super_admin: reads `?tenantId=<uuid>` from the request URL. Returns
- *   a 400 response if absent, 404 if the tenant does not exist.
+ * - For super_admin: prefers an explicit `?tenantId=<uuid>` from the request URL
+ *   (404 if that tenant does not exist). If the param is ABSENT, it falls back
+ *   to the super_admin's own profile tenant_id; only when neither is available
+ *   does it return a 400. (It does NOT hard-require the query param.)
  *
  * Usage:
  *   const scope = await resolveTenantScope(request, auth);

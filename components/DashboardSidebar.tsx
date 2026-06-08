@@ -37,6 +37,7 @@ import {
   Database,
   Home,
   MessageSquareWarning,
+  UserPlus,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -139,6 +140,9 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Time Off', href: '/dashboard/admin/time-off', icon: CalendarOff, flagKey: 'can_view_timecards', excludeRoles: ['shop_manager', 'shop_help'], moduleKey: 'timecards' },
       // Team Profiles is CORE (team_management) — never gated.
       { label: 'Team Profiles', href: '/dashboard/admin/team-profiles', icon: Users, flagKey: 'can_manage_team' },
+      // Invite Users — onboard new crew. Restricted to admin-tier roles (the
+      // invite API enforces the same + a role-escalation guard server-side).
+      { label: 'Invite Users', href: '/dashboard/admin/team/invite', icon: UserPlus, roles: ['admin', 'super_admin', 'operations_manager'] },
       { label: 'Customers', href: '/dashboard/admin/customers', icon: UserCircle2, flagKey: 'can_view_customers', moduleKey: 'customer_crm' },
       { label: 'Invoicing', href: '/dashboard/admin/billing', icon: CreditCard, flagKey: 'can_view_invoicing', moduleKey: 'billing' },
       { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs', icon: CheckCircle2, flagKey: 'can_view_completed_jobs', moduleKey: 'completed_jobs' },

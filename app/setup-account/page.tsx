@@ -14,6 +14,7 @@ import { Camera, CheckCircle, FileText, Bell, Loader2, Upload, ArrowLeft } from 
 
 interface InvitationData {
   email: string;
+  name: string | null;
   role: string;
   tenantId: string;
   tenantName: string;
@@ -119,6 +120,7 @@ function SetupAccountInner() {
         body: JSON.stringify({
           token: invitation.token,
           password,
+          confirmPassword,
           waiverSigned,
           emailConsent,
           smsConsent,
@@ -129,17 +131,20 @@ function SetupAccountInner() {
       const json = await res.json();
       if (!json.success) throw new Error(json.error || 'Setup failed');
 
-      // Upload avatar if user selected one
-      if (avatarFile && json.data?.userId) {
+      // Upload avatar if user selected one. We authenticate with the short-lived
+      // `avatarToken` returned by complete (NOT the original setup token, which
+      // is now rotated/dead). The profile row already exists at this point.
+      if (avatarFile && json.data?.userId && json.data?.avatarToken) {
         const form = new FormData();
         form.append('avatar', avatarFile);
         form.append('userId', json.data.userId);
+        form.append('invitationToken', json.data.avatarToken);
         await fetch('/api/upload/avatar', { method: 'POST', body: form });
         // Non-blocking — if avatar upload fails we still proceed
       }
 
       setStep(4);
-      setTimeout(() => router.push('/login'), 4000);
+      setTimeout(() => router.push('/company-login'), 4000);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Setup failed. Please try again.');
     } finally {
@@ -169,8 +174,8 @@ function SetupAccountInner() {
           </div>
           <h1 className="text-xl font-bold text-white mb-2">Invitation Problem</h1>
           <p className="text-gray-400 mb-6">{error}</p>
-          <a href="/login" className="text-purple-400 hover:text-purple-300 text-sm underline">
-            Go to login →
+          <a href="/company-login" className="text-purple-400 hover:text-purple-300 text-sm underline">
+            Go to sign in →
           </a>
         </div>
       </div>
@@ -187,14 +192,20 @@ function SetupAccountInner() {
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">Account Ready!</h1>
           <p className="text-gray-400 mb-4">
-            Your account has been set up successfully. Redirecting you to login...
+            Your account has been set up successfully. Redirecting you to sign in...
           </p>
           {invitation?.companyCode && (
-            <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm">
-              <span className="text-gray-400">Company code: </span>
+            <div className="bg-gray-800 rounded-xl px-4 py-3 text-sm mb-4">
+              <span className="text-gray-400">Your company code: </span>
               <strong className="text-purple-300">{invitation.companyCode}</strong>
             </div>
           )}
+          <a
+            href="/company-login"
+            className="inline-block w-full bg-purple-600 hover:bg-purple-700 text-white rounded-xl py-3 font-semibold transition-colors"
+          >
+            Go to Sign In
+          </a>
         </div>
       </div>
     );
@@ -213,9 +224,11 @@ function SetupAccountInner() {
           <div className="inline-flex items-center gap-2 bg-purple-500/10 border border-purple-500/20 rounded-full px-4 py-2 mb-4">
             <span className="text-purple-300 text-sm font-medium">{invitation?.tenantName}</span>
           </div>
-          <h1 className="text-2xl font-bold text-white">Complete Your Account Setup</h1>
+          <h1 className="text-2xl font-bold text-white">
+            {invitation?.name ? `Welcome, ${invitation.name.split(' ')[0]}!` : 'Complete Your Account Setup'}
+          </h1>
           <p className="text-gray-400 mt-2 text-sm">
-            Welcome! Just a few steps to get your account ready.
+            Just a few steps to get your account ready.
           </p>
         </div>
 
@@ -487,7 +500,7 @@ function SetupAccountInner() {
 
         <p className="text-center text-xs text-gray-600 mt-6">
           Already have an account?{' '}
-          <a href="/login" className="text-purple-400 hover:text-purple-300 underline">Sign in here</a>
+          <a href="/company-login" className="text-purple-400 hover:text-purple-300 underline">Sign in here</a>
         </p>
       </div>
     </div>

@@ -2,92 +2,163 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/setup-account/complete
- * Public endpoint — finalizes account setup from an invitation token.
- * Creates (or updates) the Supabase auth user and updates the profile.
+ *
+ * PUBLIC endpoint — no session. Gated ENTIRELY by a valid, unexpired, unused
+ * invitation token. Finalizes account setup:
+ *   1. validates the token (single-use + expiring)
+ *   2. B2 guard: refuses if the email's existing auth user belongs to a
+ *      DIFFERENT tenant than the invite (cross-tenant takeover protection)
+ *   3. creates (or activates) the Supabase auth user with the chosen password
+ *   4. upserts the profile in TWO passes:
+ *        a. a MINIMAL core upsert (id, email, role, tenant_id, active,
+ *           full_name) that CANNOT fail on optional columns — this guarantees
+ *           the user always ends up with a working, role-scoped profile, so a
+ *           missing optional column never leaves them with a login but no
+ *           profile (permanent 403).
+ *        b. a best-effort second update for optional columns
+ *           (setup_completed, waiver_signed_at, waiver_ip, notification_consent,
+ *           phone_number, date_of_birth) with a 42703 graceful-degradation path.
+ *      role + tenant_id come from the INVITE, never the request body.
+ *   5. applies any initial feature flags the inviter set (non-fatal)
+ *   6. ROTATES the invitation token to a fresh short-lived value + marks it
+ *      used/accepted. This (a) makes the token single-use, and (b) kills the
+ *      7-day window on the original setup link the moment onboarding completes,
+ *      while still letting the immediate avatar upload (which runs right after
+ *      this call) succeed within a short grace window.
+ *
+ * Returns { userId, avatarToken } — the client uploads the avatar with
+ * avatarToken (NOT the original setup token, which is now dead).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { randomBytes } from 'crypto';
+
+// Short grace window for the immediate post-complete avatar upload.
+const AVATAR_GRACE_MS = 10 * 60 * 1000; // 10 minutes
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json() as {
+    const body = (await request.json()) as {
       token: string;
       password: string;
+      confirmPassword?: string;
       waiverSigned: boolean;
       emailConsent: boolean;
       smsConsent: boolean;
-      hasAvatar: boolean;
+      hasAvatar?: boolean;
     };
 
     if (!body.token || !body.password) {
       return NextResponse.json({ error: 'token and password are required' }, { status: 400 });
     }
-
     if (body.password.length < 8) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
     }
-
+    if (body.confirmPassword !== undefined && body.password !== body.confirmPassword) {
+      return NextResponse.json({ error: 'Passwords do not match' }, { status: 400 });
+    }
     if (!body.waiverSigned) {
-      return NextResponse.json({ error: 'You must agree to the platform terms to continue' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'You must agree to the platform terms to continue' },
+        { status: 400 }
+      );
     }
 
-    // Validate token
+    // ── Validate token: must be unaccepted (single-use) AND unexpired ─────────
     const { data: inv, error: invError } = await supabaseAdmin
       .from('user_invitations')
       .select('*')
       .eq('token', body.token)
       .is('accepted_at', null)
       .gt('expires_at', new Date().toISOString())
-      .single();
+      .maybeSingle();
 
     if (invError || !inv) {
       return NextResponse.json(
-        { error: 'Invalid or expired invitation. Please request a new invitation from your administrator.' },
+        {
+          error:
+            'Invalid or expired invitation. Please request a new invitation from your administrator.',
+        },
         { status: 404 }
       );
     }
 
-    // Check if a user with this email already exists in Supabase auth
+    // Defense in depth: if used_at column exists and is set, treat as consumed.
+    if ((inv as { used_at?: string }).used_at) {
+      return NextResponse.json(
+        { error: 'This invitation has already been used. Please log in.' },
+        { status: 409 }
+      );
+    }
+
+    const email = String(inv.email).toLowerCase();
+    const fullName: string | null = (inv as { invited_name?: string }).invited_name ?? null;
+    const role: string = inv.role;
+    const tenantId: string = inv.tenant_id;
+
+    // ── Locate any existing GLOBAL auth user for this email ──────────────────
     const { data: usersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
     const existingAuthUser = usersPage?.users?.find(
-      u => u.email?.toLowerCase() === inv.email.toLowerCase()
+      (u) => u.email?.toLowerCase() === email
     );
+
+    // ── B2 guard (seam 2): cross-tenant takeover protection ──────────────────
+    // If an auth user already exists for this email, it MUST either have no
+    // profile yet, or a profile in THIS invite's tenant. If it belongs to a
+    // different tenant, refuse — do NOT touch its password/metadata/profile.
+    if (existingAuthUser) {
+      const { data: existingProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('id, tenant_id')
+        .eq('id', existingAuthUser.id)
+        .maybeSingle();
+
+      if (existingProfile && existingProfile.tenant_id && existingProfile.tenant_id !== tenantId) {
+        return NextResponse.json(
+          { error: 'This email is already associated with another account.' },
+          { status: 409 }
+        );
+      }
+    }
 
     let userId: string;
 
     if (existingAuthUser) {
-      // User already in auth — update their password and metadata
       const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
         existingAuthUser.id,
         {
           password: body.password,
+          email_confirm: true,
           user_metadata: {
             ...existingAuthUser.user_metadata,
-            tenant_id: inv.tenant_id,
-            role: inv.role,
+            full_name: fullName ?? existingAuthUser.user_metadata?.full_name,
+            tenant_id: tenantId,
+            role,
             setup_completed: true,
           },
         }
       );
       if (updateError) {
         console.error('[setup-account/complete] Error updating auth user:', updateError);
-        return NextResponse.json({ error: 'Failed to update account. Please try again.' }, { status: 500 });
+        return NextResponse.json(
+          { error: 'Failed to update account. Please try again.' },
+          { status: 500 }
+        );
       }
       userId = existingAuthUser.id;
     } else {
-      // Create a brand-new auth user
       const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: inv.email,
+        email,
         password: body.password,
         email_confirm: true,
         user_metadata: {
-          tenant_id: inv.tenant_id,
-          role: inv.role,
+          full_name: fullName,
+          tenant_id: tenantId,
+          role,
           setup_completed: true,
         },
       });
-
       if (createError || !newUser?.user) {
         console.error('[setup-account/complete] Error creating auth user:', createError);
         return NextResponse.json(
@@ -98,57 +169,122 @@ export async function POST(request: NextRequest) {
       userId = newUser.user.id;
     }
 
-    // Capture IP for waiver audit trail
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') || null;
-
     const now = new Date().toISOString();
 
-    // Update/upsert the profile with setup state
-    const { error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .update({
-        setup_completed: true,
-        waiver_signed_at: body.waiverSigned ? now : null,
-        waiver_ip: body.waiverSigned ? ip : null,
-        notification_consent: body.emailConsent || body.smsConsent,
-        updated_at: now,
-      })
-      .eq('id', userId);
+    // ── B1 pass (a): MINIMAL core profile upsert — MUST NOT FAIL ─────────────
+    // Only columns that are guaranteed to exist in prod. This is the row that
+    // makes the user's login actually work (role + tenant_id power RBAC and
+    // tenant isolation). If this fails, the whole request fails loudly so we
+    // never leave a user with auth-but-no-profile.
+    const coreRow: Record<string, unknown> = {
+      id: userId,
+      email,
+      role,
+      tenant_id: tenantId,
+      active: true,
+      updated_at: now,
+    };
+    if (fullName) coreRow.full_name = fullName;
 
-    if (profileError) {
-      console.error('[setup-account/complete] Error updating profile:', profileError);
-      // Non-fatal — auth user was created, log and continue
+    const { error: coreError } = await supabaseAdmin
+      .from('profiles')
+      .upsert(coreRow, { onConflict: 'id' });
+
+    if (coreError) {
+      console.error('[setup-account/complete] Error upserting core profile:', coreError);
+      return NextResponse.json(
+        { error: 'Account created but profile setup failed. Contact your administrator.' },
+        { status: 500 }
+      );
     }
 
-    // Apply initial feature flags if any were set by the inviter
+    // ── B1 pass (b): OPTIONAL fields — best-effort, never blocks onboarding ──
+    const ip =
+      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      request.headers.get('x-real-ip') ||
+      null;
+
+    const optionalRow: Record<string, unknown> = {
+      setup_completed: true,
+      waiver_signed_at: now,
+      waiver_ip: ip,
+      notification_consent: body.emailConsent || body.smsConsent,
+      updated_at: now,
+    };
+    if ((inv as { phone_number?: string }).phone_number) {
+      optionalRow.phone_number = (inv as { phone_number?: string }).phone_number;
+    }
+    if ((inv as { date_of_birth?: string }).date_of_birth) {
+      optionalRow.date_of_birth = (inv as { date_of_birth?: string }).date_of_birth;
+    }
+
+    const { error: optError } = await supabaseAdmin
+      .from('profiles')
+      .update(optionalRow)
+      .eq('id', userId);
+
+    if (optError && optError.code === '42703') {
+      // One or more optional columns aren't in prod yet (migration pending).
+      // Retry with only the always-present optional field(s).
+      const minimalOptional: Record<string, unknown> = { updated_at: now };
+      // phone_number/date_of_birth exist in profiles today; setup_completed/
+      // notification_consent/waiver_* are the ones a pending migration adds.
+      if (optionalRow.phone_number) minimalOptional.phone_number = optionalRow.phone_number;
+      if (optionalRow.date_of_birth) minimalOptional.date_of_birth = optionalRow.date_of_birth;
+      const { error: retryErr } = await supabaseAdmin
+        .from('profiles')
+        .update(minimalOptional)
+        .eq('id', userId);
+      if (retryErr) {
+        console.error('[setup-account/complete] Optional profile retry failed (non-fatal):', retryErr);
+      }
+    } else if (optError) {
+      console.error('[setup-account/complete] Optional profile update failed (non-fatal):', optError);
+    }
+
+    // ── Apply initial feature flags the inviter set (per-user RBAC overrides) ─
+    // Non-fatal: role preset still governs access if this fails. onConflict
+    // (user_id,tenant_id) matches the unique index on user_feature_flags.
     if (inv.initial_flags && Object.keys(inv.initial_flags).length > 0) {
       const flagData = {
         user_id: userId,
-        tenant_id: inv.tenant_id,
+        tenant_id: tenantId,
         admin_type: inv.admin_type || 'admin',
         updated_at: now,
         ...inv.initial_flags,
       };
-
       const { error: flagError } = await supabaseAdmin
         .from('user_feature_flags')
         .upsert(flagData, { onConflict: 'user_id,tenant_id' });
-
       if (flagError) {
-        console.error('[setup-account/complete] Error upserting feature flags:', flagError);
-        // Non-fatal
+        console.error('[setup-account/complete] Error upserting feature flags (non-fatal):', flagError);
       }
     }
 
-    // Mark invitation as accepted
-    await supabaseAdmin
-      .from('user_invitations')
-      .update({ accepted_at: now })
-      .eq('token', body.token);
+    // ── H3: rotate + consume the token ───────────────────────────────────────
+    // The original 7-day setup token is rotated to a fresh random value with a
+    // SHORT (10-min) expiry. This (1) makes the invite single-use — the old
+    // link is dead immediately — and (2) lets the very next call (the avatar
+    // upload) authenticate with `avatarToken` for a brief grace window, after
+    // which the avatar link also dies. accepted_at/used_at mark it consumed so
+    // `complete` itself can never run twice.
+    const avatarToken = randomBytes(32).toString('base64url');
+    const graceExpiry = new Date(Date.now() + AVATAR_GRACE_MS).toISOString();
 
-    return NextResponse.json({ success: true, data: { userId } });
-  } catch (err: any) {
+    const { error: markErr } = await supabaseAdmin
+      .from('user_invitations')
+      .update({ accepted_at: now, used_at: now, token: avatarToken, expires_at: graceExpiry })
+      .eq('token', body.token);
+    if (markErr && markErr.code === '42703') {
+      // used_at column not present yet (migration pending) — rotate the rest.
+      await supabaseAdmin
+        .from('user_invitations')
+        .update({ accepted_at: now, token: avatarToken, expires_at: graceExpiry })
+        .eq('token', body.token);
+    }
+
+    return NextResponse.json({ success: true, data: { userId, avatarToken } });
+  } catch (err) {
     console.error('[setup-account/complete] Unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

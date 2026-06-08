@@ -9,7 +9,6 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useBranding } from '@/lib/branding-context';
 import { biometricAvailable, biometryLabel, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
 
 const schema = z.object({
@@ -57,8 +56,12 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
-  const { branding: contextBranding } = useBranding();
-  const branding = tenantBranding || contextBranding;
+  // NOTE: deliberately do NOT fall back to the global `useBranding()` context here.
+  // That context defaults to one tenant and would briefly render the wrong company's
+  // branding ("pops Patriot first") before this page's per-tenant fetch resolves.
+  // Until the tenant-specific branding loads we use a neutral {} so the JSX `|| ...`
+  // fallbacks render generic Pontifex chrome — never another company's brand.
+  const branding = tenantBranding || {};
 
   // Redirect to company-login if no tenant_id param
   useEffect(() => {

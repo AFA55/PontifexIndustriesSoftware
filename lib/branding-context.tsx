@@ -76,7 +76,7 @@ const DEFAULT_BRANDING: TenantBranding = {
   pdf_header_text: null,
   pdf_footer_text: null,
   pdf_show_logo: true,
-  login_welcome_text: 'Welcome to Patriot',
+  login_welcome_text: 'Welcome Back',
   login_subtitle: null,
   show_demo_accounts: true,
   show_billing_module: true,
