@@ -299,9 +299,20 @@ export async function POST(request: NextRequest) {
     });
 
     if (emailError) {
-      console.error('[invite] Resend error:', emailError);
+      // TEMP DIAGNOSTIC (Jun 8): capture the EXACT Resend error + a safe key
+      // fingerprint (prefix + length, NEVER the full key) to find why prod fails
+      // while the same code + verified domain sends fine locally.
+      const k = process.env.RESEND_API_KEY || '';
+      console.error('[invite] EMAIL DIAG (POST):', JSON.stringify({
+        resendError: emailError,
+        keySet: !!process.env.RESEND_API_KEY,
+        keyPrefix: k.slice(0, 5),
+        keyLen: k.length,
+      }));
+      const e = emailError as { message?: string; name?: string } | null;
+      const msg = (e && (e.message || e.name)) || 'unknown error';
       return NextResponse.json(
-        { error: 'Invitation saved but the email failed to send. Try Resend.' },
+        { error: `Email send failed: ${msg}` },
         { status: 502 }
       );
     }
@@ -430,8 +441,17 @@ export async function PUT(request: NextRequest) {
     });
 
     if (emailError) {
-      console.error('[invite] PUT resend email error:', emailError);
-      return NextResponse.json({ error: 'Failed to send invitation email' }, { status: 502 });
+      // TEMP DIAGNOSTIC (Jun 8) — see POST handler note.
+      const k = process.env.RESEND_API_KEY || '';
+      console.error('[invite] EMAIL DIAG (PUT):', JSON.stringify({
+        resendError: emailError,
+        keySet: !!process.env.RESEND_API_KEY,
+        keyPrefix: k.slice(0, 5),
+        keyLen: k.length,
+      }));
+      const e = emailError as { message?: string; name?: string } | null;
+      const msg = (e && (e.message || e.name)) || 'unknown error';
+      return NextResponse.json({ error: `Email send failed: ${msg}` }, { status: 502 });
     }
 
     return NextResponse.json({ success: true, data: { id, email: inv.email } });
