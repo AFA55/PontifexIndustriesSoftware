@@ -42,7 +42,11 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
     // Send email using Resend
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const payload: any = {
-      from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <noreply@pontifexindustries.com>',
+      // VERIFIED Resend sender — `admin.pontifexindustries.com` is the verified domain;
+      // the root `pontifexindustries.com` is NOT verified (Resend 403). Hardcoded
+      // because the RESEND_FROM_EMAIL env var was misconfigured to the unverified root,
+      // which silently broke every outbound email (invites, password resets, etc.).
+      from: 'Pontifex Industries <noreply@admin.pontifexindustries.com>',
       to: [to],
       subject: subject,
       html: html,

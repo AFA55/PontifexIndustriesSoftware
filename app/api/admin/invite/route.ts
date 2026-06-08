@@ -77,10 +77,12 @@ async function sendInviteEmail(opts: {
 }) {
   const setupUrl = `${baseUrl(opts.request)}/setup-account?token=${opts.token}`;
   return getResend().emails.send({
-    // Must be a VERIFIED Resend domain. admin.pontifexindustries.com is NOT verified
-    // (only pontifexindustries.com is) — using it makes every invite send fail. Match
-    // the shared sendEmail() helper's verified sender.
-    from: process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <noreply@pontifexindustries.com>',
+    // VERIFIED Resend sender. `admin.pontifexindustries.com` IS verified in Resend
+    // (sends to external recipients succeed); the ROOT `pontifexindustries.com` is
+    // NOT verified and returns 403 "domain is not verified". Hardcoded on purpose —
+    // the RESEND_FROM_EMAIL env var was misconfigured (in Vercel) to the unverified
+    // root domain, which silently broke every invite + password-reset email.
+    from: 'Pontifex Industries <noreply@admin.pontifexindustries.com>',
     to: opts.to,
     subject: `You're invited to join ${opts.tenantName}`,
     html: `
