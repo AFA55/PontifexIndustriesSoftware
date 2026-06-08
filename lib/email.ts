@@ -5,6 +5,13 @@
 
 import { Resend } from 'resend';
 
+// VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+// `admin.pontifexindustries.com` is the ONLY verified Resend domain. The root
+// `pontifexindustries.com` is NOT verified (Resend returns 403 "domain is not verified").
+// These are the single source of truth for outbound sender addresses — import them everywhere.
+export const VERIFIED_EMAIL_DOMAIN = 'admin.pontifexindustries.com';
+export const DEFAULT_EMAIL_FROM = 'Pontifex Industries <noreply@admin.pontifexindustries.com>';
+
 export interface EmailAttachment {
   filename: string;
   /** base64-encoded string OR Buffer; passed through to Resend's `content` field. */

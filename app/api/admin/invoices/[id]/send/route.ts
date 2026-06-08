@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
+import { DEFAULT_EMAIL_FROM } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -255,7 +256,8 @@ export async function POST(
 
     // 6. Send email via Resend
     const resend = new Resend(process.env.RESEND_API_KEY);
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Pontifex Industries <noreply@pontifexindustries.com>';
+    // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+    const fromAddress = DEFAULT_EMAIL_FROM;
 
     let sendResult: { data: any; error: any };
     try {

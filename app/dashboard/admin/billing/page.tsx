@@ -1691,7 +1691,7 @@ export default function BillingPage() {
                 {/* Email send hint / warning */}
                 {emailConfigured === true && selectedInvoice.customer_email && selectedInvoice.status !== 'void' && (
                   <p className="text-xs text-slate-400 dark:text-white/40 -mt-2">
-                    Will send from: <span className="font-mono">noreply@pontifexindustries.com</span>
+                    Will send from: <span className="font-mono">noreply@admin.pontifexindustries.com</span>
                   </p>
                 )}
                 {emailConfigured === false && selectedInvoice.status !== 'void' && (

@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
+import { VERIFIED_EMAIL_DOMAIN } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -142,8 +143,8 @@ export async function POST(
       } catch {
         // ignore — keep generic fallback
       }
-      const fromAddress =
-        process.env.RESEND_FROM_EMAIL || `${companyName} <noreply@resend.dev>`;
+      // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+      const fromAddress = `${companyName} <noreply@${VERIFIED_EMAIL_DOMAIN}>`;
       const fmt$ = (n: number) =>
         new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
       const resend = new Resend(process.env.RESEND_API_KEY);

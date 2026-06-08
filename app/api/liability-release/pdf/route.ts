@@ -12,6 +12,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
+import { VERIFIED_EMAIL_DOMAIN } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -140,7 +141,8 @@ export async function POST(request: NextRequest) {
       const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
       const resend = new Resend(process.env.RESEND_API_KEY);
       const emailResult = await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || `${emailCompanyName} <noreply@resend.dev>`,
+        // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+        from: `${emailCompanyName} <noreply@${VERIFIED_EMAIL_DOMAIN}>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
         html: `

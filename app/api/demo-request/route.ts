@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { DEFAULT_EMAIL_FROM } from '@/lib/email';
 
 // SECURITY: Sanitize user input before inserting into HTML emails
 function escapeHtml(str: string): string {
@@ -74,7 +75,8 @@ export async function POST(request: NextRequest) {
 
     // Try to send notification email via Resend
     const resendKey = process.env.RESEND_API_KEY;
-    const fromEmail = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@admin.patriotconcretecutting.com>';
+    // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+    const fromEmail = DEFAULT_EMAIL_FROM;
 
     if (resendKey) {
       try {

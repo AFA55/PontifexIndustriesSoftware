@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth } from '@/lib/api-auth';
+import { DEFAULT_EMAIL_FROM } from '@/lib/email';
 
 // Allowed domains for PDF URL fetching (SSRF protection)
 const ALLOWED_PDF_DOMAINS = [
@@ -60,7 +61,8 @@ export async function POST(request: NextRequest) {
 
     // Prepare email options
     const emailOptions: any = {
-      from: process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <onboarding@resend.dev>',
+      // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+      from: DEFAULT_EMAIL_FROM,
       to: [to],
       subject: subject,
       html: html,

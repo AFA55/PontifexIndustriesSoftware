@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { Resend } from 'resend';
+import { DEFAULT_EMAIL_FROM } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -66,7 +67,8 @@ export async function POST(
       ? `This invoice is <strong>${daysOverdue} day${daysOverdue !== 1 ? 's' : ''} overdue</strong>. Please remit payment immediately to avoid service interruption.`
       : `This is a friendly reminder that your invoice is due on <strong>${invoice.due_date}</strong>. Please remit payment at your earliest convenience.`;
 
-    const fromAddress = process.env.RESEND_FROM_EMAIL || 'Patriot Concrete Cutting <noreply@resend.dev>';
+    // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
+    const fromAddress = DEFAULT_EMAIL_FROM;
 
     const html = `<!DOCTYPE html>
 <html lang="en">
