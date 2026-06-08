@@ -62,6 +62,8 @@
 	<string>Pontifex verifies you are at the job site when you clock in. Your location is only used during the clock-in check and is never tracked in the background.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Pontifex uses the camera to capture job site photos and document completed work.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Pontifex uses Face ID to securely sign you in without typing your password.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pontifex uses the microphone for voice-based equipment checkout and job notes.</string>
 	<!-- NFCReaderUsageDescription removed: the iOS app has no native NFC (badge

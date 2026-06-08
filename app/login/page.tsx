@@ -7,9 +7,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
-import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useBranding } from '@/lib/branding-context';
+import { biometricAvailable, biometryLabel, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
 
 const schema = z.object({
   email: z.string().email(),
@@ -50,6 +51,9 @@ function LoginPageInner() {
   const [demoUnlocked, setDemoUnlocked] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [tenantBranding, setTenantBranding] = useState<any>(null);
+  // Native Face ID / Touch ID sign-in (no-op on the website).
+  const [faceIdReady, setFaceIdReady] = useState(false);
+  const [bioLabel, setBioLabel] = useState('Face ID');
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
@@ -71,6 +75,17 @@ function LoginPageInner() {
       .then(json => { if (json.success && json.data) setTenantBranding(json.data); })
       .catch(() => {});
   }, [tenantId]);
+
+  // Native app only: if biometrics are available AND we've saved credentials from a
+  // previous sign-in, surface a "Sign in with Face ID" button. No-op on the website.
+  useEffect(() => {
+    (async () => {
+      const { available, biometryType } = await biometricAvailable();
+      if (!available) return;
+      setBioLabel(biometryLabel(biometryType));
+      if (await hasSavedCredentials()) setFaceIdReady(true);
+    })();
+  }, []);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -136,10 +151,17 @@ function LoginPageInner() {
       }));
       console.log('💾 User stored in localStorage');
 
-      // Redirect based on user role.
-      // Office + shop roles land on the admin dashboard (which then renders a
-      // role-specific branch). Operators + apprentices land on the field dashboard.
-      if (['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(result.user.role)) {
+      // Native app: save credentials to the iOS Keychain so the user can sign in
+      // with Face ID next time (only when "Remember me" is on). No-op on the website.
+      if (data.remember !== false) {
+        saveCredentials(data.email, data.password).catch(() => {});
+      }
+
+      // Redirect based on role. The platform owner (super_admin) lands in the
+      // Pontifex Hub; office/shop roles → admin dashboard; field roles → field dashboard.
+      if (result.user.role === 'super_admin') {
+        router.push('/dashboard/platform');
+      } else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(result.user.role)) {
         router.push('/dashboard/admin');
       } else if (['operator', 'apprentice'].includes(result.user.role)) {
         router.push('/dashboard');
@@ -157,6 +179,17 @@ function LoginPageInner() {
       }
       setLoading(false);
     }
+  };
+
+  // Face ID / Touch ID sign-in: prompt biometrics → retrieve the stored credentials
+  // → run the normal login. Only shown in the native app when credentials are saved.
+  const handleFaceIdLogin = async () => {
+    setError(null);
+    const creds = await verifyAndGetCredentials(`Sign in to ${branding.company_name || 'Pontifex'}`);
+    if (!creds) return; // user cancelled or biometric failed
+    setValue('email', creds.email);
+    setValue('password', creds.password);
+    await onSubmit({ email: creds.email, password: creds.password, remember: true });
   };
 
   return (
@@ -305,6 +338,21 @@ function LoginPageInner() {
               </span>
             ) : 'Sign In'}
           </motion.button>
+
+          {/* Native app only: Face ID / Touch ID sign-in (appears once credentials are saved). */}
+          {faceIdReady && (
+            <motion.button
+              type="button"
+              onClick={handleFaceIdLogin}
+              disabled={loading}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.75 }}
+              className="w-full py-3 sm:py-3.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-semibold flex items-center justify-center gap-2 hover:border-blue-400 hover:text-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ScanFace size={20} /> Sign in with {bioLabel}
+            </motion.button>
+          )}
 
           <motion.div
             initial={{ opacity: 0 }}
