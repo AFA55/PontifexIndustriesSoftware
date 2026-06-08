@@ -25,6 +25,15 @@ add it to the section **"Website Changes to Adopt"** at the bottom of this file.
 
 ## App Change Log
 
+### 2026-06-08 — Build 8 / v1.0.3: native Face ID / Touch ID sign-in → ✅ UPLOADED TO TESTFLIGHT
+**Status:** ✅ **Uploaded via Transporter → processing in App Store Connect → TestFlight** (not yet submitted for App Store review — TestFlight first to test on-device, then submit).
+**Version/Build:** `MARKETING_VERSION` 1.0.2 → **1.0.3**, `CURRENT_PROJECT_VERSION` 7 → **8** (both Debug+Release configs in `project.pbxproj`).
+**Native change:** native biometric sign-in via **`@capgo/capacitor-native-biometric@8.4.5`** (Capacitor 8 / SPM compatible). `lib/biometric.ts` wraps the plugin (dynamically imported ONLY in the native shell — no-op on web/SSR; degrades gracefully on older builds without the plugin). `Info.plist` already has **`NSFaceIDUsageDescription`**. The Face ID *button* is web code (served from prod via the webview) and only renders when the native plugin reports biometrics available + saved credentials exist.
+**Flow:** first sign-in = password (silently stores creds in the iOS Keychain via `setCredentials`); subsequent sign-ins show a "Sign in with Face ID" button → `verifyIdentity` → retrieves Keychain creds → auto-submits.
+**Build recipe used:** bump pbxproj → `npx cap sync ios` → `xcodebuild archive` with the project's OWN signing (Release config = **Manual** signing, `CODE_SIGN_IDENTITY="Apple Distribution"`, profile **"Pontifex App Store Distribution"** — do NOT override to Automatic, it conflicts) → `-exportArchive` with `/tmp/ExportOptions.plist` (`method: app-store-connect`, `signingStyle: manual`, profile mapped to `com.pontifexindustries.app`) → drive **Transporter.app** (already signed in) and click DELIVER (handed the final click to the user — coordinate clicks were imprecise). Profiles live in `~/Library/Developer/Xcode/UserData/Provisioning Profiles/` (newer Xcode location), NOT `~/Library/MobileDevice/…`.
+**Blocker noted:** Apple **Developer Program License Agreement** needed re-accepting (Account Holder) before upload — flagged to founder.
+**Pending:** install from TestFlight → verify Face ID on device → then App Store Connect: attach build, What's New, Submit for Review.
+
 ### 2026-06-01 — Build 6 / v1.0.1: new purple "P" icon + splash fade → ✅ SUBMITTED TO APP REVIEW
 **Status:** ✅ **SUBMITTED — "1.0.1 Waiting for Review"** (Jun 1, 8:49 PM). Commits `11ccb96a` + `43ccb13c` (native-only, not pushed).
 **Version/Build:** `MARKETING_VERSION` 1.0.0 → **1.0.1**, `CURRENT_PROJECT_VERSION` 5 → **6**

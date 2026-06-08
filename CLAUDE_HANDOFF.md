@@ -1,5 +1,43 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 7, 2026 | **Branch:** `main` | **HEAD:** `c0eec8fe` — **module gating (sidebar + per-page ModuleGuard) PUSHED → deploy `dpl_2hEoMU5w…` READY/live** | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.2 LIVE on App Store** (approved + released Jun 3; latest native build). All web work reaches the app via the webview — **no App Store resubmission needed** unless a NATIVE change ships. **Testing tickets begin week of Jun 8.**
+**Last updated:** Jun 8, 2026 | **Branch:** `main` | **HEAD:** `6957f784` — **invite system + Face ID + editable team emails + light restyle + EMAIL SENDER FIX all PUSHED & LIVE** (4 prod builds this session: `818f646e`→`799f3180`→`562c3c57`→`6957f784`, all deploys READY) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.2 LIVE on App Store** + **v1.0.3 / Build 8 (Face ID) uploaded to TestFlight** (processing → installable for on-device Face ID test). All web work reaches the app via the webview — no App Store resubmission needed for web. **Testing tickets in progress (real crew invites being sent).**
+
+> ⚠️ **VERCEL BUDGET: ~4 builds spent this session — credit likely near/at zero. Confirm before any further push.**
+
+---
+
+## ⚡ START HERE (Jun 8, 2026) — Invite system, Face ID Build 8, editable emails, EMAIL FIX — ✅ ALL LIVE
+
+Big session. Everything below is **pushed to prod and verified READY**. 4 guardians ran (all PASS). Migrations applied.
+
+### 1. 🔴 EMAIL SENDER FIX (the big one — was silently breaking ALL outbound email)
+- **Root cause:** the ONLY verified Resend domain is **`admin.pontifexindustries.com`**. The root `pontifexindustries.com` is **NOT verified** → Resend `403 "domain is not verified"`. The Vercel env var `RESEND_FROM_EMAIL` was set to the unverified root, and ~9 email routes read it first → **every** email (invites, password resets, invoices, demo, PDFs) 403-failed.
+- **Fix (code, bypasses the bad env var entirely):** `lib/email.ts` now exports `VERIFIED_EMAIL_DOMAIN` + `DEFAULT_EMAIL_FROM` (single source of truth = `admin.pontifexindustries.com`). Every sender uses it; `RESEND_FROM_EMAIL` is **no longer read anywhere** (grep: comments only). Reproduced + verified via a Node script with the real key (admin→external = success; root→403).
+- **Vercel MCP is read/deploy-only — NO env-var tool.** The stale `RESEND_FROM_EMAIL` env var is now unused/harmless; founder can delete it in the dashboard. Full gotcha saved to `memory/resend-verified-domain.md`.
+
+### 2. User INVITE system (admin onboards crew) — built + guardian-hardened
+- Admin → **Team → Invite Users** (`/dashboard/admin/team/invite`, sidebar item for admin/ops/super) → email + name + role → emailed setup link → `/setup-account?token=…` → photo + password (twice) → active with correct role/tenant.
+- **Guardian caught 3 BLOCKING (all fixed + re-verified PASS):** cross-tenant account-takeover (global email check both seams), two-pass profile upsert (core role/tenant never blocked by missing optional columns), non-unique token. Plus CSPRNG tokens, post-onboarding token rotation, rank-escalation guard.
+- Migrations applied: `20260608_invite_flow_columns` (user_invitations cols + tenant-admin RLS), `20260608_profile_setup_columns`, `20260608_invite_token_unique`.
+
+### 3. Editable TEAM EMAILS (admin/ops/super) — guardian PASS
+- Team Profiles → Edit Info → Email is now an editable input (was display-only). Backend (`/api/admin/profiles/[id]` PATCH) syncs `auth.users` + `profiles`, tenant-scoped, rank-guarded, global case-insensitive uniqueness, auth-first with revert-on-desync. Migration `20260608_profiles_email_lower_key` applied (verified 0 dup emails first).
+
+### 4. Light-mode restyle — invite + setup-account pages were hardcoded dark (`bg-gray-950`) → converted to light-default + `dark:` variants (matched completed-jobs palette). Styling-only.
+
+### 5. Login/branding/demo fixes
+- **Branding flash fix:** `/login` no longer falls back to the global Patriot-defaulted context (`lib/branding-context.tsx` default `login_welcome_text` → "Welcome Back"; login page uses `tenantBranding || {}`). Each company sees only its own brand — no "pops Patriot first."
+- **Demo logins:** `admin@pontifex.com` restored to `PontifexDemo2026!`; **new super-admin demo `superadmin@pontifex.com` / `PontifexDemo2026!`** (PONTIFEX → Hub).
+- **Google Maps console errors** = stale `.next` (GoogleMapsProvider was already off public pages); clean restart fixed.
+
+### 6. iOS Build 8 / v1.0.3 — Face ID — uploaded to TestFlight
+- Native Face ID (`lib/biometric.ts` + login button, `@capgo/capacitor-native-biometric@8.4.5`, NSFaceIDUsageDescription) was committed last session; this session bumped to **1.0.3 / Build 8**, archived (manual signing, "Pontifex App Store Distribution" profile — NOT automatic), exported IPA, uploaded via **Transporter** (user clicked DELIVER). Now **processing in App Store Connect → TestFlight**. First login is password (silently saves to Keychain); subsequent logins show "Sign in with Face ID". ⚠️ Apple **License Agreement** needed re-accepting (founder did/should).
+
+### ⏭️ Immediate next / open
+- **Test:** resend Adam Ingalls' invite from prod (real crew onboarding test) → confirm email lands + onboarding works.
+- **Founder:** install Build 8 from TestFlight → test Face ID on device; optionally delete the unused `RESEND_FROM_EMAIL` Vercel env var; optionally verify the root domain in Resend for cleaner `@pontifexindustries.com` sends.
+- Other email routes (invoices/demo/PDFs) now fixed in code but **untested live** — exercise them when convenient.
+
+---
 
 > 🧰 **New:** `DEV_TOOLING_RECOMMENDATIONS.md` — ranked, popularity-verified plan to speed up dev & prevent recurring bugs (date lib + Sentry + Zod + TanStack Query + RHF + shadcn + tests). Phased, additive, no big-bang. Phase A (date lib + Sentry) is the highest-ROI next step.
 

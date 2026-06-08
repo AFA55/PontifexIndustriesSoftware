@@ -344,6 +344,16 @@ For now, the auto-preview URL per branch is enough.
 - [x] **Operator timecard date bug** (Zack: Jun 1 showed as "Sun May 31") — UTC-vs-local parsing fixed in `timecard/page.tsx` + `lib/timecard-utils.ts`; pushed live (`cefd3e85`)
 - [x] **`DEV_TOOLING_RECOMMENDATIONS.md`** created — phased tooling plan to speed up dev + prevent bug classes
 
+### Session — Jun 8, 2026 — Invite system, Face ID Build 8, editable emails, EMAIL SENDER FIX ✅ COMPLETE (4 pushes)
+- [x] **🔴 EMAIL SENDER FIX** — verified Resend domain is `admin.pontifexindustries.com`; root `pontifexindustries.com` is NOT verified (403). `RESEND_FROM_EMAIL` (Vercel) pointed at the unverified root → ALL email (invites, resets, invoices, demo, PDFs) silently 403-failed. Fixed: `lib/email.ts` exports `VERIFIED_EMAIL_DOMAIN`/`DEFAULT_EMAIL_FROM`; all ~9 senders use it; env var no longer read. Saved to `memory/resend-verified-domain.md`.
+- [x] **User INVITE system** — admin Invite Users page (email+name+role) → emailed setup link → photo+password → active. Guardian caught 3 BLOCKING (cross-tenant takeover, 2-pass profile upsert, non-unique token) — all fixed + re-verified PASS. CSPRNG tokens, rank-escalation guard. Migrations: invite_flow_columns, profile_setup_columns, invite_token_unique.
+- [x] **Editable team emails** (admin/ops/super) — Team Profiles Edit Info; backend syncs `auth.users`+`profiles`, tenant-scoped, rank-guarded, global unique, revert-on-desync. Guardian PASS. Migration `profiles_email_lower_key`.
+- [x] **Light-mode restyle** — invite + setup-account pages were hardcoded dark → light-default + `dark:` variants (matched completed-jobs palette)
+- [x] **Branding flash fix** — `/login` no longer shows Patriot before the entered company loads (debranded default + `tenantBranding || {}`)
+- [x] **Demo logins** — `admin@pontifex.com`→`PontifexDemo2026!`; new super-admin demo `superadmin@pontifex.com`/`PontifexDemo2026!` (PONTIFEX→Hub)
+- [x] **iOS v1.0.3 / Build 8 (Face ID)** — bumped, archived (manual signing), exported IPA, uploaded to TestFlight via Transporter → processing
+- [x] **4 prod pushes** (`818f646e`, `799f3180`, `562c3c57`, `6957f784`) — all deploys verified READY
+
 ### Ongoing / As-Needed
 - [ ] **Tooling Phase A** (highest ROI) — add a date lib + `lib/dates.ts` + Sentry + first Vitest test. See `DEV_TOOLING_RECOMMENDATIONS.md`.
 - [ ] **🔴 iOS resubmission** — commit Info.plist fix, push, rebuild archive (Build 4), resubmit to App Store. See CLAUDE_HANDOFF.md top section.
