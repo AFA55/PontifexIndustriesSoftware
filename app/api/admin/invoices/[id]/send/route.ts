@@ -10,7 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
-import { DEFAULT_EMAIL_FROM } from '@/lib/email';
+import { DEFAULT_EMAIL_FROM, getResendApiKey, isEmailConfigured } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -246,7 +246,7 @@ export async function POST(
 </html>`;
 
     // 5. Guard: Resend API key must be configured
-    if (!process.env.RESEND_API_KEY) {
+    if (!isEmailConfigured()) {
       console.error('RESEND_API_KEY is not configured.');
       return NextResponse.json(
         { error: 'Email delivery is not configured. Please contact your administrator.' },
@@ -255,7 +255,7 @@ export async function POST(
     }
 
     // 6. Send email via Resend
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const resend = new Resend(getResendApiKey());
     // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
     const fromAddress = DEFAULT_EMAIL_FROM;
 

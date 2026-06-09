@@ -21,10 +21,11 @@ import { requireAdmin, resolveTenantScope, type AuthSuccess } from '@/lib/api-au
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canInviteRole, ROLES_WITH_LABELS } from '@/lib/rbac';
 import { Resend } from 'resend';
+import { getResendApiKey } from '@/lib/email';
 import { randomBytes } from 'crypto';
 
 const VALID_ROLES = ROLES_WITH_LABELS.map((r) => r.value);
-const getResend = () => new Resend(process.env.RESEND_API_KEY || 're_placeholder');
+const getResend = () => new Resend(getResendApiKey() || 're_placeholder');
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
@@ -303,11 +304,15 @@ export async function POST(request: NextRequest) {
       // fingerprint (prefix + length, NEVER the full key) to find why prod fails
       // while the same code + verified domain sends fine locally.
       const k = process.env.RESEND_API_KEY || '';
+      const sk = getResendApiKey();
       console.error('[invite] EMAIL DIAG (POST):', JSON.stringify({
         resendError: emailError,
         keySet: !!process.env.RESEND_API_KEY,
-        keyPrefix: k.slice(0, 5),
-        keyLen: k.length,
+        rawPrefix: k.slice(0, 5),
+        rawLen: k.length,
+        sanitizedPrefix: sk.slice(0, 4),
+        sanitizedLen: sk.length,
+        sanitizedOk: sk.startsWith('re_'),
       }));
       const e = emailError as { message?: string; name?: string } | null;
       const msg = (e && (e.message || e.name)) || 'unknown error';
@@ -443,11 +448,15 @@ export async function PUT(request: NextRequest) {
     if (emailError) {
       // TEMP DIAGNOSTIC (Jun 8) — see POST handler note.
       const k = process.env.RESEND_API_KEY || '';
+      const sk = getResendApiKey();
       console.error('[invite] EMAIL DIAG (PUT):', JSON.stringify({
         resendError: emailError,
         keySet: !!process.env.RESEND_API_KEY,
-        keyPrefix: k.slice(0, 5),
-        keyLen: k.length,
+        rawPrefix: k.slice(0, 5),
+        rawLen: k.length,
+        sanitizedPrefix: sk.slice(0, 4),
+        sanitizedLen: sk.length,
+        sanitizedOk: sk.startsWith('re_'),
       }));
       const e = emailError as { message?: string; name?: string } | null;
       const msg = (e && (e.message || e.name)) || 'unknown error';

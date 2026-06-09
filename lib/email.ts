@@ -12,6 +12,40 @@ import { Resend } from 'resend';
 export const VERIFIED_EMAIL_DOMAIN = 'admin.pontifexindustries.com';
 export const DEFAULT_EMAIL_FROM = 'Pontifex Industries <noreply@admin.pontifexindustries.com>';
 
+/**
+ * Returns the Resend API key, defensively sanitized.
+ *
+ * Guards against a real production footgun we hit: the Vercel env var value was
+ * pasted as `RESEND_API_KEY=re_xxx` (the variable NAME glued onto the front of
+ * the value), so `process.env.RESEND_API_KEY` came back as the whole string and
+ * Resend rejected it → every outbound email silently 502'd. We also strip stray
+ * surrounding quotes / whitespace. Returns '' when unset.
+ *
+ * Resend keys always start with `re_`, which makes the malformation recoverable:
+ * if the value contains `re_` but doesn't start with it, we extract from there.
+ */
+export function getResendApiKey(): string {
+  let k = (process.env.RESEND_API_KEY || '').trim();
+  if (!k) return '';
+  // Strip surrounding single/double quotes some dashboards add.
+  k = k.replace(/^['"]+|['"]+$/g, '').trim();
+  // Strip a self-referential `RESEND_API_KEY=` (or any `…=`) prefix.
+  const eq = k.indexOf('=');
+  if (eq !== -1 && !k.startsWith('re_')) {
+    k = k.slice(eq + 1).trim();
+  }
+  // Final safety net: if the real key is embedded anywhere, recover it.
+  if (!k.startsWith('re_') && k.includes('re_')) {
+    k = k.slice(k.indexOf('re_')).trim();
+  }
+  return k;
+}
+
+/** True when a usable (sanitized) Resend key is present. */
+export function isEmailConfigured(): boolean {
+  return getResendApiKey().startsWith('re_');
+}
+
 export interface EmailAttachment {
   filename: string;
   /** base64-encoded string OR Buffer; passed through to Resend's `content` field. */
@@ -26,9 +60,9 @@ interface EmailOptions {
   attachments?: EmailAttachment[];
 }
 
-// Initialize Resend with API key from environment variables
-// Use a dummy key if not set to prevent build errors (checked before use)
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
+// Initialize Resend with the SANITIZED API key (see getResendApiKey above).
+// Use a dummy key if not set to prevent build errors (checked before use).
+const resend = new Resend(getResendApiKey() || 're_dummy_key_for_build');
 
 export async function sendEmail({ to, subject, html, attachments }: EmailOptions): Promise<boolean> {
   try {
@@ -38,8 +72,8 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
       console.log(`📧 Attachments: ${attachments.map((a) => a.filename).join(', ')}`);
     }
 
-    // Check if Resend API key is configured
-    if (!process.env.RESEND_API_KEY) {
+    // Check if Resend API key is configured (sanitized)
+    if (!isEmailConfigured()) {
       console.warn('⚠️ RESEND_API_KEY not configured. Email will not be sent.');
       console.log('📧 Email HTML (for development):');
       console.log(html);

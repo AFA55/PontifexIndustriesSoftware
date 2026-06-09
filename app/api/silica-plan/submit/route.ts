@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { Resend } from 'resend';
-import { DEFAULT_EMAIL_FROM } from '@/lib/email';
+import { DEFAULT_EMAIL_FROM, getResendApiKey } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
       const fromAddress = DEFAULT_EMAIL_FROM;
       try {
-        const resend = new Resend(process.env.RESEND_API_KEY);
+        const resend = new Resend(getResendApiKey());
         await resend.emails.send({
           from: fromAddress,
           to: customerEmail,

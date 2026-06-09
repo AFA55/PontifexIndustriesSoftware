@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { Resend } from 'resend';
-import { DEFAULT_EMAIL_FROM } from '@/lib/email';
+import { DEFAULT_EMAIL_FROM, getResendApiKey } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -171,7 +171,7 @@ export async function POST(
 </body>
 </html>`;
 
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const resend = new Resend(getResendApiKey());
     await resend.emails.send({
       from: fromAddress,
       to: invoice.customer_email,

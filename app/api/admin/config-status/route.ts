@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
+import { isEmailConfigured } from '@/lib/email';
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
@@ -31,9 +32,8 @@ export async function GET(request: NextRequest) {
       sms_configured,
       telnyx_configured: telnyxConfigured,
       twilio_configured: twilioConfigured,
-      email_configured: !!(
-        process.env.RESEND_API_KEY || process.env.SENDGRID_API_KEY
-      ),
+      email_configured:
+        isEmailConfigured() || !!process.env.SENDGRID_API_KEY,
     },
   });
 }

@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
 import { requireAuth } from '@/lib/api-auth';
-import { DEFAULT_EMAIL_FROM } from '@/lib/email';
+import { DEFAULT_EMAIL_FROM, getResendApiKey, isEmailConfigured } from '@/lib/email';
 
 // Allowed domains for PDF URL fetching (SSRF protection)
 const ALLOWED_PDF_DOMAINS = [
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     console.log(`[send-email] User ${auth.userId} sending email to: ${to}`);
 
     // Check if Resend API key is configured
-    if (!process.env.RESEND_API_KEY) {
+    if (!isEmailConfigured()) {
       console.warn('[send-email] RESEND_API_KEY not configured.');
       return NextResponse.json(
         { error: 'Email service not configured' },
@@ -108,7 +108,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Send email using Resend
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const resend = new Resend(getResendApiKey());
     const { data, error } = await resend.emails.send(emailOptions);
 
     if (error) {
