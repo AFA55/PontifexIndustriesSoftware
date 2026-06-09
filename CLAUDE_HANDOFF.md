@@ -1,7 +1,10 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 8, 2026 | **Branch:** `main` | **HEAD:** `6957f784` — **invite system + Face ID + editable team emails + light restyle + EMAIL SENDER FIX all PUSHED & LIVE** (4 prod builds this session: `818f646e`→`799f3180`→`562c3c57`→`6957f784`, all deploys READY) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** ✅ **v1.0.2 LIVE on App Store** + **v1.0.3 / Build 8 (Face ID) uploaded to TestFlight** (processing → installable for on-device Face ID test). All web work reaches the app via the webview — no App Store resubmission needed for web. **Testing tickets in progress (real crew invites being sent).**
+**Last updated:** Jun 9, 2026 | **Branch:** `main` | **HEAD:** `2f6541a4` (diagnostic) — invite system + Face ID + editable emails + light restyle + email-sender fixes all PUSHED & LIVE (`818f646e`→`799f3180`→`562c3c57`→`6957f784`→`2f6541a4`) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** v1.0.2 LIVE on App Store + v1.0.3/Build 8 (Face ID) in TestFlight processing.
 
-> ⚠️ **VERCEL BUDGET: ~4 builds spent this session — credit likely near/at zero. Confirm before any further push.**
+> 🔴🔴 **#1 OPEN BLOCKER — INVITE/EMAIL STILL FAILS ON PROD. ROOT CAUSE FOUND, FIX IS A 1-LINE VERCEL EDIT (founder only):**
+> The Vercel env var **`RESEND_API_KEY`** (project `pontifex-industries-software-awja`, "Project" tab, added Jan 20, flagged "Needs Attention") has a **MALFORMED VALUE**: it's `RESEND_API_KEY=re_CBn…` — i.e. the variable NAME is glued to the front of the value. So `process.env.RESEND_API_KEY` = `"RESEND_API_KEY=re_CBn…"` → Resend rejects it → every email 502s. **FIX:** Vercel → project → Settings → Environment Variables → RESEND_API_KEY → Edit → set Value to JUST the key (`re_CBn…`, no `RESEND_API_KEY=` prefix; clean value is in `.env.local`) → Save → Redeploy. Claude is HARD-BLOCKED from entering API keys into fields, so this last paste is founder-only. After it works: **revert the temp diagnostic in `2f6541a4`** (the EMAIL DIAG logging + raw-error response in `app/api/admin/invite/route.ts` POST+PUT handlers).
+
+> ⚠️ **VERCEL BUDGET: ~5 builds spent this session — credit near/at zero. CONFIRM before any push.**
 
 ---
 
