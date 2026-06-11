@@ -1,10 +1,53 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 9, 2026 | **Branch:** `main` | **HEAD:** `2f6541a4` (diagnostic) — invite system + Face ID + editable emails + light restyle + email-sender fixes all PUSHED & LIVE (`818f646e`→`799f3180`→`562c3c57`→`6957f784`→`2f6541a4`) | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** v1.0.2 LIVE on App Store + v1.0.3/Build 8 (Face ID) in TestFlight processing.
+**Last updated:** Jun 9, 2026 (PT 2) | **Branch:** `main` | **HEAD pushed:** `a56a2322` (email self-heal, deploy READY) + local docs-reorg commit pending | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** v1.0.2 LIVE + v1.0.3/Build 8 (Face ID) in TestFlight.
 
-> 🔴🔴 **#1 OPEN BLOCKER — INVITE/EMAIL STILL FAILS ON PROD. ROOT CAUSE FOUND, FIX IS A 1-LINE VERCEL EDIT (founder only):**
-> The Vercel env var **`RESEND_API_KEY`** (project `pontifex-industries-software-awja`, "Project" tab, added Jan 20, flagged "Needs Attention") has a **MALFORMED VALUE**: it's `RESEND_API_KEY=re_CBn…` — i.e. the variable NAME is glued to the front of the value. So `process.env.RESEND_API_KEY` = `"RESEND_API_KEY=re_CBn…"` → Resend rejects it → every email 502s. **FIX:** Vercel → project → Settings → Environment Variables → RESEND_API_KEY → Edit → set Value to JUST the key (`re_CBn…`, no `RESEND_API_KEY=` prefix; clean value is in `.env.local`) → Save → Redeploy. Claude is HARD-BLOCKED from entering API keys into fields, so this last paste is founder-only. After it works: **revert the temp diagnostic in `2f6541a4`** (the EMAIL DIAG logging + raw-error response in `app/api/admin/invite/route.ts` POST+PUT handlers).
+> ✅ **EMAIL BLOCKER RESOLVED IN CODE (Jun 9):** the malformed Vercel `RESEND_API_KEY`
+> (`RESEND_API_KEY=re_CBn…` — name glued to value) is now **self-healed at runtime** by
+> `getResendApiKey()` in `lib/email.ts` (strips the glued prefix/quotes/whitespace; 9 Jest tests
+> incl. the exact prod case). ALL ~10 Resend call sites route through it. Deployed
+> `a56a2322` → Vercel **READY**. **Founder no longer needs to edit the env var** (cleanup optional).
+> **REMAINING:** ① founder sends a test invite → verify logs show `sanitizedOk: true` + no
+> `resendError` → ② revert the temp `EMAIL DIAG` diagnostic in `app/api/admin/invite/route.ts`
+> (from `2f6541a4`) — batch with the next code push. Both tracked in BACKLOG.md P0.
 
-> ⚠️ **VERCEL BUDGET: ~5 builds spent this session — credit near/at zero. CONFIRM before any push.**
+> ⚠️ **VERCEL BUDGET: credit near zero. CONFIRM before any push.**
+
+---
+
+## ⚡ START HERE (Jun 9, 2026 — PT 2) — Email self-heal LIVE + dev-foundation reorg ✅
+
+**1. Email fix shipped** (see banner above). Root-cause method: identical code sent fine locally
+(clean key, `re_C…`/36 chars) but 502'd on prod → isolated to the env-var VALUE; fresh 502 in logs
+confirmed still broken; defensive sanitizer beats the founder-only dashboard edit because it
+prevents the whole malformation class forever.
+
+**2. Development foundation reorganized** (docs-only commit, NOT pushed — rides with next code push):
+- **Root MD sprawl killed: 119 → 7 files.** New tree: `docs/plans/` (19) · `docs/playbooks/` (18) ·
+  `docs/reference/` (6) · `docs/archive/` (72). Rule in CLAUDE.md: no new root MDs.
+- **NEW `ARCHITECTURE.md`** — full system design with 6 Mermaid diagrams (system context, auth/
+  tenancy, code layout, job lifecycle, deploy pipeline) — renders visually on GitHub.
+- **NEW `BACKLOG.md`** — THE single prioritized issue/feature list (P0–P3), seeded from everything
+  scattered in CLAUDE.md + handoff. New issues go there, nowhere else.
+- **NEW `README.md`**, **`docs/DEVELOPMENT_PLAYBOOK.md`** (executive-engineer + guardian workflow,
+  verification gate, Definition of Done), **`docs/TOOLING_EVALUATION.md`** (repo verdicts + adoption rules).
+- **CLAUDE.md trimmed 33.7KB → ~13KB** (61% less context per session): sprint history →
+  `docs/SESSION_LOG.md`; stale branch info fixed; playbooks → skills.
+- **NEW project skills** (`.claude/skills/`): `ios-release`, `prod-deploy`, `guardian-review`,
+  `design-taste` (adopted from Leonxlnx/taste-skill 40k★ — for landing/marketing pages).
+- **Tooling verdicts** (from the trending-repos roundup, each verified on GitHub): ADOPTED
+  taste-skill + skills-pattern; STAGED Understand-Anything (visual codebase graph — founder runs
+  `/plugin install understand-anything`, BACKLOG P2) + codegraph (agent token savings, later);
+  REJECTED ECC (overlaps ruflo), MoneyPrinterTurbo, Cybersecurity-Skills (3rd-party bloat),
+  academic-research, pi. Full reasoning in docs/TOOLING_EVALUATION.md.
+
+**3. Claude Fable 5 note** — released Jun 9; this machine now runs it. ⚠️ A fake GitHub org
+(`anthropic-claude-fable-5`) is circulating a "desktop client" — it's a malware lure; access is
+via claude.ai / Claude Code `/model` / API only.
+
+### ⏭️ Next session
+1. P0s in BACKLOG.md: invite send test → diagnostic revert → Supabase Pro upgrade (founder).
+2. Then P1s: Build 8 device test + App Store submit, exercise email routes, Sentry DSN.
+3. Then resume the fine-tuning phase plans (docs/plans/PHASE_A_KICKOFF.md → MOBILE_RESPONSIVE_AUDIT.md → SEO).
 
 ---
 
