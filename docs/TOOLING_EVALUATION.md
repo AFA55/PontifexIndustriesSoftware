@@ -33,6 +33,30 @@
 | **academic-research-skills** | Academic paper workflows — irrelevant to a SaaS operations platform. |
 | **pi** (earendil-works) | Toolkit for building agent *products*. We build construction software, not agents. Our agent needs are met by Claude Code itself. |
 
+## Batch 2 — "THE SKILLS" roundup (Instagram/article list, evaluated Jun 9, 2026)
+
+Headline: **more than half this list was already installed** in our environment. Verdicts:
+
+| Item | Verdict | Reason |
+|---|---|---|
+| PDF / DOCX / PPTX / XLSX (official) | ✅ **Already installed** (`anthropic-skills` plugin) | Live now — say "make me a deck/spreadsheet/contract review" and they fire |
+| skill-creator (official) | ✅ Already installed | Use it when we notice repeated instructions worth skill-ifying |
+| frontend-design (official) | ✅ Adopted earlier today | `.claude/skills/frontend-design/` |
+| brand-guidelines (official) | ✅ **Adapted, not installed** | It's a template carrying ANTHROPIC's brand — we cloned the pattern as **`pontifex-brand`** (bridge-P, journey gradient, indigo surfaces, white-label DO-NOT-APPLY rule for tenant UI) |
+| Context7 (Upstash MCP) | ✅ **Adopted** — added to project `.mcp.json` | Version-accurate docs for Next.js 15/React 19/Supabase at code time; kills hallucinated-API bugs. Loads next session |
+| canvas-design (official) | 🟡 Staged | Adopt when the marketing/social push starts (SEO homepage, GBP, social assets) |
+| doc-coauthoring (official) | 🟡 Staged | Useful for proposals/strategy docs with the founder; install on first need |
+| Claude SEO (AgriciDaniel) | ❌ Redundant | `searchfit-seo` plugin already installed: 12+ skills incl. full audit, technical SEO, schema, AI visibility |
+| Marketing Skills (Corey Haines) | ❌ Redundant | `marketing` + `small-business` plugins already cover campaigns, email sequences, CRO-adjacent content, briefs |
+| Deep Research Skill | ❌ Redundant | Built-in `deep-research` harness already present (multi-phase, source-verified) |
+| Tavily MCP | ❌ Redundant | Built-in WebSearch/WebFetch cover it; no second search stack |
+| Superpowers (obra) | ❌ Rejected | A 20-skill dev-process framework — we already HAVE the process (DEVELOPMENT_PLAYBOOK + guardian-review + prod-deploy + SPARC/claude-flow stack). Rule 2: no second framework. Worth mining for single ideas later, not installing wholesale |
+| Planning with Files | ❌ Rejected | Solves "agent loses track on long tasks" — our harness already has plan mode + task tracking, and BACKLOG.md is the cross-session plan file |
+| Context Optimization | ❌ Rejected | Aimed at people building API agents; Claude Code manages its own context. We already cut per-session context 61% by trimming CLAUDE.md — that's the real lever |
+| Task Master AI MCP | ❌ Rejected | "PRD → ordered tasks" is exactly BACKLOG.md + the session ritual; a parallel task DB would split the single source of truth |
+| Obsidian Skills | ❌ Rejected | We don't use Obsidian |
+| NotebookLM Integration | ❌ Rejected | No NotebookLM workflow; PDF skill + deep-research cover dense-document analysis |
+
 ## House rules for future tool adoption
 
 1. **Verify before trusting** — fetch the actual repo; star counts and "official-sounding" names lie
