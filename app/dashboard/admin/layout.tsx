@@ -7,6 +7,7 @@ import { Search, Plus, ClipboardCheck } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
 import NotificationBell from '@/components/NotificationBell';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
+import UserAvatar from '@/components/UserAvatar';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 
@@ -40,21 +41,9 @@ function HeaderAvatar({ user }: { user: User | null }) {
     );
   }
 
-  const initial = user.name.trim().charAt(0).toUpperCase() || '?';
-
   return (
     <div className="flex items-center gap-2.5 cursor-default select-none">
-      {avatarUrl ? (
-        <img
-          src={avatarUrl}
-          alt={user.name}
-          className="w-8 h-8 rounded-full object-cover flex-shrink-0 ring-2 ring-purple-500/30"
-        />
-      ) : (
-        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
-          {initial}
-        </div>
-      )}
+      <UserAvatar src={avatarUrl} name={user.name} size="sm" className="ring-2 ring-purple-500/30" />
       <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-white/80 truncate max-w-[120px]">
         {user.name}
       </span>

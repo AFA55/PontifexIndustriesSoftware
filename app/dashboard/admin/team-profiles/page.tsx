@@ -17,6 +17,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
 import InviteMemberModal from '@/components/InviteMemberModal';
+import UserAvatar from '@/components/UserAvatar';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -126,12 +127,13 @@ function MemberAvatar({
   const gradient = ROLE_GRADIENT[member.role] || 'from-gray-400 to-gray-600';
 
   if (member.profile_picture_url) {
+    const px = size === 'sm' ? 32 : size === 'lg' ? 64 : 40;
     return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
+      <UserAvatar
         src={member.profile_picture_url}
-        alt={member.full_name}
-        className={`${sizeClass} rounded-full object-cover flex-shrink-0 ring-2 ring-white`}
+        name={member.full_name}
+        size={px}
+        className="ring-2 ring-white"
       />
     );
   }

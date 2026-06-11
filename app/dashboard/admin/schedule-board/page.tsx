@@ -94,6 +94,7 @@ export default function ScheduleBoardPage() {
   const [allHelpersList, setAllHelpersList] = useState<string[]>([]);
   const [operatorIdMap, setOperatorIdMap] = useState<Record<string, string>>({}); // name → id
   const [helperIdMap, setHelperIdMap] = useState<Record<string, string>>({}); // name → id
+  const [operatorAvatarMap, setOperatorAvatarMap] = useState<Record<string, string | null>>({}); // name → avatar_url
 
   // ═══ CAPACITY SETTINGS ═══
   const [capacityMaxSlots, setCapacityMaxSlots] = useState(8);
@@ -247,13 +248,17 @@ export default function ScheduleBoardPage() {
         const res = await apiFetch('/api/admin/schedule-board/operators');
         if (res.ok) {
           const json = await res.json();
-          const ops: { id: string; name: string }[] = json.data?.operators || [];
-          const helpers: { id: string; name: string }[] = json.data?.helpers || [];
+          const ops: { id: string; name: string; avatarUrl?: string | null }[] = json.data?.operators || [];
+          const helpers: { id: string; name: string; avatarUrl?: string | null }[] = json.data?.helpers || [];
           setAllOperatorsList(ops.map(o => o.name));
           setAllHelpersList(helpers.map(h => h.name));
           const opMap: Record<string, string> = {};
           ops.forEach(o => { opMap[o.name] = o.id; });
           setOperatorIdMap(opMap);
+          const avatarMap: Record<string, string | null> = {};
+          ops.forEach(o => { avatarMap[o.name] = o.avatarUrl || null; });
+          helpers.forEach(h => { avatarMap[h.name] = h.avatarUrl || null; });
+          setOperatorAvatarMap(avatarMap);
           const helpMap: Record<string, string> = {};
           helpers.forEach(h => { helpMap[h.name] = h.id; });
           setHelperIdMap(helpMap);
@@ -1964,6 +1969,7 @@ export default function ScheduleBoardPage() {
             unassignedJobs={unassignedJobs}
             rowAssignments={rowAssignments}
             operatorIdMap={operatorIdMap}
+            operatorAvatarMap={operatorAvatarMap}
             operatorSkillMap={operatorSkillMap}
             allOperatorsList={allOperatorsList}
             timeOffMap={timeOffMap}

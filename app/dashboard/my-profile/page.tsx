@@ -160,6 +160,27 @@ export default function MyProfilePage() {
     }
   };
 
+  const handleRemoveAvatar = async () => {
+    setUploadingAvatar(true);
+    setAvatarError('');
+    try {
+      const res = await apiFetch('/api/profile/avatar', { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        setProfilePicUrl('');
+        setAvatarFile(null);
+        setAvatarPreview('');
+        setProfile(prev => prev ? { ...prev, profile_picture_url: null } : prev);
+      } else {
+        setAvatarError(json.error || 'Failed to remove photo');
+      }
+    } catch {
+      setAvatarError('Failed to remove photo. Please try again.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
@@ -215,11 +236,21 @@ export default function MyProfilePage() {
             {/* Profile Header Card */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 flex items-center gap-5 shadow-sm">
               <div className="relative flex-shrink-0">
-                <Avatar
-                  src={avatarPreview || profile.profile_picture_url}
-                  name={profile.full_name}
-                  size={80}
-                />
+                {/* Tap the avatar itself to change the photo (80px target) */}
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                  className="block rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-60"
+                  title="Change profile photo"
+                  aria-label="Change profile photo"
+                >
+                  <Avatar
+                    src={avatarPreview || profile.profile_picture_url}
+                    name={profile.full_name}
+                    size={80}
+                  />
+                </button>
                 {/* Clickable camera overlay */}
                 <button
                   onClick={() => avatarInputRef.current?.click()}
@@ -310,19 +341,32 @@ export default function MyProfilePage() {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">Profile Photo</label>
-                <label className="flex items-center gap-3 cursor-pointer w-fit">
-                  <div className="flex items-center gap-2 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 hover:border-purple-400 dark:hover:border-purple-500 rounded-xl px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors">
-                    <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
-                    {uploadingAvatar ? 'Uploading...' : profilePicUrl ? 'Change Photo' : 'Upload Photo'}
-                  </div>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleAvatarChange}
-                    disabled={uploadingAvatar}
-                  />
-                </label>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <label className="flex items-center cursor-pointer w-fit">
+                    <div className="flex items-center gap-2 min-h-[44px] bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 hover:border-purple-400 dark:hover:border-purple-500 rounded-xl px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors">
+                      <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                      {uploadingAvatar ? 'Uploading...' : profilePicUrl ? 'Change Photo' : 'Upload Photo'}
+                    </div>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                      disabled={uploadingAvatar}
+                    />
+                  </label>
+                  {profilePicUrl && (
+                    <button
+                      type="button"
+                      onClick={handleRemoveAvatar}
+                      disabled={uploadingAvatar}
+                      className="flex items-center gap-2 min-h-[44px] bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 hover:border-red-400 dark:hover:border-red-500 rounded-xl px-4 py-2.5 text-sm text-red-600 dark:text-red-400 transition-colors disabled:opacity-60"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Remove Photo
+                    </button>
+                  )}
+                </div>
                 {profilePicUrl && !avatarPreview && (
                   <p className="text-xs text-green-600 dark:text-green-400 mt-1">Photo uploaded</p>
                 )}

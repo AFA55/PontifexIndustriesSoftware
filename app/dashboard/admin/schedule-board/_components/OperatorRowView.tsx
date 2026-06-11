@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { Users, Briefcase } from 'lucide-react';
 import DroppableOperatorRow from './DroppableOperatorRow';
+import UserAvatar from '@/components/UserAvatar';
 import DraggableJobCard from './DraggableJobCard';
 import JobCard from './JobCard';
 import type { JobCardData } from './JobCard';
@@ -18,6 +19,7 @@ interface OperatorRowViewProps {
   unassignedJobs: JobCardData[];
   rowAssignments: { operator: string | null; helper: string | null }[];
   operatorIdMap: Record<string, string>;
+  operatorAvatarMap?: Record<string, string | null>;
   operatorSkillMap: Record<string, number | null>;
   allOperatorsList: string[];
   timeOffMap: Record<string, { type: string; notes: string | null }>;
@@ -53,6 +55,7 @@ export default function OperatorRowView({
   unassignedJobs,
   rowAssignments,
   operatorIdMap,
+  operatorAvatarMap,
   operatorSkillMap,
   allOperatorsList,
   timeOffMap,
@@ -174,11 +177,15 @@ export default function OperatorRowView({
                 {/* Operator header */}
                 <div className="flex items-center gap-3 mb-3">
                   {/* Avatar / initials */}
-                  <div className={`w-10 h-10 rounded-xl ${colorScheme.bg} flex items-center justify-center`}>
-                    <span className={`text-sm font-bold ${colorScheme.text}`}>
-                      {getInitials(op.name)}
-                    </span>
-                  </div>
+                  {operatorAvatarMap?.[op.name] ? (
+                    <UserAvatar src={operatorAvatarMap[op.name]} name={op.name} size={40} />
+                  ) : (
+                    <div className={`w-10 h-10 rounded-xl ${colorScheme.bg} flex items-center justify-center`}>
+                      <span className={`text-sm font-bold ${colorScheme.text}`}>
+                        {getInitials(op.name)}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">

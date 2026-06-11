@@ -183,14 +183,26 @@ export async function createOrRefreshInvitation(
   const inviterName = await getInviterName(opts.inviter.userId, opts.inviter.email);
 
   // Re-use an unexpired pending invite for the same email+tenant if present.
-  const { data: existingInv } = await supabaseAdmin
+  // NOT .maybeSingle(): historical data contains duplicate pending rows for the
+  // same email (pre-pipeline resends), and .maybeSingle() ERRORS on >1 row —
+  // which would silently fall through and insert yet another duplicate. Take
+  // the newest one instead.
+  const { data: existingInvRows, error: lookupError } = await supabaseAdmin
     .from('user_invitations')
     .select('id, token, expires_at')
     .eq('tenant_id', opts.tenantId)
     .eq('email', email)
     .is('accepted_at', null)
     .gt('expires_at', new Date().toISOString())
-    .maybeSingle();
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (lookupError) {
+    // Don't fall through to INSERT on a transient failure — that's exactly how
+    // duplicate pending invitations get created.
+    console.error('[invitations] pending-invite lookup failed:', lookupError);
+    return { ok: false, status: 500, error: 'Could not check existing invitations. Try again.' };
+  }
+  const existingInv = existingInvRows?.[0] ?? null;
 
   let token: string;
   let invitationId: string | null = null;
@@ -208,6 +220,8 @@ export async function createOrRefreshInvitation(
     invitationId = existingInv.id;
     reusedExisting = true;
     // Refresh metadata in case role/name changed; tolerate missing columns.
+    // Also extend the TTL — re-approving/resending means "get this person in",
+    // so the link should get a fresh 7 days, not die on the original clock.
     const update: Record<string, unknown> = {
       role,
       admin_type: opts.adminType ?? null,
@@ -215,15 +229,23 @@ export async function createOrRefreshInvitation(
       invited_name: name,
       phone_number: opts.phoneNumber ?? null,
       date_of_birth: opts.dateOfBirth ?? null,
+      expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
     };
     const { error: updErr } = await supabaseAdmin
       .from('user_invitations')
       .update(update)
       .eq('id', existingInv.id);
     if (updErr && updErr.code === '42703') {
+      // Optional columns missing — retry with guaranteed base columns only
+      // (expires_at is core schema, keep the TTL extension).
       await supabaseAdmin
         .from('user_invitations')
-        .update({ role, admin_type: opts.adminType ?? null, initial_flags: opts.initialFlags ?? {} })
+        .update({
+          role,
+          admin_type: opts.adminType ?? null,
+          initial_flags: opts.initialFlags ?? {},
+          expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+        })
         .eq('id', existingInv.id);
     }
   } else {

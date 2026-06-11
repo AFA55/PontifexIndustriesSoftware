@@ -132,6 +132,12 @@ export async function approveAccessRequest(opts: {
   }
 
   // ── Same code path as a manual invite (token, dedupe guards, setup email).
+  // 'refresh': if this email ALREADY has a pending invitation (e.g. the admin
+  // manually invited them earlier and they ALSO submitted an access request),
+  // approving refreshes that invitation with the chosen role and RESENDS the
+  // setup email instead of blocking with "already invited" — the admin's
+  // intent when clicking Approve is "get this person onboarded", not a 409.
+  // (The cross-tenant takeover guard still hard-rejects regardless.)
   const result = await createOrRefreshInvitation({
     tenantId: opts.tenantId,
     email: req.email,
@@ -141,7 +147,7 @@ export async function approveAccessRequest(opts: {
     origin: opts.origin,
     phoneNumber: req.phone_number ?? null,
     dateOfBirth: req.date_of_birth ?? null,
-    onExistingPending: 'reject',
+    onExistingPending: 'refresh',
     sendInviteEmail: approvalInviteEmailSender,
   });
 

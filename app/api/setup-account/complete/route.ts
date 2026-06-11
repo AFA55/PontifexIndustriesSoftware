@@ -17,7 +17,9 @@ export const dynamic = 'force-dynamic';
  *           profile (permanent 403).
  *        b. a best-effort second update for optional columns
  *           (setup_completed, waiver_signed_at, waiver_ip, notification_consent,
- *           phone_number, date_of_birth) with a 42703 graceful-degradation path.
+ *           phone_number, nickname, date_of_birth) with a 42703
+ *           graceful-degradation path. nickname + phone come from the
+ *           onboarding form body (user content, not authorization).
  *      role + tenant_id come from the INVITE, never the request body.
  *   5. applies any initial feature flags the inviter set (non-fatal)
  *   6. ROTATES the invitation token to a fresh short-lived value + marks it
@@ -46,12 +48,32 @@ export async function POST(request: NextRequest) {
       waiverSigned: boolean;
       emailConsent: boolean;
       smsConsent: boolean;
+      nickname?: string;
+      phone?: string;
       hasAvatar?: boolean;
     };
 
     if (!body.token || !body.password) {
       return NextResponse.json({ error: 'token and password are required' }, { status: 400 });
     }
+
+    // ── Optional user-content fields (NOT authorization fields — body is OK) ──
+    // Phone: loose US validation — strip non-digits, allow a leading country 1,
+    // accept exactly 10 digits or empty. Stored formatted: (864) 555-1234.
+    let phoneNumber: string | null = null;
+    if (typeof body.phone === 'string' && body.phone.trim()) {
+      let digits = body.phone.replace(/\D/g, '');
+      if (digits.length === 11 && digits.startsWith('1')) digits = digits.slice(1);
+      if (digits.length !== 10) {
+        return NextResponse.json(
+          { error: 'Phone number must be 10 digits, or leave it blank.' },
+          { status: 400 }
+        );
+      }
+      phoneNumber = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    const nickname =
+      typeof body.nickname === 'string' ? body.nickname.trim().slice(0, 40) : '';
     if (body.password.length < 8) {
       return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 });
     }
@@ -211,9 +233,14 @@ export async function POST(request: NextRequest) {
       notification_consent: body.emailConsent || body.smsConsent,
       updated_at: now,
     };
-    if ((inv as { phone_number?: string }).phone_number) {
+    // User-entered phone (this onboarding form) wins over the phone the
+    // inviter typed on the invite, if any.
+    if (phoneNumber) {
+      optionalRow.phone_number = phoneNumber;
+    } else if ((inv as { phone_number?: string }).phone_number) {
       optionalRow.phone_number = (inv as { phone_number?: string }).phone_number;
     }
+    if (nickname) optionalRow.nickname = nickname;
     if ((inv as { date_of_birth?: string }).date_of_birth) {
       optionalRow.date_of_birth = (inv as { date_of_birth?: string }).date_of_birth;
     }
@@ -227,9 +254,11 @@ export async function POST(request: NextRequest) {
       // One or more optional columns aren't in prod yet (migration pending).
       // Retry with only the always-present optional field(s).
       const minimalOptional: Record<string, unknown> = { updated_at: now };
-      // phone_number/date_of_birth exist in profiles today; setup_completed/
-      // notification_consent/waiver_* are the ones a pending migration adds.
+      // phone_number/nickname/date_of_birth exist in profiles today;
+      // setup_completed/notification_consent/waiver_* are the ones a pending
+      // migration adds.
       if (optionalRow.phone_number) minimalOptional.phone_number = optionalRow.phone_number;
+      if (optionalRow.nickname) minimalOptional.nickname = optionalRow.nickname;
       if (optionalRow.date_of_birth) minimalOptional.date_of_birth = optionalRow.date_of_birth;
       const { error: retryErr } = await supabaseAdmin
         .from('profiles')

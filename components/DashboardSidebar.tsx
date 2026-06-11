@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import SharedUserAvatar from '@/components/UserAvatar';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -254,21 +255,7 @@ function Badge({ count }: { count: number }) {
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
-  const initial = name.trim().charAt(0).toUpperCase() || '?';
-  if (avatarUrl) {
-    return (
-      <img
-        src={avatarUrl}
-        alt={name}
-        className="flex-shrink-0 w-8 h-8 rounded-lg object-cover ring-1 ring-purple-500/40 select-none"
-      />
-    );
-  }
-  return (
-    <span className="flex-shrink-0 w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white text-sm font-bold select-none">
-      {initial}
-    </span>
-  );
+  return <SharedUserAvatar src={avatarUrl} name={name} size="sm" className="ring-1 ring-purple-500/40" />;
 }
 
 // ---------------------------------------------------------------------------

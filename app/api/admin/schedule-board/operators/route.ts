@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     // Fetch operators (role = 'operator')
     let opQuery = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role')
+      .select('id, full_name, role, avatar_url')
       .eq('role', 'operator')
       .order('full_name');
     opQuery = opQuery.eq('tenant_id', tenantId);
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
     // Fetch helpers (role = 'apprentice')
     let helpQuery = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role')
+      .select('id, full_name, role, avatar_url')
       .eq('role', 'apprentice')
       .order('full_name');
     helpQuery = helpQuery.eq('tenant_id', tenantId);
@@ -56,8 +56,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: {
-        operators: (operators || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown' })),
-        helpers: (helpers || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown' })),
+        operators: (operators || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown', avatarUrl: p.avatar_url || null })),
+        helpers: (helpers || []).map(p => ({ id: p.id, name: p.full_name || 'Unknown', avatarUrl: p.avatar_url || null })),
       },
     });
   } catch (error) {

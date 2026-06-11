@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
+import UserAvatar from '@/components/UserAvatar';
 
 // ── Types ────────────────────────────────────────────────────
 interface DayInfo {
@@ -33,6 +34,7 @@ interface TeamMember {
   fullName: string;
   email: string;
   role: string;
+  avatarUrl?: string | null;
   dailyHours: Record<string, DayInfo>;
   weeklyTotal: number;
   regularHours: number;
@@ -1093,13 +1095,22 @@ export default function AdminTimecardsPage() {
                         {/* Name + Avatar */}
                         <td className="sticky left-0 z-10 bg-white dark:bg-[#0e0720] group-hover:bg-gray-50 dark:group-hover:bg-[#150c2a] transition-colors px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm ${
-                              member.isClockedIn
-                                ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-2 ring-emerald-500/30'
-                                : 'bg-gradient-to-br from-purple-500 to-indigo-600'
-                            }`}>
-                              {member.fullName?.charAt(0) || '?'}
-                            </div>
+                            {member.avatarUrl ? (
+                              <UserAvatar
+                                src={member.avatarUrl}
+                                name={member.fullName}
+                                size={36}
+                                className={`shadow-sm ${member.isClockedIn ? 'ring-2 ring-emerald-500/60' : ''}`}
+                              />
+                            ) : (
+                              <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm ${
+                                member.isClockedIn
+                                  ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-2 ring-emerald-500/30'
+                                  : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                              }`}>
+                                {member.fullName?.charAt(0) || '?'}
+                              </div>
+                            )}
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{member.fullName}</p>
@@ -1326,13 +1337,22 @@ export default function AdminTimecardsPage() {
                   >
                     {/* Header: avatar + name + role + status */}
                     <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm ${
-                        member.isClockedIn
-                          ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-2 ring-emerald-500/30'
-                          : 'bg-gradient-to-br from-purple-500 to-indigo-600'
-                      }`}>
-                        {member.fullName?.charAt(0) || '?'}
-                      </div>
+                      {member.avatarUrl ? (
+                        <UserAvatar
+                          src={member.avatarUrl}
+                          name={member.fullName}
+                          size={36}
+                          className={`shadow-sm ${member.isClockedIn ? 'ring-2 ring-emerald-500/60' : ''}`}
+                        />
+                      ) : (
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs flex-shrink-0 shadow-sm ${
+                          member.isClockedIn
+                            ? 'bg-gradient-to-br from-emerald-500 to-emerald-600 ring-2 ring-emerald-500/30'
+                            : 'bg-gradient-to-br from-purple-500 to-indigo-600'
+                        }`}>
+                          {member.fullName?.charAt(0) || '?'}
+                        </div>
+                      )}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5">
                           <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{member.fullName}</p>

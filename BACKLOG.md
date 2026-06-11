@@ -48,6 +48,19 @@
 - [ ] **Login title/tagline still swap during branding load** on `/login` — logo flash fixed Jun 10
       with a skeleton; "Welcome Back" → "Welcome to Patriot" text swap remains (minor polish).
 
+## 🟡 P2 (guardian nits from Jun 11 onboarding/avatar review)
+
+- [ ] **Avatar DELETE doesn't remove the onboarding-uploaded file** (`avatars/{uid}.{ext}`) and old
+      timestamped self-service uploads accumulate — prune both in DELETE/POST.
+- [ ] **Setup success screen shows the local photo preview even if the fire-and-forget upload failed** —
+      add "photo will appear shortly" copy or check the upload response; revoke `createObjectURL`.
+- [ ] **Refresh path overwrites inviter-typed name/phone/DOB with public-form values** — consider
+      not overwriting non-empty existing values.
+- [ ] **Schedule-board avatar map keyed by display name** (two same-name operators share an avatar) —
+      pre-existing pattern; fold into the schedule-board extraction refactor.
+- [ ] **Jest picks up ~70 stale `.claude/worktrees/` duplicate suites** — add `.claude/` to
+      `testPathIgnorePatterns` + clean the worktrees (disk re-inflating).
+
 ## 🟡 P2 (guardian nits from Jun 11 invite/access-request review — real but non-blocking)
 
 - [ ] **Orphaned invitation on email-send failure** during access-request approval — claim reverts

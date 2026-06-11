@@ -11,6 +11,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const BUCKET = 'avatars';
 const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5 MB
+// Same whitelist as /api/upload/avatar (the invite-onboarding route).
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,8 +28,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File too large (max 5 MB)' }, { status: 413 });
     }
 
-    if (!file.type.startsWith('image/')) {
-      return NextResponse.json({ error: 'Only image files are allowed' }, { status: 400 });
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return NextResponse.json({ error: 'Only JPEG, PNG, GIF, or WebP images are allowed' }, { status: 400 });
     }
 
     const ext = (file.name.split('.').pop()?.toLowerCase() || 'jpg').replace(/[^a-z0-9]/g, '') || 'jpg';

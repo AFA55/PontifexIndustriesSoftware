@@ -18,6 +18,7 @@ import {
   type PermissionLevel,
 } from '@/lib/rbac';
 import PermissionEditorModal from './_components/PermissionEditorModal';
+import UserAvatar from '@/components/UserAvatar';
 import RolePermissionsPanel from './_components/RolePermissionsPanel';
 import {
   ArrowLeft, Users, UserPlus, Shield, Bell, CheckCircle2,
@@ -53,6 +54,7 @@ interface TeamMember {
   active: boolean;
   phone_number?: string;
   created_at?: string;
+  profile_picture_url?: string | null;
 }
 
 // ============================================================
@@ -929,9 +931,13 @@ export default function TeamManagementPage() {
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <div className={`w-8 h-8 bg-gradient-to-br ${ROLE_GRADIENT[member.role] || 'from-gray-400 to-gray-500'} rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
-                          {member.full_name.charAt(0).toUpperCase()}
-                        </div>
+                        {member.profile_picture_url ? (
+                          <UserAvatar src={member.profile_picture_url} name={member.full_name} size="sm" />
+                        ) : (
+                          <div className={`w-8 h-8 bg-gradient-to-br ${ROLE_GRADIENT[member.role] || 'from-gray-400 to-gray-500'} rounded-lg flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
+                            {member.full_name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div className="min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold text-gray-900 text-sm">{member.full_name}</span>
