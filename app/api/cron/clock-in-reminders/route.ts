@@ -104,17 +104,21 @@ export async function GET(request: NextRequest) {
 
       if (earliestStart.size === 0) continue;
 
-      // PTO / time-off skip — drop any operator who has an operator_time_off row
-      // for today (covers pto / sick / unpaid / worked_last_night night-shift
-      // recovery / other). Tenant-scoped.
+      // PTO / time-off skip — drop any operator who has an APPROVED
+      // operator_time_off row covering today (range-aware: [date, end_date],
+      // end_date NULL = single day). Pending requests do NOT suppress the
+      // reminder — the operator is still expected at work. Tenant-scoped.
       const { data: timeOff } = await supabaseAdmin
         .from('operator_time_off')
-        .select('operator_id')
+        .select('operator_id, status')
         .eq('tenant_id', tenant.id)
-        .eq('date', today)
+        .lte('date', today)
+        .or(`end_date.gte.${today},and(end_date.is.null,date.eq.${today})`)
         .in('operator_id', Array.from(earliestStart.keys()));
       const offToday = new Set(
-        (timeOff || []).map((r: { operator_id: string }) => r.operator_id)
+        (timeOff || [])
+          .filter((r: { status?: string | null }) => (r.status ?? 'approved') === 'approved')
+          .map((r: { operator_id: string }) => r.operator_id)
       );
       for (const opId of offToday) earliestStart.delete(opId);
 

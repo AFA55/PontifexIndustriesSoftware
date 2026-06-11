@@ -278,13 +278,20 @@ export async function POST(request: NextRequest) {
 
     // ─── Step 4: Fetch time-off and current operator workload ─────
 
-    // Exclude operators who have time-off on this date
+    // Exclude operators who have APPROVED time-off covering this date.
+    // Range-aware: a row spans [date, end_date] (end_date NULL = single day).
+    // Pending/denied/cancelled requests do NOT block scheduling.
     const { data: timeOffData } = await supabaseAdmin
       .from('operator_time_off')
-      .select('operator_id')
-      .eq('date', date);
+      .select('operator_id, status')
+      .lte('date', date)
+      .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`);
 
-    const timeOffOperatorIds = new Set((timeOffData || []).map((e: any) => e.operator_id));
+    const timeOffOperatorIds = new Set(
+      (timeOffData || [])
+        .filter((e: any) => (e.status ?? 'approved') === 'approved')
+        .map((e: any) => e.operator_id)
+    );
 
     // Filter out operators on time-off
     const availableRawOperators = rawOperators.filter(op => !timeOffOperatorIds.has(op.id));

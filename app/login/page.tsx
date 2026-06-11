@@ -9,7 +9,35 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { biometricAvailable, biometryLabel, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
+import { biometricAvailable, biometryLabel, clearCredentials, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
+
+/**
+ * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
+ * Creates the record on successful login and enriches an existing record with the
+ * tenant's display name + logo once branding loads. logout() never clears this key.
+ */
+function upsertLastCompany(
+  tenantId: string,
+  branding: { company_name?: string; logo_icon_url?: string; logo_url?: string },
+  { createIfMissing }: { createIfMissing: boolean }
+) {
+  try {
+    const raw = localStorage.getItem('pontifex.lastCompany');
+    const prev = raw ? JSON.parse(raw) : null;
+    const matches = prev?.tenantId === tenantId;
+    if (!matches && !createIfMissing) return;
+    const name = branding.company_name || (matches ? prev.name : null);
+    if (!name) return; // never store a record without a display name
+    localStorage.setItem('pontifex.lastCompany', JSON.stringify({
+      tenantId,
+      code: matches ? prev.code : undefined,
+      name,
+      logoUrl: branding.logo_icon_url || branding.logo_url || (matches ? prev.logoUrl : undefined),
+    }));
+  } catch {
+    /* localStorage unavailable — non-fatal */
+  }
+}
 
 const schema = z.object({
   email: z.string().email(),
@@ -79,7 +107,14 @@ function LoginPageInner() {
     if (!tenantId) return;
     fetch(`/api/admin/branding?tenant_id=${tenantId}`)
       .then(r => r.json())
-      .then(json => { if (json.success && json.data) setTenantBranding(json.data); })
+      .then(json => {
+        if (json.success && json.data) {
+          setTenantBranding(json.data);
+          // Enrich the /company-login fast path with this tenant's name + logo.
+          // Only updates an EXISTING record (visiting /login alone doesn't create one).
+          upsertLastCompany(tenantId, json.data, { createIfMissing: false });
+        }
+      })
       .catch(() => {})
       .finally(() => setBrandingLoaded(true));
   }, [tenantId]);
@@ -160,9 +195,20 @@ function LoginPageInner() {
       console.log('💾 User stored in localStorage');
 
       // Native app: save credentials to the iOS Keychain so the user can sign in
-      // with Face ID next time (only when "Remember me" is on). No-op on the website.
+      // with Face ID next time (only when "Remember me" is on). Unchecking
+      // "Remember me" also REMOVES any previously saved credentials so the
+      // Face ID button stops offering a sign-in the user opted out of.
+      // Both are no-ops on the website.
       if (data.remember !== false) {
         saveCredentials(data.email, data.password).catch(() => {});
+      } else {
+        clearCredentials().catch(() => {});
+      }
+
+      // Remember this company for the one-tap fast path on /company-login
+      // (covers users who deep-linked straight to /login?tenant_id=...).
+      if (tenantId) {
+        upsertLastCompany(tenantId, tenantBranding || {}, { createIfMissing: true });
       }
 
       // Redirect based on role. The platform owner (super_admin) lands in the

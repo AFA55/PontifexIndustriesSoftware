@@ -11,11 +11,11 @@
 | **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
 | **Prod** | ✅ LIVE — pontifexindustries.com (`a56a2322` deployed READY) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) awaiting founder device test |
-| **Open** | P0: 2 · P1: 7 · P2: 11 · P3: 8 |
-| **In flight** | Jun 10 fix batch built+tested, awaiting push: branding flash, logo 1.5x, demo-funnel 500 fix, demo-requests inbox, diagnostic revert |
+| **Open** | P0: 2 · P1: 7 · P2: 14 · P3: 8 |
+| **In flight** | TWO Jun 10 batches built+tested+guardian-PASS, awaiting ONE push: (1) branding flash/logo/demo-funnel/inbox, (2) time-off overhaul + GPS-only clock-in 90ft + company-code memory |
 | **Blocked on founder** | Push confirmation · Supabase Pro upgrade · Build 8 device test · Sentry DSN |
-| **Unpushed commits** | Docs commits (`4cb515c8`+) + Jun 10 code batch |
-| **Last groomed** | Jun 10, 2026 |
+| **Unpushed commits** | Docs commits + 2 code batches |
+| **Last groomed** | Jun 10, 2026 (PT 2) |
 
 ## 🔴 P0 — Verify / unblock now
 
@@ -47,6 +47,15 @@
       Plan: docs/plans/PLATFORM_HUB_V2_PLAN.md. Phase 1 (demo-requests inbox) shipped Jun 10.
 - [ ] **Login title/tagline still swap during branding load** on `/login` — logo flash fixed Jun 10
       with a skeleton; "Welcome Back" → "Welcome to Patriot" text swap remains (minor polish).
+
+## 🟡 P2 (guardian nits from Jun 10 time-off review — real but non-blocking)
+
+- [ ] **PTO balance adjustments are fire-and-forget** in the approval route — await + surface failure
+      (quasi-financial record shouldn't silently drift).
+- [ ] **Weekend pay mismatch**: approval inserts 8h paid timecards for ALL calendar days while the
+      PTO debit counts business days only — filter weekends from the timecard inserts.
+- [ ] **Time-off date picker min** should be the earliest eligible date (28 days out), not today —
+      avoids a guaranteed 422. Also: timecard page still uses alert() for clock-in errors → toasts.
 
 ## 🟡 P2 — Soon
 

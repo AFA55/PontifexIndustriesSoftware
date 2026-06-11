@@ -138,18 +138,33 @@ export async function GET(request: NextRequest) {
     }
 
     // ── 4) Time off ───────────────────────────────────────────────
+    // Range-aware overlap: a row spans [date, end_date] (end_date NULL = single
+    // day). Only APPROVED entries block capacity (legacy NULL status counts as
+    // approved); pending/denied/cancelled requests do not.
     let timeOffQuery = supabaseAdmin
       .from('operator_time_off')
-      .select('operator_id, date')
-      .gte('date', start)
-      .lte('date', end);
+      .select('operator_id, date, end_date, status')
+      .lte('date', end)
+      .or(`end_date.gte.${start},and(end_date.is.null,date.gte.${start})`);
     if (tenantId) timeOffQuery = timeOffQuery.eq('tenant_id', tenantId);
     const { data: timeOff } = await timeOffQuery;
     const timeOffByDate: Record<string, Set<string>> = {};
     for (const t of timeOff || []) {
-      const d = String(t.date).slice(0, 10);
-      if (!timeOffByDate[d]) timeOffByDate[d] = new Set();
-      timeOffByDate[d].add(t.operator_id);
+      const rowStatus = (t as any).status ?? 'approved';
+      if (rowStatus !== 'approved') continue;
+      const first = String(t.date).slice(0, 10);
+      const last = String((t as any).end_date || t.date).slice(0, 10);
+      const from = first < start ? start : first;
+      const to = last > end ? end : last;
+      for (
+        let d = new Date(`${from}T00:00:00Z`);
+        d.toISOString().slice(0, 10) <= to;
+        d.setUTCDate(d.getUTCDate() + 1)
+      ) {
+        const day = d.toISOString().slice(0, 10);
+        if (!timeOffByDate[day]) timeOffByDate[day] = new Set();
+        timeOffByDate[day].add(t.operator_id);
+      }
     }
 
     // ── 5) Per-day rollup ─────────────────────────────────────────

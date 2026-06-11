@@ -21,6 +21,7 @@ import {
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
+import { MANAGEMENT_REQUESTER_ROLES } from '@/lib/time-off';
 import LogTimeOffModal from './_components/LogTimeOffModal';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ interface TimeOffRequest {
   id: string;
   operator_id: string;
   operator_name: string;
+  operator_role?: string;
   type: string;
   date: string;
   end_date?: string | null;
@@ -38,6 +40,8 @@ interface TimeOffRequest {
   notes?: string | null;
   created_at: string;
   is_paid: boolean;
+  pay_override?: string | null;
+  edited_at?: string | null;
 }
 
 interface OperatorStats {
@@ -174,13 +178,14 @@ function StatCard({
 // Tab 1: Time-Off Requests
 // ---------------------------------------------------------------------------
 
-function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => void }) {
+function RequestsTab({ token, currentRole, onRefresh }: { token: string; currentRole: string; onRefresh?: () => void }) {
   const [requests, setRequests] = useState<TimeOffRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [actioning, setActioning] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
 
   const fetchRequests = useCallback(async () => {
@@ -202,21 +207,40 @@ function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => vo
 
   useEffect(() => { fetchRequests(); }, [fetchRequests]);
 
-  const handleAction = async (id: string, status: 'approved' | 'denied') => {
+  const handleAction = async (
+    id: string,
+    status: 'approved' | 'denied',
+    payOverride?: 'unpaid'
+  ) => {
     setActioning(id);
+    setActionError(null);
     try {
-      await fetch(`/api/admin/time-off/${id}`, {
+      const res = await fetch(`/api/admin/time-off/${id}`, {
         method: 'PATCH',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status, ...(payOverride ? { pay_override: payOverride } : {}) }),
       });
+      if (!res.ok) {
+        let msg = 'Failed to update request';
+        try {
+          const json = await res.json();
+          if (json.error) msg = json.error;
+        } catch { /* non-JSON */ }
+        setActionError(msg);
+      }
       await fetchRequests();
       onRefresh?.();
     } catch {
-      // silent
+      setActionError('Failed to update request. Check your connection.');
     }
     setActioning(null);
   };
+
+  // Management requesters can only be decided by a super_admin (also
+  // enforced server-side in /api/admin/time-off/[id]).
+  const canDecide = (r: TimeOffRequest) =>
+    currentRole === 'super_admin' ||
+    !MANAGEMENT_REQUESTER_ROLES.includes(r.operator_role ?? 'operator');
 
   const filtered = useMemo(() => {
     return requests.filter((r) => {
@@ -277,6 +301,16 @@ function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => vo
         </button>
       </div>
 
+      {/* Action error */}
+      {actionError && (
+        <div className="bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/25 rounded-xl p-3 flex items-center justify-between gap-3">
+          <p className="text-sm font-medium text-rose-700 dark:text-rose-300">{actionError}</p>
+          <button onClick={() => setActionError(null)} className="text-rose-500 hover:text-rose-700 text-xs font-semibold shrink-0 min-h-[44px] px-2">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="bg-white dark:bg-white/[0.05] border border-gray-100 dark:border-white/10 rounded-2xl overflow-hidden">
         {loading ? (
@@ -316,15 +350,43 @@ function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => vo
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-white/[0.06]">
-                {filtered.map((r) => (
+                {filtered.map((r) => {
+                  const isManagement = MANAGEMENT_REQUESTER_ROLES.includes(r.operator_role ?? 'operator');
+                  const decidable = canDecide(r);
+                  return (
                   <tr key={r.id} className="hover:bg-gray-50 dark:hover:bg-white/[0.03] transition-colors">
                     <td className="px-5 py-3.5 font-semibold text-gray-900 dark:text-white">
-                      {r.operator_name}
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {r.operator_name}
+                        {isManagement && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-indigo-100 text-indigo-700 ring-1 ring-indigo-300 dark:bg-indigo-500/15 dark:text-indigo-300">
+                            Mgmt
+                          </span>
+                        )}
+                        {r.edited_at && r.status === 'pending' && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-sky-100 text-sky-700 ring-1 ring-sky-300 dark:bg-sky-500/15 dark:text-sky-300">
+                            Edited
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200 capitalize">
-                        {r.type.replace(/_/g, ' ')}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 ring-1 ring-blue-200 capitalize">
+                          {r.type.replace(/_/g, ' ')}
+                        </span>
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            r.pay_override === 'unpaid'
+                              ? 'bg-orange-50 text-orange-700 ring-1 ring-orange-300'
+                              : r.is_paid
+                                ? 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'
+                                : 'bg-gray-100 text-gray-500 ring-1 ring-gray-200'
+                          }`}
+                        >
+                          {r.pay_override === 'unpaid' ? '→ UNPAID' : r.is_paid ? 'PAID' : 'UNPAID'}
+                        </span>
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-gray-600 dark:text-white/60 whitespace-nowrap">
                       {formatDateRange(r.date, r.end_date)}
@@ -340,30 +402,48 @@ function RequestsTab({ token, onRefresh }: { token: string; onRefresh?: () => vo
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       {r.status === 'pending' ? (
-                        <div className="flex items-center justify-end gap-2">
+                        decidable ? (
+                        <div className="flex items-center justify-end gap-2 flex-wrap">
                           <button
                             onClick={() => handleAction(r.id, 'approved')}
                             disabled={actioning === r.id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 px-3 py-2.5 min-h-[44px] rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-semibold transition-colors disabled:opacity-50"
                           >
                             {actioning === r.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
                             Approve
                           </button>
+                          {r.is_paid && (
+                            <button
+                              onClick={() => handleAction(r.id, 'approved', 'unpaid')}
+                              disabled={actioning === r.id}
+                              title="Approve the dates, but convert to unpaid time off"
+                              className="flex items-center gap-1 px-3 py-2.5 min-h-[44px] rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                            >
+                              <Check className="w-3 h-3" />
+                              Approve Unpaid
+                            </button>
+                          )}
                           <button
                             onClick={() => handleAction(r.id, 'denied')}
                             disabled={actioning === r.id}
-                            className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 px-3 py-2.5 min-h-[44px] rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition-colors disabled:opacity-50"
                           >
                             <X className="w-3 h-3" />
                             Deny
                           </button>
                         </div>
+                        ) : (
+                          <span className="text-[11px] font-semibold text-indigo-500 dark:text-indigo-300 whitespace-nowrap">
+                            Super admin only
+                          </span>
+                        )
                       ) : (
                         <span className="text-gray-300 text-xs italic">—</span>
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -681,6 +761,7 @@ export default function TimeOffPage() {
   const moduleGate = useModuleGate('timecards');
   const [tab, setTab] = useState<Tab>('scorecards');
   const [token, setToken] = useState('');
+  const [currentRole, setCurrentRole] = useState('');
   const [authReady, setAuthReady] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -692,6 +773,7 @@ export default function TimeOffPage() {
       window.location.href = '/dashboard/admin';
       return;
     }
+    setCurrentRole(user.role);
 
     supabase.auth.getSession().then(({ data }) => {
       setToken(data.session?.access_token ?? '');
@@ -760,7 +842,7 @@ export default function TimeOffPage() {
 
       {/* Tab content */}
       {tab === 'scorecards' && <ScorecardsTab token={token} key={`scorecards-${refreshKey}`} />}
-      {tab === 'requests' && <RequestsTab token={token} onRefresh={() => setRefreshKey((k) => k + 1)} />}
+      {tab === 'requests' && <RequestsTab token={token} currentRole={currentRole} onRefresh={() => setRefreshKey((k) => k + 1)} />}
       {tab === 'calendar' && <CalendarTab />}
 
       {/* Global add modal */}

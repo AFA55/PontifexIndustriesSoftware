@@ -1,16 +1,16 @@
 'use client';
 
 import { Suspense, useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import {
   ArrowLeft, Clock, Calendar, CheckCircle, AlertTriangle,
   ChevronLeft, ChevronRight, Moon, Factory, Briefcase, TrendingUp,
-  LogOut, Loader2, FileText, CalendarOff, Wifi, MapPin, Edit2, X, Send, ClipboardList
+  LogOut, Loader2, FileText, CalendarOff, Edit2, X, Send, ClipboardList
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import NFCClockIn, { type ClockInResult } from '@/components/NFCClockIn';
+import GpsClockIn, { type ClockInResult } from '@/components/NFCClockIn';
 import { requestLocation, LocationBlockedModal, type LocationErrorKind } from '@/components/ui/LocationPermissionGuard';
 
 interface TimecardEntry {
@@ -81,12 +81,9 @@ function TimecardPage() {
   const [activeTimecard, setActiveTimecard] = useState<any>(null);
   const [clockLoading, setClockLoading] = useState(true);
   const [clockingAction, setClockingAction] = useState(false);
-  const [clockMethod, setClockMethod] = useState<'nfc' | 'gps' | 'remote'>('nfc');
   const [liveHours, setLiveHours] = useState('0.0');
   const [showTimeOffRequest, setShowTimeOffRequest] = useState(false);
-  const [bypassNfc, setBypassNfc] = useState(false);
   const [locationErrorKind, setLocationErrorKind] = useState<LocationErrorKind | null>(null);
-  const [pendingClockInAfterLocationFix, setPendingClockInAfterLocationFix] = useState(false);
 
   const [showDailyReportGate, setShowDailyReportGate] = useState(false);
   const [dailyReportSubmitted, setDailyReportSubmitted] = useState<boolean | null>(null); // null = not checked yet
@@ -115,7 +112,6 @@ function TimecardPage() {
     })().catch(() => {});
   }, []);
   const router = useRouter();
-  const searchParams = useSearchParams();
   const isRedirecting = useRef(false);
 
   const redirectToLogin = useCallback(() => {
@@ -127,14 +123,6 @@ function TimecardPage() {
   }, []);
 
   const { monday, sunday } = useMemo(() => getWeekBounds(currentWeekOffset), [currentWeekOffset]);
-
-  // Check for bypass_nfc URL param
-  useEffect(() => {
-    if (searchParams.get('bypass_nfc') === 'true') {
-      setBypassNfc(true);
-      setClockMethod('gps');
-    }
-  }, [searchParams]);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -177,53 +165,6 @@ function TimecardPage() {
     const interval = setInterval(update, 30000);
     return () => clearInterval(interval);
   }, [activeTimecard]);
-
-  const handleClockIn = useCallback(async (nfcTagUid?: string) => {
-    setClockingAction(true);
-    setLocationErrorKind(null);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      // NFC doesn't require GPS — skip location for NFC clock-ins
-      let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
-      if (!nfcTagUid && clockMethod !== 'nfc') {
-        try {
-          const loc = await requestLocation();
-          latitude = loc.latitude;
-          longitude = loc.longitude;
-          accuracy = loc.accuracy;
-        } catch (locErr: any) {
-          setClockingAction(false);
-          setLocationErrorKind(locErr.kind ?? 'position_unavailable');
-          setPendingClockInAfterLocationFix(true);
-          return;
-        }
-      }
-
-      const body: Record<string, unknown> = {
-        clock_in_method: nfcTagUid ? 'nfc' : clockMethod,
-        latitude, longitude, accuracy,
-      };
-      if (nfcTagUid) body.nfc_tag_uid = nfcTagUid;
-
-      const res = await fetch('/api/timecard/clock-in', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify(body),
-      });
-
-      if (res.ok) {
-        await fetchActiveTimecard();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Clock-in failed');
-      }
-    } catch (err: any) {
-      alert(err.message || 'Clock-in failed');
-    }
-    setClockingAction(false);
-  }, [clockMethod, fetchActiveTimecard]);
 
   const handleClockOut = useCallback(async () => {
     setClockingAction(true);
@@ -478,14 +419,8 @@ function TimecardPage() {
       {/* Location permission modal — shows when GPS is blocked */}
       <LocationBlockedModal
         errorKind={locationErrorKind}
-        onDismiss={() => { setLocationErrorKind(null); setPendingClockInAfterLocationFix(false); }}
-        onRetry={() => {
-          setLocationErrorKind(null);
-          if (pendingClockInAfterLocationFix) {
-            setPendingClockInAfterLocationFix(false);
-            handleClockIn();
-          }
-        }}
+        onDismiss={() => setLocationErrorKind(null)}
+        onRetry={() => setLocationErrorKind(null)}
       />
 
       {/* ── Header ─────────────────────────────────────── */}
@@ -619,41 +554,18 @@ function TimecardPage() {
                 </div>
               </div>
 
-              {/* Bypass NFC Banner */}
-              {bypassNfc && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl p-4 text-left max-w-sm mx-auto">
-                  <div className="flex items-start gap-2">
-                    <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Remote Clock-In</p>
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        NFC requirement has been bypassed by your admin. GPS location will still be captured. Clock in using the button below.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {bypassNfc ? (
-                /* Legacy bypass flow — kept for admin-bypass notifications */
-                <button onClick={() => handleClockIn()} disabled={clockingAction}
-                  className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
-                  {clockingAction ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
-                  Clock In (Remote - No NFC)
-                </button>
-              ) : (
-                /* NFCClockIn component: NFC scan / daily PIN / out-of-town GPS remote */
-                <NFCClockIn
-                  disabled={clockingAction}
-                  onClockIn={(result: ClockInResult) => {
-                    if (result.success) {
-                      fetchActiveTimecard();
-                    } else {
-                      alert(result.error);
-                    }
-                  }}
-                />
-              )}
+              {/* GpsClockIn component: GPS shop clock-in (primary) / out-of-town remote */}
+              <GpsClockIn
+                disabled={clockingAction}
+                onLocationError={(kind) => setLocationErrorKind(kind)}
+                onClockIn={(result: ClockInResult) => {
+                  if (result.success) {
+                    fetchActiveTimecard();
+                  } else {
+                    alert(result.error);
+                  }
+                }}
+              />
             </div>
           )}
         </div>

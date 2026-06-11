@@ -14,6 +14,38 @@
 
 ---
 
+## ⚡ START HERE (Jun 10, 2026 — PT 2) — Time-off overhaul + GPS-only clock-in + login memory ✅ (3 parallel builders + guardian)
+
+Founder's second bug-dump batch, built by 3 PARALLEL subagents on disjoint files, guardian-reviewed
+(2 BLOCKING caught + fixed + re-verified), tsc clean, build green, 855/855 tests.
+
+1. **TIME-OFF SYSTEM REBUILT (was 100% broken)** — root cause: page POSTed to nonexistent
+   `/api/operator/time-off` → 404 HTML → Safari "string did not match the expected pattern".
+   NEW one-row-per-request model: POST/GET/PATCH(edit-pending)/DELETE(cancel) for ALL roles;
+   28-day rule kept (422 + earliest_date); overlap checks; PTO balance card + My Requests history
+   on the request page; **rank rules SERVER-enforced** (management requesters → super_admin only;
+   field/shop → admin/ops/super; self-approval blocked); **Approve-as-UNPAID** override
+   (`pay_override`); PTO auto-debit on paid approval + credit-back on reversal;
+   **status-transition guard** (guardian catch #1: double-approve double-debited PTO + could
+   resurrect cancelled requests → now 409). Migration `time_off_overhaul` APPLIED to prod
+   (pay_override, edited_at + indexes). Consumers fixed: week-capacity/auto-schedule/clock-in-
+   reminders now only count APPROVED (pending no longer blocks scheduling).
+2. **GPS-ONLY CLOCK-IN (PIN + NFC retired)** — `components/NFCClockIn.tsx` → GpsClockIn
+   ("At Shop" GPS primary + "Remote" approval flow); timecard page cleaned (bypass_nfc, PIN pad,
+   NFC warnings gone); radius **100ft → 90ft** (`ALLOWED_RADIUS_METERS = 27.432`); guardian catch
+   #2: dashboards' `NfcClockInModal` still had a live PIN path + `/nfc-clock` kiosk still posted
+   nfc → PIN flow stripped from modal (shares the 90ft constant), kiosk page = redirect stub.
+   Patriot `require_nfc_clock_in` verified false (no server block).
+3. **LOGIN MEMORY** — `/company-login` one-tap "Continue to {Company}" fast path
+   (`pontifex.lastCompany`, survives logout; browser-verified end-to-end); unchecking Remember-me
+   now CLEARS saved Face ID credentials; Face ID wiring confirmed already-correct (device test on
+   Build 8 still pending — founder).
+4. Guardian NITS logged to BACKLOG P2 (PTO fire-and-forget, weekend-pay mismatch, date-picker min).
+
+**⏭️ PUSH NEXT** (founder pre-authorized "after we finish these we can push") → then Hub v2 wizard.
+
+---
+
 ## ⚡ START HERE (Jun 10, 2026) — Email outage CONFIRMED FIXED + founder 4-task batch ✅ (push pending)
 
 **✅ EMAIL OUTAGE CLOSED:** founder resent Adam Ingalls' invite from prod at 10:36 PM →

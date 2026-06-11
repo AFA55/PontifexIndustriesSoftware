@@ -75,6 +75,12 @@ export const logout = async (): Promise<void> => {
   Object.keys(localStorage)
     .filter(k => k.startsWith('sb-') && k.endsWith('-auth-token'))
     .forEach(k => localStorage.removeItem(k));
+  // ⚠️ Deliberately PRESERVED across logout (do not "clean up" these):
+  //  - localStorage 'pontifex.lastCompany' → powers the one-tap "Continue to
+  //    {Company}" fast path on /company-login (no re-typing the company code)
+  //  - localStorage 'pontifex.rememberMe' → the user's remember-me preference
+  //  - iOS Keychain credentials (lib/biometric.ts) → powers "Sign in with Face ID"
+  //    after logout. Only an explicit "Remember me" opt-out clears them.
   console.log('User logged out');
 };
 

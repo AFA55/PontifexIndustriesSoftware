@@ -1,11 +1,41 @@
 'use client';
 
-import React, { useState, Suspense } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Building2, ArrowRight, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import SplashIntro from '@/components/SplashIntro';
+
+/**
+ * Last company the user successfully signed in with (or looked up).
+ * Persisted in localStorage under `pontifex.lastCompany` so a returning user
+ * gets a one-tap "Continue to {Company}" fast path instead of re-typing the
+ * company code on every app launch / after every logout.
+ * NOTE: logout() in lib/auth.ts intentionally does NOT clear this key.
+ */
+interface LastCompany {
+  tenantId: string;
+  code?: string;
+  name: string;
+  logoUrl?: string;
+}
+
+const LAST_COMPANY_KEY = 'pontifex.lastCompany';
+
+function readLastCompany(): LastCompany | null {
+  try {
+    const raw = localStorage.getItem(LAST_COMPANY_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed && typeof parsed.tenantId === 'string' && parsed.tenantId && typeof parsed.name === 'string' && parsed.name) {
+      return parsed as LastCompany;
+    }
+  } catch {
+    /* corrupt JSON / private mode — fall through to the code form */
+  }
+  return null;
+}
 
 function PontifexLogo() {
   return (
@@ -25,6 +55,27 @@ function CompanyLoginContent() {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Fast path: remember the last company so returning users tap once instead of
+  // re-typing the code. 'pending' avoids a form→fast-path flash before hydration.
+  const [lastCompany, setLastCompany] = useState<LastCompany | null>(null);
+  const [view, setView] = useState<'pending' | 'fast' | 'form'>('pending');
+  const [continuing, setContinuing] = useState(false);
+
+  useEffect(() => {
+    const last = readLastCompany();
+    if (last) {
+      setLastCompany(last);
+      setView('fast');
+    } else {
+      setView('form');
+    }
+  }, []);
+
+  const handleContinue = () => {
+    if (!lastCompany) return;
+    setContinuing(true);
+    router.push(`/login?tenant_id=${lastCompany.tenantId}`);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,6 +110,20 @@ function CompanyLoginContent() {
         setError('Company not found. Please check your company code.');
         setLoading(false);
         return;
+      }
+
+      // Persist for the one-tap "Continue to {Company}" fast path next launch.
+      // The login page enriches this with the tenant logo once branding loads.
+      try {
+        const prev = readLastCompany();
+        localStorage.setItem(LAST_COMPANY_KEY, JSON.stringify({
+          tenantId: tenant.id,
+          code: trimmed,
+          name: tenant.name || trimmed,
+          logoUrl: prev && prev.tenantId === tenant.id ? prev.logoUrl : undefined,
+        }));
+      } catch {
+        /* localStorage unavailable — non-fatal */
       }
 
       // Navigate before clearing loading — router.push triggers navigation immediately
@@ -119,10 +184,49 @@ function CompanyLoginContent() {
               Pontifex Industries
             </h1>
             <p className="text-slate-400 text-sm text-center">
-              Enter your company code to sign in
+              {view === 'fast' ? 'Welcome back' : 'Enter your company code to sign in'}
             </p>
           </div>
 
+          {/* Fast path — returning user: one tap back to their company's login */}
+          {view === 'fast' && lastCompany && (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={handleContinue}
+                disabled={continuing}
+                className="w-full min-h-[56px] py-4 px-5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide flex items-center justify-center gap-3 transition-all shadow-lg shadow-indigo-900/40"
+              >
+                {continuing ? (
+                  <><Loader2 className="w-4 h-4 animate-spin shrink-0" /> Opening sign in…</>
+                ) : (
+                  <>
+                    {lastCompany.logoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={lastCompany.logoUrl}
+                        alt=""
+                        className="w-7 h-7 rounded-lg object-contain bg-white/90 shrink-0"
+                      />
+                    ) : (
+                      <Building2 className="w-5 h-5 shrink-0" />
+                    )}
+                    <span className="leading-snug">Continue to {lastCompany.name}</span>
+                    <ArrowRight className="w-4 h-4 shrink-0" />
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('form')}
+                className="w-full min-h-[44px] py-3 text-sm text-slate-400 hover:text-slate-200 font-medium transition-colors"
+              >
+                Use a different company
+              </button>
+            </div>
+          )}
+
+          {view === 'form' && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
               <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
@@ -159,6 +263,10 @@ function CompanyLoginContent() {
               )}
             </button>
           </form>
+          )}
+
+          {/* Pre-hydration placeholder — keeps the card from collapsing for one frame */}
+          {view === 'pending' && <div className="h-[120px]" aria-hidden="true" />}
 
           <p className="text-center text-slate-500 text-xs mt-6">
             Don&apos;t have a company code?{' '}

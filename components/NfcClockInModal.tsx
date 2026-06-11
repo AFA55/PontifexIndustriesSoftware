@@ -9,7 +9,7 @@ import { SHOP_LOCATION, ALLOWED_RADIUS_METERS, calculateDistance, isLocationBypa
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type ClockInMethod = 'nfc' | 'gps' | 'remote';
+type ClockInMethod = 'gps' | 'remote';
 
 interface NfcClockInModalProps {
   isShopHours: boolean;
@@ -26,7 +26,7 @@ interface NfcClockInModalProps {
   }) => Promise<void>;
   /** Called when user completes clock-OUT */
   onClockOut?: (data: {
-    method: 'nfc' | 'gps' | 'remote';
+    method: 'gps' | 'remote';
     nfc_tag_id?: string;
     nfc_tag_uid?: string;
     clock_out_photo_url?: string;
@@ -40,9 +40,9 @@ interface NfcClockInModalProps {
 // Shop coordinates + radius now sourced from lib/geolocation.ts (single source of truth).
 const SHOP_LAT = SHOP_LOCATION.latitude;
 const SHOP_LNG = SHOP_LOCATION.longitude;
-const SHOP_RADIUS_M = ALLOWED_RADIUS_METERS; // shared from lib/geolocation.ts (currently 30.48m ≈ 100ft)
+const SHOP_RADIUS_M = ALLOWED_RADIUS_METERS; // shared from lib/geolocation.ts (single source of truth)
 
-type Flow = 'choose' | 'shop_pin' | 'shop_gps' | 'jobsite_camera' | 'processing' | 'success' | 'bypass_code';
+type Flow = 'choose' | 'shop_gps' | 'jobsite_camera' | 'processing' | 'success' | 'bypass_code';
 type GpsStatus = 'idle' | 'acquiring' | 'ok' | 'outside' | 'error';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -153,10 +153,6 @@ export default function NfcClockInModal({
 
   // ── State ──
   const [flow, setFlow] = useState<Flow>('choose');
-  const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState<string | null>(null);
-  const [pinShake, setPinShake] = useState(false);
-  const [pinVerifying, setPinVerifying] = useState(false);
 
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('idle');
   const [gpsCoords, setGpsCoords] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
@@ -187,55 +183,6 @@ export default function NfcClockInModal({
   useEffect(() => {
     if (isClockOut) setFlow('choose');
   }, [isClockOut]);
-
-  // ── PIN handlers ──
-  const addDigit = useCallback((d: string) => {
-    if (pin.length >= 6) return;
-    setPinError(null);
-    setPin((p) => p + d);
-  }, [pin]);
-
-  const removeDigit = useCallback(() => {
-    setPinError(null);
-    setPin((p) => p.slice(0, -1));
-  }, []);
-
-  const verifyPin = async () => {
-    if (pin.length < 6) return;
-    setPinVerifying(true);
-    setPinError(null);
-    try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token || '';
-
-      const res = await fetch('/api/timecard/verify-pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ pin_code: pin }),
-      });
-      const json = await res.json();
-
-      if (json.success) {
-        // Advance to GPS step
-        setFlow('shop_gps');
-        startShopGps();
-      } else {
-        // Shake + error
-        setPinShake(true);
-        setPinError(json.error || 'Invalid code. Try again.');
-        setPin('');
-        setTimeout(() => setPinShake(false), 600);
-      }
-    } catch {
-      setPinShake(true);
-      setPinError('Could not verify. Check your connection.');
-      setPin('');
-      setTimeout(() => setPinShake(false), 600);
-    } finally {
-      setPinVerifying(false);
-    }
-  };
 
   // ── Shop GPS ──
   const startShopGps = () => {
@@ -544,58 +491,6 @@ export default function NfcClockInModal({
             )}
 
             {/* ════════════════════════════════ SHOP PIN ════════════════════════════════ */}
-            {flow === 'shop_pin' && (
-              <div>
-                <button
-                  onClick={() => setFlow('choose')}
-                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 mb-3 transition-colors"
-                >
-                  <ChevronLeft className="w-3 h-3" /> Back
-                </button>
-
-                <div className="text-center mb-1">
-                  <h3 className="font-bold text-slate-900 dark:text-white text-base">Enter Today&apos;s Shop Code</h3>
-                  <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5">Get the code from your operations manager</p>
-                </div>
-
-                {/* 6-dot display */}
-                <div className={pinShake ? 'animate-shake' : ''}>
-                  <PinDots length={6} filled={pin.length} />
-                </div>
-
-                {/* Error */}
-                {pinError && (
-                  <p className="text-center text-xs text-red-500 dark:text-red-400 mb-2 font-semibold">{pinError}</p>
-                )}
-
-                {/* Numpad */}
-                <NumPad onDigit={addDigit} onBack={removeDigit} />
-
-                {/* Verify button */}
-                <button
-                  onClick={verifyPin}
-                  disabled={pin.length < 6 || pinVerifying}
-                  className="w-full mt-4 py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:from-purple-700 hover:to-indigo-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-                >
-                  {pinVerifying ? (
-                    <><Loader2 className="w-4 h-4 animate-spin" /> Verifying…</>
-                  ) : (
-                    'Verify Code'
-                  )}
-                </button>
-
-                {/* Testing bypass — only when env var is set */}
-                {expectedBypassCode && (
-                  <button
-                    onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
-                    className="w-full mt-2 py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
-                  >
-                    <KeyRound className="w-3 h-3" /> Testing bypass
-                  </button>
-                )}
-              </div>
-            )}
-
             {/* ════════════════════════════════ SHOP GPS ════════════════════════════════ */}
             {flow === 'shop_gps' && (
               <div className="text-center py-2">

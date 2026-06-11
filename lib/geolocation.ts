@@ -13,15 +13,16 @@ export const SHOP_LOCATION = {
   name: 'Patriot Concrete Cutting',
 };
 
-// Allowed radius for clock-IN/OUT — 30.48m ≈ 100 feet. Wide enough to
+// Allowed radius for clock-IN — 27.432m ≈ 90 feet (tightened from 100 ft
+// June 2026 alongside the GPS-only clock-in rollout). Wide enough to
 // accommodate mobile GPS drift indoors (metal/concrete walls scatter the
 // signal). Still well below "from home" distance (which is miles), so
 // anti-fraud is preserved — operator can't clock in from anywhere but at
 // or directly outside the shop building.
-export const ALLOWED_RADIUS_METERS = 30.48;
+export const ALLOWED_RADIUS_METERS = 27.432;
 
-// Clock-out uses the same radius for now (no need for asymmetric — fraud
-// incentive on clock-out is low anyway).
+// Clock-out keeps the wider 30.48m ≈ 100 ft radius (no need for symmetric —
+// fraud incentive on clock-out is low anyway).
 export const ALLOWED_RADIUS_CLOCKOUT_METERS = 30.48;
 
 /**

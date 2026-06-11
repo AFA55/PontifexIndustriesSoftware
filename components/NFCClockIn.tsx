@@ -1,32 +1,32 @@
 'use client';
 
 /**
- * NFCClockIn — Mobile-first clock-in component with 3 modes:
+ * GpsClockIn — Mobile-first clock-in component with 2 modes:
  *
- *  Mode 1 — NFC Scan (Android + Chrome with Web NFC API)
- *    - Large animated "Tap NFC Tag" button
- *    - NDEFReader scan on press; extracts serial number / NDEF text record
- *    - On successful scan: verifies against /api/timecard/verify-nfc, then clocks in
+ *  Mode 1 — Clock In at Shop (GPS, primary)
+ *    - Big primary button; requests location, clocks in with method 'gps'
+ *    - Server validates the operator is within the shop radius
+ *    - Out of radius → server 403 with distance details, shown inline
  *
- *  Mode 2 — Daily PIN (iOS or unsupported browsers)
- *    - Shown automatically when NDEFReader is unavailable
- *    - 6-digit PIN pad to prove on-site presence (admin sets daily PIN)
- *    - Calls /api/timecard/verify-pin, then /api/timecard/clock-in with method 'pin'
- *
- *  Mode 3 — Out-of-Town GPS Mode
- *    - Toggled by operator when traveling/at remote jobsite
+ *  Mode 2 — Out-of-Town / Remote
+ *    - Toggled by operator when traveling/at a remote jobsite
  *    - Captures GPS coordinates, submits with requires_approval: true + method 'gps_remote'
- *    - Admin sees these in the timecards queue with amber "Remote" badge
+ *    - Admin sees these in the timecards queue with an amber "Remote" badge
+ *
+ * NFC scanning and daily shop PINs were retired (June 2026). Server-side
+ * support for those methods remains in /api/timecard/clock-in for other
+ * tenants — the UI just never sends them anymore.
  */
 
 import { useState, useCallback } from 'react';
 import {
-  Wifi, MapPin, Smartphone, Loader2, CheckCircle, AlertTriangle,
-  X, KeyRound, Navigation, ToggleLeft, ToggleRight
+  MapPin, Loader2, AlertTriangle, Navigation, ToggleLeft, ToggleRight,
 } from 'lucide-react';
-import { useNFCScan } from '@/hooks/useNFCScan';
 import { supabase } from '@/lib/supabase';
 import { SHOP_LOCATION, isLocationBypassActive } from '@/lib/geolocation';
+import {
+  requestLocation, LocationError, type LocationErrorKind, type LocationResult,
+} from '@/components/ui/LocationPermissionGuard';
 
 // ── Types ──────────────────────────────────────────────────────
 export type ClockInResult = {
@@ -39,40 +39,21 @@ export type ClockInResult = {
   error: string;
 };
 
-interface NFCClockInProps {
+interface GpsClockInProps {
   onClockIn: (result: ClockInResult) => void;
   isShopContext?: boolean;   // if true, marks entry as shop hours
   disabled?: boolean;
+  /** Optional: surface typed location errors (denied/unavailable/timeout)
+   *  so the page can show the device-specific LocationBlockedModal. */
+  onLocationError?: (kind: LocationErrorKind) => void;
 }
 
-// ── PIN pad digit layout ────────────────────────────────────────
-const PIN_DIGITS = [
-  ['1','2','3'],
-  ['4','5','6'],
-  ['7','8','9'],
-  ['','0','⌫'],
-];
-
 // ── Helpers ────────────────────────────────────────────────────
-async function getGPS(): Promise<{ latitude: number; longitude: number; accuracy?: number }> {
+async function getLocation(): Promise<LocationResult> {
   if (isLocationBypassActive()) {
     return { latitude: SHOP_LOCATION.latitude, longitude: SHOP_LOCATION.longitude, accuracy: 0 };
   }
-  return new Promise((resolve) => {
-    if (!navigator.geolocation) {
-      resolve({ latitude: 0, longitude: 0 });
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-      }),
-      () => resolve({ latitude: 0, longitude: 0 }),
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
-  });
+  return requestLocation(); // throws typed LocationError on denial/unavailable/timeout
 }
 
 async function getAuthHeaders(): Promise<Record<string, string> | null> {
@@ -85,141 +66,46 @@ async function getAuthHeaders(): Promise<Record<string, string> | null> {
 }
 
 // ── Main Component ─────────────────────────────────────────────
-export default function NFCClockIn({ onClockIn, isShopContext = false, disabled = false }: NFCClockInProps) {
-  const { isSupported, isScanning, startScan, stopScan, lastScan, error: nfcError, clearError } = useNFCScan();
-
-  const [mode, setMode] = useState<'nfc' | 'pin' | 'gps_remote'>(isSupported ? 'nfc' : 'pin');
+export default function GpsClockIn({ onClockIn, isShopContext = false, disabled = false, onLocationError }: GpsClockInProps) {
+  const [mode, setMode] = useState<'gps' | 'gps_remote'>('gps');
   const [remoteToggled, setRemoteToggled] = useState(false);
-  const [pin, setPin] = useState('');
   const [loading, setLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
+  const [showRemoteHint, setShowRemoteHint] = useState(false);
 
   const showStatus = (msg: string, err = false) => {
     setStatusMessage(msg);
     setIsError(err);
   };
 
-  // ── NFC scan triggered ──────────────────────────────────────
-  const handleNFCScan = useCallback(async () => {
+  // ── GPS shop clock-in (primary) ─────────────────────────────
+  const handleGPSShop = useCallback(async () => {
     if (disabled || loading) return;
-    clearError();
-    setStatusMessage(null);
-
-    await startScan();
-    // lastScan will update via the hook state once a tag is read
-    // We watch for it below in useEffect — but since this is a single-function
-    // component, we use a different approach: startScan completes when a tag
-    // is found or errors. The lastScan state will trigger a re-render.
-    // The actual submission is driven by the effect watching lastScan.
-  }, [disabled, loading, clearError, startScan]);
-
-  // Process NFC scan result when hook updates lastScan
-  // We use a ref-tracked "processed" approach to avoid double-submit
-  const lastScanId = lastScan?.timestamp;
-  const processedScanRef = useState<string | null>(null);
-
-  if (lastScan && lastScan.timestamp !== processedScanRef[0] && mode === 'nfc' && !loading) {
-    processedScanRef[1](lastScan.timestamp);
-    // Fire-and-forget async NFC verify + clock-in
-    (async () => {
-      if (!lastScan.tagUid) {
-        showStatus('Could not read tag UID. Try again.', true);
-        return;
-      }
-      setLoading(true);
-      showStatus('Verifying NFC tag...');
-      try {
-        const headers = await getAuthHeaders();
-        if (!headers) { showStatus('Please log in first.', true); setLoading(false); return; }
-
-        // Verify the tag
-        const verifyRes = await fetch('/api/timecard/verify-nfc', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            tag_uid: lastScan.tagUid,
-            serial_number: lastScan.serialNumber,
-          }),
-        });
-        const verifyJson = await verifyRes.json();
-
-        if (!verifyRes.ok || !verifyJson.success) {
-          showStatus(verifyJson.error || 'Tag not recognized.', true);
-          setLoading(false);
-          return;
-        }
-
-        showStatus('Clocking in...');
-        const location = await getGPS();
-
-        const clockRes = await fetch('/api/timecard/clock-in', {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            clock_in_method: 'nfc',
-            nfc_tag_uid: lastScan.tagUid,
-            nfc_tag_serial: lastScan.serialNumber,
-            nfc_tag_id: verifyJson.data?.tag_id,
-            is_shop_hours: isShopContext || verifyJson.data?.tag_type === 'shop',
-            latitude: location.latitude,
-            longitude: location.longitude,
-            accuracy: location.accuracy,
-          }),
-        });
-        const clockJson = await clockRes.json();
-
-        if (!clockRes.ok) {
-          showStatus(clockJson.error || 'Clock-in failed.', true);
-          setLoading(false);
-          return;
-        }
-
-        onClockIn({
-          success: true,
-          timecardId: clockJson.data?.id,
-          message: clockJson.message || 'Clocked in with NFC!',
-          needsApproval: false,
-        });
-      } catch (err: any) {
-        showStatus(err.message || 'Unexpected error.', true);
-      }
-      setLoading(false);
-    })();
-  }
-
-  // ── PIN submit ──────────────────────────────────────────────
-  const handlePinSubmit = useCallback(async () => {
-    if (pin.length < 4 || disabled || loading) return;
     setLoading(true);
-    showStatus('Verifying PIN...');
+    setShowRemoteHint(false);
+    showStatus('Getting your location...');
     try {
       const headers = await getAuthHeaders();
       if (!headers) { showStatus('Please log in first.', true); setLoading(false); return; }
 
-      // Verify daily PIN
-      const verifyRes = await fetch('/api/timecard/verify-pin', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ pin_code: pin }),
-      });
-      const verifyJson = await verifyRes.json();
-
-      if (!verifyRes.ok || !verifyJson.success) {
-        showStatus(verifyJson.error || 'Invalid PIN.', true);
-        setPin('');
+      let location: LocationResult;
+      try {
+        location = await getLocation();
+      } catch (locErr: any) {
+        showStatus(locErr.message || 'Could not get GPS location. Enable location access and try again.', true);
+        if (locErr instanceof LocationError) onLocationError?.(locErr.kind);
         setLoading(false);
         return;
       }
 
       showStatus('Clocking in...');
-      const location = await getGPS();
 
       const clockRes = await fetch('/api/timecard/clock-in', {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          clock_in_method: 'pin',
+          clock_in_method: 'gps',
           is_shop_hours: isShopContext,
           latitude: location.latitude,
           longitude: location.longitude,
@@ -229,7 +115,10 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
       const clockJson = await clockRes.json();
 
       if (!clockRes.ok) {
-        showStatus(clockJson.error || 'Clock-in failed.', true);
+        // Out-of-radius 403 includes error + distance details
+        const msg = [clockJson.error, clockJson.details].filter(Boolean).join(' ') || 'Clock-in failed.';
+        showStatus(msg, true);
+        setShowRemoteHint(clockRes.status === 403);
         setLoading(false);
         return;
       }
@@ -237,15 +126,15 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
       onClockIn({
         success: true,
         timecardId: clockJson.data?.id,
-        message: clockJson.message || 'Clocked in with PIN!',
+        message: clockJson.message || 'Clocked in!',
         needsApproval: false,
       });
+      setStatusMessage(null);
     } catch (err: any) {
       showStatus(err.message || 'Unexpected error.', true);
     }
     setLoading(false);
-    setPin('');
-  }, [pin, disabled, loading, isShopContext, onClockIn]);
+  }, [disabled, loading, isShopContext, onClockIn, onLocationError]);
 
   // ── GPS Remote submit ───────────────────────────────────────
   const handleGPSRemote = useCallback(async () => {
@@ -256,9 +145,12 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
       const headers = await getAuthHeaders();
       if (!headers) { showStatus('Please log in first.', true); setLoading(false); return; }
 
-      const location = await getGPS();
-      if (!location.latitude && !location.longitude) {
-        showStatus('Could not get GPS location. Enable location access and try again.', true);
+      let location: LocationResult;
+      try {
+        location = await getLocation();
+      } catch (locErr: any) {
+        showStatus(locErr.message || 'Could not get GPS location. Enable location access and try again.', true);
+        if (locErr instanceof LocationError) onLocationError?.(locErr.kind);
         setLoading(false);
         return;
       }
@@ -291,51 +183,36 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
         message: 'Remote clock-in submitted. Pending admin approval.',
         needsApproval: true,
       });
+      setStatusMessage(null);
     } catch (err: any) {
       showStatus(err.message || 'Unexpected error.', true);
     }
     setLoading(false);
-  }, [disabled, loading, onClockIn]);
-
-  // ── PIN pad digit press ─────────────────────────────────────
-  const handleDigit = (d: string) => {
-    if (d === '⌫') {
-      setPin((p) => p.slice(0, -1));
-    } else if (pin.length < 6) {
-      setPin((p) => p + d);
-    }
-  };
+  }, [disabled, loading, onClockIn, onLocationError]);
 
   // ── Render ──────────────────────────────────────────────────
   return (
     <div className="space-y-4">
 
       {/* Mode toggle tabs */}
-      <div className="flex justify-center gap-1 p-1 bg-slate-100 rounded-xl max-w-xs mx-auto">
-        {isSupported && (
-          <button
-            onClick={() => { setMode('nfc'); setStatusMessage(null); stopScan(); }}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-              mode === 'nfc' ? 'bg-white shadow text-purple-700' : 'text-slate-500 hover:text-slate-700'
-            }`}
-          >
-            <Wifi className="w-3.5 h-3.5" />
-            NFC
-          </button>
-        )}
+      <div className="flex justify-center gap-1 p-1 bg-slate-100 dark:bg-white/10 rounded-xl max-w-xs mx-auto">
         <button
-          onClick={() => { setMode('pin'); setStatusMessage(null); stopScan(); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-            mode === 'pin' ? 'bg-white shadow text-purple-700' : 'text-slate-500 hover:text-slate-700'
+          onClick={() => { setMode('gps'); setStatusMessage(null); setShowRemoteHint(false); }}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-lg text-xs font-semibold transition-all ${
+            mode === 'gps'
+              ? 'bg-white dark:bg-white/20 shadow text-purple-700 dark:text-purple-300'
+              : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
           }`}
         >
-          <KeyRound className="w-3.5 h-3.5" />
-          PIN
+          <MapPin className="w-3.5 h-3.5" />
+          At Shop
         </button>
         <button
-          onClick={() => { setMode('gps_remote'); setStatusMessage(null); stopScan(); }}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-all ${
-            mode === 'gps_remote' ? 'bg-white shadow text-amber-700' : 'text-slate-500 hover:text-slate-700'
+          onClick={() => { setMode('gps_remote'); setStatusMessage(null); setShowRemoteHint(false); }}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 min-h-[44px] rounded-lg text-xs font-semibold transition-all ${
+            mode === 'gps_remote'
+              ? 'bg-white dark:bg-white/20 shadow text-amber-700 dark:text-amber-300'
+              : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'
           }`}
         >
           <Navigation className="w-3.5 h-3.5" />
@@ -343,148 +220,61 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
         </button>
       </div>
 
-      {/* ── Mode 1: NFC ──────────────────────────────────── */}
-      {mode === 'nfc' && (
+      {/* ── Mode 1: GPS at shop (primary) ─────────────────── */}
+      {mode === 'gps' && (
         <div className="text-center space-y-4 py-2">
-          {!isScanning ? (
-            <>
-              <button
-                onClick={handleNFCScan}
-                disabled={disabled || loading}
-                className="relative w-28 h-28 mx-auto rounded-full bg-gradient-to-br from-purple-500 to-violet-700 flex items-center justify-center shadow-xl hover:shadow-purple-500/30 transition-all active:scale-95 disabled:opacity-50 group"
-              >
-                {/* Subtle pulse when idle */}
-                <div className="absolute inset-0 rounded-full bg-purple-400/20 group-hover:animate-ping" />
-                {loading ? (
-                  <Loader2 className="w-10 h-10 text-white animate-spin" />
-                ) : (
-                  <Wifi className="w-10 h-10 text-white" />
-                )}
-              </button>
-              <div>
-                <p className="text-sm font-bold text-slate-700">Tap to Scan NFC</p>
-                <p className="text-xs text-slate-400 mt-0.5">Then hold your phone near the NFC chip</p>
-              </div>
-            </>
-          ) : (
-            <>
-              {/* Scanning animation */}
-              <div className="relative w-28 h-28 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full bg-purple-500/20 animate-ping" />
-                <div className="absolute inset-2 rounded-full bg-purple-500/10 animate-pulse" style={{ animationDelay: '0.4s' }} />
-                <div className="relative w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-violet-700 flex items-center justify-center shadow-xl">
-                  <Smartphone className="w-9 h-9 text-white" />
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-700 animate-pulse">Hold phone near NFC tag...</p>
-                <p className="text-xs text-slate-400 mt-0.5">Keep still for 1-2 seconds</p>
-              </div>
-              <button
-                onClick={stopScan}
-                className="flex items-center gap-1.5 mx-auto px-4 py-2 text-xs text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
-              >
-                <X className="w-3.5 h-3.5" /> Cancel
-              </button>
-            </>
-          )}
-
-          {(nfcError) && (
-            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-xl text-left max-w-xs mx-auto">
-              <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-red-700">{nfcError}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Mode 2: Daily PIN ─────────────────────────────── */}
-      {mode === 'pin' && (
-        <div className="text-center space-y-4 py-2">
-          {!isSupported && (
-            <div className="flex items-center gap-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 max-w-xs mx-auto">
-              <Smartphone className="w-4 h-4 flex-shrink-0" />
-              <span>NFC unavailable on this device. Use today's shop PIN.</span>
-            </div>
-          )}
-
-          {/* PIN display */}
-          <div className="flex justify-center gap-2 py-2">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center text-lg font-bold transition-all ${
-                  i < pin.length
-                    ? 'border-purple-500 bg-purple-50 text-purple-700'
-                    : 'border-slate-200 bg-slate-50 text-transparent'
-                }`}
-              >
-                {i < pin.length ? '●' : '○'}
-              </div>
-            ))}
-          </div>
-
-          {/* PIN pad */}
-          <div className="max-w-[200px] mx-auto space-y-2">
-            {PIN_DIGITS.map((row, ri) => (
-              <div key={ri} className="flex gap-2">
-                {row.map((d, di) => (
-                  <button
-                    key={di}
-                    onClick={() => d && handleDigit(d)}
-                    disabled={!d || loading}
-                    className={`flex-1 h-12 rounded-xl text-base font-bold transition-all ${
-                      d
-                        ? 'bg-slate-100 hover:bg-slate-200 text-slate-800 active:scale-95'
-                        : 'bg-transparent cursor-default'
-                    } ${d === '⌫' ? 'text-red-500' : ''}`}
-                  >
-                    {d}
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
-
           <button
-            onClick={handlePinSubmit}
-            disabled={pin.length < 4 || loading || disabled}
-            className="w-full max-w-xs mx-auto py-3.5 bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-xl font-bold text-sm shadow-lg hover:shadow-purple-500/30 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
+            onClick={handleGPSShop}
+            disabled={disabled || loading}
+            className="w-full max-w-xs mx-auto py-4 min-h-[56px] bg-gradient-to-r from-purple-600 to-violet-700 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-purple-500/30 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
           >
-            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-            Clock In with PIN
+            {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
+            Clock In at Shop
           </button>
+          <p className="text-xs text-slate-400 dark:text-white/40">
+            Uses your location to verify you&apos;re at {SHOP_LOCATION.name}
+          </p>
+
+          {showRemoteHint && (
+            <button
+              onClick={() => { setMode('gps_remote'); setStatusMessage(null); setShowRemoteHint(false); }}
+              className="inline-flex items-center gap-1.5 min-h-[44px] px-4 py-2 text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-all"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              At an out-of-town jobsite? Use Remote clock-in
+            </button>
+          )}
         </div>
       )}
 
-      {/* ── Mode 3: GPS Remote ───────────────────────────── */}
+      {/* ── Mode 2: GPS Remote ───────────────────────────── */}
       {mode === 'gps_remote' && (
         <div className="text-center space-y-4 py-2">
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-left max-w-xs mx-auto space-y-2">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-2xl p-4 text-left max-w-xs mx-auto space-y-2">
             <div className="flex items-center gap-2">
-              <Navigation className="w-5 h-5 text-amber-600 flex-shrink-0" />
-              <p className="text-sm font-bold text-amber-800">Out-of-Town / Remote Mode</p>
+              <Navigation className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+              <p className="text-sm font-bold text-amber-800 dark:text-amber-300">Out-of-Town / Remote Mode</p>
             </div>
-            <p className="text-xs text-amber-700 leading-relaxed">
-              Use this when you're working remotely or at an out-of-town jobsite without an NFC chip.
+            <p className="text-xs text-amber-700 dark:text-amber-400 leading-relaxed">
+              Use this when you&apos;re working remotely or at an out-of-town jobsite.
               Your GPS coordinates will be saved and this clock-in will be flagged for admin approval.
             </p>
             <div className="flex items-center gap-2 pt-1">
               <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-              <span className="text-xs font-semibold text-amber-700">Requires admin approval</span>
+              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">Requires admin approval</span>
             </div>
           </div>
 
           {/* Confirm remote toggle */}
           <div className="flex items-center justify-center gap-3 py-1">
-            <span className="text-sm text-slate-600">I confirm I&apos;m working remotely</span>
+            <span className="text-sm text-slate-600 dark:text-white/60">I confirm I&apos;m working remotely</span>
             <button
               onClick={() => setRemoteToggled((v) => !v)}
-              className="transition-all"
+              className="min-h-[44px] min-w-[44px] flex items-center justify-center transition-all"
             >
               {remoteToggled
                 ? <ToggleRight className="w-8 h-8 text-amber-500" />
-                : <ToggleLeft className="w-8 h-8 text-slate-300" />
+                : <ToggleLeft className="w-8 h-8 text-slate-300 dark:text-white/30" />
               }
             </button>
           </div>
@@ -492,7 +282,7 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
           <button
             onClick={handleGPSRemote}
             disabled={!remoteToggled || loading || disabled}
-            className="w-full max-w-xs mx-auto py-3.5 bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-sm shadow-lg hover:shadow-amber-500/30 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
+            className="w-full max-w-xs mx-auto py-3.5 min-h-[52px] bg-gradient-to-r from-amber-500 to-orange-600 text-white rounded-xl font-bold text-sm shadow-lg hover:shadow-amber-500/30 transition-all active:scale-[0.98] disabled:opacity-40 flex items-center justify-center gap-2"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
             Submit Remote Clock-In
@@ -503,13 +293,15 @@ export default function NFCClockIn({ onClockIn, isShopContext = false, disabled 
       {/* Status / error messages */}
       {statusMessage && (
         <div className={`flex items-start gap-2 p-3 rounded-xl max-w-xs mx-auto text-left ${
-          isError ? 'bg-red-50 border border-red-200' : 'bg-blue-50 border border-blue-200'
+          isError
+            ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/50'
+            : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50'
         }`}>
           {isError
             ? <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
             : <Loader2 className="w-4 h-4 text-blue-500 animate-spin flex-shrink-0 mt-0.5" />
           }
-          <p className={`text-xs ${isError ? 'text-red-700' : 'text-blue-700'}`}>{statusMessage}</p>
+          <p className={`text-xs ${isError ? 'text-red-700 dark:text-red-400' : 'text-blue-700 dark:text-blue-400'}`}>{statusMessage}</p>
         </div>
       )}
     </div>

@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('operator_time_off')
-      .select('id, operator_id, date, end_date, type, request_type, is_paid, is_callout, callout_reason, pto_days_used, status, notes, approved_by, approved_at, created_at')
+      .select('id, operator_id, date, end_date, type, request_type, is_paid, pay_override, edited_at, is_callout, callout_reason, pto_days_used, status, notes, approved_by, approved_at, created_at')
       .eq('tenant_id', tenantId)
       .order('date', { ascending: false })
       .limit(limit);
@@ -67,22 +67,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch time-off entries' }, { status: 500 });
     }
 
-    // Resolve operator names
+    // Resolve operator names + roles (role drives the management badge +
+    // super_admin-only approval gating in the UI; enforced server-side in [id]).
     const operatorIds = [...new Set((data ?? []).map((e: any) => e.operator_id).filter(Boolean))];
     const nameMap: Record<string, string> = {};
+    const roleMap: Record<string, string> = {};
     if (operatorIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('id, full_name')
+        .select('id, full_name, role')
         .in('id', operatorIds);
       for (const p of profiles ?? []) {
         nameMap[p.id] = p.full_name ?? 'Unknown';
+        roleMap[p.id] = p.role ?? 'operator';
       }
     }
 
     const entries = (data ?? []).map((e: any) => ({
       ...e,
       operator_name: nameMap[e.operator_id] ?? 'Unknown',
+      operator_role: roleMap[e.operator_id] ?? 'operator',
     }));
 
     return NextResponse.json({ success: true, data: entries });
