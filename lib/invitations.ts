@@ -1,0 +1,273 @@
+/**
+ * Shared invitation-creation pipeline.
+ *
+ * Single source of truth for creating a `user_invitations` row + emailing the
+ * setup link. Used by BOTH:
+ *   - the manual invite flow   (POST /api/admin/invite)
+ *   - the access-request flow  (PATCH /api/admin/access-requests/[id] approve)
+ *
+ * Email SENDING is injected via a callback so each caller keeps its own
+ * template (the manual-invite route owns its inline HTML; the access-request
+ * flow uses lib/email's generateInviteEmail). Token, dedupe guards, and DB
+ * writes exist exactly once — here.
+ */
+
+import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canInviteRole, ROLES_WITH_LABELS } from '@/lib/rbac';
+import { randomBytes } from 'crypto';
+
+export const VALID_ROLES = ROLES_WITH_LABELS.map((r) => r.value);
+
+export const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+/**
+ * Cryptographically-secure, unguessable token. This is the ONLY gate on the
+ * public setup flow, so it must NOT encode timestamps or the email (which an
+ * attacker may know). 32 random bytes = 256 bits of entropy.
+ */
+export function newToken(): string {
+  return randomBytes(32).toString('base64url');
+}
+
+/** Resolve the public origin for setup links (env > request origin > prod). */
+export function resolveOrigin(requestOrigin?: string | null): string {
+  return (
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ||
+    requestOrigin ||
+    'https://www.pontifexindustries.com'
+  );
+}
+
+export function buildSetupUrl(origin: string, token: string): string {
+  return `${origin}/setup-account?token=${token}`;
+}
+
+export async function getTenantMeta(tenantId: string) {
+  const { data: tenant } = await supabaseAdmin
+    .from('tenants')
+    .select('name, company_code')
+    .eq('id', tenantId)
+    .maybeSingle();
+  return {
+    tenantName: tenant?.name || 'Pontifex Industries',
+    companyCode: tenant?.company_code || '',
+  };
+}
+
+export async function getInviterName(userId: string, fallback: string): Promise<string> {
+  const { data: inviterProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('full_name')
+    .eq('id', userId)
+    .maybeSingle();
+  return inviterProfile?.full_name || fallback;
+}
+
+/** Best-effort insert that degrades gracefully if optional columns are missing. */
+async function insertInvitation(row: Record<string, unknown>) {
+  const { data, error } = await supabaseAdmin
+    .from('user_invitations')
+    .insert(row)
+    .select('id')
+    .single();
+  if (error && error.code === '42703') {
+    // One or more optional columns don't exist yet (migration not applied).
+    // Re-insert with only the guaranteed-present base columns.
+    const base: Record<string, unknown> = {
+      tenant_id: row.tenant_id,
+      email: row.email,
+      role: row.role,
+      admin_type: row.admin_type ?? null,
+      invited_by: row.invited_by,
+      token: row.token,
+      expires_at: row.expires_at,
+      initial_flags: row.initial_flags ?? {},
+    };
+    return supabaseAdmin.from('user_invitations').insert(base).select('id').single();
+  }
+  return { data, error };
+}
+
+export interface InviteEmailPayload {
+  email: string;
+  token: string;
+  setupUrl: string;
+  inviteeName: string;
+  inviterName: string;
+  tenantName: string;
+  companyCode: string;
+  role: string;
+}
+
+/** Caller-supplied email sender. Return a non-null `error` on failure. */
+export type InviteEmailSender = (payload: InviteEmailPayload) => Promise<{ error: unknown }>;
+
+export interface CreateInvitationOpts {
+  tenantId: string;
+  email: string;
+  name: string;
+  /** Role chosen by the ADMIN — validated against rank here, never trusted from a requester. */
+  role: string;
+  inviter: { userId: string; role: string; email: string };
+  origin: string;
+  phoneNumber?: string | null;
+  dateOfBirth?: string | null;
+  adminType?: string | null;
+  initialFlags?: Record<string, boolean>;
+  /**
+   * What to do when an unexpired pending invitation already exists for this
+   * email + tenant: 'refresh' (manual invite — re-use + re-send) or
+   * 'reject' (access-request approve — surface "already invited").
+   */
+  onExistingPending: 'refresh' | 'reject';
+  sendInviteEmail: InviteEmailSender;
+}
+
+export type CreateInvitationResult =
+  | { ok: true; invitationId: string | null; email: string; role: string; reusedExisting: boolean }
+  | { ok: false; status: number; error: string };
+
+export async function createOrRefreshInvitation(
+  opts: CreateInvitationOpts
+): Promise<CreateInvitationResult> {
+  const email = opts.email?.trim().toLowerCase();
+  const name = opts.name?.trim();
+  const role = opts.role?.trim();
+
+  if (!email || !name || !role) {
+    return { ok: false, status: 400, error: 'email, name, and role are required' };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { ok: false, status: 400, error: 'Please enter a valid email address' };
+  }
+  if (!VALID_ROLES.includes(role)) {
+    return { ok: false, status: 400, error: 'Unknown role' };
+  }
+
+  // ── Role-escalation guard ────────────────────────────────────────────────
+  // An inviter may only assign a role STRICTLY BELOW their own rank.
+  // super_admin is never invitable through this flow.
+  if (!canInviteRole(opts.inviter.role, role)) {
+    return {
+      ok: false,
+      status: 403,
+      error: 'You cannot invite a user to a role at or above your own access level.',
+    };
+  }
+
+  // ── Cross-tenant takeover guard ──────────────────────────────────────────
+  // auth.users is GLOBAL (one row per email platform-wide). If we only checked
+  // this tenant, an admin in Tenant B could invite an email that already
+  // belongs to a user in Tenant A; `complete` would then find that global auth
+  // user, reset its password and flip its tenant/role to B (takeover/DoS).
+  // Invites are ONLY for brand-new emails: reject if a profile OR an auth user
+  // with this email exists in ANY tenant.
+  const { data: existingProfile } = await supabaseAdmin
+    .from('profiles')
+    .select('id')
+    .ilike('email', email) // case-insensitive, any tenant
+    .maybeSingle();
+  if (existingProfile) {
+    return { ok: false, status: 409, error: 'A user with this email already exists.' };
+  }
+
+  const { data: authUsersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+  const emailTakenInAuth = authUsersPage?.users?.some(
+    (u) => u.email?.toLowerCase() === email
+  );
+  if (emailTakenInAuth) {
+    return { ok: false, status: 409, error: 'A user with this email already exists.' };
+  }
+
+  const { tenantName, companyCode } = await getTenantMeta(opts.tenantId);
+  const inviterName = await getInviterName(opts.inviter.userId, opts.inviter.email);
+
+  // Re-use an unexpired pending invite for the same email+tenant if present.
+  const { data: existingInv } = await supabaseAdmin
+    .from('user_invitations')
+    .select('id, token, expires_at')
+    .eq('tenant_id', opts.tenantId)
+    .eq('email', email)
+    .is('accepted_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .maybeSingle();
+
+  let token: string;
+  let invitationId: string | null = null;
+  let reusedExisting = false;
+
+  if (existingInv) {
+    if (opts.onExistingPending === 'reject') {
+      return {
+        ok: false,
+        status: 409,
+        error: 'This email has already been invited — check the Invitations list.',
+      };
+    }
+    token = existingInv.token;
+    invitationId = existingInv.id;
+    reusedExisting = true;
+    // Refresh metadata in case role/name changed; tolerate missing columns.
+    const update: Record<string, unknown> = {
+      role,
+      admin_type: opts.adminType ?? null,
+      initial_flags: opts.initialFlags ?? {},
+      invited_name: name,
+      phone_number: opts.phoneNumber ?? null,
+      date_of_birth: opts.dateOfBirth ?? null,
+    };
+    const { error: updErr } = await supabaseAdmin
+      .from('user_invitations')
+      .update(update)
+      .eq('id', existingInv.id);
+    if (updErr && updErr.code === '42703') {
+      await supabaseAdmin
+        .from('user_invitations')
+        .update({ role, admin_type: opts.adminType ?? null, initial_flags: opts.initialFlags ?? {} })
+        .eq('id', existingInv.id);
+    }
+  } else {
+    token = newToken();
+    const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
+    const { data: inserted, error: insertError } = await insertInvitation({
+      tenant_id: opts.tenantId,
+      email,
+      role,
+      admin_type: opts.adminType ?? null,
+      invited_by: opts.inviter.userId,
+      invited_name: name,
+      phone_number: opts.phoneNumber ?? null,
+      date_of_birth: opts.dateOfBirth ?? null,
+      token,
+      expires_at: expiresAt,
+      initial_flags: opts.initialFlags ?? {},
+    });
+    if (insertError) {
+      console.error('[invitations] Error inserting invitation:', insertError);
+      return { ok: false, status: 500, error: 'Failed to create invitation' };
+    }
+    invitationId = inserted?.id ?? null;
+  }
+
+  const { error: emailError } = await opts.sendInviteEmail({
+    email,
+    token,
+    setupUrl: buildSetupUrl(opts.origin, token),
+    inviteeName: name,
+    inviterName,
+    tenantName,
+    companyCode,
+    role,
+  });
+
+  if (emailError) {
+    console.error('[invitations] invite email error:', emailError);
+    return {
+      ok: false,
+      status: 502,
+      error: 'Invitation saved but the email failed to send. Try Resend.',
+    };
+  }
+
+  return { ok: true, invitationId, email, role, reusedExisting };
+}

@@ -1,8 +1,18 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * API Route: DELETE /api/access-requests/[id]/delete
- * Permanently deletes an access request from the database
+ * API Route: POST /api/access-requests/[id]/delete
+ * Permanently deletes an access request.
+ *
+ * SECURITY HISTORY (guardian, Jun 11 2026): this route used to cascade-delete
+ * the PROFILE (matched by email, NO tenant filter) and the GLOBAL auth user
+ * whenever the request was 'approved'. That was built for the old
+ * direct-account-creation flow and became a cross-tenant deletion primitive:
+ * tenant X deleting its stale approved request could destroy a user who had
+ * legitimately onboarded into tenant Y under the same email. The cascade is
+ * REMOVED — approval now only ever creates a user_invitations row, so the
+ * correct cleanup is to REVOKE the unaccepted invitation (otherwise deleting
+ * an approved request would leave a live setup link = revocation bypass).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -29,91 +39,79 @@ export async function POST(
       );
     }
 
-    console.log(`🗑️ Deleting access request: ${requestId}`);
-
-    // First, get the access request to find the associated email (tenant-scoped)
-    let delFetch = supabaseAdmin.from('access_requests').select('email, status').eq('id', requestId);
-    if (tenantId) delFetch = delFetch.eq('tenant_id', tenantId);
+    // Fetch the request (tenant-scoped; unclaimed rows have tenant_id IS NULL —
+    // the public form sets no tenant). Select the linked invitation so we can
+    // revoke its setup token below.
+    let delFetch = supabaseAdmin
+      .from('access_requests')
+      .select('email, status, tenant_id, invitation_id')
+      .eq('id', requestId);
+    if (tenantId) delFetch = delFetch.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     const { data: accessRequest, error: fetchError } = await delFetch.single();
 
-    if (fetchError) {
-      console.error('❌ Error fetching access request:', fetchError);
+    if (fetchError || !accessRequest) {
       return NextResponse.json(
         { error: 'Access request not found' },
         { status: 404 }
       );
     }
 
-    // If the request was approved, we need to delete the user from profiles and auth
+    // If the request was approved, REVOKE the unaccepted invitation it produced
+    // so the emailed setup link stops working. Deleting the request is an
+    // admin's "undo" — it must actually revoke access. We only ever touch
+    // UNACCEPTED invitations (accepted_at IS NULL): once someone has onboarded,
+    // removing them is account deactivation, a separate, deliberate flow.
     if (accessRequest.status === 'approved') {
-      console.log(`🧹 Request was approved, cleaning up user: ${accessRequest.email}`);
-
-      // Delete from profiles table
-      const { error: profileError } = await supabaseAdmin
-        .from('profiles')
-        .delete()
-        .eq('email', accessRequest.email.toLowerCase());
-
-      if (profileError) {
-        console.warn('⚠️ Error deleting profile:', profileError);
-        // Continue even if profile deletion fails
-      } else {
-        console.log('✅ Profile deleted successfully');
-      }
-
-      // Delete from Supabase Auth
+      const invTenant = accessRequest.tenant_id ?? tenantId;
       try {
-        // Get the user ID from auth by email
-        const { data: authUsers, error: authListError } = await supabaseAdmin.auth.admin.listUsers();
-
-        if (!authListError && authUsers?.users) {
-          const userToDelete = authUsers.users.find(
-            u => u.email?.toLowerCase() === accessRequest.email.toLowerCase()
-          );
-
-          if (userToDelete) {
-            const { error: authDeleteError } = await supabaseAdmin.auth.admin.deleteUser(
-              userToDelete.id
-            );
-
-            if (authDeleteError) {
-              console.warn('⚠️ Error deleting auth user:', authDeleteError);
-            } else {
-              console.log('✅ Auth user deleted successfully');
-            }
-          }
+        if (accessRequest.invitation_id) {
+          await supabaseAdmin
+            .from('user_invitations')
+            .delete()
+            .eq('id', accessRequest.invitation_id)
+            .is('accepted_at', null);
+        } else if (invTenant) {
+          // Pre-migration rows have no invitation_id link — fall back to
+          // email + tenant, still unaccepted-only.
+          await supabaseAdmin
+            .from('user_invitations')
+            .delete()
+            .eq('email', (accessRequest.email || '').toLowerCase())
+            .eq('tenant_id', invTenant)
+            .is('accepted_at', null);
         }
-      } catch (authError) {
-        console.warn('⚠️ Error during auth cleanup:', authError);
-        // Continue even if auth deletion fails
+      } catch (revokeError) {
+        // Revocation failure must not be silent — the setup link would stay live.
+        console.error('[access-requests/delete] invitation revoke failed:', revokeError);
+        return NextResponse.json(
+          { error: 'Could not revoke the pending invitation. Request not deleted — try again.' },
+          { status: 500 }
+        );
       }
     }
 
-    // Delete the access request from the database
-    const { error: deleteError } = await supabaseAdmin
-      .from('access_requests')
-      .delete()
-      .eq('id', requestId);
+    // Delete the access request row itself (re-assert tenant scope).
+    let del = supabaseAdmin.from('access_requests').delete().eq('id', requestId);
+    if (tenantId) del = del.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+    const { error: deleteError } = await del;
 
     if (deleteError) {
-      console.error('❌ Error deleting request:', deleteError);
+      console.error('[access-requests/delete] delete failed:', deleteError);
       return NextResponse.json(
         { error: 'Failed to delete request' },
         { status: 500 }
       );
     }
 
-    console.log('✅ Access request and associated data deleted successfully');
-
     return NextResponse.json(
       {
         success: true,
-        message: 'Access request deleted successfully',
+        message: 'Access request deleted and any pending invitation revoked.',
       },
       { status: 200 }
     );
-  } catch (error: any) {
-    console.error('💥 Unexpected error deleting request:', error);
+  } catch (error: unknown) {
+    console.error('[access-requests/delete] unexpected error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

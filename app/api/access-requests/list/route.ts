@@ -17,12 +17,15 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
     const tenantId = await getTenantId(auth.userId);
 
-    // Fetch all access requests using admin client (bypasses RLS), scoped to tenant
+    // Fetch all access requests using admin client (bypasses RLS), scoped to tenant.
+    // IMPORTANT: the public /request-access form has no tenant context, so rows
+    // arrive with tenant_id IS NULL ("unclaimed"). A bare .eq('tenant_id', ...)
+    // filter hid every new request from admins — include unclaimed rows.
     let listQuery = supabaseAdmin
       .from('access_requests')
       .select('id, full_name, email, phone_number, date_of_birth, position, status, reviewed_by, reviewed_at, assigned_role, denial_reason, created_at')
       .order('created_at', { ascending: false });
-    if (tenantId) listQuery = listQuery.eq('tenant_id', tenantId);
+    if (tenantId) listQuery = listQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     const { data, error } = await listQuery;
 
     if (error) {

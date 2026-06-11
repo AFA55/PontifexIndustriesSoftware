@@ -1,101 +1,55 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * API Route: POST /api/access-requests/[id]/deny
- * Deny an access request with a reason
+ * API Route: POST /api/access-requests/[id]/deny   (legacy — Team Management)
+ * Deny an access request with a reason. Delegates to the same shared logic as
+ * the canonical PATCH /api/admin/access-requests/[id] endpoint.
+ *
+ * Audit identity is the authenticated caller (the legacy `reviewedBy` body
+ * field is ignored — it was client-spoofable).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
+import { denyAccessRequest } from '@/lib/access-requests';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Security: only admins can deny access requests
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
-    const tenantId = await getTenantId(auth.userId);
+
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
 
     const { id } = await params;
-    const body = await request.json();
-    const { denialReason, reviewedBy } = body;
+    const body = (await request.json()) as { denialReason?: string };
 
-    // Validation
-    if (!denialReason || denialReason.trim() === '') {
-      return NextResponse.json(
-        { error: 'Denial reason is required' },
-        { status: 400 }
-      );
+    // Legacy contract: the Team Management UI requires a reason.
+    if (!body.denialReason || body.denialReason.trim() === '') {
+      return NextResponse.json({ error: 'Denial reason is required' }, { status: 400 });
     }
 
-    if (!reviewedBy) {
-      return NextResponse.json(
-        { error: 'reviewedBy (admin user ID) is required' },
-        { status: 400 }
-      );
+    const result = await denyAccessRequest({
+      requestId: id,
+      reason: body.denialReason,
+      tenantId: scope.tenantId,
+      approverUserId: auth.userId,
+    });
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    // Fetch the access request (tenant-scoped)
-    let denyQuery = supabaseAdmin.from('access_requests').select('*').eq('id', id);
-    if (tenantId) denyQuery = denyQuery.eq('tenant_id', tenantId);
-    const { data: accessRequest, error: fetchError } = await denyQuery.single();
-
-    if (fetchError || !accessRequest) {
-      return NextResponse.json(
-        { error: 'Access request not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if already processed
-    if (accessRequest.status !== 'pending') {
-      return NextResponse.json(
-        { error: `This request has already been ${accessRequest.status}` },
-        { status: 400 }
-      );
-    }
-
-    // Update access request to denied
-    const { error: updateError } = await supabaseAdmin
-      .from('access_requests')
-      .update({
-        status: 'denied',
-        reviewed_by: reviewedBy,
-        reviewed_at: new Date().toISOString(),
-        denial_reason: denialReason,
-      })
-      .eq('id', id);
-
-    if (updateError) {
-      console.error('Error updating access request:', updateError);
-      return NextResponse.json(
-        { error: 'Failed to deny access request' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      {
-        success: true,
-        message: `Access request denied for ${accessRequest.full_name}`,
-        data: {
-          id: accessRequest.id,
-          email: accessRequest.email,
-          status: 'denied',
-          denialReason: denialReason,
-        },
-      },
-      { status: 200 }
-    );
-  } catch (error: any) {
-    console.error('Unexpected error in deny route:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      success: true,
+      message: `Access request denied for ${result.data.email as string}`,
+      data: result.data,
+    });
+  } catch (error) {
+    console.error('[deny] Unexpected error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

@@ -17,26 +17,20 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin, resolveTenantScope, type AuthSuccess } from '@/lib/api-auth';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canInviteRole, ROLES_WITH_LABELS } from '@/lib/rbac';
 import { Resend } from 'resend';
-import { getResendApiKey } from '@/lib/email';
-import { randomBytes } from 'crypto';
+import { getResendApiKey, generateInviteEmail } from '@/lib/email';
+import {
+  createOrRefreshInvitation,
+  getTenantMeta,
+  getInviterName,
+  newToken,
+  INVITE_TTL_MS,
+} from '@/lib/invitations';
 
-const VALID_ROLES = ROLES_WITH_LABELS.map((r) => r.value);
 const getResend = () => new Resend(getResendApiKey() || 're_placeholder');
-
-const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-
-/**
- * Cryptographically-secure, unguessable token. This is the ONLY gate on the
- * public setup flow, so it must NOT encode timestamps or the email (which an
- * attacker may know). 32 random bytes = 256 bits of entropy.
- */
-function newToken(): string {
-  return randomBytes(32).toString('base64url');
-}
 
 function baseUrl(request: NextRequest): string {
   return (
@@ -46,27 +40,6 @@ function baseUrl(request: NextRequest): string {
   );
 }
 
-/** Best-effort insert that degrades gracefully if optional columns are missing. */
-async function insertInvitation(row: Record<string, unknown>) {
-  const { error } = await supabaseAdmin.from('user_invitations').insert(row);
-  if (error && error.code === '42703') {
-    // One or more optional columns don't exist yet (migration not applied).
-    // Re-insert with only the guaranteed-present base columns.
-    const base: Record<string, unknown> = {
-      tenant_id: row.tenant_id,
-      email: row.email,
-      role: row.role,
-      admin_type: row.admin_type ?? null,
-      invited_by: row.invited_by,
-      token: row.token,
-      expires_at: row.expires_at,
-      initial_flags: row.initial_flags ?? {},
-    };
-    return supabaseAdmin.from('user_invitations').insert(base);
-  }
-  return { error };
-}
-
 async function sendInviteEmail(opts: {
   request: NextRequest;
   to: string;
@@ -74,9 +47,12 @@ async function sendInviteEmail(opts: {
   inviterName: string;
   tenantName: string;
   companyCode: string;
+  role: string;
   token: string;
 }) {
   const setupUrl = `${baseUrl(opts.request)}/setup-account?token=${opts.token}`;
+  const roleLabel =
+    ROLES_WITH_LABELS.find((r) => r.value === opts.role)?.label || opts.role;
   return getResend().emails.send({
     // VERIFIED Resend sender. `admin.pontifexindustries.com` IS verified in Resend
     // (sends to external recipients succeed); the ROOT `pontifexindustries.com` is
@@ -86,73 +62,15 @@ async function sendInviteEmail(opts: {
     from: 'Pontifex Industries <noreply@admin.pontifexindustries.com>',
     to: opts.to,
     subject: `You're invited to join ${opts.tenantName}`,
-    html: `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f0f1a; color: #fff; margin: 0; padding: 40px 20px;">
-  <div style="max-width: 560px; margin: 0 auto;">
-    <div style="background: linear-gradient(135deg, #7c3aed, #4f46e5); border-radius: 12px; padding: 32px; text-align: center; margin-bottom: 24px;">
-      <h1 style="margin: 0; font-size: 28px; font-weight: 700; color: #fff;">Welcome to ${opts.tenantName}</h1>
-      <p style="margin: 12px 0 0; color: rgba(255,255,255,0.8); font-size: 16px;">You've been invited to join the team</p>
-    </div>
-
-    <div style="background: #1a1a2e; border-radius: 12px; padding: 32px; margin-bottom: 24px;">
-      <p style="margin: 0 0 8px; color: #a78bfa; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Hello, ${opts.inviteeName}</p>
-      <h2 style="margin: 0 0 16px; font-size: 20px; color: #fff;">Complete your account setup</h2>
-      <p style="margin: 0 0 24px; color: #9ca3af; line-height: 1.6;">
-        ${opts.inviterName} has created an account for you on the ${opts.tenantName} operations platform.
-        Click the button below to finish setting up your account &mdash; it only takes 2 minutes.
-      </p>
-
-      <a href="${setupUrl}" style="display: block; background: linear-gradient(135deg, #7c3aed, #4f46e5); color: #fff; text-decoration: none; border-radius: 8px; padding: 14px 28px; text-align: center; font-weight: 600; font-size: 16px; margin-bottom: 16px;">
-        Complete Account Setup &rarr;
-      </a>
-
-      <p style="margin: 0; color: #6b7280; font-size: 12px; text-align: center;">
-        This link expires in 7 days.${opts.companyCode ? ` Company code: <strong style="color: #9ca3af;">${opts.companyCode}</strong>` : ''}
-      </p>
-    </div>
-
-    <div style="background: #1a1a2e; border-radius: 12px; padding: 24px; margin-bottom: 24px;">
-      <h3 style="margin: 0 0 16px; font-size: 14px; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.05em;">What happens next</h3>
-      <div style="color: #d1d5db; font-size: 14px; line-height: 2;">
-        <div>Add your profile photo</div>
-        <div>Create your password</div>
-        <div>Review and sign the platform agreement</div>
-        <div>Access your dashboard</div>
-      </div>
-    </div>
-
-    <p style="color: #4b5563; font-size: 12px; text-align: center; line-height: 1.6;">
-      If you weren't expecting this invitation, you can safely ignore this email.<br>
-      &copy; ${new Date().getFullYear()} ${opts.tenantName} &mdash; Powered by Pontifex Platform
-    </p>
-  </div>
-</body>
-</html>`,
+    html: generateInviteEmail({
+      inviteeName: opts.inviteeName,
+      inviterName: opts.inviterName,
+      tenantName: opts.tenantName,
+      roleLabel,
+      companyCode: opts.companyCode,
+      setupUrl,
+    }),
   });
-}
-
-async function getTenantMeta(tenantId: string) {
-  const { data: tenant } = await supabaseAdmin
-    .from('tenants')
-    .select('name, company_code')
-    .eq('id', tenantId)
-    .maybeSingle();
-  return {
-    tenantName: tenant?.name || 'Pontifex Industries',
-    companyCode: tenant?.company_code || '',
-  };
-}
-
-async function getInviterName(auth: AuthSuccess): Promise<string> {
-  const { data: inviterProfile } = await supabaseAdmin
-    .from('profiles')
-    .select('full_name')
-    .eq('id', auth.userId)
-    .maybeSingle();
-  return inviterProfile?.full_name || auth.userEmail;
 }
 
 // ============================================================
@@ -177,137 +95,41 @@ export async function POST(request: NextRequest) {
       initialFlags?: Record<string, boolean>;
     };
 
-    const email = body.email?.trim().toLowerCase();
-    const name = body.name?.trim();
-    const role = body.role?.trim();
-
-    if (!email || !name || !role) {
-      return NextResponse.json({ error: 'email, name, and role are required' }, { status: 400 });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return NextResponse.json({ error: 'Please enter a valid email address' }, { status: 400 });
-    }
-    if (!VALID_ROLES.includes(role)) {
-      return NextResponse.json({ error: 'Unknown role' }, { status: 400 });
-    }
-
-    // ── Role-escalation guard ────────────────────────────────────────────────
-    // An inviter may only assign a role STRICTLY BELOW their own rank.
-    // super_admin is never invitable through this flow.
-    if (!canInviteRole(auth.role, role)) {
-      return NextResponse.json(
-        { error: 'You cannot invite a user to a role at or above your own access level.' },
-        { status: 403 }
-      );
-    }
-
-    // ── B2: cross-tenant takeover guard (seam 1) ─────────────────────────────
-    // auth.users is GLOBAL (one row per email platform-wide). If we only checked
-    // this tenant, an admin in Tenant B could invite an email that already
-    // belongs to a user in Tenant A; `complete` would then find that global auth
-    // user, reset its password and flip its tenant/role to B (takeover/DoS).
-    // Invites are ONLY for brand-new emails: reject if a profile OR an auth user
-    // with this email exists in ANY tenant.
-    const { data: existingProfile } = await supabaseAdmin
-      .from('profiles')
-      .select('id')
-      .ilike('email', email) // case-insensitive, any tenant
-      .maybeSingle();
-    if (existingProfile) {
-      return NextResponse.json(
-        { error: 'A user with this email already exists.' },
-        { status: 409 }
-      );
-    }
-
-    const { data: authUsersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-    const emailTakenInAuth = authUsersPage?.users?.some(
-      (u) => u.email?.toLowerCase() === email
-    );
-    if (emailTakenInAuth) {
-      return NextResponse.json(
-        { error: 'A user with this email already exists.' },
-        { status: 409 }
-      );
-    }
-
-    const { tenantName, companyCode } = await getTenantMeta(tenantId);
-    const inviterName = await getInviterName(auth);
-
-    // Re-use an unexpired pending invite for the same email+tenant if present.
-    const { data: existingInv } = await supabaseAdmin
-      .from('user_invitations')
-      .select('id, token, expires_at')
-      .eq('tenant_id', tenantId)
-      .eq('email', email)
-      .is('accepted_at', null)
-      .gt('expires_at', new Date().toISOString())
-      .maybeSingle();
-
-    let token: string;
-
-    if (existingInv) {
-      token = existingInv.token;
-      // Refresh metadata in case role/name changed; tolerate missing columns.
-      const update: Record<string, unknown> = {
-        role,
-        admin_type: body.adminType ?? null,
-        initial_flags: body.initialFlags ?? {},
-        invited_name: name,
-        phone_number: body.phone_number ?? null,
-        date_of_birth: body.date_of_birth ?? null,
-      };
-      const { error: updErr } = await supabaseAdmin
-        .from('user_invitations')
-        .update(update)
-        .eq('id', existingInv.id);
-      if (updErr && updErr.code === '42703') {
-        await supabaseAdmin
-          .from('user_invitations')
-          .update({ role, admin_type: body.adminType ?? null, initial_flags: body.initialFlags ?? {} })
-          .eq('id', existingInv.id);
-      }
-    } else {
-      token = newToken();
-      const expiresAt = new Date(Date.now() + INVITE_TTL_MS).toISOString();
-      const { error: insertError } = await insertInvitation({
-        tenant_id: tenantId,
-        email,
-        role,
-        admin_type: body.adminType ?? null,
-        invited_by: auth.userId,
-        invited_name: name,
-        phone_number: body.phone_number ?? null,
-        date_of_birth: body.date_of_birth ?? null,
-        token,
-        expires_at: expiresAt,
-        initial_flags: body.initialFlags ?? {},
-      });
-      if (insertError) {
-        console.error('[invite] Error inserting invitation:', insertError);
-        return NextResponse.json({ error: 'Failed to create invitation' }, { status: 500 });
-      }
-    }
-
-    const { error: emailError } = await sendInviteEmail({
-      request,
-      to: email,
-      inviteeName: name,
-      inviterName,
-      tenantName,
-      companyCode,
-      token,
+    // All validation (email format, role, rank guard), the cross-tenant
+    // takeover guard, token generation, and the user_invitations write live in
+    // the shared pipeline — also used by access-request approvals.
+    const result = await createOrRefreshInvitation({
+      tenantId,
+      email: body.email ?? '',
+      name: body.name ?? '',
+      role: body.role ?? '',
+      inviter: { userId: auth.userId, role: auth.role, email: auth.userEmail },
+      origin: baseUrl(request),
+      phoneNumber: body.phone_number ?? null,
+      dateOfBirth: body.date_of_birth ?? null,
+      adminType: body.adminType ?? null,
+      initialFlags: body.initialFlags ?? {},
+      onExistingPending: 'refresh', // manual invite: re-use + re-send
+      sendInviteEmail: async (p) => {
+        const { error } = await sendInviteEmail({
+          request,
+          to: p.email,
+          inviteeName: p.inviteeName,
+          inviterName: p.inviterName,
+          tenantName: p.tenantName,
+          companyCode: p.companyCode,
+          role: p.role,
+          token: p.token,
+        });
+        return { error: error ?? null };
+      },
     });
 
-    if (emailError) {
-      console.error('[invite] Resend error:', emailError);
-      return NextResponse.json(
-        { error: 'Invitation saved but the email failed to send. Try Resend.' },
-        { status: 502 }
-      );
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    return NextResponse.json({ success: true, data: { email, role } });
+    return NextResponse.json({ success: true, data: { email: result.email, role: result.role } });
   } catch (err) {
     console.error('[invite] POST unexpected error:', err);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -418,7 +240,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const { tenantName, companyCode } = await getTenantMeta(tenantId);
-    const inviterName = await getInviterName(auth);
+    const inviterName = await getInviterName(auth.userId, auth.userEmail);
 
     const { error: emailError } = await sendInviteEmail({
       request,
@@ -427,6 +249,7 @@ export async function PUT(request: NextRequest) {
       inviterName,
       tenantName,
       companyCode,
+      role: inv.role,
       token,
     });
 

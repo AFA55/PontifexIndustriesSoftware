@@ -14,6 +14,39 @@
 
 ---
 
+## ⚡ START HERE (Jun 11, 2026) — v1.0.3 SUBMITTED to Apple + invite email redesign + access-requests pipeline ✅ (commit pending push)
+
+**1. 🍎 iOS v1.0.3 (Build 8, Face ID) SUBMITTED FOR REVIEW** — driven via Claude-in-Chrome on the
+founder's ASC session: created version 1.0.3 → What's New (Face ID, one-tap company return, simpler
+clock-in) → attached Build 8 (purple-P icon verified in binary) → Submit. Status: **Waiting for
+Review** (≤48h, email to iCloud). Note: Face ID untested on device — founder accepted the risk.
+
+**2. Invite email REDESIGNED** (was dark/unstyled with dead "Next steps" text — founder showed
+Adam's screenshot): new `generateInviteEmail()` in `lib/email.ts` — light theme (dark-mode-proof
+meta hints), tenant-branded gradient header, bulletproof violet "Set Up My Account" CTA + raw-link
+fallback, 3-step numbered guide, expiry+company-code callout, "Powered by Pontifex" footer. Both
+invite POST + PUT use it. Bonus: all interpolations now HTML-escaped (old template was raw).
+
+**3. ACCESS-REQUESTS pipeline (was invisible + broken)** — public form wrote rows with
+`tenant_id=NULL`; admin list filtered `.eq(tenant_id)` → **every request invisible**. **3 real
+pending: Bryan Walker (since May 7!), Adam Ingalls ×2** (company email + gmail — approve ONE, deny
+the dup). Legacy approve created accounts that could never log in (dead recovery link, no tenant on
+profile). NEW: shared `lib/invitations.ts` (`createOrRefreshInvitation` — extraction-verified
+against original guards) + `lib/access-requests.ts`; canonical `GET/PATCH /api/admin/access-requests`
+(approve→role choice rank-guarded server-side→same setup-link pipeline as manual invites, race-guarded
+claim; deny w/ reason + race guard); legacy routes repaired/delegated; **Invite Users page now has an
+"Access Requests" tab** w/ pending badge + per-request role dropdown + Approve&Invite / Deny.
+Migration `access_requests_flow` APPLIED (role CHECK widened, invitation_id link, NULL tenants
+backfilled to Patriot). **Guardian caught 2 BLOCKING in the legacy delete route — both fixed:**
+cross-tenant user-deletion cascade REMOVED (could destroy another tenant's user by shared email);
+deleting an approved request now REVOKES the unaccepted invitation (was a revocation bypass).
+Deny-race fake-success also fixed. Remaining nits → BACKLOG P2.
+
+**⏭️ Next:** push this batch (founder confirms) → founder works the 3 pending requests in the new
+tab → Hub v2 wizard.
+
+---
+
 ## ⚡ START HERE (Jun 10, 2026 — PT 2) — Time-off overhaul + GPS-only clock-in + login memory ✅ (3 parallel builders + guardian)
 
 Founder's second bug-dump batch, built by 3 PARALLEL subagents on disjoint files, guardian-reviewed

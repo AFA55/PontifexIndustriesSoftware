@@ -115,6 +115,177 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
   }
 }
 
+/** Escape user-supplied values interpolated into email HTML. */
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Generate team invite email HTML (used by POST + PUT /api/admin/invite).
+ *
+ * Light-theme, table-based, inline-styled — same family as the other templates
+ * in this file. `color-scheme: light only` hints keep Apple Mail / Gmail dark
+ * mode from inverting it into mud. The CTA is a bulletproof table-wrapped <a>
+ * with a raw-link fallback below it (same pattern as the password-reset email).
+ *
+ * White-label: the header carries the TENANT'S name (never hardcoded Patriot /
+ * Pontifex); Pontifex appears only as "Powered by" in the footer.
+ */
+export function generateInviteEmail(opts: {
+  inviteeName: string;
+  inviterName: string;
+  tenantName: string;
+  /** Human-readable role label, e.g. "Operator" — already mapped from the role key. */
+  roleLabel: string;
+  companyCode?: string;
+  setupUrl: string;
+}): string {
+  const inviteeName = escapeHtml(opts.inviteeName);
+  const inviterName = escapeHtml(opts.inviterName);
+  const tenantName = escapeHtml(opts.tenantName);
+  const roleLabel = escapeHtml(opts.roleLabel);
+  const companyCode = opts.companyCode ? escapeHtml(opts.companyCode) : '';
+  // setupUrl is built server-side from APP_URL + token (never user input), but
+  // escape anyway so a stray ampersand in future params can't break markup.
+  const setupUrl = escapeHtml(opts.setupUrl);
+
+  const steps: Array<[string, string]> = [
+    ['1', 'Tap the &ldquo;Set Up My Account&rdquo; button'],
+    ['2', 'Add your photo and create a password'],
+    ['3', "You're in — your dashboard is ready"],
+  ];
+
+  const stepsRows = steps
+    .map(
+      ([n, label]) => `
+                <tr>
+                  <td style="padding: 6px 0; vertical-align: top; width: 36px;">
+                    <table role="presentation" style="border-collapse: collapse;">
+                      <tr>
+                        <td bgcolor="#ede9fe" style="background-color: #ede9fe; border-radius: 50%; width: 26px; height: 26px; text-align: center; vertical-align: middle; color: #7c3aed; font-size: 13px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">${n}</td>
+                      </tr>
+                    </table>
+                  </td>
+                  <td style="padding: 6px 0 6px 4px; color: #334155; font-size: 15px; line-height: 26px; vertical-align: middle;">${label}</td>
+                </tr>`
+    )
+    .join('');
+
+  return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title>You're invited to join ${tenantName}</title>
+  <style>
+    :root { color-scheme: light only; supported-color-schemes: light only; }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
+  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;" bgcolor="#f8fafc">
+    <tr>
+      <td style="padding: 48px 20px;">
+        <!-- Main Container -->
+        <table role="presentation" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;" bgcolor="#ffffff">
+
+          <!-- Header -->
+          <tr>
+            <td bgcolor="#7c3aed" style="background-color: #7c3aed; background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 44px 40px; text-align: center;">
+              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
+                ${tenantName}
+              </h1>
+              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
+                You're invited to join the team
+              </p>
+            </td>
+          </tr>
+
+          <!-- Main Content -->
+          <tr>
+            <td style="padding: 44px 40px;">
+              <!-- Greeting -->
+              <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
+                Hi <strong style="color: #0f172a; font-weight: 600;">${inviteeName}</strong>,
+              </p>
+
+              <!-- Main Message -->
+              <p style="margin: 0 0 28px; color: #475569; font-size: 16px; line-height: 1.6;">
+                <strong style="color: #0f172a; font-weight: 600;">${inviterName}</strong> set up an account for you on the ${tenantName} platform as <strong style="color: #7c3aed; font-weight: 600;">${roleLabel}</strong>. Finish setup in about 2 minutes.
+              </p>
+
+              <!-- CTA Button (bulletproof: table-wrapped, inline-styled) -->
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 20px;">
+                <tr>
+                  <td style="text-align: center;">
+                    <a href="${setupUrl}" style="display: inline-block; padding: 16px 48px; background-color: #7c3aed; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px; line-height: 1.2;">
+                      Set Up My Account
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Alternative Link -->
+              <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px 20px; margin-bottom: 28px;">
+                <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; font-weight: 600;">
+                  Button not working?
+                </p>
+                <p style="margin: 0; font-size: 12px; word-break: break-all; line-height: 1.5;">
+                  <a href="${setupUrl}" style="color: #7c3aed; text-decoration: underline;">${setupUrl}</a>
+                </p>
+              </div>
+
+              <!-- What Happens Next -->
+              <p style="margin: 0 0 12px; color: #0f172a; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
+                What happens next
+              </p>
+              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 28px;">${stepsRows}
+              </table>
+
+              <!-- Expiry Notice -->
+              <div style="background-color: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; padding: 14px 18px; margin-bottom: 24px;">
+                <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
+                  This invitation expires in <strong>7 days</strong>.${companyCode ? ` Your company code is <strong>${companyCode}</strong> &mdash; you'll use it to log in.` : ''}
+                </p>
+              </div>
+
+              <!-- Help Notice -->
+              <div style="background-color: #f1f5f9; border-left: 3px solid #94a3b8; border-radius: 4px; padding: 14px 18px;">
+                <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.5;">
+                  <strong style="color: #334155;">Need help?</strong> Contact ${inviterName} or your administrator. If you weren't expecting this invitation, you can safely ignore this email.
+                </p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td bgcolor="#f8fafc" style="background-color: #f8fafc; padding: 28px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
+                <strong style="color: #475569;">${tenantName}</strong><br>
+                Powered by Pontifex Industries
+              </p>
+              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
+                This is an automated message. Please do not reply.
+              </p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
+  `;
+}
+
 /**
  * Generate approval confirmation email HTML
  */

@@ -48,6 +48,19 @@
 - [ ] **Login title/tagline still swap during branding load** on `/login` — logo flash fixed Jun 10
       with a skeleton; "Welcome Back" → "Welcome to Patriot" text swap remains (minor polish).
 
+## 🟡 P2 (guardian nits from Jun 11 invite/access-request review — real but non-blocking)
+
+- [ ] **Orphaned invitation on email-send failure** during access-request approval — claim reverts
+      to pending but the `user_invitations` row persists → re-approve 409s. Recovery = Resend in the
+      Invitations list; cleaner: delete the orphan on revert or reuse 'refresh' semantics.
+- [ ] **`listUsers({perPage:1000})` in the cross-tenant takeover guard** stops covering auth users
+      past 1000 — paginate or look up by email (load-bearing guard; fine at current ~25 users).
+- [ ] **`sendEmail` dev fallback logs full HTML incl. setup-token URLs** when RESEND_API_KEY unset — gate it.
+- [ ] **`lib/database.ts` legacy access-request getters use `select('*')`** via the public client —
+      would ship `password_hash` if an RLS read policy ever lands; replace with explicit columns or delete.
+- [ ] **Public request-access confirmation email hardcodes "Patriot Concrete Cutting"** — white-label violation.
+- [ ] Public request-access form collects password + DOB the new flow never uses; consent checkboxes not sent despite columns existing — simplify the form.
+
 ## 🟡 P2 (guardian nits from Jun 10 time-off review — real but non-blocking)
 
 - [ ] **PTO balance adjustments are fire-and-forget** in the approval route — await + surface failure
