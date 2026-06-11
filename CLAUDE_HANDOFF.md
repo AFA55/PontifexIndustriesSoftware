@@ -14,6 +14,34 @@
 
 ---
 
+## ⚡ START HERE (Jun 10, 2026) — Email outage CONFIRMED FIXED + founder 4-task batch ✅ (push pending)
+
+**✅ EMAIL OUTAGE CLOSED:** founder resent Adam Ingalls' invite from prod at 10:36 PM →
+`PUT /api/admin/invite` → **200** (every pre-sanitizer attempt was 502). Sanitizer works in prod.
+Temp EMAIL DIAG diagnostic REVERTED (clean error handling restored in invite route).
+
+**Founder's bug-dump batch (all built, tsc clean, build green, 855/855 tests — NOT pushed yet):**
+1. **Login branding flash fixed** (`app/login/page.tsx`) — Pontifex logo no longer flashes before
+   the tenant logo: neutral skeleton until the branding fetch settles (`brandingLoaded` state);
+   platform logo only if tenant truly has none. Logo upsized 1.5× (84px/120px). Remaining nit →
+   BACKLOG P1: welcome-text still swaps.
+2. **Founder super-admin** — verified existing: andres.altamirano1280@gmail.com IS super_admin in
+   PONTIFEX (active). Nothing built; he logs in with code PONTIFEX (forgot-password works now).
+3. **🔴 FOUND+FIXED: demo-request funnel was 100% broken** — `/api/demo-requests` (called by
+   `/request-demo` 3-step funnel) inserted columns that don't exist in `demo_requests`
+   (first_name/company_name/... vs real name/company/...) → 42703 → every submission 500'd.
+   **0 rows ever saved.** Fixed mapping + added founder-notification email (to
+   pontifexindustries@gmail.com — also re-pointed the old `/api/demo-request` notify from
+   patriotconcretecutting@gmail.com). Added super-admin GET/PATCH on the same route.
+4. **NEW: Platform Hub demo-requests inbox** (`/dashboard/platform/demo-requests`) — status
+   pipeline (new→contacted→demo_scheduled→converted/closed), notes, mailto/tel, convert-to-tenant
+   CTA; linked from hub overview. Phase 1 of **PLATFORM_HUB_V2_PLAN.md** (NEW plan: tenant-creation
+   WIZARD pre-filled from leads + control-center overview — the founder's "sequence" ask).
+
+**⏭️ Next:** push this batch (founder confirms) → Hub v2 wizard build → P1s (Build 8 submit, Sentry DSN, exercise invoice/email routes).
+
+---
+
 ## ⚡ START HERE (Jun 9, 2026 — PT 2) — Email self-heal LIVE + dev-foundation reorg ✅
 
 **1. Email fix shipped** (see banner above). Root-cause method: identical code sent fine locally

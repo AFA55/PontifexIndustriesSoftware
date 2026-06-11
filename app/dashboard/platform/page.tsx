@@ -7,7 +7,7 @@ import Link from 'next/link';
 import {
   Building2, Plus, ChevronRight, Users as UsersIcon, ToggleRight,
   RefreshCw, ShieldCheck, Globe, Activity, AlertTriangle, Bug,
-  CheckCircle2, ArrowRight, ServerCog, MessageSquareWarning,
+  CheckCircle2, ArrowRight, ServerCog, MessageSquareWarning, Inbox,
 } from 'lucide-react';
 import {
   type Tenant, getHeaders, statusColors, planIcons,
@@ -258,6 +258,12 @@ export default function PlatformHubPage() {
             <Building2 className="w-4 h-4" /> Client Companies
           </h2>
           <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/platform/demo-requests"
+              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
+            >
+              <Inbox className="w-3.5 h-3.5" /> Demo requests
+            </Link>
             <Link
               href="/dashboard/platform/tenants"
               className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"

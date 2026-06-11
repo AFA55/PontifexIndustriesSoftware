@@ -88,7 +88,8 @@ export async function POST(request: NextRequest) {
           },
           body: JSON.stringify({
             from: fromEmail,
-            to: ['patriotconcretecutting@gmail.com'],
+            // Platform-demo leads belong to Pontifex (the software company), not Patriot (a tenant).
+            to: ['pontifexindustries@gmail.com'],
             subject: `New Demo Request: ${safeName} - ${safeCompany}`,
             html: `
               <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">

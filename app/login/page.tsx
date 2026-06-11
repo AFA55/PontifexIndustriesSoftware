@@ -50,6 +50,10 @@ function LoginPageInner() {
   const [demoUnlocked, setDemoUnlocked] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const [tenantBranding, setTenantBranding] = useState<any>(null);
+  // True once the tenant branding fetch has settled (success OR failure). Until then we
+  // render a neutral logo placeholder — NEVER the Pontifex platform logo — so the user
+  // doesn't see Pontifex flash and then swap to their company's logo.
+  const [brandingLoaded, setBrandingLoaded] = useState(false);
   // Native Face ID / Touch ID sign-in (no-op on the website).
   const [faceIdReady, setFaceIdReady] = useState(false);
   const [bioLabel, setBioLabel] = useState('Face ID');
@@ -76,7 +80,8 @@ function LoginPageInner() {
     fetch(`/api/admin/branding?tenant_id=${tenantId}`)
       .then(r => r.json())
       .then(json => { if (json.success && json.data) setTenantBranding(json.data); })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setBrandingLoaded(true));
   }, [tenantId]);
 
   // Native app only: if biometrics are available AND we've saved credentials from a
@@ -222,12 +227,22 @@ function LoginPageInner() {
             transition={{ delay: 0.2, duration: 0.5 }}
             className="flex flex-col items-center"
           >
-            {/* Tenant logo (loaded after company code entered) → else Pontifex platform logo */}
-            <img
-              src={branding.logo_icon_url || branding.logo_url || '/logo.svg'}
-              alt={branding.company_name || 'Pontifex Industries'}
-              className="h-14 w-14 sm:h-20 sm:w-20 object-contain rounded-2xl rounded-xl"
-            />
+            {/* Tenant logo. While the tenant branding fetch is in flight we show a neutral
+                placeholder — never the Pontifex platform logo — to avoid the
+                Pontifex→tenant logo flash. Platform logo only appears if the fetch
+                settles and the tenant has no logo of its own. */}
+            {tenantId && !brandingLoaded ? (
+              <div
+                className="h-[84px] w-[84px] sm:h-[120px] sm:w-[120px] rounded-2xl bg-gray-100 animate-pulse"
+                aria-hidden="true"
+              />
+            ) : (
+              <img
+                src={branding.logo_icon_url || branding.logo_url || '/logo.svg'}
+                alt={branding.company_name || 'Pontifex Industries'}
+                className="h-[84px] w-[84px] sm:h-[120px] sm:w-[120px] object-contain rounded-2xl"
+              />
+            )}
           </motion.div>
           <motion.h1
             initial={{ opacity: 0 }}

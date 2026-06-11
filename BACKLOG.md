@@ -11,21 +11,22 @@
 | **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
 | **Prod** | ✅ LIVE — pontifexindustries.com (`a56a2322` deployed READY) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) awaiting founder device test |
-| **Open** | P0: 3 · P1: 5 · P2: 11 · P3: 8 |
-| **In flight** | Email self-heal deployed, awaiting live invite test |
-| **Blocked on founder** | Test invite · Supabase Pro upgrade · Build 8 device test · Sentry DSN |
-| **Unpushed commits** | `4cb515c8` + this session's (docs/skills — ride with next code push) |
-| **Last groomed** | Jun 9, 2026 (PT 2) |
+| **Open** | P0: 2 · P1: 7 · P2: 11 · P3: 8 |
+| **In flight** | Jun 10 fix batch built+tested, awaiting push: branding flash, logo 1.5x, demo-funnel 500 fix, demo-requests inbox, diagnostic revert |
+| **Blocked on founder** | Push confirmation · Supabase Pro upgrade · Build 8 device test · Sentry DSN |
+| **Unpushed commits** | Docs commits (`4cb515c8`+) + Jun 10 code batch |
+| **Last groomed** | Jun 10, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
 
-- [ ] **Verify invite email works on prod** — the `RESEND_API_KEY` sanitizer fix (`a56a2322`) is
-      deployed READY. Founder: send a test invite from `/dashboard/admin/team/invite` → then check
-      Vercel logs for `sanitizedOk: true` + no `resendError`. (Adam Ingalls' invite = real test.)
-- [ ] **Revert temp invite diagnostic** (commit `2f6541a4`: `EMAIL DIAG` logging + raw error in
-      `app/api/admin/invite/route.ts` POST+PUT) — after the test above passes. Batch with next push.
+- [x] ~~Verify invite email works on prod~~ — ✅ Jun 10: founder's resend hit `PUT /api/admin/invite`
+      → **200** (was 502 before the sanitizer). Email outage CONFIRMED resolved. Adam Ingalls'
+      invite went out — confirm he received it.
+- [x] ~~Revert temp invite diagnostic~~ — ✅ Jun 10: EMAIL DIAG logging + raw-error response removed.
 - [ ] **Supabase Free → Pro ($25/mo)** — founder action. Payroll data currently has NO automated
       backups. Highest-leverage 5 minutes available. (See docs/plans/BACKUP_AND_CLOUD_STRATEGY.md.)
+- [ ] **Push the Jun 10 fix batch** (founder confirms): branding-flash fix + logo 1.5x + demo-funnel
+      500 fix + demo-requests inbox + diagnostic revert.
 
 ## 🟠 P1 — This week
 
@@ -38,6 +39,14 @@
 - [ ] **Supabase Auth rate limits** — Dashboard → Auth → Settings (HIGH-2 from security audit).
 - [ ] **Clean up Vercel env vars** — founder: delete unused `RESEND_FROM_EMAIL`; optionally fix the
       malformed `RESEND_API_KEY` value (code now self-heals it, so cosmetic).
+
+## 🟠 P1 (added Jun 10)
+
+- [ ] **Platform Hub v2** — tenant-creation WIZARD (schedule-form-style sequence, pre-fill from a
+      demo lead, branding preview, module presets, first-admin invite) + control-center overview.
+      Plan: docs/plans/PLATFORM_HUB_V2_PLAN.md. Phase 1 (demo-requests inbox) shipped Jun 10.
+- [ ] **Login title/tagline still swap during branding load** on `/login` — logo flash fixed Jun 10
+      with a skeleton; "Welcome Back" → "Welcome to Patriot" text swap remains (minor polish).
 
 ## 🟡 P2 — Soon
 
