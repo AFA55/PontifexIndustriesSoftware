@@ -9,13 +9,13 @@
 | | |
 |---|---|
 | **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
-| **Prod** | ✅ LIVE — pontifexindustries.com (`a56a2322` deployed READY) |
-| **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) awaiting founder device test |
-| **Open** | P0: 2 · P1: 7 · P2: 14 · P3: 8 |
-| **In flight** | TWO Jun 10 batches built+tested+guardian-PASS, awaiting ONE push: (1) branding flash/logo/demo-funnel/inbox, (2) time-off overhaul + GPS-only clock-in 90ft + company-code memory |
-| **Blocked on founder** | Push confirmation · Supabase Pro upgrade · Build 8 device test · Sentry DSN |
-| **Unpushed commits** | Docs commits + 2 code batches |
-| **Last groomed** | Jun 10, 2026 (PT 2) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (`999df3fc` deployed READY Jun 11) |
+| **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
+| **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
+| **In flight** | v1.0.3 App Store submission (Claude-in-Chrome + founder) |
+| **Blocked on founder** | Supabase Pro upgrade · Sentry DSN · live-flow spot checks (clock-in, time-off, fast-path login) |
+| **Unpushed commits** | This STATUS refresh only (rides with next code push) |
+| **Last groomed** | Jun 11, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
 
