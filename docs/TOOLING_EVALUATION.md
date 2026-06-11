@@ -14,6 +14,7 @@
 | **anthropics/skills** (pattern) | Official Agent Skills format (`SKILL.md`) | Our playbooks (iOS release, deploy gate, guardian review) were prose buried in CLAUDE.md — as skills they're executable, versioned procedures | Project skills in `.claude/skills/` |
 | **taste-skill** (Leonxlnx, 40.6k★) | Design-quality instructions for AI UI generation — brief-inference, design-system mapping, anti-"generic slop", pre-flight checks | Zero infrastructure (pure instructions); installed verbatim from the repo | `.claude/skills/design-taste/` — scoped by the skill itself to **landing/marketing pages & redesigns** (not dashboards). Use for the SEO homepage rewrite (BACKLOG P2) and public pages |
 | **knowledge-work-plugins** (Anthropic) | Official business-domain plugins | Already installed in our Claude environment (sales/legal/small-business packs) | Available on demand; no action |
+| **frontend-design** (anthropics/skills, official) | Design-lead instructions for distinctive, non-templated UI — deliberate palette/typography/layout, anti-default calibration, two-pass plan→critique→build process | Official, 55 lines, zero infra; applies to ALL UI incl. product/dashboard screens (complements design-taste, which is marketing-pages-only) | `.claude/skills/frontend-design/` — invoke when building or restyling any screen (Jun 9, 2026; flagged by founder from an Instagram skills roundup, verified in anthropics/skills) |
 
 ## 🟡 Staged (adopt when trigger hits)
 

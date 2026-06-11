@@ -3,8 +3,19 @@
 > Every bug, feature, and chore lives HERE — not in CLAUDE.md, not in the handoff, not in chat.
 > Priorities: **P0** = broken in prod / blocking · **P1** = this week · **P2** = soon · **P3** = someday.
 > When work completes: check it off, move to "Recently shipped" (keep ~2 sessions), then delete.
->
-> Last groomed: Jun 9, 2026
+
+## 📊 STATUS (update every session — this is the at-a-glance progress dashboard)
+
+| | |
+|---|---|
+| **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (`a56a2322` deployed READY) |
+| **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) awaiting founder device test |
+| **Open** | P0: 3 · P1: 5 · P2: 11 · P3: 8 |
+| **In flight** | Email self-heal deployed, awaiting live invite test |
+| **Blocked on founder** | Test invite · Supabase Pro upgrade · Build 8 device test · Sentry DSN |
+| **Unpushed commits** | `4cb515c8` + this session's (docs/skills — ride with next code push) |
+| **Last groomed** | Jun 9, 2026 (PT 2) |
 
 ## 🔴 P0 — Verify / unblock now
 

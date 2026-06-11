@@ -69,6 +69,29 @@ Then: feature branch → Vercel preview URL → eyeball it → founder confirms 
 A feature is done when: builder built it → guardian passed it → build/tsc/jest green → verified
 live (preview or prod) → BACKLOG.md updated → handoff updated. Not before.
 
+## Progress tracking (how any conversation knows where we are)
+
+**Principle: progress lives in the REPO, never in a chat's memory.** Any conversation — today's,
+next week's, a fresh one after a crash — reads the same three artifacts and knows exactly where we are:
+
+| Artifact | Question it answers | Updated |
+|---|---|---|
+| `BACKLOG.md` → **📊 STATUS table** | "Where are we right now?" — phase, prod/iOS state, open counts by priority, what's in flight, what's blocked on the founder, unpushed commits | Every session (start + end) |
+| `BACKLOG.md` → P0–P3 lists | "What's next and what's done?" | The moment an item changes state |
+| `CLAUDE_HANDOFF.md` top section | "What happened last session, in detail?" | End of every session |
+
+**The session ritual (Claude does this automatically):**
+1. **Session start** — read handoff + BACKLOG → post a short **status report** in chat: ✅ shipped
+   since last time · 🔄 in flight · 🔴 blocked on founder · 🎯 today's plan. The founder should
+   never have to ask "where are we?"
+2. **During** — completed items get checked off in BACKLOG.md *as they finish*, not at the end.
+   New issues discovered mid-work go straight into BACKLOG.md with a priority.
+3. **Session end** — refresh the 📊 STATUS table, move shipped items to "Recently shipped",
+   update the handoff. The next conversation inherits everything.
+
+**Founder's view:** open `BACKLOG.md` on GitHub anytime — the STATUS table is the dashboard;
+`ARCHITECTURE.md` is the map. Or just ask "where are we?" in any conversation.
+
 ## Skills (executable playbooks)
 
 Repeatable multi-step procedures live as project skills in `.claude/skills/` so any session can
