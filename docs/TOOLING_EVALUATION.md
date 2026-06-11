@@ -57,6 +57,12 @@ Headline: **more than half this list was already installed** in our environment.
 | Obsidian Skills | ❌ Rejected | We don't use Obsidian |
 | NotebookLM Integration | ❌ Rejected | No NotebookLM workflow; PDF skill + deep-research cover dense-document analysis |
 
+## Batch 3 — Vercel Plugin for AI Coding Agents (Jun 11, 2026)
+
+| Tool | Verdict | Notes |
+|---|---|---|
+| **vercel/vercel-plugin** (official Vercel) | ✅ **Adopted** — installed user-scope via `npx plugins add vercel/vercel-plugin` (→ `vercel@claude-plugins-official`) | Verified against vercel.com/docs/agent-resources/vercel-plugin before install. 25+ skills (the ones we care about: `deployments-cicd`, `env-vars`, `vercel-cli`, `nextjs`, `react-best-practices`, `vercel-functions`), 3 specialist agents (`deployment-expert`, `performance-optimizer`, `ai-architect`), slash commands incl. `/vercel-plugin:deploy`, `/vercel-plugin:env`, `/vercel-plugin:status`. Hooks are lightweight (session-start context only in Next.js/Vercel projects — ours qualifies). Telemetry = one daily ping; disable with `VERCEL_PLUGIN_TELEMETRY=off` if desired. **Why adopted:** directly targets our two recurring Vercel pain points — env-var management (the RESEND_API_KEY fiasco) and deploy troubleshooting (the Jun 11 git-integration no-fire). CLI is already authed as the founder, so `/vercel-plugin:env` + `vercel env` workflows work. Requires session restart to load. |
+
 ## House rules for future tool adoption
 
 1. **Verify before trusting** — fetch the actual repo; star counts and "official-sounding" names lie
