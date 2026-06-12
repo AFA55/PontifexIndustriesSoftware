@@ -2,6 +2,7 @@
 
 import PushRegistration from '@/components/PushRegistration';
 import SubscriptionGate from '@/components/SubscriptionGate';
+import WelcomeProfileModal from '@/components/WelcomeProfileModal';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 
 /**
@@ -24,6 +25,8 @@ export default function DashboardLayout({
     <GoogleMapsProvider>
       <PushRegistration />
       <SubscriptionGate />
+      {/* One-time "finish your profile" nudge for accounts missing photo/nickname/phone */}
+      <WelcomeProfileModal />
       {children}
     </GoogleMapsProvider>
   );

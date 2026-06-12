@@ -41,6 +41,7 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
+import { getRoleLabel } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
 import { supabase } from '@/lib/supabase';
 import { useFeatureFlags, type UserFeatureFlags } from '@/lib/feature-flags';
@@ -263,6 +264,12 @@ function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | nu
 // ---------------------------------------------------------------------------
 
 function formatRole(role: string): string {
+  // Use the product's display labels (salesman → "Project Manager",
+  // inventory_manager → "Office Admin", apprentice → "Team Member", ...) —
+  // raw DB keys must never leak into the UI. Falls back to title-casing
+  // for any unknown role value.
+  const label = getRoleLabel(role);
+  if (label !== role) return label;
   return role
     .split('_')
     .map(w => w.charAt(0).toUpperCase() + w.slice(1))
