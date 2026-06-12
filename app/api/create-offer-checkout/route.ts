@@ -8,16 +8,18 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
+import { resolveAppOrigin, PROD_APP_ORIGIN } from '@/lib/app-url';
 
 const getStripe = () => new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_placeholder', {
   apiVersion: '2026-03-25.dahlia',
 });
 
-// Always use production URL for Stripe callbacks — never localhost
-const APP_URL =
-  process.env.NEXT_PUBLIC_APP_URL?.startsWith('http://localhost')
-    ? 'https://pontifexindustries.com'
-    : process.env.NEXT_PUBLIC_APP_URL || 'https://pontifexindustries.com';
+// Always use production URL for Stripe callbacks — never localhost.
+// resolveAppOrigin trims + validates NEXT_PUBLIC_APP_URL (garbage falls through).
+const RESOLVED_ORIGIN = resolveAppOrigin();
+const APP_URL = RESOLVED_ORIGIN.startsWith('http://localhost')
+  ? PROD_APP_ORIGIN
+  : RESOLVED_ORIGIN;
 
 export async function POST(request: NextRequest) {
   try {

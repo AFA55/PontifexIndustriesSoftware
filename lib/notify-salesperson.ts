@@ -13,6 +13,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail } from '@/lib/email';
 import { sendPushToUser } from '@/lib/send-push';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 export type SalespersonEvent =
   | 'job_active'
@@ -91,7 +92,7 @@ function escapeHtml(str: string): string {
 function buildEmailHtml(title: string, message: string, actionUrl: string): string {
   const safeTitle = escapeHtml(title);
   const safeMessage = escapeHtml(message);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const appUrl = resolveAppOrigin();
   const link = actionUrl ? encodeURI(`${appUrl}${actionUrl}`) : '';
 
   return `

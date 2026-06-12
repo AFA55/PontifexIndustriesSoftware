@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendEmail, generatePasswordResetEmail } from '@/lib/email';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 // Generic response so the client can never tell whether an email exists.
 const GENERIC_OK = {
@@ -33,7 +34,9 @@ const GENERIC_OK = {
   message: 'If an account exists with that email, a password reset link has been sent.',
 };
 
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com').replace(/\/$/, '');
+// Hardened: trim + validate as http(s) + origin-only. A whitespace-polluted
+// NEXT_PUBLIC_APP_URL once poisoned the recovery redirectTo for every reset.
+const APP_URL = resolveAppOrigin();
 
 export async function POST(request: NextRequest) {
   try {

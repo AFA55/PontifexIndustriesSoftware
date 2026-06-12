@@ -25,7 +25,7 @@ import { getInvitableRoles, getRoleLabel } from '@/lib/rbac';
 import {
   ArrowLeft, UserPlus, Mail, Loader2, CheckCircle2, Clock,
   AlertTriangle, RefreshCw, Send, Phone, User as UserIcon, Shield,
-  Inbox, Check, X,
+  Inbox, Check, X, Building2,
 } from 'lucide-react';
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'operations_manager'];
@@ -52,6 +52,12 @@ interface AccessRequest {
   assigned_role: string | null;
   denial_reason: string | null;
   created_at: string;
+}
+
+interface TenantOption {
+  id: string;
+  name: string;
+  company_code: string | null;
 }
 
 type TabKey = 'invite' | 'requests';
@@ -91,6 +97,24 @@ export default function InviteUsersPage() {
   const [requestsError, setRequestsError] = useState('');
   const [requestsSuccess, setRequestsSuccess] = useState('');
 
+  // ── Super-admin tenant targeting ───────────────────────────────────────────
+  // A super_admin (platform org) inviting from this page once landed a real
+  // crew member in the WRONG tenant (the super_admin's own org + default role).
+  // Super admins must now pick the target company EXPLICITLY — no default —
+  // and every API call on this page is scoped with ?tenantId=.
+  // Non-super-admins see no change (the API pins them to their own tenant).
+  const [tenants, setTenants] = useState<TenantOption[]>([]);
+  const [loadingTenants, setLoadingTenants] = useState(false);
+  const [selectedTenantId, setSelectedTenantId] = useState('');
+
+  const isSuperAdmin = inviterRole === 'super_admin';
+  /** Query-string suffix scoping a request to the chosen tenant ('' for non-super-admins). */
+  const tenantQS = isSuperAdmin && selectedTenantId
+    ? `?tenantId=${encodeURIComponent(selectedTenantId)}`
+    : '';
+  /** True while a super_admin hasn't chosen a company yet — data loads + sends are held. */
+  const tenantPending = isSuperAdmin && !selectedTenantId;
+
   const invitableRoles = inviterRole ? getInvitableRoles(inviterRole) : [];
   const pendingRequests = requests.filter((r) => r.status === 'pending');
   const processedRequests = requests.filter((r) => r.status !== 'pending');
@@ -104,9 +128,15 @@ export default function InviteUsersPage() {
   }, []);
 
   const loadInvitations = useCallback(async () => {
+    if (tenantPending) {
+      // Super admin hasn't picked a company yet — nothing to show.
+      setInvitations([]);
+      setLoadingList(false);
+      return;
+    }
     setLoadingList(true);
     try {
-      const res = await fetch('/api/admin/invite', { headers: await authHeaders() });
+      const res = await fetch(`/api/admin/invite${tenantQS}`, { headers: await authHeaders() });
       const json = await res.json();
       if (json.success) setInvitations(json.data.invitations || []);
     } catch {
@@ -114,12 +144,17 @@ export default function InviteUsersPage() {
     } finally {
       setLoadingList(false);
     }
-  }, [authHeaders]);
+  }, [authHeaders, tenantQS, tenantPending]);
 
   const loadRequests = useCallback(async () => {
+    if (tenantPending) {
+      setRequests([]);
+      setLoadingRequests(false);
+      return;
+    }
     setLoadingRequests(true);
     try {
-      const res = await fetch('/api/admin/access-requests', { headers: await authHeaders() });
+      const res = await fetch(`/api/admin/access-requests${tenantQS}`, { headers: await authHeaders() });
       const json = await res.json();
       if (json.success) {
         setRequests(json.data.requests || []);
@@ -131,7 +166,7 @@ export default function InviteUsersPage() {
     } finally {
       setLoadingRequests(false);
     }
-  }, [authHeaders]);
+  }, [authHeaders, tenantQS, tenantPending]);
 
   // ── Auth gate ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -151,9 +186,42 @@ export default function InviteUsersPage() {
         new URLSearchParams(window.location.search).get('tab') === 'requests') {
       setActiveTab('requests');
     }
+  }, [router]);
+
+  // Load lists once authed — and reload whenever the super_admin switches the
+  // target company (tenantQS changes → callbacks change → effect re-runs).
+  useEffect(() => {
+    if (!authChecked) return;
     void loadInvitations();
     void loadRequests();
-  }, [router, loadInvitations, loadRequests]);
+  }, [authChecked, loadInvitations, loadRequests]);
+
+  // super_admin only: fetch the tenant list for the Company picker.
+  useEffect(() => {
+    if (!authChecked || inviterRole !== 'super_admin') return;
+    let cancelled = false;
+    (async () => {
+      setLoadingTenants(true);
+      try {
+        const res = await fetch('/api/admin/tenants', { headers: await authHeaders() });
+        const json = await res.json();
+        if (!cancelled && json.success) {
+          setTenants(
+            (json.data || []).map((t: { id: string; name: string; company_code: string | null }) => ({
+              id: t.id,
+              name: t.name,
+              company_code: t.company_code ?? null,
+            }))
+          );
+        }
+      } catch {
+        /* non-fatal — picker shows empty, Send stays disabled */
+      } finally {
+        if (!cancelled) setLoadingTenants(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authChecked, inviterRole, authHeaders]);
 
   // Default the role select to the first invitable role once known.
   useEffect(() => {
@@ -165,6 +233,10 @@ export default function InviteUsersPage() {
     setFormError('');
     setFormSuccess('');
 
+    if (tenantPending) {
+      setFormError('Select which company this person is being invited to first.');
+      return;
+    }
     if (!email.trim() || !name.trim() || !role) {
       setFormError('Email, full name, and role are required.');
       return;
@@ -172,7 +244,7 @@ export default function InviteUsersPage() {
 
     setSubmitting(true);
     try {
-      const res = await fetch('/api/admin/invite', {
+      const res = await fetch(`/api/admin/invite${tenantQS}`, {
         method: 'POST',
         headers: await authHeaders(),
         body: JSON.stringify({
@@ -213,7 +285,7 @@ export default function InviteUsersPage() {
     setRequestsError('');
     setRequestsSuccess('');
     try {
-      const res = await fetch(`/api/admin/access-requests/${req.id}`, {
+      const res = await fetch(`/api/admin/access-requests/${req.id}${tenantQS}`, {
         method: 'PATCH',
         headers: await authHeaders(),
         body: JSON.stringify({ action: 'approve', role }),
@@ -236,7 +308,7 @@ export default function InviteUsersPage() {
     setRequestsError('');
     setRequestsSuccess('');
     try {
-      const res = await fetch(`/api/admin/access-requests/${req.id}`, {
+      const res = await fetch(`/api/admin/access-requests/${req.id}${tenantQS}`, {
         method: 'PATCH',
         headers: await authHeaders(),
         body: JSON.stringify({ action: 'deny', reason: denyReason.trim() || undefined }),
@@ -259,7 +331,7 @@ export default function InviteUsersPage() {
     setFormError('');
     setFormSuccess('');
     try {
-      const res = await fetch('/api/admin/invite', {
+      const res = await fetch(`/api/admin/invite${tenantQS}`, {
         method: 'PUT',
         headers: await authHeaders(),
         body: JSON.stringify({ id }),
@@ -323,6 +395,47 @@ export default function InviteUsersPage() {
             <p className="text-slate-500 dark:text-white/60 text-sm">Send a setup link so your crew can onboard themselves.</p>
           </div>
         </div>
+
+        {/* Super-admin company picker — forces an EXPLICIT tenant choice.
+            A real onboarding once landed in the wrong tenant because the
+            super_admin's own org was silently used as the default. */}
+        {isSuperAdmin && (
+          <div className="bg-white/90 ring-1 ring-violet-200 shadow-sm rounded-2xl p-4 sm:p-5 mb-6 dark:bg-white/[0.04] dark:ring-violet-500/30">
+            <label htmlFor="invite-tenant" className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
+              <Building2 className="w-3.5 h-3.5" /> Company
+              <span className="text-violet-600 dark:text-violet-300 font-medium">(required)</span>
+            </label>
+            <select
+              id="invite-tenant"
+              value={selectedTenantId}
+              onChange={(e) => {
+                setSelectedTenantId(e.target.value);
+                setFormError('');
+                setRequestsError('');
+                setFormSuccess('');
+                setRequestsSuccess('');
+              }}
+              className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
+                bg-white border border-slate-200 text-slate-900
+                focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                dark:bg-white/5 dark:border-white/10 dark:text-white
+                dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+            >
+              <option value="" disabled>
+                {loadingTenants ? 'Loading companies…' : 'Select a company…'}
+              </option>
+              {tenants.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}{t.company_code ? ` (${t.company_code})` : ''}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-slate-400 dark:text-white/40 mt-1.5">
+              You&apos;re a platform super admin — invitations, the invitation list, and access
+              requests below all target the company you pick here.
+            </p>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6" role="tablist" aria-label="Invite and access requests">
@@ -389,6 +502,10 @@ export default function InviteUsersPage() {
             {loadingRequests ? (
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="w-6 h-6 text-violet-500 dark:text-violet-400 animate-spin" />
+              </div>
+            ) : tenantPending ? (
+              <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">
+                Select a company above to see its access requests.
               </div>
             ) : pendingRequests.length === 0 ? (
               <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">
@@ -623,9 +740,15 @@ export default function InviteUsersPage() {
             </p>
           )}
 
+          {tenantPending && (
+            <p className="text-amber-700 dark:text-amber-300 text-sm bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-500/20 rounded-lg px-3 py-2">
+              Select a company above before sending — this controls which team the person joins.
+            </p>
+          )}
+
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || tenantPending}
             className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 font-semibold transition-colors min-h-[44px]"
           >
             {submitting ? (
@@ -654,6 +777,10 @@ export default function InviteUsersPage() {
         {loadingList ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="w-6 h-6 text-violet-500 dark:text-violet-400 animate-spin" />
+          </div>
+        ) : tenantPending ? (
+          <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">
+            Select a company above to see its invitations.
           </div>
         ) : invitations.length === 0 ? (
           <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">

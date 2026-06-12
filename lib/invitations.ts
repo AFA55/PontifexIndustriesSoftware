@@ -14,7 +14,13 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canInviteRole, ROLES_WITH_LABELS } from '@/lib/rbac';
+import { logAuditEvent } from '@/lib/audit';
+import { resolveAppOrigin } from '@/lib/app-url';
 import { randomBytes } from 'crypto';
+
+// Re-export for existing consumers; the implementation lives in lib/app-url.ts
+// (pure module, safe for client imports — THIS file pulls in supabase-admin).
+export { resolveAppOrigin, sanitizeOrigin, PROD_APP_ORIGIN } from '@/lib/app-url';
 
 export const VALID_ROLES = ROLES_WITH_LABELS.map((r) => r.value);
 
@@ -29,13 +35,14 @@ export function newToken(): string {
   return randomBytes(32).toString('base64url');
 }
 
-/** Resolve the public origin for setup links (env > request origin > prod). */
+/**
+ * Resolve the public origin for setup links (env > request origin > prod).
+ * Delegates to the hardened resolver: candidates are trimmed, must parse as a
+ * valid http(s) URL, and only the origin is kept (a trailing-whitespace env
+ * value once poisoned every emailed invite link — never again).
+ */
 export function resolveOrigin(requestOrigin?: string | null): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ||
-    requestOrigin ||
-    'https://www.pontifexindustries.com'
-  );
+  return resolveAppOrigin(requestOrigin);
 }
 
 export function buildSetupUrl(origin: string, token: string): string {
@@ -271,10 +278,14 @@ export async function createOrRefreshInvitation(
     invitationId = inserted?.id ?? null;
   }
 
+  // Belt-and-braces: re-sanitize the caller-supplied origin so a bad value can
+  // never reach an email even if a caller bypasses resolveOrigin().
+  const setupOrigin = resolveAppOrigin(opts.origin);
+
   const { error: emailError } = await opts.sendInviteEmail({
     email,
     token,
-    setupUrl: buildSetupUrl(opts.origin, token),
+    setupUrl: buildSetupUrl(setupOrigin, token),
     inviteeName: name,
     inviterName,
     tenantName,
@@ -290,6 +301,26 @@ export async function createOrRefreshInvitation(
       error: 'Invitation saved but the email failed to send. Try Resend.',
     };
   }
+
+  // Observability (fire-and-forget): record exactly which origin the setup
+  // link was built with — NEVER the token — so "what link did they actually
+  // get?" is answerable from audit_logs next time an emailed link misbehaves.
+  logAuditEvent({
+    userId: opts.inviter.userId,
+    userEmail: opts.inviter.email,
+    userRole: opts.inviter.role,
+    action: 'invite_email_sent',
+    resourceType: 'user_invitation',
+    resourceId: invitationId ?? undefined,
+    details: {
+      email,
+      invitationId,
+      setupUrlOrigin: setupOrigin,
+      role,
+      tenantId: opts.tenantId,
+      reusedExisting,
+    },
+  });
 
   return { ok: true, invitationId, email, role, reusedExisting };
 }

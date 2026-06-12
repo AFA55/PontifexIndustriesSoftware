@@ -11,8 +11,9 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { sendEmail } from '@/lib/email';
 import { sendSMSAny } from '@/lib/sms';
+import { resolveAppOrigin } from '@/lib/app-url';
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com';
+const APP_URL = resolveAppOrigin(); // hardened: trim + validate + origin-only
 
 export async function POST(request: NextRequest) {
   try {

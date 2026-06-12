@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { sendEmail } from '@/lib/email';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 export async function POST(request: NextRequest) {
   try {
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (profiles) {
       for (const profile of profiles) {
         if (profile.email) {
-          const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+          const appUrl = resolveAppOrigin();
           const fullActionUrl = `${appUrl}${actionUrl}`;
           const emailHtml = generateClockInReminderEmail(
             profile.full_name || 'Team Member',

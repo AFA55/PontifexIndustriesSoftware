@@ -12,6 +12,7 @@ import { requireAdmin } from '@/lib/api-auth';
 import { sendEmail } from '@/lib/email';
 import { sendSignatureRequestSMS } from '@/lib/sms';
 import crypto from 'crypto';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -80,7 +81,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Failed to create signature request' }, { status: 500 });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = resolveAppOrigin();
     const signingUrl = `${appUrl}/sign/${token}`;
     const jobLabel = job.project_name || job.title || job.job_number;
     const jobDate = job.scheduled_date
@@ -192,7 +193,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .order('created_at', { ascending: false })
       .limit(5);
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const appUrl = resolveAppOrigin();
 
     return NextResponse.json({
       success: true,

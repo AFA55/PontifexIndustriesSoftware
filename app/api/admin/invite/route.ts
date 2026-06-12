@@ -28,16 +28,19 @@ import {
   getInviterName,
   newToken,
   INVITE_TTL_MS,
+  resolveOrigin,
 } from '@/lib/invitations';
+import { logAuditEvent } from '@/lib/audit';
 
 const getResend = () => new Resend(getResendApiKey() || 're_placeholder');
 
+/**
+ * Hardened origin resolution (lib/app-url via resolveOrigin): trims, validates
+ * as http(s), keeps only the origin. A whitespace-polluted NEXT_PUBLIC_APP_URL
+ * once broke every invite link sent from this route.
+ */
 function baseUrl(request: NextRequest): string {
-  return (
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') ||
-    request.headers.get('origin') ||
-    'https://www.pontifexindustries.com'
-  );
+  return resolveOrigin(request.headers.get('origin'));
 }
 
 async function sendInviteEmail(opts: {
@@ -257,6 +260,26 @@ export async function PUT(request: NextRequest) {
       console.error('[invite] PUT resend email error:', emailError);
       return NextResponse.json({ error: 'Failed to send invitation email' }, { status: 502 });
     }
+
+    // Observability (fire-and-forget): which origin did the resent link use?
+    // (origin only — NEVER the token)
+    logAuditEvent({
+      userId: auth.userId,
+      userEmail: auth.userEmail,
+      userRole: auth.role,
+      action: 'invite_email_sent',
+      resourceType: 'user_invitation',
+      resourceId: id,
+      details: {
+        email: inv.email,
+        invitationId: id,
+        setupUrlOrigin: baseUrl(request),
+        role: inv.role,
+        tenantId,
+        resend: true,
+      },
+      request,
+    });
 
     return NextResponse.json({ success: true, data: { id, email: inv.email } });
   } catch (err) {

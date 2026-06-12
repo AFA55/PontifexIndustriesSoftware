@@ -5,6 +5,7 @@ import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getCardPermission, type PermissionLevel } from '@/lib/rbac';
 import { sendSMS } from '@/lib/sms';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 /**
  * POST /api/admin/schedule-board/dispatch
@@ -217,7 +218,7 @@ export async function POST(request: NextRequest) {
     }
 
     // 5. Fire-and-forget SMS to operators/helpers who have a phone number
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com';
+    const appUrl = resolveAppOrigin();
     const smsPromises: Promise<unknown>[] = [];
 
     for (const job of jobsToNotify) {

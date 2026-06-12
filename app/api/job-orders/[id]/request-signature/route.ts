@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { resolveAppOrigin } from '@/lib/app-url';
 import crypto from 'crypto';
 
 export async function GET(
@@ -119,7 +120,7 @@ export async function POST(
     // Build the public signing URL.
     // Use server-trusted env first to prevent host-header injection. Fall back
     // to the request's parsed origin (server-set, NOT a client-supplied header).
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
+    const baseUrl = resolveAppOrigin(request.nextUrl.origin);
 
     const signUrl = `${baseUrl}/sign/${token}`;
 

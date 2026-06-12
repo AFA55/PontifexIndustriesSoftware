@@ -4,6 +4,7 @@
  */
 
 import { Resend } from 'resend';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
 // `admin.pontifexindustries.com` is the ONLY verified Resend domain. The root
@@ -290,7 +291,7 @@ export function generateInviteEmail(opts: {
  * Generate approval confirmation email HTML
  */
 export function generateApprovalEmail(fullName: string, email: string, role: string): string {
-  const loginUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/login`;
+  const loginUrl = `${resolveAppOrigin()}/login`;
 
   return `
 <!DOCTYPE html>

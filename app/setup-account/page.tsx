@@ -79,7 +79,10 @@ const inputClasses = `w-full rounded-xl px-4 py-3 transition-colors min-h-[44px]
 function SetupAccountInner() {
   const params = useSearchParams();
   const router = useRouter();
-  const token = params.get('token');
+  // Trim defensively: a whitespace-polluted env var once produced links like
+  // ".../setup-account?token=xxx%20%20" — stray spaces around the token must
+  // not turn a valid invitation into a dead end.
+  const token = (params.get('token') || '').trim() || null;
 
   // 0=loading, -1=error, 1-4=steps, 5=success
   const [step, setStep] = useState<-1 | 0 | 1 | 2 | 3 | 4 | 5>(0);
@@ -102,7 +105,9 @@ function SetupAccountInner() {
 
   useEffect(() => {
     if (!token) {
-      setError('No invitation token found in the URL. Please use the link from your invitation email.');
+      // NEVER redirect away — always land on the friendly "Invitation Problem"
+      // card below so the person knows exactly what to do next.
+      setError('This link is missing its invitation code — it may have been cut off when it was copied from the email.');
       setStep(-1);
       return;
     }
@@ -273,9 +278,16 @@ function SetupAccountInner() {
             <AlertTriangle className="w-8 h-8 text-red-500 dark:text-red-400" />
           </div>
           <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Invitation Problem</h1>
-          <p className="text-slate-500 dark:text-white/60 mb-6">{error}</p>
-          <a href="/company-login" className="text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300 text-sm underline">
-            Go to sign in →
+          <p className="text-slate-500 dark:text-white/60 mb-4">{error}</p>
+          <p className="text-sm text-slate-600 dark:text-white/70 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/5 dark:ring-white/10 rounded-xl px-4 py-3 mb-6">
+            Ask your admin to resend the invitation — a fresh link will bring you right back here.
+          </p>
+          <a
+            href="/company-login"
+            className="inline-flex items-center justify-center gap-2 w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl py-3 font-semibold transition-colors min-h-[44px]"
+          >
+            Go to sign in
+            <ArrowRight className="w-4 h-4" />
           </a>
         </div>
       </div>
