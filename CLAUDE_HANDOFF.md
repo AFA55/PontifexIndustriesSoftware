@@ -14,6 +14,27 @@
 
 ---
 
+## ⚡ START HERE (Jun 12, 2026) — Remember-me AUTO SIGN-IN live + prompt-advisor + Vercel plugin
+
+1. **"Remember me" finally works** (`46f040d4`, deployed READY via healthy git integration): the
+   Supabase session was always persisted but NO page ever read it — everyone re-typed passwords
+   every launch. Both entry pages now auto-resume a valid session ("Signing you back in…" →
+   dashboard, zero typing); unchecking Remember-me genuinely opts out; dead sessions clear the
+   stale `supabase-user` blob. Verified live in preview against real Supabase (all 3 paths).
+   Reaches the iOS app automatically (webview).
+2. **Prompt-advisor hook** (`.claude/hooks/prompt-advisor.sh` + settings entry): pattern-matches
+   founder prompts → injects one-line pointers to the right skill/procedure. Pipe-tested; fires
+   alongside the ruflo router.
+3. **Official Vercel plugin adopted** (user-scope; skills active since this session). Used the
+   authed CLI for an env audit: deleted dead `RESEND_FROM_EMAIL` + typo'd
+   `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`; found `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` was set in prod
+   all along (backlog item was stale → now a spot-check). Still missing: SENTRY_DSN (founder).
+4. Jun 11 batch context: v1.0.3 (Face ID) Waiting for Review; access-requests pipeline +
+   onboarding sequence + avatars all live; founder still to approve Bryan + 1 of Adam's two
+   requests (deny the dup) in Invite Users → Access Requests.
+
+---
+
 ## ⚡ START HERE (Jun 11, 2026) — v1.0.3 SUBMITTED to Apple + invite email redesign + access-requests pipeline ✅ (commit pending push)
 
 **1. 🍎 iOS v1.0.3 (Build 8, Face ID) SUBMITTED FOR REVIEW** — driven via Claude-in-Chrome on the

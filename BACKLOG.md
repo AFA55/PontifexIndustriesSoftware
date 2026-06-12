@@ -9,10 +9,10 @@
 | | |
 |---|---|
 | **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
-| **Prod** | ✅ LIVE — pontifexindustries.com (`5b5d4012` deployed READY Jun 11 PT 2, via CLI) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (`46f040d4` deployed READY Jun 12 — Remember-me auto sign-in) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
-| **In flight** | v1.0.3 Waiting for Review at Apple · ⚠️ Vercel git-integration didn't fire on the last push (CLI deploy used) — watch next push |
+| **In flight** | v1.0.3 Waiting for Review at Apple · git-integration HEALTHY again (fired normally on the Jun 12 push) |
 | **Blocked on founder** | Approve Bryan + 1 of Adam's requests (deny dup) · Supabase Pro upgrade · Sentry DSN |
 | **Unpushed commits** | This STATUS refresh only (rides with next code push) |
 | **Last groomed** | Jun 11, 2026 |
