@@ -14,6 +14,34 @@
 
 ---
 
+## ⚡ START HERE (Jun 12, 2026 — PT 2) — Adam incident: root causes found + platform-wide link hardening ✅ (push pending)
+
+**THE ADAM INCIDENT, fully unwound (3 root causes):**
+1. **Poisoned `NEXT_PUBLIC_APP_URL`** in Vercel — DEAD old-project URL + two trailing spaces →
+   EVERY emailed link broken platform-wide (invites, password resets, signature requests, portal
+   links, notifications, dispatch). Env FIXED via CLI/API (clean canonical domain, verified).
+2. **Wrong-tenant manual invite** — founder (PONTIFEX super_admin) invited Adam Jun 8 → invitation
+   landed in PONTIFEX as salesman (scope defaulted to the inviter's org).
+3. Duplicate pending invitations colliding with the access-request flow.
+**Resolution:** Adam wiped clean (2 invitations + 2 requests deleted; never had an account), then
+founder asked for DIRECT creation: adam@patriotconcretecutting.com / role salesman ("Project
+Manager" label) @ PATRIOT — created via admin API + profile insert, login verified live on prod.
+
+**Built + guardian-PASSED (committed `a51b7196` + `bec07ebc`, NOT pushed):**
+- **lib/app-url.ts** origin hardening: 14 consumers, zero raw env reads remain; forgot-password
+  can't consume attacker origins; 35 incident-contract tests (890/890 total).
+- **/setup-account**: token trim + plain-words error card + go-to-sign-in button; never redirects away.
+- **Invite Users: SUPER-ADMIN COMPANY PICKER** (default none, Send disabled until chosen,
+  ?tenantId= threaded everywhere, server-enforced) — kills root cause #2 forever.
+- 'invite_email_sent' audit events (origin only, never token).
+- **Sidebar role LABELS** (salesman → "Project Manager") + **WelcomeProfileModal** (greets users
+  missing photo/nickname/phone, checklist → My Profile; session snooze; auto-gone when complete).
+  Verified live AS Adam.
+
+**⏭️ Next:** push this batch → founder approves Bryan's request (Adam done) → Hub v2 wizard.
+
+---
+
 ## ⚡ START HERE (Jun 12, 2026) — Remember-me AUTO SIGN-IN live + prompt-advisor + Vercel plugin
 
 1. **"Remember me" finally works** (`46f040d4`, deployed READY via healthy git integration): the

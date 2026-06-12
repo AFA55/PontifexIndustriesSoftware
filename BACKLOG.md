@@ -12,9 +12,9 @@
 | **Prod** | ✅ LIVE — pontifexindustries.com (`46f040d4` deployed READY Jun 12 — Remember-me auto sign-in) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
-| **In flight** | v1.0.3 Waiting for Review at Apple · git-integration HEALTHY again (fired normally on the Jun 12 push) |
-| **Blocked on founder** | Approve Bryan + 1 of Adam's requests (deny dup) · Supabase Pro upgrade · Sentry DSN |
-| **Unpushed commits** | This STATUS refresh only (rides with next code push) |
+| **In flight** | v1.0.3 Waiting for Review at Apple · Jun 12 PT2 batch committed awaiting push: link hardening + company picker + role labels + welcome modal |
+| **Blocked on founder** | Push confirmation · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
+| **Unpushed commits** | 3 code commits (bec07ebc role-labels+welcome-modal, a51b7196 link hardening) + docs |
 | **Last groomed** | Jun 11, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
