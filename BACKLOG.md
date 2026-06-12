@@ -37,8 +37,9 @@
 - [ ] **Sentry DSN** — code is fully wired & gated; founder sets `SENTRY_DSN` +
       `NEXT_PUBLIC_SENTRY_DSN` in Vercel → instant prod error visibility. (Phase A, docs/plans/PHASE_A_KICKOFF.md)
 - [ ] **Supabase Auth rate limits** — Dashboard → Auth → Settings (HIGH-2 from security audit).
-- [ ] **Clean up Vercel env vars** — founder: delete unused `RESEND_FROM_EMAIL`; optionally fix the
-      malformed `RESEND_API_KEY` value (code now self-heals it, so cosmetic).
+- [x] ~~Clean up Vercel env vars~~ — ✅ Jun 12 via authed CLI: deleted unused `RESEND_FROM_EMAIL` +
+      typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
+      Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
 
 ## 🟠 P1 (added Jun 10)
 
@@ -97,7 +98,7 @@
 - [ ] **Consolidate timecard settings tables** — key/value `timecard_settings` is bypassed; converge on v2.
 - [ ] **`grant-super-admin` audit-log insert uses wrong columns** — silently failing (pre-existing).
 - [ ] **Patriot visual assets** — founder uploads logo → Settings → Company Branding.
-- [ ] **Google Maps API key in Vercel** (`NEXT_PUBLIC_GOOGLE_MAPS_API_KEY`) → restores address autocomplete.
+- [ ] **Verify address autocomplete on prod** — env audit (Jun 12) found `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` HAS been set in Production for ~25 days; the 'missing key' item was stale. Spot-check autocomplete on the schedule form; the local-dev console spam is just the key missing from `.env.local`.
 - [ ] **Twilio**: toll-free verification + rotate auth token.
 - [ ] **Understand-Anything pilot** — founder runs `/plugin install understand-anything` in Claude
       Code → `/understand` → commit the JSON graph → visual codebase dashboard for the team.
