@@ -57,19 +57,58 @@ function CompanyLoginContent() {
   const [error, setError] = useState<string | null>(null);
   // Fast path: remember the last company so returning users tap once instead of
   // re-typing the code. 'pending' avoids a form→fast-path flash before hydration.
+  // 'resuming' = a valid persisted session was found and we're sending the user
+  // straight to their dashboard — THE "Remember me" behavior. Before this,
+  // sessions persisted in localStorage but no page ever read them, so everyone
+  // re-typed their password on every launch.
   const [lastCompany, setLastCompany] = useState<LastCompany | null>(null);
-  const [view, setView] = useState<'pending' | 'fast' | 'form'>('pending');
+  const [view, setView] = useState<'pending' | 'resuming' | 'fast' | 'form'>('pending');
   const [continuing, setContinuing] = useState(false);
 
   useEffect(() => {
-    const last = readLastCompany();
-    if (last) {
-      setLastCompany(last);
-      setView('fast');
-    } else {
-      setView('form');
-    }
-  }, []);
+    let cancelled = false;
+
+    const showEntry = () => {
+      if (cancelled) return;
+      const last = readLastCompany();
+      if (last) {
+        setLastCompany(last);
+        setView('fast');
+      } else {
+        setView('form');
+      }
+    };
+
+    (async () => {
+      try {
+        // Respect an explicit opt-out: unchecking "Remember me" disables auto
+        // sign-in (the user chose to re-authenticate each visit).
+        const remember = localStorage.getItem('pontifex.rememberMe') !== 'false';
+        // Dashboard guards read this profile blob; without it they'd bounce
+        // the user back here, so only resume when BOTH halves are present.
+        const storedUser = localStorage.getItem('supabase-user');
+        if (!remember || !storedUser) return showEntry();
+
+        // getSession() returns the persisted session and transparently
+        // refreshes an expired access token when the refresh token is valid.
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) return;
+        if (session) {
+          setView('resuming');
+          router.replace('/dashboard');
+          return;
+        }
+        // Session truly gone (signed out / refresh token revoked) — the stale
+        // profile blob must not linger or guards mis-render before bouncing.
+        localStorage.removeItem('supabase-user');
+        showEntry();
+      } catch {
+        showEntry();
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [router]);
 
   const handleContinue = () => {
     if (!lastCompany) return;
@@ -184,9 +223,17 @@ function CompanyLoginContent() {
               Pontifex Industries
             </h1>
             <p className="text-slate-400 text-sm text-center">
-              {view === 'fast' ? 'Welcome back' : 'Enter your company code to sign in'}
+              {view === 'resuming' ? 'Welcome back' : view === 'fast' ? 'Welcome back' : 'Enter your company code to sign in'}
             </p>
           </div>
+
+          {/* Auto sign-in — valid remembered session found, heading to the dashboard */}
+          {view === 'resuming' && (
+            <div className="flex flex-col items-center gap-3 py-8" role="status" aria-live="polite">
+              <Loader2 className="w-7 h-7 text-violet-400 animate-spin" />
+              <p className="text-slate-300 text-sm font-medium">Signing you back in…</p>
+            </div>
+          )}
 
           {/* Fast path — returning user: one tap back to their company's login */}
           {view === 'fast' && lastCompany && (

@@ -102,6 +102,25 @@ function LoginPageInner() {
     }
   }, [tenantId, router]);
 
+  // "Remember me" auto sign-in: a returning user with a valid persisted session
+  // (and the stored profile the dashboard guards read) goes straight to the
+  // dashboard instead of re-typing their password. Mirrors company-login.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const remember = localStorage.getItem('pontifex.rememberMe') !== 'false';
+        const storedUser = localStorage.getItem('supabase-user');
+        if (!remember || !storedUser) return;
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!cancelled && session) router.replace('/dashboard');
+      } catch {
+        /* fall through to the normal login form */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [router]);
+
   // Fetch branding for the specific tenant from the URL param
   useEffect(() => {
     if (!tenantId) return;
