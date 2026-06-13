@@ -12,7 +12,7 @@
 | **Prod** | ✅ LIVE — pontifexindustries.com (`46f040d4` deployed READY Jun 12 — Remember-me auto sign-in) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
-| **In flight** | Schedule-form batch READY to push: Maps autocomplete fix (`451b124a`) + safety-requirements toggle + PPE-persistence fix (`73bc5029`) |
+| **In flight** | Jarvis Command Center — Phase 1 (HUD shell) SHIPPING; Phase 2 (Claude brain) next |
 | **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
 | **Unpushed commits** | 3 code commits (bec07ebc role-labels+welcome-modal, a51b7196 link hardening) + docs |
 | **Last groomed** | Jun 11, 2026 |
@@ -58,7 +58,14 @@
       site_contact, contact_phone, estimated_cost. Editing a job silently loses these + can wipe
       them on re-save. ppe_required + additional_safety_requirements already fixed (`73bc5029`);
       reconcile the rest of the select against the edit-load mapping.
-- [ ] **Smart-fill system** — founder has an idea (3rd queued task; awaiting the brief).
+- [x] ~~Smart-fill → evolved into the **Jarvis Command Center**~~ — Phase 1 (HUD shell) shipped Jun 13
+      (`88efd8d3`): arc-reactor canvas + tabs + live data rail + launch tile, read-only, 0 AI cost.
+- [ ] **Jarvis Phase 2 — the brain (text):** `POST /api/command-center/assistant` (Claude via Vercel
+      AI Gateway, tenant-scoped READ-ONLY tools) + text chat in the HUD answering "how's the app
+      doing?". Founder: confirm AI Gateway + a monthly $ ceiling. Plan: docs/plans/JARVIS_COMMAND_CENTER_PLAN.md §3.
+- [ ] **Jarvis Phase 3 — the voice:** ElevenLabs British voice (founder provisions the key) +
+      reactor pulses to audio (amplitude prop already wired) + web speech-in. iOS = type for v1.
+- [ ] **Jarvis Phase 4 (later):** gated write/action tools behind confirmations.
 
 ## 🟠 P1 (added Jun 10)
 
