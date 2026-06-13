@@ -12,7 +12,7 @@
 | **Prod** | ✅ LIVE — pontifexindustries.com (`46f040d4` deployed READY Jun 12 — Remember-me auto sign-in) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
-| **In flight** | Schedule-form batch building (Maps autocomplete fix `451b124a` committed-held + safety-requirements toggle) → one push when both ready |
+| **In flight** | Schedule-form batch READY to push: Maps autocomplete fix (`451b124a`) + safety-requirements toggle + PPE-persistence fix (`73bc5029`) |
 | **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
 | **Unpushed commits** | 3 code commits (bec07ebc role-labels+welcome-modal, a51b7196 link hardening) + docs |
 | **Last groomed** | Jun 11, 2026 |
@@ -51,6 +51,13 @@
 - [ ] **Remove dead dep `use-places-autocomplete`** (`npm uninstall`) — zero imports after the Maps fix.
 - [ ] **GoogleAddressAutocomplete dark-mode** — component is light-only (pre-existing, not a regression
       from the rewrite); add dark: variants when convenient.
+- [ ] **🟠 Schedule-form EDIT MODE is lossy (pre-existing, guardian-found Jun 12)** —
+      `/api/admin/jobs/[id]/summary` builds an explicit `job` object the edit-load reads, but it
+      OMITS ~12 fields the form maps: scope_details, scheduling_flexibility, site_compliance,
+      jobsite_conditions, equipment_needed/details/selections, customer_id, location_name,
+      site_contact, contact_phone, estimated_cost. Editing a job silently loses these + can wipe
+      them on re-save. ppe_required + additional_safety_requirements already fixed (`73bc5029`);
+      reconcile the rest of the select against the edit-load mapping.
 - [ ] **Smart-fill system** — founder has an idea (3rd queued task; awaiting the brief).
 
 ## 🟠 P1 (added Jun 10)
