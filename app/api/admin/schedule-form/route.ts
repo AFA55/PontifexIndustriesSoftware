@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
       special_equipment: body.special_equipment ? [body.special_equipment] : [],  // legacy array format
       special_equipment_notes: body.special_equipment || null,  // clean text format
       equipment_rentals: body.equipment_rentals || [],
+      ppe_required: body.ppe_required || [],
+      additional_safety_requirements: body.additional_safety_requirements || [],
 
       // ── Step 5: Scheduling Details ──────────────────────────
       scheduled_date: body.scheduled_date,

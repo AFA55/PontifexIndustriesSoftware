@@ -80,6 +80,25 @@ const PPE_ITEMS = [
 
 const GLOVE_CUT_LEVELS = [3, 4, 5] as const;
 
+// Additional, distinct safety requirements (beyond standard PPE) — Step 5.
+// Custom entries are stored as `other:<text>` keys.
+const SAFETY_REQUIREMENTS = [
+  { key: 'fall_protection', label: 'Fall Protection / Tie-Off', icon: '🪢' },
+  { key: 'confined_space', label: 'Confined Space Entry', icon: '🕳️' },
+  { key: 'lockout_tagout', label: 'Lockout / Tagout (LOTO)', icon: '🔒' },
+  { key: 'hot_work', label: 'Hot Work Permit', icon: '🔥' },
+  { key: 'respiratory', label: 'Respiratory Protection', icon: '😷' },
+  { key: 'silica_control', label: 'Silica Dust Control', icon: '🌫️' },
+  { key: 'hi_vis', label: 'Hi-Vis Vest', icon: '🦺' },
+  { key: 'hard_hat', label: 'Hard Hat', icon: '⛑️' },
+  { key: 'steel_toe', label: 'Steel-Toe Boots', icon: '🥾' },
+  { key: 'spotter', label: 'Spotter Required', icon: '👀' },
+  { key: 'barricades', label: 'Barricades & Signage', icon: '🚧' },
+  { key: 'traffic_control', label: 'Traffic Control', icon: '🚦' },
+  { key: 'fire_watch', label: 'Fire Watch', icon: '🧯' },
+  { key: 'overhead', label: 'Overhead Hazard Awareness', icon: '🏗️' },
+] as const;
+
 // Equipment presets config moved to SERVICE_EQUIPMENT
 
 // ── Scope fields per service type (quantity inputs for Step 3) ──
@@ -413,6 +432,7 @@ interface FormData {
   equipment_rentals: { name: string; pickup_required: boolean }[];
   rental_equipment_input: string;
   ppe_required: string[];
+  additional_safety_requirements: string[];
   // Step 5
   start_date: string;
   end_date: string;
@@ -500,6 +520,7 @@ const initialFormData: FormData = {
   equipment_rentals: [],
   rental_equipment_input: '',
   ppe_required: [],
+  additional_safety_requirements: [],
   start_date: '',
   end_date: '',
   special_arrival: false,
@@ -831,6 +852,12 @@ export default function ScheduleFormPage() {
   const [savedDrafts, setSavedDrafts] = useState<{ id: string; customer: string; step: number; date: string }[]>([]);
   const [draftSaved, setDraftSaved] = useState(false);
 
+  // Step 5 — "Additional safety requirements?" collapse + custom "Other" input.
+  // Toggle state is tracked separately so an accidental toggle-off collapses the
+  // section WITHOUT discarding the user's selections (data is preserved in form).
+  const [showSafetyReqs, setShowSafetyReqs] = useState(false);
+  const [safetyOtherInput, setSafetyOtherInput] = useState('');
+
   // Site coordinates from Google Places autocomplete (used for drive-time chip)
   const [siteCoords, setSiteCoords] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -947,6 +974,7 @@ export default function ScheduleFormPage() {
             equipment_details: j.equipment_details || {},
             equipment_selections: j.equipment_selections || {},
             ppe_required: j.ppe_required || [],
+            additional_safety_requirements: j.additional_safety_requirements || [],
             jobsite_photo_urls: j.jobsite_photo_urls || [],
             scope_photo_urls: j.scope_photo_urls || [],
             start_date: j.scheduled_date || '',
@@ -963,6 +991,11 @@ export default function ScheduleFormPage() {
             // Booleans / nested
             overcutting_allowed: typeof jc.overcutting_allowed === 'boolean' ? jc.overcutting_allowed : (f as any).overcutting_allowed,
           }));
+          // If the loaded job already has additional safety requirements, start
+          // the Step-5 section expanded so the founder can see/edit them.
+          if (Array.isArray(j.additional_safety_requirements) && j.additional_safety_requirements.length > 0) {
+            setShowSafetyReqs(true);
+          }
           // Jump to the scope step (3) when requested
           if (jumpToParam === 'scope') {
             setCurrentStep(3);
@@ -1645,6 +1678,7 @@ export default function ScheduleFormPage() {
         equipment_selections: Object.keys(form.equipment_selections).length > 0 ? form.equipment_selections : undefined,
         special_equipment: form.special_equipment || null,
         ppe_required: form.ppe_required,
+        additional_safety_requirements: form.additional_safety_requirements,
         equipment_rentals: form.equipment_rentals.map(r =>
           r.pickup_required ? `${r.name} (PICKUP REQUIRED)` : r.name
         ),
@@ -1727,6 +1761,7 @@ export default function ScheduleFormPage() {
             equipment_selections: payload.equipment_selections,
             special_equipment: payload.special_equipment,
             ppe_required: payload.ppe_required,
+            additional_safety_requirements: payload.additional_safety_requirements,
             arrival_time: form.arrival_time || form.special_arrival_time || null,
           }),
         });
@@ -3559,6 +3594,118 @@ export default function ScheduleFormPage() {
                   })}
                 </div>
               )}
+
+              {/* ── Additional safety requirements (distinct from standard PPE) ── */}
+              <div className="mt-5 pt-5 border-t border-slate-200 dark:border-white/10">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <div>
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">Additional safety requirements?</span>
+                    <p className="text-[11px] text-slate-500 dark:text-white/40">Job-specific safety controls beyond standard PPE</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={showSafetyReqs}
+                    onClick={() => setShowSafetyReqs(v => !v)}
+                    className={`relative shrink-0 w-12 h-7 rounded-full transition-colors ${showSafetyReqs ? 'bg-orange-500' : 'bg-slate-300 dark:bg-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform ${showSafetyReqs ? 'translate-x-5' : ''}`} />
+                  </button>
+                </label>
+
+                {showSafetyReqs && (
+                  <div className="mt-4 space-y-4">
+                    {/* Selectable chips */}
+                    <div className="flex flex-wrap gap-2">
+                      {SAFETY_REQUIREMENTS.map(item => {
+                        const active = form.additional_safety_requirements.includes(item.key);
+                        return (
+                          <button
+                            key={item.key}
+                            type="button"
+                            onClick={() => {
+                              const next = active
+                                ? form.additional_safety_requirements.filter(k => k !== item.key)
+                                : [...form.additional_safety_requirements, item.key];
+                              updateForm({ additional_safety_requirements: next });
+                            }}
+                            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold border-2 transition-all ${
+                              active
+                                ? 'bg-orange-500 border-orange-500 text-white shadow-md'
+                                : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/60 hover:border-orange-300 dark:hover:border-orange-400/40 hover:text-orange-600 dark:hover:text-orange-400'
+                            }`}
+                          >
+                            <span>{item.icon}</span>
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* "Other" free-text input */}
+                    <div className="bg-slate-50 dark:bg-white/5 rounded-xl p-4 border border-slate-200 dark:border-white/10">
+                      <p className="text-xs font-bold text-slate-700 dark:text-white/70 mb-2">Other (custom)</p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={safetyOtherInput}
+                          onChange={e => setSafetyOtherInput(e.target.value)}
+                          onKeyDown={e => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const text = safetyOtherInput.trim().slice(0, 120);
+                              if (text && !form.additional_safety_requirements.includes(`other:${text}`)) {
+                                updateForm({ additional_safety_requirements: [...form.additional_safety_requirements, `other:${text}`] });
+                              }
+                              setSafetyOtherInput('');
+                            }
+                          }}
+                          placeholder="e.g. Asbestos abatement clearance"
+                          className="flex-1 min-w-0 px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/30"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const text = safetyOtherInput.trim().slice(0, 120);
+                            if (text && !form.additional_safety_requirements.includes(`other:${text}`)) {
+                              updateForm({ additional_safety_requirements: [...form.additional_safety_requirements, `other:${text}`] });
+                            }
+                            setSafetyOtherInput('');
+                          }}
+                          disabled={!safetyOtherInput.trim()}
+                          className="shrink-0 min-h-[44px] px-4 py-2 rounded-xl text-sm font-bold bg-orange-500 text-white shadow-md hover:bg-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                          Add
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Summary chip strip of selected additional requirements */}
+                    {form.additional_safety_requirements.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {form.additional_safety_requirements.map(key => {
+                          const preset = SAFETY_REQUIREMENTS.find(s => s.key === key);
+                          const isOther = key.startsWith('other:');
+                          const label = preset ? `${preset.icon} ${preset.label}` : isOther ? `📝 ${key.slice('other:'.length)}` : key;
+                          return (
+                            <span key={key} className="inline-flex items-center gap-1 bg-orange-100 dark:bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-200 dark:border-orange-400/30 rounded-full px-2.5 py-0.5 text-[11px] font-semibold">
+                              {label}
+                              <button
+                                type="button"
+                                onClick={() => updateForm({ additional_safety_requirements: form.additional_safety_requirements.filter(k => k !== key) })}
+                                className="ml-0.5 -mr-1 w-4 h-4 inline-flex items-center justify-center rounded-full hover:bg-orange-200 dark:hover:bg-orange-400/30 transition-colors"
+                                aria-label={`Remove ${label}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         );

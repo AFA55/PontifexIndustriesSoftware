@@ -59,7 +59,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         utility_waiver_signer_name,
         utility_waiver_signed_at,
         commission_rate,
-        photo_urls
+        photo_urls,
+        ppe_required,
+        additional_safety_requirements
       `)
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
@@ -359,6 +361,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
           completion_rejected_at: (job as any).rejected_at ?? null,
           completion_rejection_notes: (job as any).rejection_notes ?? (job as any).rejection_reason ?? null,
           commission_rate: (job as any).commission_rate ?? null,
+          // Schedule-form edit-load reads these to repopulate Step 5 (PPE +
+          // additional safety requirements). Without them the toggle never
+          // re-expands and a re-save would wipe the stored values.
+          ppe_required: Array.isArray((job as any).ppe_required) ? (job as any).ppe_required : [],
+          additional_safety_requirements: Array.isArray((job as any).additional_safety_requirements)
+            ? (job as any).additional_safety_requirements
+            : [],
         },
         scope: {
           items: enrichedScopeItems,

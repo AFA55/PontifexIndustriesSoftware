@@ -98,6 +98,7 @@ export async function PATCH(
       'description', 'assigned_to', 'helper_assigned_to', 'scheduled_date', 'end_date',
       'estimated_hours', 'estimated_cost', 'operator_name', 'status', 'priority',
       'is_will_call', 'difficulty_rating',
+      'ppe_required', 'additional_safety_requirements',
     ];
 
     allowedFields.forEach(field => {
