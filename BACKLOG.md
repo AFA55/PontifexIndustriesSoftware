@@ -9,13 +9,13 @@
 | | |
 |---|---|
 | **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
-| **Prod** | ✅ LIVE — pontifexindustries.com (`46f040d4` deployed READY Jun 12 — Remember-me auto sign-in) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (`88efd8d3` deployed READY Jun 13 — Jarvis Command Center Phase 1) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
-| **In flight** | Jarvis Command Center — Phase 1 (HUD shell) SHIPPING; Phase 2 (Claude brain) next |
+| **In flight** | Jarvis Phase 1 LIVE ✅ → Phase 2 (Claude brain, text) next — awaiting founder AI-Gateway greenlight |
 | **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
-| **Unpushed commits** | 3 code commits (bec07ebc role-labels+welcome-modal, a51b7196 link hardening) + docs |
-| **Last groomed** | Jun 11, 2026 |
+| **Unpushed commits** | none (all pushed through `88efd8d3` + docs) |
+| **Last groomed** | Jun 13, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
 
@@ -25,8 +25,6 @@
 - [x] ~~Revert temp invite diagnostic~~ — ✅ Jun 10: EMAIL DIAG logging + raw-error response removed.
 - [ ] **Supabase Free → Pro ($25/mo)** — founder action. Payroll data currently has NO automated
       backups. Highest-leverage 5 minutes available. (See docs/plans/BACKUP_AND_CLOUD_STRATEGY.md.)
-- [ ] **Push the Jun 10 fix batch** (founder confirms): branding-flash fix + logo 1.5x + demo-funnel
-      500 fix + demo-requests inbox + diagnostic revert.
 
 ## 🟠 P1 — This week
 
