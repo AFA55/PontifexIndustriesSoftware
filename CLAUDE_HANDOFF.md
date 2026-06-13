@@ -1,5 +1,31 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 9, 2026 (PT 2) | **Branch:** `main` | **HEAD pushed:** `a56a2322` (email self-heal, deploy READY) + local docs-reorg commit pending | **Production:** ✅ LIVE at pontifexindustries.com | **iOS:** v1.0.2 LIVE + v1.0.3/Build 8 (Face ID) in TestFlight.
+**Last updated:** Jun 13, 2026 | **Branch:** `main` | **HEAD pushed:** `88efd8d3` (Jarvis Command Center Phase 1) — deploy READY | **Production:** ✅ LIVE | **iOS:** v1.0.2 live + v1.0.3/Build 8 (Face ID) Waiting for Review at Apple.
+
+## ⚡ START HERE (Jun 13, 2026) — Jarvis Command Center Phase 1 LIVE + schedule-form fixes
+
+**Smart-fill evolved into the JARVIS COMMAND CENTER** — a Stark-HUD AI command center. Full
+architecture + decisions in `docs/plans/JARVIS_COMMAND_CENTER_PLAN.md`. Phased so nothing big-bangs.
+- **Phase 1 SHIPPED (`88efd8d3`, READY):** `/dashboard/command-center` — vanilla-canvas arc-reactor
+  (spins; `state`+`amplitude` props ALREADY wired for Phase 3 voice-pulse), management tabs, live
+  right rail (`GET /api/command-center/overview`, tenant-scoped + fail-soft), launch tile at the
+  bottom of the admin dashboard (admin/super_admin/ops_manager). Read-only, ZERO AI/voice cost.
+  Guardian PASS. ArcReactor: `components/command-center/ArcReactor.tsx`.
+- **Phase 2 (NEXT) — the brain (text):** `POST /api/command-center/assistant`, Claude via Vercel AI
+  Gateway (`"anthropic/..."`), tenant-scoped READ-ONLY tools (clocked-in, jobs, approvals, revenue),
+  text chat in the HUD. **Blocked on founder:** greenlight AI Gateway + a monthly $ ceiling.
+- **Phase 3 — voice:** ElevenLabs British voice (founder provisions key) → pipe Web Audio amplitude
+  into the ArcReactor `amplitude` prop (no component change needed) + web speech-in (type on iOS v1).
+- **Phase 4 (later):** gated write/action tools behind confirmations.
+
+**Also shipped this batch:** Maps autocomplete fix (`451b124a`, Places API New + manual fallback —
+needs founder to enable "Places API (New)" in Google Cloud for live suggestions) · safety-requirements
+toggle + **the PPE-was-never-persisted bug** (`73bc5029`).
+
+**Founder open actions:** enable Places API (New) in Google Cloud · approve Bryan's access request ·
+Supabase Free→Pro (payroll backups) · Sentry DSN · test Build 8 Face ID → submit when Apple approves.
+
+---
+
 
 > ✅ **EMAIL BLOCKER RESOLVED IN CODE (Jun 9):** the malformed Vercel `RESEND_API_KEY`
 > (`RESEND_API_KEY=re_CBn…` — name glued to value) is now **self-healed at runtime** by
