@@ -12,8 +12,8 @@
 | **Prod** | ✅ LIVE — pontifexindustries.com (`46f040d4` deployed READY Jun 12 — Remember-me auto sign-in) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
-| **In flight** | v1.0.3 Waiting for Review at Apple · Jun 12 PT2 batch committed awaiting push: link hardening + company picker + role labels + welcome modal |
-| **Blocked on founder** | Push confirmation · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
+| **In flight** | Schedule-form batch building (Maps autocomplete fix `451b124a` committed-held + safety-requirements toggle) → one push when both ready |
+| **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
 | **Unpushed commits** | 3 code commits (bec07ebc role-labels+welcome-modal, a51b7196 link hardening) + docs |
 | **Last groomed** | Jun 11, 2026 |
 
@@ -40,6 +40,18 @@
 - [x] ~~Clean up Vercel env vars~~ — ✅ Jun 12 via authed CLI: deleted unused `RESEND_FROM_EMAIL` +
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
+
+## 🟠 P1 (added Jun 12 — schedule-form session)
+
+- [ ] **🔴 FOUNDER: enable "Places API (New)" in Google Cloud Console** for the project behind
+      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (+ keep "Maps JavaScript API"; ensure the key's HTTP-referrer
+      + API restrictions allow pontifexindustries.com/* and *.vercel.app/*). The address-autocomplete
+      code fix (`451b124a`) migrated to Places API (New) + degrades to manual entry, but suggestions
+      only work once this API is enabled. Add localhost:3000/* to referrers for local dev.
+- [ ] **Remove dead dep `use-places-autocomplete`** (`npm uninstall`) — zero imports after the Maps fix.
+- [ ] **GoogleAddressAutocomplete dark-mode** — component is light-only (pre-existing, not a regression
+      from the rewrite); add dark: variants when convenient.
+- [ ] **Smart-fill system** — founder has an idea (3rd queued task; awaiting the brief).
 
 ## 🟠 P1 (added Jun 10)
 
