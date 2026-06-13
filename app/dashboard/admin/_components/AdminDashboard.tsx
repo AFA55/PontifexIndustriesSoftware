@@ -18,6 +18,7 @@ import {
   Activity, Clock, Umbrella, DollarSign, Receipt, ClipboardList,
   CheckCircle2, ChevronRight, AlertCircle, Briefcase, CalendarDays, ListChecks,
 } from 'lucide-react';
+import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
 interface ActiveJob {
   id: string;
@@ -309,6 +310,9 @@ export default function AdminDashboard({ user, dashData, dashLoading, activeJobs
           </div>
         )}
       </section>
+
+      {/* ── Command Center launch ──────────────────────────────────────────── */}
+      <CommandCenterLaunch />
     </div>
   );
 }

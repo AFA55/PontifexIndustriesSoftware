@@ -36,6 +36,7 @@ import { getCurrentUser, type User } from '@/lib/auth';
 import { ADMIN_DASHBOARD_ROLES } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
 import CommissionsCard from '@/components/CommissionsCard';
+import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
 // Heavy demo-only walkthrough — only renders when showWalkthrough && isDemoAdmin
 const AdminOnboardingTour = nextDynamic(() => import('@/components/AdminOnboardingTour'), { ssr: false, loading: () => null });
@@ -1490,6 +1491,11 @@ export default function AdminDashboard() {
           )}
         </div>
       </div>
+
+      {/* ── Command Center launch (super_admin / operations_manager) ──────── */}
+      {user && ['super_admin', 'operations_manager'].includes(user.role) && (
+        <CommandCenterLaunch />
+      )}
 
       {/* Admin Onboarding Tour */}
       {showWalkthrough && isDemoAdmin && user && (
