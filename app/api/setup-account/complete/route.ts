@@ -302,6 +302,33 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // ── Seed notification preferences from the consent the user just gave ─────
+    // Setup collects email + SMS consent; without this the choice is lost (the
+    // user lands with zero preference rows → defaults push-on/email-off/sms-off,
+    // ignoring what they picked). Push stays on (mobile alerts); email + SMS
+    // follow the consent checkboxes. Non-fatal: a missing table never blocks
+    // onboarding. Idempotent via the UNIQUE(user_id, category).
+    const NOTIF_CATEGORIES = [
+      'clock_in_reminder', 'work_performed_reminder', 'time_off_status',
+      'job_dispatched', 'document_to_sign', 'maintenance_update',
+    ];
+    const { error: prefError } = await supabaseAdmin
+      .from('notification_preferences')
+      .upsert(
+        NOTIF_CATEGORIES.map((category) => ({
+          user_id: userId,
+          category,
+          push_enabled: true,
+          sms_enabled: !!body.smsConsent,
+          email_enabled: !!body.emailConsent,
+          updated_at: now,
+        })),
+        { onConflict: 'user_id,category' }
+      );
+    if (prefError) {
+      console.error('[setup-account/complete] Error seeding notification prefs (non-fatal):', prefError);
+    }
+
     // ── H3: rotate + consume the token ───────────────────────────────────────
     // The original 7-day setup token is rotated to a fresh random value with a
     // SHORT (10-min) expiry. This (1) makes the invite single-use — the old

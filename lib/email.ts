@@ -35,37 +35,81 @@ const DEFAULT_EMAIL_BRANDING: EmailBranding = {
 /**
  * Resolve the email branding for a given tenant.
  *
- * - `tenantId` null OR lookup fails → platform defaults (today's purple look).
- * - Tenant found → its `name` + `primary_color` + `logo_url`. When a tenant has
- *   ANY `primary_color`, the accent flips to blue (`#1d4ed8`) so a red primary
- *   reads as a red→blue "red/white/blue" header; with no primary_color we keep
- *   the purple default accent. Wrapped in try/catch — never throws (emails must
- *   not fail on a branding lookup).
+ * Reads the RICH `tenant_branding` store — the SAME source the app's login page
+ * uses (logo + secondary color live there, NOT in the sparse `tenants` table).
+ * Falls back to the `tenants` row, then to platform defaults. The accent is the
+ * tenant's real `secondary_color` when set (e.g. Patriot's navy → red/white/blue
+ * with the red primary), else blue, else the purple platform default. Wrapped in
+ * try/catch — never throws (emails must not fail on a branding lookup).
  */
 export async function getTenantEmailBranding(
   tenantId: string | null
 ): Promise<EmailBranding> {
   if (!tenantId) return { ...DEFAULT_EMAIL_BRANDING };
   try {
-    const { data, error } = await supabaseAdmin
-      .from('tenants')
-      .select('name, primary_color, logo_url')
-      .eq('id', tenantId)
+    const { data: tb } = await supabaseAdmin
+      .from('tenant_branding')
+      .select('company_name, primary_color, secondary_color, logo_url, logo_icon_url')
+      .eq('tenant_id', tenantId)
       .maybeSingle();
-    if (error || !data) return { ...DEFAULT_EMAIL_BRANDING };
 
-    const primaryColor: string | null = data.primary_color || null;
+    // Fall back to the tenants row only when there's no branding record.
+    const { data: t } = tb
+      ? { data: null }
+      : await supabaseAdmin
+          .from('tenants')
+          .select('name, primary_color, logo_url')
+          .eq('id', tenantId)
+          .maybeSingle();
+
+    if (!tb && !t) return { ...DEFAULT_EMAIL_BRANDING };
+
+    const primaryColor: string | null = tb?.primary_color || t?.primary_color || null;
+    const secondaryColor: string | null = tb?.secondary_color || null;
     return {
-      companyName: data.name || DEFAULT_COMPANY_NAME,
+      companyName: tb?.company_name || t?.name || DEFAULT_COMPANY_NAME,
       brandColor: primaryColor || DEFAULT_BRAND_COLOR,
-      // A tenant primary_color → blue accent (red/white/blue header).
-      // No primary_color → keep the purple platform-default accent.
-      accentColor: primaryColor ? '#1d4ed8' : DEFAULT_ACCENT_COLOR,
-      logoUrl: data.logo_url || null,
+      // Real secondary (e.g. navy) → true red/white/blue; else blue when a
+      // primary exists; else keep the purple platform-default accent.
+      accentColor: secondaryColor || (primaryColor ? '#1d4ed8' : DEFAULT_ACCENT_COLOR),
+      logoUrl: tb?.logo_url || tb?.logo_icon_url || t?.logo_url || null,
     };
   } catch {
     return { ...DEFAULT_EMAIL_BRANDING };
   }
+}
+
+/**
+ * Shared, white-label email header: a thin brand→accent accent bar over a WHITE
+ * band with the tenant LOGO (when present) + company name + a subtitle. White
+ * background so the logo reads correctly; the red→navy bar gives the brand pop
+ * (true red/white/blue for Patriot). Used by every transactional email so they
+ * all match the company the recipient is joining.
+ */
+export function emailHeader(
+  b: { companyName: string; brandColor: string; accentColor: string; logoUrl: string | null },
+  subtitle: string
+): string {
+  const companyName = escapeHtml(b.companyName);
+  const brand = escapeHtml(b.brandColor);
+  const accent = escapeHtml(b.accentColor);
+  const logo = b.logoUrl ? escapeHtml(b.logoUrl) : '';
+  const logoTag = logo
+    ? `<img src="${logo}" alt="${companyName}" height="56" style="max-height:56px;max-width:200px;margin:0 auto 14px;display:block;">`
+    : '';
+  return `
+          <!-- Brand accent bar -->
+          <tr>
+            <td style="height:6px; line-height:6px; font-size:0; background-color:${brand}; background:linear-gradient(90deg, ${brand} 0%, ${accent} 100%);">&nbsp;</td>
+          </tr>
+          <!-- White header: logo + company name + subtitle -->
+          <tr>
+            <td bgcolor="#ffffff" style="background-color:#ffffff; padding:32px 40px 24px; text-align:center;">
+              ${logoTag}
+              <h1 style="margin:0; color:#0f172a; font-size:24px; font-weight:700; letter-spacing:-0.4px;">${companyName}</h1>
+              <p style="margin:8px 0 0; color:#64748b; font-size:13px; font-weight:500;">${subtitle}</p>
+            </td>
+          </tr>`;
 }
 
 // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
@@ -273,18 +317,7 @@ export function generateInviteEmail(opts: {
         <!-- Main Container -->
         <table role="presentation" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;" bgcolor="#ffffff">
 
-          <!-- Header -->
-          <tr>
-            <td bgcolor="${brandColor}" style="background-color: ${brandColor}; background: linear-gradient(135deg, ${brandColor} 0%, ${accentColor} 100%); padding: 44px 40px; text-align: center;">
-              ${logoTag}
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                ${tenantName}
-              </h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                You're invited to join the team
-              </p>
-            </td>
-          </tr>
+${emailHeader({ companyName: opts.tenantName, brandColor: opts.brandColor || DEFAULT_BRAND_COLOR, accentColor: opts.accentColor || DEFAULT_ACCENT_COLOR, logoUrl: opts.logoUrl ?? null }, "You're invited to join the team")}
 
           <!-- Main Content -->
           <tr>
@@ -399,18 +432,7 @@ export function generateApprovalEmail(
         <!-- Main Container -->
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;">
 
-          <!-- Header -->
-          <tr>
-            <td bgcolor="${brandColor}" style="background-color: ${brandColor}; background: linear-gradient(135deg, ${brandColor} 0%, ${accentColor} 100%); padding: 48px 40px; text-align: center;">
-              ${logoTag}
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                ${companyName}
-              </h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                Concrete Cutting Management System
-              </p>
-            </td>
-          </tr>
+${emailHeader(branding, 'Concrete Cutting Management System')}
 
           <!-- Main Content -->
           <tr>
@@ -529,18 +551,7 @@ export function generateAccessRequestReceivedEmail(
         <!-- Main Container -->
         <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;">
 
-          <!-- Header -->
-          <tr>
-            <td bgcolor="${brandColor}" style="background-color: ${brandColor}; background: linear-gradient(135deg, ${brandColor} 0%, ${accentColor} 100%); padding: 48px 40px; text-align: center;">
-              ${logoTag}
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                ${companyName}
-              </h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                Concrete Cutting Management System
-              </p>
-            </td>
-          </tr>
+${emailHeader(branding, 'Concrete Cutting Management System')}
 
           <!-- Main Content -->
           <tr>
