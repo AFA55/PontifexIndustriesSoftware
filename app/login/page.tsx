@@ -10,10 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { biometricAvailable, biometryLabel, clearCredentials, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
-import PasskeyLoginButton from '@/components/PasskeyLoginButton';
-import BiometricEnrollPrompt from '@/components/BiometricEnrollPrompt';
 import { isNativeApp } from '@/lib/is-native';
-import { getEnrolledBiometric, passkeySupported, platformPasskeyAvailable } from '@/lib/webauthn-client';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
@@ -93,7 +90,6 @@ function LoginPageInner() {
   const faceIdAutoTried = useRef(false);
   // Post-login "enable Touch ID?" prompt (website). When set, we hold the
   // role-based redirect until the user enables or skips.
-  const [enrollPrompt, setEnrollPrompt] = useState<{ email: string; redirect: string } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
@@ -183,11 +179,13 @@ function LoginPageInner() {
     defaultValues: { remember: true }, // "Remember me" checked by default
   });
 
-  // Bank-of-America style: pre-fill the saved username on return, so the user
-  // sees their email + the "Use Touch ID" button instead of a blank form.
+  // Remember the last username on this device so the email field is pre-filled
+  // on return. The browser's own password manager handles the password / passkey.
   useEffect(() => {
-    const enrolled = getEnrolledBiometric();
-    if (enrolled?.email) setValue('email', enrolled.email);
+    try {
+      const last = localStorage.getItem('pontifex.lastEmail');
+      if (last) setValue('email', last);
+    } catch { /* storage unavailable — non-fatal */ }
   }, [setValue]);
 
   const onSubmit = async (data: FormData) => {
@@ -247,6 +245,9 @@ function LoginPageInner() {
         email: result.user.email,
         role: result.user.role,
       }));
+      // Remember the username so the login form pre-fills it next time (the
+      // browser's password manager handles the password / passkey).
+      try { localStorage.setItem('pontifex.lastEmail', data.email); } catch { /* non-fatal */ }
       console.log('💾 User stored in localStorage');
 
       // Native app: save credentials to the iOS Keychain so the user can sign in
@@ -283,21 +284,6 @@ function LoginPageInner() {
         return;
       }
 
-      // Website only: after the first password login on a biometric-capable
-      // browser, offer "Use Touch ID next time?" (Bank-of-America style) BEFORE
-      // redirecting. Skipped on the native app (it has native Face ID), when
-      // "Remember me" is off, or if this device is already enrolled.
-      const eligibleForBiometric =
-        !isNativeApp() &&
-        data.remember !== false &&
-        passkeySupported() &&
-        !getEnrolledBiometric() &&
-        (await platformPasskeyAvailable());
-      if (eligibleForBiometric) {
-        setEnrollPrompt({ email: data.email, redirect: target });
-        return; // the prompt's onDone performs the redirect
-      }
-
       router.push(target);
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
@@ -329,18 +315,6 @@ function LoginPageInner() {
         background: `linear-gradient(to bottom right, ${branding.login_bg_gradient_from || '#0f172a'}, ${branding.login_bg_gradient_to || '#1e1b4b'})`,
       }}
     >
-      {/* Post-login "Use Touch ID next time?" prompt (website). Redirects on done. */}
-      {enrollPrompt && (
-        <BiometricEnrollPrompt
-          email={enrollPrompt.email}
-          onDone={() => {
-            const target = enrollPrompt.redirect;
-            setEnrollPrompt(null);
-            router.push(target);
-          }}
-        />
-      )}
-
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
@@ -505,9 +479,6 @@ function LoginPageInner() {
               <ScanFace size={20} /> Sign in with {bioLabel}
             </motion.button>
           )}
-
-          {/* Website only: passwordless passkey (fingerprint / Touch ID / Windows Hello). */}
-          <PasskeyLoginButton />
 
           <motion.div
             initial={{ opacity: 0 }}
