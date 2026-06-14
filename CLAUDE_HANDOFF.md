@@ -1,7 +1,20 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 14, 2026 (PT 2) | **Branch:** `main` | **HEAD pushed:** `2e8c4df0` → Vercel deploying | **Production:** ✅ LIVE | **iOS:** v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight.
+**Last updated:** Jun 14, 2026 (PT 4) | **Branch:** `main` | **HEAD pushed + LIVE:** `e7739ee7` | **Production:** ✅ LIVE | **iOS:** v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight (no Build 9 — all session work is web, ships via Vercel).
 
-## ⚡ START HERE (Jun 14 PT 2) — in-app testing fixes SHIPPED to prod (`2e8c4df0`)
+## ⚡ START HERE (Jun 14 PT 4) — BofA-style Touch ID login + smart profile nudge SHIPPED (`e7739ee7`, LIVE)
+
+All deployed to prod and live in the app (force-close + reopen to load). Verified: tsc clean, build green, deploy READY.
+
+- ✅ **Bank-of-America-style biometric login (web)** — after first password login a prompt offers "Sign in faster with Touch ID/Face ID?"; on return the login screen pre-fills the saved username + shows a **"Use Touch ID"** button → DIRECT biometric (targets the device credential, no passkey chooser) → passwordless session. Files: `components/BiometricEnrollPrompt.tsx`, `PasskeyLoginButton.tsx`, `PasskeySettings.tsx`, `lib/webauthn-client.ts`, `app/api/auth/webauthn/*`. Deep-research-validated (passwordless chosen over PRF-encrypt-password: simpler/safer, same UX). Hidden on native app (which uses native Face ID).
+- ✅ **Fingerprint button removed from company-code page.**
+- ✅ **Smart welcome-profile nudge** — was nagging admin every login; now persistent via `profiles.welcome_dismissed_at` (migration applied) + `POST /api/my-profile/dismiss-welcome`. Shown at most once per user.
+- **iOS decision:** founder chose to TEST Build 8's native Face ID on-device before cutting Build 9 (a build is blocked anyway until the Account Holder accepts the updated Apple Developer License Agreement, and nothing this session is native). Build 9 only if Build 8 Face ID is broken on-device.
+
+### Next pending: invite + request-access end-to-end test (already live on prod), then Google Play.
+
+<details><summary>Prior — Jun 14 PT 2 (`2e8c4df0`)</summary>
+
+## In-app testing fixes (`2e8c4df0`)
 
 Founder tested on the iOS app (v1.0.3/Build 8) and reported issues. **Key architecture fact: the app is a remote-URL webview loading prod, so all these are web fixes that ship via Vercel — the app gets them with NO App Store build.** All shipped in `2e8c4df0` (pushed; batch also carried the earlier passkey + remember-me + maps commits):
 
@@ -20,6 +33,8 @@ Founder tested on the iOS app (v1.0.3/Build 8) and reported issues. **Key archit
 **Note on "didn't remember me":** the Supabase session persists in the webview's localStorage (remember-me adapter shipped). If it still drops on relaunch after this deploy, the robust fix is native `@capacitor/preferences` session storage (needs a build) — hold until confirmed.
 
 **"Passkey in the app":** WebAuthn doesn't work in the iOS webview; the app's native Face ID/Touch ID is the equivalent. Passkeys are a website-only feature (now live on `/login` + `/company-login` + My Profile on the web).
+
+</details>
 
 ---
 
