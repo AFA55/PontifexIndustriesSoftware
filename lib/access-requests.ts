@@ -21,7 +21,7 @@ import {
   VALID_ROLES,
   type InviteEmailPayload,
 } from '@/lib/invitations';
-import { sendEmail, generateInviteEmail } from '@/lib/email';
+import { sendEmail, generateInviteEmail, getTenantEmailBranding } from '@/lib/email';
 import { canInviteRole, getRoleLabel } from '@/lib/rbac';
 
 /** Safe columns — NEVER expose password_hash / password_reset_token to clients. */
@@ -37,23 +37,33 @@ export type AccessRequestActionResult =
   | { ok: true; data: Record<string, unknown> }
   | { ok: false; status: number; error: string };
 
-/** Email sender for approvals — calls the existing lib/email invite template. */
-const approvalInviteEmailSender = async (p: InviteEmailPayload): Promise<{ error: unknown }> => {
-  const html = generateInviteEmail({
-    inviteeName: p.inviteeName,
-    inviterName: p.inviterName,
-    tenantName: p.tenantName,
-    roleLabel: getRoleLabel(p.role),
-    companyCode: p.companyCode,
-    setupUrl: p.setupUrl,
-  });
-  const sent = await sendEmail({
-    to: p.email,
-    subject: `You're invited to join ${p.tenantName}`,
-    html,
-  });
-  return { error: sent ? null : new Error('Invite email failed to send') };
-};
+/**
+ * Build an approval invite-email sender bound to the recipient tenant, so the
+ * email is white-labeled with that tenant's colors/logo. (InviteEmailPayload
+ * carries no tenantId, so we capture it here from the approving call's scope.)
+ */
+const makeApprovalInviteEmailSender =
+  (tenantId: string) =>
+  async (p: InviteEmailPayload): Promise<{ error: unknown }> => {
+    const branding = await getTenantEmailBranding(tenantId);
+    const html = generateInviteEmail({
+      inviteeName: p.inviteeName,
+      inviterName: p.inviterName,
+      tenantName: p.tenantName,
+      roleLabel: getRoleLabel(p.role),
+      companyCode: p.companyCode,
+      setupUrl: p.setupUrl,
+      brandColor: branding.brandColor,
+      accentColor: branding.accentColor,
+      logoUrl: branding.logoUrl,
+    });
+    const sent = await sendEmail({
+      to: p.email,
+      subject: `You're invited to join ${p.tenantName}`,
+      html,
+    });
+    return { error: sent ? null : new Error('Invite email failed to send') };
+  };
 
 async function fetchPendingRequest(requestId: string, tenantId: string) {
   const { data: req, error } = await supabaseAdmin
@@ -148,7 +158,7 @@ export async function approveAccessRequest(opts: {
     phoneNumber: req.phone_number ?? null,
     dateOfBirth: req.date_of_birth ?? null,
     onExistingPending: 'refresh',
-    sendInviteEmail: approvalInviteEmailSender,
+    sendInviteEmail: makeApprovalInviteEmailSender(opts.tenantId),
   });
 
   if (!result.ok) {

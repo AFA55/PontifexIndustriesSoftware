@@ -7,16 +7,18 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { sendEmail, generateAccessRequestReceivedEmail } from '@/lib/email';
-import bcrypt from 'bcryptjs';
+import { sendEmail, generateAccessRequestReceivedEmail, getTenantEmailBranding } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, phoneNumber, password, dateOfBirth, position } = body;
+    const { fullName, email, phoneNumber, dateOfBirth, position } = body;
 
-    // Validation
-    if (!fullName || !email || !phoneNumber || !password || !dateOfBirth) {
+    // Validation — NO password here. The applicant sets their password ONCE, at
+    // the post-approval setup link. A password typed at request time can't be
+    // used to log in (Supabase manages credentials), so collecting it here only
+    // made users enter it twice.
+    if (!fullName || !email || !phoneNumber || !dateOfBirth) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -28,14 +30,6 @@ export async function POST(request: NextRequest) {
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
-        { status: 400 }
-      );
-    }
-
-    // Validate password length
-    if (password.length < 6) {
-      return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
         { status: 400 }
       );
     }
@@ -89,11 +83,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash the password securely
-    const saltRounds = 10;
-    const passwordHash = await bcrypt.hash(password, saltRounds);
-
-    // Insert access request (password_hash only — never store plaintext)
+    // Insert access request (contact info only — password is set later, once,
+    // at the post-approval setup link).
     const { data, error } = await supabaseAdmin
       .from('access_requests')
       .insert([
@@ -101,7 +92,6 @@ export async function POST(request: NextRequest) {
           full_name: fullName,
           email: email.toLowerCase(),
           phone_number: phoneNumber,
-          password_hash: passwordHash,
           date_of_birth: dateOfBirth,
           position: position || 'Not specified',
           status: 'pending',
@@ -118,10 +108,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Send confirmation email to the user
+    // Send confirmation email to the user — white-labeled with the tenant's brand.
+    // access_requests rows have no tenant_id yet, so resolve the single client
+    // tenant (Patriot) by company_code. Falls back to platform defaults on failure.
+    // TODO: thread real tenant context when the request form is tenant-aware
+    let receivedBranding = await getTenantEmailBranding(null);
+    try {
+      const { data: patriotTenant } = await supabaseAdmin
+        .from('tenants')
+        .select('id')
+        .eq('company_code', 'PATRIOT')
+        .maybeSingle();
+      if (patriotTenant?.id) {
+        receivedBranding = await getTenantEmailBranding(patriotTenant.id);
+      }
+    } catch {
+      // keep platform defaults
+    }
+
     const confirmationEmailHtml = generateAccessRequestReceivedEmail(
       fullName,
-      email
+      email,
+      receivedBranding
     );
 
     const emailSent = await sendEmail({

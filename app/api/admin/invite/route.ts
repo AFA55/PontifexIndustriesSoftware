@@ -21,7 +21,7 @@ import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canInviteRole, ROLES_WITH_LABELS } from '@/lib/rbac';
 import { Resend } from 'resend';
-import { getResendApiKey, generateInviteEmail } from '@/lib/email';
+import { getResendApiKey, generateInviteEmail, getTenantEmailBranding } from '@/lib/email';
 import {
   createOrRefreshInvitation,
   getTenantMeta,
@@ -52,10 +52,14 @@ async function sendInviteEmail(opts: {
   companyCode: string;
   role: string;
   token: string;
+  /** Recipient tenant — drives white-label email colors/logo. */
+  tenantId: string;
 }) {
   const setupUrl = `${baseUrl(opts.request)}/setup-account?token=${opts.token}`;
   const roleLabel =
     ROLES_WITH_LABELS.find((r) => r.value === opts.role)?.label || opts.role;
+  // White-label: brand the invite email with the recipient tenant's colors/logo.
+  const branding = await getTenantEmailBranding(opts.tenantId);
   return getResend().emails.send({
     // VERIFIED Resend sender. `admin.pontifexindustries.com` IS verified in Resend
     // (sends to external recipients succeed); the ROOT `pontifexindustries.com` is
@@ -72,6 +76,9 @@ async function sendInviteEmail(opts: {
       roleLabel,
       companyCode: opts.companyCode,
       setupUrl,
+      brandColor: branding.brandColor,
+      accentColor: branding.accentColor,
+      logoUrl: branding.logoUrl,
     }),
   });
 }
@@ -123,6 +130,7 @@ export async function POST(request: NextRequest) {
           companyCode: p.companyCode,
           role: p.role,
           token: p.token,
+          tenantId,
         });
         return { error: error ?? null };
       },
@@ -254,6 +262,7 @@ export async function PUT(request: NextRequest) {
       companyCode,
       role: inv.role,
       token,
+      tenantId,
     });
 
     if (emailError) {

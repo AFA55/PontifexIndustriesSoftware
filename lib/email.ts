@@ -5,6 +5,68 @@
 
 import { Resend } from 'resend';
 import { resolveAppOrigin } from '@/lib/app-url';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
+// ── Platform-default brand (the historical purple look). Used whenever no tenant
+// context is available OR a lookup fails — emails must NEVER throw on branding.
+const DEFAULT_BRAND_COLOR = '#7c3aed';
+const DEFAULT_ACCENT_COLOR = '#4f46e5';
+const DEFAULT_COMPANY_NAME = 'Pontifex Industries';
+
+/**
+ * White-label branding pulled from the RECIPIENT tenant. Drives the email
+ * header gradient, CTA/accent colors, and (when present) a logo above the name.
+ */
+export interface EmailBranding {
+  companyName: string;
+  brandColor: string;
+  accentColor: string;
+  logoUrl: string | null;
+}
+
+/** The platform default (purple) branding — frozen so callers can't mutate it. */
+const DEFAULT_EMAIL_BRANDING: EmailBranding = {
+  companyName: DEFAULT_COMPANY_NAME,
+  brandColor: DEFAULT_BRAND_COLOR,
+  accentColor: DEFAULT_ACCENT_COLOR,
+  logoUrl: null,
+};
+
+/**
+ * Resolve the email branding for a given tenant.
+ *
+ * - `tenantId` null OR lookup fails → platform defaults (today's purple look).
+ * - Tenant found → its `name` + `primary_color` + `logo_url`. When a tenant has
+ *   ANY `primary_color`, the accent flips to blue (`#1d4ed8`) so a red primary
+ *   reads as a red→blue "red/white/blue" header; with no primary_color we keep
+ *   the purple default accent. Wrapped in try/catch — never throws (emails must
+ *   not fail on a branding lookup).
+ */
+export async function getTenantEmailBranding(
+  tenantId: string | null
+): Promise<EmailBranding> {
+  if (!tenantId) return { ...DEFAULT_EMAIL_BRANDING };
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('tenants')
+      .select('name, primary_color, logo_url')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (error || !data) return { ...DEFAULT_EMAIL_BRANDING };
+
+    const primaryColor: string | null = data.primary_color || null;
+    return {
+      companyName: data.name || DEFAULT_COMPANY_NAME,
+      brandColor: primaryColor || DEFAULT_BRAND_COLOR,
+      // A tenant primary_color → blue accent (red/white/blue header).
+      // No primary_color → keep the purple platform-default accent.
+      accentColor: primaryColor ? '#1d4ed8' : DEFAULT_ACCENT_COLOR,
+      logoUrl: data.logo_url || null,
+    };
+  } catch {
+    return { ...DEFAULT_EMAIL_BRANDING };
+  }
+}
 
 // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
 // `admin.pontifexindustries.com` is the ONLY verified Resend domain. The root
@@ -145,6 +207,12 @@ export function generateInviteEmail(opts: {
   roleLabel: string;
   companyCode?: string;
   setupUrl: string;
+  /** White-label brand color (header gradient start, CTA, accents). Defaults to platform purple. */
+  brandColor?: string;
+  /** White-label accent color (header gradient end). Defaults to platform indigo. */
+  accentColor?: string;
+  /** Optional tenant logo rendered above the company name in the header. */
+  logoUrl?: string | null;
 }): string {
   const inviteeName = escapeHtml(opts.inviteeName);
   const inviterName = escapeHtml(opts.inviterName);
@@ -154,6 +222,14 @@ export function generateInviteEmail(opts: {
   // setupUrl is built server-side from APP_URL + token (never user input), but
   // escape anyway so a stray ampersand in future params can't break markup.
   const setupUrl = escapeHtml(opts.setupUrl);
+  // White-label colors — fall back to the historical purple so existing callers
+  // are byte-identical when they pass nothing.
+  const brandColor = escapeHtml(opts.brandColor || DEFAULT_BRAND_COLOR);
+  const accentColor = escapeHtml(opts.accentColor || DEFAULT_ACCENT_COLOR);
+  const logoUrl = opts.logoUrl ? escapeHtml(opts.logoUrl) : '';
+  const logoTag = logoUrl
+    ? `<img src="${logoUrl}" alt="${tenantName}" height="40" style="max-height:40px;margin:0 auto 10px;display:block;">`
+    : '';
 
   const steps: Array<[string, string]> = [
     ['1', 'Tap the &ldquo;Set Up My Account&rdquo; button'],
@@ -168,7 +244,7 @@ export function generateInviteEmail(opts: {
                   <td style="padding: 6px 0; vertical-align: top; width: 36px;">
                     <table role="presentation" style="border-collapse: collapse;">
                       <tr>
-                        <td bgcolor="#ede9fe" style="background-color: #ede9fe; border-radius: 50%; width: 26px; height: 26px; text-align: center; vertical-align: middle; color: #7c3aed; font-size: 13px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">${n}</td>
+                        <td bgcolor="#ede9fe" style="background-color: #ede9fe; border-radius: 50%; width: 26px; height: 26px; text-align: center; vertical-align: middle; color: ${brandColor}; font-size: 13px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">${n}</td>
                       </tr>
                     </table>
                   </td>
@@ -199,7 +275,8 @@ export function generateInviteEmail(opts: {
 
           <!-- Header -->
           <tr>
-            <td bgcolor="#7c3aed" style="background-color: #7c3aed; background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 44px 40px; text-align: center;">
+            <td bgcolor="${brandColor}" style="background-color: ${brandColor}; background: linear-gradient(135deg, ${brandColor} 0%, ${accentColor} 100%); padding: 44px 40px; text-align: center;">
+              ${logoTag}
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
                 ${tenantName}
               </h1>
@@ -219,14 +296,14 @@ export function generateInviteEmail(opts: {
 
               <!-- Main Message -->
               <p style="margin: 0 0 28px; color: #475569; font-size: 16px; line-height: 1.6;">
-                <strong style="color: #0f172a; font-weight: 600;">${inviterName}</strong> set up an account for you on the ${tenantName} platform as <strong style="color: #7c3aed; font-weight: 600;">${roleLabel}</strong>. Finish setup in about 2 minutes.
+                <strong style="color: #0f172a; font-weight: 600;">${inviterName}</strong> set up an account for you on the ${tenantName} platform as <strong style="color: ${brandColor}; font-weight: 600;">${roleLabel}</strong>. Finish setup in about 2 minutes.
               </p>
 
               <!-- CTA Button (bulletproof: table-wrapped, inline-styled) -->
               <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 20px;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="${setupUrl}" style="display: inline-block; padding: 16px 48px; background-color: #7c3aed; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px; line-height: 1.2;">
+                    <a href="${setupUrl}" style="display: inline-block; padding: 16px 48px; background-color: ${brandColor}; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px; line-height: 1.2;">
                       Set Up My Account
                     </a>
                   </td>
@@ -239,7 +316,7 @@ export function generateInviteEmail(opts: {
                   Button not working?
                 </p>
                 <p style="margin: 0; font-size: 12px; word-break: break-all; line-height: 1.5;">
-                  <a href="${setupUrl}" style="color: #7c3aed; text-decoration: underline;">${setupUrl}</a>
+                  <a href="${setupUrl}" style="color: ${brandColor}; text-decoration: underline;">${setupUrl}</a>
                 </p>
               </div>
 
@@ -290,8 +367,20 @@ export function generateInviteEmail(opts: {
 /**
  * Generate approval confirmation email HTML
  */
-export function generateApprovalEmail(fullName: string, email: string, role: string): string {
+export function generateApprovalEmail(
+  fullName: string,
+  email: string,
+  role: string,
+  branding: EmailBranding = DEFAULT_EMAIL_BRANDING
+): string {
   const loginUrl = `${resolveAppOrigin()}/login`;
+  const companyName = escapeHtml(branding.companyName);
+  const brandColor = escapeHtml(branding.brandColor);
+  const accentColor = escapeHtml(branding.accentColor);
+  const logoUrl = branding.logoUrl ? escapeHtml(branding.logoUrl) : '';
+  const logoTag = logoUrl
+    ? `<img src="${logoUrl}" alt="${companyName}" height="40" style="max-height:40px;margin:0 auto 10px;display:block;">`
+    : '';
 
   return `
 <!DOCTYPE html>
@@ -312,9 +401,10 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
 
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #2563eb 0%, #dc2626 100%); padding: 48px 40px; text-align: center;">
+            <td bgcolor="${brandColor}" style="background-color: ${brandColor}; background: linear-gradient(135deg, ${brandColor} 0%, ${accentColor} 100%); padding: 48px 40px; text-align: center;">
+              ${logoTag}
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                Patriot Concrete Cutting
+                ${companyName}
               </h1>
               <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
                 Concrete Cutting Management System
@@ -337,7 +427,7 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
 
               <!-- Main Message -->
               <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Your access request has been approved. You now have <strong style="color: #2563eb; font-weight: 600;">${role}</strong> access to the platform.
+                Your access request has been approved. You now have <strong style="color: ${brandColor}; font-weight: 600;">${role}</strong> access to the platform.
               </p>
 
               <!-- Account Details -->
@@ -354,7 +444,7 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
                       </tr>
                       <tr>
                         <td style="padding: 10px 0; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">Role</td>
-                        <td style="padding: 10px 0; color: #2563eb; font-size: 14px; font-weight: 600; text-align: right; text-transform: capitalize; border-top: 1px solid #e2e8f0;">${role}</td>
+                        <td style="padding: 10px 0; color: ${brandColor}; font-size: 14px; font-weight: 600; text-align: right; text-transform: capitalize; border-top: 1px solid #e2e8f0;">${role}</td>
                       </tr>
                     </table>
                   </td>
@@ -370,7 +460,7 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
               <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 32px;">
                 <tr>
                   <td style="text-align: center;">
-                    <a href="${loginUrl}" style="display: inline-block; padding: 16px 48px; background-color: #2563eb; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px;">
+                    <a href="${loginUrl}" style="display: inline-block; padding: 16px 48px; background-color: ${brandColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px;">
                       Login to Your Account
                     </a>
                   </td>
@@ -390,7 +480,7 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
           <tr>
             <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">Patriot Concrete Cutting</strong><br>
+                <strong style="color: #475569;">${companyName}</strong><br>
                 Concrete Cutting Management System
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 12px;">
@@ -410,7 +500,18 @@ export function generateApprovalEmail(fullName: string, email: string, role: str
 /**
  * Generate access request received confirmation email HTML
  */
-export function generateAccessRequestReceivedEmail(fullName: string, email: string): string {
+export function generateAccessRequestReceivedEmail(
+  fullName: string,
+  email: string,
+  branding: EmailBranding = DEFAULT_EMAIL_BRANDING
+): string {
+  const companyName = escapeHtml(branding.companyName);
+  const brandColor = escapeHtml(branding.brandColor);
+  const accentColor = escapeHtml(branding.accentColor);
+  const logoUrl = branding.logoUrl ? escapeHtml(branding.logoUrl) : '';
+  const logoTag = logoUrl
+    ? `<img src="${logoUrl}" alt="${companyName}" height="40" style="max-height:40px;margin:0 auto 10px;display:block;">`
+    : '';
   return `
 <!DOCTYPE html>
 <html lang="en">
@@ -430,9 +531,10 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
 
           <!-- Header -->
           <tr>
-            <td style="background: linear-gradient(135deg, #2563eb 0%, #dc2626 100%); padding: 48px 40px; text-align: center;">
+            <td bgcolor="${brandColor}" style="background-color: ${brandColor}; background: linear-gradient(135deg, ${brandColor} 0%, ${accentColor} 100%); padding: 48px 40px; text-align: center;">
+              ${logoTag}
               <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                Patriot Concrete Cutting
+                ${companyName}
               </h1>
               <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
                 Concrete Cutting Management System
@@ -455,7 +557,7 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
 
               <!-- Main Message -->
               <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Thank you for requesting access to the Patriot Concrete Cutting platform. We've received your request and our team will review it shortly.
+                Thank you for requesting access to the ${companyName} platform. We've received your request and our team will review it shortly.
               </p>
 
               <!-- Request Details -->
@@ -505,7 +607,7 @@ export function generateAccessRequestReceivedEmail(fullName: string, email: stri
           <tr>
             <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
               <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">Patriot Concrete Cutting</strong><br>
+                <strong style="color: #475569;">${companyName}</strong><br>
                 Concrete Cutting Management System
               </p>
               <p style="margin: 0; color: #94a3b8; font-size: 12px;">

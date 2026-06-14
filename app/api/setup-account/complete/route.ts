@@ -33,6 +33,7 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import type { User } from '@supabase/supabase-js';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { randomBytes } from 'crypto';
 
@@ -119,11 +120,22 @@ export async function POST(request: NextRequest) {
     const role: string = inv.role;
     const tenantId: string = inv.tenant_id;
 
-    // ── Locate any existing GLOBAL auth user for this email ──────────────────
-    const { data: usersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-    const existingAuthUser = usersPage?.users?.find(
-      (u) => u.email?.toLowerCase() === email
-    );
+    // ── Locate any existing GLOBAL auth user for this email (reliable O(1)) ───
+    // Previously listUsers({perPage:1000}) — a SINGLE page that silently missed
+    // users buried past the first 1000. That caused re-used/old emails to fall
+    // through to createUser → "already registered" → orphaned profile-less
+    // accounts, AND it bypassed the cross-tenant guard below. Now a direct,
+    // service-role-only lookup by email.
+    let existingAuthUser: User | null = null;
+    {
+      const { data: foundId } = await supabaseAdmin.rpc('auth_user_id_by_email', {
+        p_email: email,
+      });
+      if (foundId) {
+        const { data: u } = await supabaseAdmin.auth.admin.getUserById(String(foundId));
+        existingAuthUser = u?.user ?? null;
+      }
+    }
 
     // ── B2 guard (seam 2): cross-tenant takeover protection ──────────────────
     // If an auth user already exists for this email, it MUST either have no

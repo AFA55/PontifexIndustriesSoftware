@@ -14,8 +14,6 @@ export default function RequestAccessPage() {
     fullName: '',
     email: '',
     phoneNumber: '',
-    password: '',
-    confirmPassword: '',
     birthMonth: '',
     birthDay: '',
     birthYear: '',
@@ -28,18 +26,10 @@ export default function RequestAccessPage() {
     setLoading(true);
     setError('');
 
-    // Validation
-    if (formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      setLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      setError('Password must be at least 6 characters');
-      setLoading(false);
-      return;
-    }
+    // NOTE: no password here. You set your password ONCE, at the setup link we
+    // email after an admin approves — a password typed now can't be used to log
+    // in (Supabase manages its own credentials), so asking for it here would
+    // just make you enter it twice.
 
     // Validate privacy and terms acceptance
     if (!formData.acceptedPrivacy || !formData.acceptedTerms) {
@@ -82,7 +72,6 @@ export default function RequestAccessPage() {
           fullName: formData.fullName,
           email: formData.email,
           phoneNumber: formData.phoneNumber,
-          password: formData.password,
           dateOfBirth: `${formData.birthYear}-${formData.birthMonth.padStart(2, '0')}-${formData.birthDay.padStart(2, '0')}`,
         }),
       });
@@ -201,37 +190,13 @@ export default function RequestAccessPage() {
             <p className="text-xs text-gray-500 mt-1">Your contact phone number</p>
           </div>
 
-          {/* Password */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Password <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
-                placeholder="••••••••"
-                minLength={6}
-              />
-              <p className="text-xs text-gray-500 mt-1">At least 6 characters</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Confirm Password <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="password"
-                required
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none transition-colors text-gray-800"
-                placeholder="••••••••"
-              />
-            </div>
+          {/* No password here — you'll create it once via the secure setup link
+              we email after an admin approves your request. */}
+          <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-3">
+            <p className="text-sm text-blue-900">
+              No password needed yet — once an admin approves your request, we&apos;ll email you a
+              secure link to set your password and finish your account.
+            </p>
           </div>
 
           {/* Date of Birth */}
