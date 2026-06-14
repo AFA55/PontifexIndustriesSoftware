@@ -86,6 +86,11 @@ export default function Dashboard() {
   // to the shop pick "shop" before clocking in; choice persists on the timecard.
   const [workLocation, setWorkLocation] = useState<'field' | 'shop'>('field');
   const [showNfcClockInModal, setShowNfcClockInModal] = useState(false);
+  // For apprentices/operators the Field/Shop toggle IS the shop-hours choice, so
+  // keep isShopHours in sync with it and hide the separate checkbox (no double ask).
+  useEffect(() => {
+    if (user?.role === 'apprentice' || user?.role === 'operator') setIsShopHours(workLocation === 'shop');
+  }, [workLocation, user?.role]);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
     blockType: string;
@@ -969,8 +974,10 @@ export default function Dashboard() {
                   </div>
                 )}
 
-                {/* Shop Hours Checkbox — only visible when NOT clocked in (for re-clock-in) */}
-                {!isClockedIn && (
+                {/* Shop Hours Checkbox — only for roles WITHOUT the Field/Shop toggle
+                    above (apprentices/operators get the toggle, which already sets
+                    shop hours, so showing this too would ask about Shop twice). */}
+                {!isClockedIn && !(user?.role === 'apprentice' || user?.role === 'operator') && (
                   <label className="flex items-center gap-3 px-4 py-3 bg-amber-50 border-2 border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100 transition-colors w-full sm:w-auto">
                     <input
                       type="checkbox"

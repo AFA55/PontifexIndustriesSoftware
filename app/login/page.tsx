@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -11,6 +11,7 @@ import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, Sca
 import { motion } from 'framer-motion';
 import { biometricAvailable, biometryLabel, clearCredentials, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
 import PasskeyLoginButton from '@/components/PasskeyLoginButton';
+import { isNativeApp } from '@/lib/is-native';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
@@ -86,6 +87,8 @@ function LoginPageInner() {
   // Native Face ID / Touch ID sign-in (no-op on the website).
   const [faceIdReady, setFaceIdReady] = useState(false);
   const [bioLabel, setBioLabel] = useState('Face ID');
+  // Guards the one-shot Face ID auto-prompt on native app launch.
+  const faceIdAutoTried = useRef(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
@@ -139,15 +142,35 @@ function LoginPageInner() {
       .finally(() => setBrandingLoaded(true));
   }, [tenantId]);
 
-  // Native app only: if biometrics are available AND we've saved credentials from a
-  // previous sign-in, surface a "Sign in with Face ID" button. No-op on the website.
+  // Native app only: biometric (Face ID / Touch ID) sign-in. No-op on the website.
+  // 1) If biometrics are available AND we saved credentials on a prior sign-in,
+  //    surface the "Sign in with Face ID" button.
+  // 2) On the NATIVE app, also AUTO-PROMPT Face ID on launch when there's no active
+  //    session — so the app actually asks for Face ID instead of hiding it behind a
+  //    button the user (who normally auto-resumes) never sees. Fires once per mount;
+  //    if the user cancels, the normal form + button remain.
   useEffect(() => {
     (async () => {
       const { available, biometryType } = await biometricAvailable();
       if (!available) return;
       setBioLabel(biometryLabel(biometryType));
-      if (await hasSavedCredentials()) setFaceIdReady(true);
+      if (!(await hasSavedCredentials())) return;
+      setFaceIdReady(true);
+
+      if (!isNativeApp() || faceIdAutoTried.current) return;
+      // Don't prompt if the user is already signed in (remember-me auto-resume
+      // handles that case and redirects to the dashboard).
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) return;
+      } catch {
+        /* no session resolvable — fall through to the Face ID prompt */
+      }
+      faceIdAutoTried.current = true;
+      handleFaceIdLogin();
     })();
+    // handleFaceIdLogin is stable for our purposes; auto-prompt must run once on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({

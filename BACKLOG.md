@@ -19,6 +19,13 @@
 
 ## 🔴 P0 — Verify / unblock now
 
+### Jun 14 — in-app testing (founder on iOS v1.0.3/Build 8) — batch into ONE push
+- [ ] **Notification bell invisible in light mode** — `components/NotificationBell.tsx` hardcodes `variant="dark"` (white icon) but the operator header (`app/dashboard/page.tsx`) is `bg-white dark:bg-white/[0.03]` → white-on-white in light mode. Fix: theme-aware contrast (web → ships via Vercel).
+- [ ] **Operators need a Manage-Profile hub** — exists in committed code (`/dashboard/my-profile` + self-edit PATCH) but UNPUSHED; verify completeness + ship.
+- [ ] **Clock-in card asks for Shop twice** — Field/🏭Shop toggle AND a separate "🏭 Shop Hours" checkbox for operators/apprentices. Remove the redundant checkbox when the toggle is shown; derive `isShopHours` from `workLocation === 'shop'`.
+- [ ] **App didn't remember me / never offered Face ID** — Face ID button only appears after a password login THEN a return to the login screen; most users auto-resume and never see it. Fix: auto-trigger Face ID on app launch when saved creds exist (web; native plugin already in Build 8). Harden remember-me persistence.
+- [ ] **Cut iOS Build 9** — version bump + `cap sync` to guarantee the native biometric plugin; submit to App Store (only the native part needs a build — UI fixes ship via Vercel instantly).
+
 - [x] ~~Verify invite email works on prod~~ — ✅ Jun 10: founder's resend hit `PUT /api/admin/invite`
       → **200** (was 502 before the sanitizer). Email outage CONFIRMED resolved. Adam Ingalls'
       invite went out — confirm he received it.

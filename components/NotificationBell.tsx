@@ -154,20 +154,14 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
     return `${days}d ago`;
   };
 
-  const isDark = variant === 'dark';
-
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
         onClick={() => setOpen(!open)}
         className={`relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200 ${
-          isDark
-            ? unreadCount > 0
-              ? 'bg-white/20 hover:bg-white/30 text-white'
-              : 'bg-white/10 hover:bg-white/20 text-white/70'
-            : unreadCount > 0
-              ? 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-              : 'bg-gray-100 hover:bg-gray-200 text-gray-500'
+          unreadCount > 0
+            ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-white/20 dark:text-white dark:hover:bg-white/30'
+            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/20'
         }`}
       >
         <Bell className="w-5 h-5" />

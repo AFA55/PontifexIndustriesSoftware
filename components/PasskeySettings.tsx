@@ -19,6 +19,7 @@ import {
   type SavedPasskey,
 } from '@/lib/webauthn-client';
 import { formatDay } from '@/lib/dates';
+import { isNativeApp } from '@/lib/is-native';
 
 export default function PasskeySettings() {
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -66,6 +67,10 @@ export default function PasskeySettings() {
       setError('Could not remove that passkey.');
     }
   };
+
+  // The native iOS app uses native Face ID/Touch ID (lib/biometric.ts), not
+  // WebAuthn — which doesn't work in the webview. Hide this web-only section there.
+  if (isNativeApp()) return null;
 
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6">
