@@ -42,12 +42,17 @@ function HeaderAvatar({ user }: { user: User | null }) {
   }
 
   return (
-    <div className="flex items-center gap-2.5 cursor-default select-none">
+    <Link
+      href="/dashboard/my-profile"
+      title="My Profile"
+      aria-label="My Profile"
+      className="flex items-center gap-2.5 min-h-[44px] px-1.5 -mx-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none"
+    >
       <UserAvatar src={avatarUrl} name={user.name} size="sm" className="ring-2 ring-purple-500/30" />
       <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-white/80 truncate max-w-[120px]">
         {user.name}
       </span>
-    </div>
+    </Link>
   );
 }
 

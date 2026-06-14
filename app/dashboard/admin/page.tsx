@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
-import { ADMIN_DASHBOARD_ROLES } from '@/lib/rbac';
+import { ADMIN_DASHBOARD_ROLES, COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
 import CommissionsCard from '@/components/CommissionsCard';
 import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
@@ -832,6 +832,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* ── Command Center launch (salesman is an office/management role) ── */}
+        <CommandCenterLaunch />
+
         {/* Onboarding hook still respects salesman path */}
         {showWalkthrough && isDemoAdmin && user && (
           <AdminOnboardingTour userId={user.id} onComplete={markWalkthroughComplete} />
@@ -1492,8 +1495,8 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {/* ── Command Center launch (super_admin / operations_manager) ──────── */}
-      {user && ['super_admin', 'operations_manager'].includes(user.role) && (
+      {/* ── Command Center launch (all office/management roles) ──────────── */}
+      {user && COMMAND_CENTER_ROLES.includes(user.role) && (
         <CommandCenterLaunch />
       )}
 

@@ -21,21 +21,28 @@ export async function GET(request: NextRequest) {
       role: string;
       tenant_id: string;
       invited_name?: string | null;
+      phone_number?: string | null;
+      date_of_birth?: string | null;
       tenants?: { name?: string; company_code?: string } | { name?: string; company_code?: string }[] | null;
     }
 
     let inv: InvRow | null = null;
 
+    // Optional columns (invited_name / phone_number / date_of_birth) are stamped
+    // on the invitation at approve/invite time so the setup form can prefill what
+    // the user already provided. If the migration adding them hasn't run, the
+    // SELECT returns 42703 — degrade to the guaranteed base columns (those
+    // prefill fields simply come back null, never a 500).
     const full = await supabaseAdmin
       .from('user_invitations')
-      .select('id, email, role, tenant_id, invited_name, tenants(name, company_code)')
+      .select('id, email, role, tenant_id, invited_name, phone_number, date_of_birth, tenants(name, company_code)')
       .eq('token', token)
       .is('accepted_at', null)
       .gt('expires_at', new Date().toISOString())
       .single();
 
     if (full.error && full.error.code === '42703') {
-      // invited_name column not present yet — retry without it.
+      // One or more prefill columns not present yet — retry with base columns only.
       const fallback = await supabaseAdmin
         .from('user_invitations')
         .select('id, email, role, tenant_id, tenants(name, company_code)')
@@ -70,6 +77,8 @@ export async function GET(request: NextRequest) {
       data: {
         email: inv.email,
         name: inv.invited_name ?? null,
+        phoneNumber: inv.phone_number ?? null,
+        dateOfBirth: inv.date_of_birth ?? null,
         role: inv.role,
         tenantId: inv.tenant_id,
         tenantName: tenant?.name || 'Pontifex Industries',

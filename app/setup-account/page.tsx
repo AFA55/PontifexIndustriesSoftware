@@ -24,6 +24,8 @@ import {
 interface InvitationData {
   email: string;
   name: string | null;
+  phoneNumber: string | null;
+  dateOfBirth: string | null;
   role: string;
   tenantId: string;
   tenantName: string;
@@ -122,6 +124,15 @@ function SetupAccountInner() {
         } else {
           const data: InvitationData = { ...json.data, token };
           setInvitation(data);
+          // Prefill what the requester already gave us at access-request time so
+          // they don't re-type it. The phone field is the only one of these the
+          // 4-step form exposes (name drives the greeting; DOB has no field here,
+          // so it's carried in InvitationData but intentionally not rendered).
+          // Run through formatPhoneInput so the prefilled value shows formatted;
+          // the user can still edit it.
+          if (data.phoneNumber) {
+            setPhone(formatPhoneInput(data.phoneNumber));
+          }
           if (data.alreadySetup) {
             setError('This account has already been set up. Please log in.');
             setStep(-1);

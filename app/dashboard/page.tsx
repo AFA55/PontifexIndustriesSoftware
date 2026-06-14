@@ -796,7 +796,13 @@ export default function Dashboard() {
 
             {/* Modern Profile Section */}
             <div className="flex items-center gap-4">
-              <div className="hidden sm:flex items-center gap-3 bg-gray-50 dark:bg-white/[0.05] px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10">
+              {/* Profile chip doubles as the My Profile entry point */}
+              <Link
+                href="/dashboard/my-profile"
+                title="My Profile"
+                aria-label="My Profile"
+                className="hidden sm:flex items-center gap-3 bg-gray-50 dark:bg-white/[0.05] px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-500 hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors"
+              >
                 <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg overflow-hidden flex-shrink-0">
                   {operatorAvatarUrl ? (
                     <img src={operatorAvatarUrl} alt={user?.name || ''} className="w-full h-full object-cover" />
@@ -806,9 +812,9 @@ export default function Dashboard() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-bold text-gray-900 dark:text-white">{user?.name || 'Demo Operator'}</p>
-                  <p className="text-xs text-gray-500 dark:text-white/50 capitalize font-medium">{user?.role || 'Operator'}</p>
+                  <p className="text-xs text-cyan-600 dark:text-cyan-400 capitalize font-medium">My Profile</p>
                 </div>
-              </div>
+              </Link>
 
               {/* Dark Mode Toggle */}
               <DarkModeIconToggle />
@@ -1162,6 +1168,39 @@ export default function Dashboard() {
             </div>
           </Link>
 
+          {/* My Profile — Premium Cyan/Blue Card */}
+          <Link
+            href="/dashboard/my-profile"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-cyan-50 dark:from-white/[0.05] dark:to-cyan-900/10 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-400 hover:scale-[1.03]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 via-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-cyan-100 dark:ring-cyan-500/20 group-hover:ring-white/30 overflow-hidden">
+                  {operatorAvatarUrl ? (
+                    <img src={operatorAvatarUrl} alt={user?.name || ''} className="w-full h-full object-cover" />
+                  ) : (
+                    <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                    </svg>
+                  )}
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2 transition-colors duration-300">
+                My Profile
+              </h3>
+              <p className="text-gray-700 dark:text-white/70 group-hover:text-white/95 font-semibold transition-colors duration-300">
+                Update your photo, phone, and emergency contact
+              </p>
+              <div className="mt-5 flex items-center text-cyan-600 dark:text-cyan-400 group-hover:text-white font-bold transition-colors duration-300">
+                <span>Edit Profile</span>
+                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
         </div>
 
         {/* Quick Actions Bar */}
@@ -1222,6 +1261,15 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                 </svg>
                 Inbox
+              </Link>
+              <Link
+                href="/dashboard/my-profile"
+                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
+                My Profile
               </Link>
             </div>
           </div>

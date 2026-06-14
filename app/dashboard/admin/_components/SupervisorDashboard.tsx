@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/lib/auth';
+import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
 interface VisitRow {
   id: string;
@@ -505,6 +506,8 @@ export default function SupervisorDashboard({ user }: { user: User }) {
         </div>
       </div>
 
+      {/* Command Center launch (supervisor is an office/management role) */}
+      <CommandCenterLaunch />
     </div>
   );
 }

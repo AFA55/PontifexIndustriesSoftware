@@ -284,6 +284,13 @@ export const ROLES_WITH_LABELS: RoleOption[] = [
 // Roles that can access the admin dashboard
 export const ADMIN_DASHBOARD_ROLES = ['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'];
 
+// Roles that can open the Jarvis Command Center (the live operations HUD).
+// All office/management roles — same population as the admin dashboard.
+// Worker tier (operator / apprentice) is intentionally excluded.
+// This is the SINGLE source of truth shared by the launch tile, the page
+// guard, and the overview API gate so UI visibility and data access agree.
+export const COMMAND_CENTER_ROLES = [...ADMIN_DASHBOARD_ROLES];
+
 // ============================================================
 // Role rank (privilege order) — used to gate invitations so an inviter
 // can never create a user with a role >= their own. Higher number = more

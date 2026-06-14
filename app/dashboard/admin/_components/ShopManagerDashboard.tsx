@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import type { User } from '@/lib/auth';
 import NfcClockInModal from '@/components/NfcClockInModal';
 import DailyEquipmentNeeds from './DailyEquipmentNeeds';
+import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
 /**
  * Shop Manager dashboard — Phase 1A skeleton.
@@ -332,6 +333,9 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
           onClose={() => setShowModal(false)}
         />
       )}
+
+      {/* Command Center launch (shop_manager is an office/management role) */}
+      <CommandCenterLaunch />
     </div>
   );
 }

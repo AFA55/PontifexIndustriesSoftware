@@ -21,10 +21,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { formatTime } from '@/lib/dates';
+import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import ArcReactor from '@/components/command-center/ArcReactor';
-
-// Roles allowed into the command center.
-const COMMAND_CENTER_ROLES = ['admin', 'super_admin', 'operations_manager'];
 
 interface OverviewData {
   clockedIn: number;

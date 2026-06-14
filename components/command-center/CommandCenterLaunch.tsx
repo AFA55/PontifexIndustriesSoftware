@@ -7,7 +7,9 @@ import { ChevronRight } from 'lucide-react';
  * Launch tile for the Jarvis Command Center, pinned at the bottom of the admin
  * dashboard. Brand-gradient mini arc-reactor mark + label → /dashboard/command-center.
  *
- * Render this only for command-center roles (admin / super_admin / operations_manager).
+ * Render this only for command-center roles — see COMMAND_CENTER_ROLES in lib/rbac.ts
+ * (all office/management roles; worker tier excluded). The render sites gate by role;
+ * this component carries no role logic of its own.
  * It is an intentional dark tile that does NOT invert for light mode (it teases the
  * dark HUD it links to).
  */

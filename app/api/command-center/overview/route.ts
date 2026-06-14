@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
  * Powers the live right-rail HUD: a small set of tenant-scoped, read-only counts.
  * NO AI / NO voice — just live numbers, refreshed by the client on an interval.
  *
- * Auth:   requireAdmin (admin / super_admin / operations_manager).
+ * Auth:   requireAuth + role ∈ COMMAND_CENTER_ROLES (all office/management roles;
+ *         worker tier excluded). The HUD returns only low-sensitivity tenant-scoped
+ *         counts, so management-wide read is acceptable.
  *         Tenant resolved via resolveTenantScope — super_admin may pass
  *         ?tenantId=<uuid> (mirrors the invite route); everyone else is pinned
  *         to their own tenant.
@@ -35,7 +37,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
+import { requireAuth, resolveTenantScope } from '@/lib/api-auth';
+import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import { toLocalYMD } from '@/lib/dates';
 
 /** Run a count query, returning 0 on ANY error so one metric can't sink the HUD. */
@@ -57,9 +60,19 @@ async function safeCount(
 }
 
 export async function GET(request: NextRequest) {
-  // Auth + tenant scope are the only hard gates. Everything past here is fail-soft.
-  const auth = await requireAdmin(request);
+  // Auth + role + tenant scope are the only hard gates. Everything past here is fail-soft.
+  // Broadened from requireAdmin to all office/management roles (COMMAND_CENTER_ROLES):
+  // the HUD only returns low-sensitivity tenant-scoped COUNTS, so management-wide read
+  // is fine. Worker tier (operator / apprentice) stays out.
+  const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
+
+  if (!COMMAND_CENTER_ROLES.includes(auth.role)) {
+    return NextResponse.json(
+      { error: 'Forbidden. Command Center access required.' },
+      { status: 403 }
+    );
+  }
 
   const scope = await resolveTenantScope(request, auth);
   if ('response' in scope) return scope.response;

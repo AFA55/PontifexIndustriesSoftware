@@ -512,25 +512,38 @@ function SidebarContent({
       <div className="border-t border-slate-200 dark:border-slate-800 px-2 py-3 flex-shrink-0">
         {user ? (
           <div
-            className={`flex items-center gap-3 px-2 py-1.5 ${
-              collapsed ? 'justify-center flex-col' : ''
+            className={`flex items-center gap-1 ${
+              collapsed ? 'justify-center flex-col gap-2' : ''
             }`}
           >
-            <UserAvatar name={user.name} avatarUrl={avatarUrl} />
-            {!collapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-900 dark:text-white text-xs font-semibold truncate leading-tight">
-                  {user.name}
-                </p>
-                <p className="text-purple-600 dark:text-purple-400 text-[10px] leading-tight truncate">
-                  {formatRole(user.role)}
-                </p>
-              </div>
-            )}
+            {/* The user chip itself is the My Profile control — tapping the
+                avatar / name navigates to the self-profile page (≥44px). */}
+            <Link
+              href="/dashboard/my-profile"
+              onClick={onNavClick}
+              title="My Profile"
+              aria-label="My Profile"
+              className={`flex items-center gap-3 min-h-[44px] rounded-lg px-2 py-1.5 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors ${
+                collapsed ? 'justify-center' : 'flex-1 min-w-0'
+              }`}
+            >
+              <UserAvatar name={user.name} avatarUrl={avatarUrl} />
+              {!collapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-slate-900 dark:text-white text-xs font-semibold truncate leading-tight">
+                    {user.name}
+                  </p>
+                  <p className="text-purple-600 dark:text-purple-400 text-[10px] leading-tight truncate">
+                    My Profile · {formatRole(user.role)}
+                  </p>
+                </div>
+              )}
+            </Link>
             <button
               onClick={onSignOut}
               title="Sign out"
-              className="flex-shrink-0 p-1.5 rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-red-400 dark:hover:bg-slate-800 transition-colors"
+              aria-label="Sign out"
+              className="flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-md text-slate-400 hover:text-red-500 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-red-400 dark:hover:bg-slate-800 transition-colors"
             >
               <LogOut className="w-4 h-4" />
             </button>
