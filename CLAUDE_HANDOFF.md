@@ -1,7 +1,19 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 13, 2026 | **Branch:** `main` | **HEAD pushed:** `88efd8d3` (Jarvis Command Center Phase 1) — deploy READY | **Production:** ✅ LIVE | **iOS:** v1.0.2 live + v1.0.3/Build 8 (Face ID) Waiting for Review at Apple.
+**Last updated:** Jun 14, 2026 | **Branch:** `main` | **HEAD (committed, NOT pushed):** `0f376e76` | **Last pushed:** `88efd8d3` | **Production:** ✅ LIVE | **iOS:** v1.0.2 live + v1.0.3/Build 8 (Face ID) Waiting for Review at Apple.
 
-## ⚡ START HERE (Jun 13, 2026) — Jarvis Command Center Phase 1 LIVE + schedule-form fixes
+## ⚡ START HERE (Jun 14, 2026) — Passkey login + real Remember Me + Maps console fix (3 commits, UNPUSHED — founder to test on localhost first)
+
+**Three commits sit on `main` locally, not yet pushed** (`3f93659c` → `62d388e7` → `0f376e76`). Founder wanted to test on localhost before paying for a build. `npm run build` is GREEN; tsc 0 errors.
+
+1. **Maps console errors KILLED (`62d388e7`).** Both errors came from `@react-google-maps/api`'s `useJsApiLoader` on pages where the script can't load (localhost = referrer-blocked key): the "unique key prop" warning AND a tight retry loop ("retrying in 2 ms") that flooded console + network. Removed the library entirely — `components/providers/GoogleMapsProvider.tsx` is now a single-flight bootstrap that injects ONE `<script id=gmaps-bootstrap loading=async libraries=places>` and rejects ONCE (no loop). On localhost `window.google` stays undefined → address field degrades to manual entry (expected; works on deployed domains). Also keyed the dashboard-layout children to silence a React-misattributed warning. Patterns documented in CLAUDE.md.
+2. **Passwordless passkey / fingerprint login (`0f376e76`)** — the web analogue of the app's Face ID. `@simplewebauthn` v13. New `webauthn_credentials` table (**migration already applied to prod**). Ceremonies `app/api/auth/webauthn/*`; verified assertion mints a Supabase session with NO password (`admin.generateLink` + `verifyOtp`). UI: **"Add a passkey" in My Profile** (`PasskeySettings`) + **"Sign in with fingerprint" on /login & /company-login** (`PasskeyLoginButton`, hidden on native app). Usernameless/discoverable → no company code needed to sign in. **Real biometric prompt is device-only — founder must test enroll+login on a real laptop/phone on the localhost or preview URL.**
+3. **Remember Me now real on all platforms (same commit)** — `rememberAwareStorage` adapter in `lib/supabase.ts`: checked → `localStorage` (survives restart), unchecked → `sessionStorage` (cleared on close). **Both paths verified E2E** on the real login form. Same storageKey → existing trial-customer sessions unaffected.
+
+**Founder open actions (carried + new):** ① **test passkey enroll/login on a real device** (localhost:3000 or push a preview), ② push these 3 commits when happy (~$1–2 build), ③ enable Places API (New) in Google Cloud, ④ approve Bryan's access, ⑤ Supabase Free→Pro, ⑥ Sentry DSN, ⑦ test Build 8 Face ID. **Jarvis Phase 2 (Claude brain)** still queued — needs AI Gateway greenlight + $ ceiling.
+
+---
+
+## Jun 13, 2026 — Jarvis Command Center Phase 1 LIVE + schedule-form fixes
 
 **Smart-fill evolved into the JARVIS COMMAND CENTER** — a Stark-HUD AI command center. Full
 architecture + decisions in `docs/plans/JARVIS_COMMAND_CENTER_PLAN.md`. Phased so nothing big-bangs.
