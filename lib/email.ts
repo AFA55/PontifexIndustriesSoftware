@@ -112,6 +112,48 @@ export function emailHeader(
           </tr>`;
 }
 
+/**
+ * Plain, straightforward EVENT notification email (job assigned, time-off result,
+ * etc.) — the email channel of sendNotification(). Shared branded header + the
+ * title/message + an optional "View" button. Deliberately simple, not marketing.
+ */
+export function generateNotificationEmail(opts: {
+  title: string;
+  message: string;
+  actionUrl?: string;
+  branding?: EmailBranding;
+}): string {
+  const branding = opts.branding ?? DEFAULT_EMAIL_BRANDING;
+  const title = escapeHtml(opts.title);
+  const message = escapeHtml(opts.message);
+  const brand = escapeHtml(branding.brandColor);
+  let url = opts.actionUrl || '';
+  if (url && url.startsWith('/')) url = `${resolveAppOrigin()}${url}`;
+  url = escapeHtml(url);
+  const button = url
+    ? `<table role="presentation" style="border-collapse:collapse; margin:24px 0 0;"><tr><td>
+         <a href="${url}" style="display:inline-block; padding:13px 32px; background-color:${brand}; color:#ffffff; text-decoration:none; border-radius:8px; font-size:15px; font-weight:600;">View details</a>
+       </td></tr></table>`
+    : '';
+  return `<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light"><title>${title}</title></head>
+<body style="margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background-color:#f8fafc; color:#1e293b;">
+  <table role="presentation" style="width:100%; border-collapse:collapse; background-color:#f8fafc;" bgcolor="#f8fafc"><tr><td style="padding:40px 20px;">
+    <table role="presentation" style="width:100%; max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow:hidden;" bgcolor="#ffffff">
+${emailHeader(branding, escapeHtml(branding.companyName))}
+      <tr><td style="padding:36px 40px;">
+        <h2 style="margin:0 0 16px; color:#0f172a; font-size:20px; font-weight:700;">${title}</h2>
+        <p style="margin:0; color:#475569; font-size:15px; line-height:1.6;">${message}</p>
+        ${button}
+      </td></tr>
+      <tr><td bgcolor="#f8fafc" style="background-color:#f8fafc; padding:20px 40px; text-align:center; border-top:1px solid #e2e8f0;">
+        <p style="margin:0; color:#94a3b8; font-size:12px;">You're receiving this because email notifications are on for your account. Manage them in Settings → Notifications.</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+}
+
 // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
 // `admin.pontifexindustries.com` is the ONLY verified Resend domain. The root
 // `pontifexindustries.com` is NOT verified (Resend returns 403 "domain is not verified").

@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
-import { sendPushToUser } from '@/lib/send-push';
+import { sendNotification } from '@/lib/send-reminder';
 
 export async function PATCH(
   request: NextRequest,
@@ -205,15 +205,20 @@ export async function PATCH(
           }
         }
 
-        // Native push to the newly-assigned operator — only when the
-        // assignment actually changed (a genuine dispatch/assignment), and
-        // only to a real recipient that the update just resolved.
+        // Notify the newly-assigned operator across their enabled channels
+        // (in-app bell + push + email, per their notification_preferences) —
+        // only when the assignment actually changed (a genuine dispatch).
         // Fire-and-forget: never blocks or alters the API response.
         if ('assigned_to' in changes && jobOrder.assigned_to) {
-          sendPushToUser(jobOrder.assigned_to, {
+          sendNotification({
+            userId: jobOrder.assigned_to,
+            tenantId: jobOrder.tenant_id ?? null,
+            category: 'job_dispatched',
             title: 'New job assigned 📋',
-            body: `${jobOrder.job_number || 'A job'} for ${jobOrder.customer_name || 'a customer'} has been assigned to you.`,
-            data: { route: '/dashboard/my-jobs' },
+            message: `${jobOrder.job_number || 'A job'} for ${jobOrder.customer_name || 'a customer'} has been assigned to you.`,
+            inAppType: 'job_order',
+            jobOrderId: jobOrder.id,
+            actionUrl: '/dashboard/my-jobs',
           }).catch(() => {});
         }
       }

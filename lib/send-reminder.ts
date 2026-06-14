@@ -18,6 +18,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendPushToUser } from '@/lib/send-push';
 import { sendSMSAny } from '@/lib/sms';
+import { sendEmail, generateNotificationEmail, getTenantEmailBranding } from '@/lib/email';
 
 export type NotificationCategory =
   | 'clock_in_reminder'
@@ -48,6 +49,7 @@ export interface DeliveryResult {
   inApp: boolean;
   push: boolean;
   sms: boolean;
+  email: boolean;
 }
 
 interface Prefs { push_enabled: boolean; sms_enabled: boolean; email_enabled: boolean; }
@@ -72,7 +74,7 @@ async function getPrefs(userId: string, category: NotificationCategory): Promise
  */
 export async function sendNotification(opts: ReminderOptions): Promise<DeliveryResult> {
   const prefs = await getPrefs(opts.userId, opts.category);
-  const result: DeliveryResult = { inApp: false, push: false, sms: false };
+  const result: DeliveryResult = { inApp: false, push: false, sms: false, email: false };
 
   // 1. In-app — always (the bell). Uses the `notifications` table.
   try {
@@ -116,6 +118,32 @@ export async function sendNotification(opts: ReminderOptions): Promise<DeliveryR
       result.sms = sms.success;
     } catch (e) {
       console.warn('[reminder] sms failed:', e);
+    }
+  }
+
+  // 4. Email — if enabled. Look up the user's email, send a plain branded note.
+  if (prefs.email_enabled) {
+    try {
+      const { data: prof } = await supabaseAdmin
+        .from('profiles')
+        .select('email')
+        .eq('id', opts.userId)
+        .maybeSingle();
+      if (prof?.email) {
+        const branding = await getTenantEmailBranding(opts.tenantId ?? null);
+        result.email = await sendEmail({
+          to: prof.email,
+          subject: opts.title,
+          html: generateNotificationEmail({
+            title: opts.title,
+            message: opts.message,
+            actionUrl: opts.actionUrl,
+            branding,
+          }),
+        });
+      }
+    } catch (e) {
+      console.warn('[reminder] email failed:', e);
     }
   }
 
