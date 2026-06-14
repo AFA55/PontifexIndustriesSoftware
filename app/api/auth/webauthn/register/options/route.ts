@@ -54,11 +54,15 @@ export async function POST(request: NextRequest) {
         | undefined,
     })),
     authenticatorSelection: {
-      // Discoverable (resident) key → enables true passwordless login later.
+      // PLATFORM only → the built-in biometric (Touch ID / Face ID / Windows
+      // Hello / Android fingerprint), never a roaming security key or the
+      // phone-via-QR flow. This is the "Use Touch ID" experience.
+      authenticatorAttachment: 'platform',
+      // Discoverable (resident) key → enables passwordless login later.
       residentKey: 'required',
       requireResidentKey: true,
-      // Biometric / PIN check on the device (Touch ID, Windows Hello, etc.).
-      userVerification: 'preferred',
+      // Force the biometric/PIN check ('preferred' can be silently skipped).
+      userVerification: 'required',
     },
   });
 

@@ -1,13 +1,20 @@
 'use client';
 
 /**
- * Browser-side passkey helpers — biometric (fingerprint / Touch ID / Windows
- * Hello) sign-in for the website. Thin glue over @simplewebauthn/browser that
- * talks to the ceremony routes under /api/auth/webauthn/*.
+ * Browser-side biometric (Touch ID / Face ID / Windows Hello / fingerprint)
+ * sign-in for the website — the Bank-of-America-style flow:
+ *   1. After a normal password login we ask "Use Touch ID next time?" and enroll
+ *      a PLATFORM passkey, remembering the username on THIS device.
+ *   2. On return the login screen shows the saved username + a "Use Touch ID"
+ *      button → a DIRECT biometric prompt (no passkey chooser) signs the user in.
  *
- * Web analogue of the native app's Face ID (lib/biometric.ts). On the iOS
- * Capacitor webview the native Face ID path still applies; this is for real
- * browsers (incl. desktop Safari Touch ID, Chrome on Android, Windows Hello).
+ * Passwordless by design: the biometric assertion is the credential — we never
+ * store the password. Web analogue of the native app's Face ID (lib/biometric.ts);
+ * hidden on the native app (which has its own native biometric path).
+ *
+ * Thin glue over @simplewebauthn/browser + the ceremony routes under
+ * /api/auth/webauthn/*. "Direct prompt, no chooser" is achieved by targeting the
+ * one credential enrolled on this device (allowCredentials = [its id]).
  */
 
 import {
@@ -18,20 +25,62 @@ import {
 } from '@simplewebauthn/browser';
 import { supabase } from '@/lib/supabase';
 
-/**
- * Authorization header for the authenticated (enrollment / management) calls.
- * The API's requireAuth() reads `Authorization: Bearer <access_token>`, matching
- * the rest of the app (see app/dashboard/my-profile/page.tsx). The PUBLIC login
- * ceremonies don't need this (the user isn't signed in yet).
- */
-async function authHeaders(): Promise<Record<string, string>> {
+// Per-device record of the biometric enrollment, so the login screen can show
+// the saved username + target the exact credential for a chooser-free prompt.
+const BIOMETRIC_KEY = 'pontifex.biometric';
+
+export interface EnrolledBiometric {
+  credentialId: string;
+  email: string;
+  /** Device-appropriate label captured at enroll time ('Touch ID', 'Face ID', …). */
+  label: string;
+}
+
+export function getEnrolledBiometric(): EnrolledBiometric | null {
+  if (typeof window === 'undefined') return null;
   try {
-    const { data } = await supabase.auth.getSession();
-    const token = data.session?.access_token;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const raw = localStorage.getItem(BIOMETRIC_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw);
+    return v?.credentialId && v?.email ? (v as EnrolledBiometric) : null;
   } catch {
-    return {};
+    return null;
   }
+}
+
+export function setEnrolledBiometric(v: EnrolledBiometric): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(BIOMETRIC_KEY, JSON.stringify(v));
+  } catch {
+    /* storage unavailable — non-fatal */
+  }
+}
+
+export function clearEnrolledBiometric(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.removeItem(BIOMETRIC_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Device-appropriate biometric label for the button/prompt copy:
+ * "Touch ID" (Mac), "Face ID" (iPhone/iPad), "Windows Hello", "fingerprint"
+ * (Android), or a generic fallback. The web has no API to read the actual
+ * biometric type, so we infer from the platform — purely cosmetic.
+ */
+export function biometricLabel(): string {
+  if (typeof navigator === 'undefined') return 'biometrics';
+  const ua = navigator.userAgent || '';
+  const plat = navigator.platform || '';
+  if (/iPhone|iPad|iPod/.test(ua) || /iPad|iPhone/.test(plat)) return 'Face ID';
+  if (/Mac/.test(plat) || /Macintosh/.test(ua)) return 'Touch ID';
+  if (/Android/.test(ua)) return 'fingerprint';
+  if (/Win/.test(plat) || /Windows/.test(ua)) return 'Windows Hello';
+  return 'biometrics';
 }
 
 /** Does this browser support WebAuthn at all? */
@@ -61,21 +110,22 @@ export interface PasskeyLoginResult {
 }
 
 /**
- * Enroll a new passkey for the CURRENTLY SIGNED-IN user.
- * Returns { success } or { success:false, error } (incl. user-cancelled).
+ * Enroll a PLATFORM biometric for the CURRENTLY SIGNED-IN user (call right after
+ * a successful password login). Returns the new credential id so the caller can
+ * remember it + the username on this device via setEnrolledBiometric().
  */
 export async function registerPasskey(
   nickname?: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; credentialId?: string }> {
   if (!passkeySupported()) {
-    return { success: false, error: 'This device does not support passkeys.' };
+    return { success: false, error: 'This device does not support biometric sign-in.' };
   }
   try {
     const headers = await authHeaders();
     const optRes = await fetch('/api/auth/webauthn/register/options', { method: 'POST', headers });
     const optJson = await optRes.json();
     if (!optRes.ok || !optJson.options) {
-      return { success: false, error: optJson.error || 'Could not start passkey setup.' };
+      return { success: false, error: optJson.error || 'Could not start biometric setup.' };
     }
 
     // Prompts the platform biometric / creates the credential.
@@ -88,27 +138,33 @@ export async function registerPasskey(
     });
     const verifyJson = await verifyRes.json();
     if (!verifyRes.ok || !verifyJson.success) {
-      return { success: false, error: verifyJson.error || 'Passkey setup failed.' };
+      return { success: false, error: verifyJson.error || 'Biometric setup failed.' };
     }
-    return { success: true };
+    return { success: true, credentialId: verifyJson.credential?.id };
   } catch (err) {
     return { success: false, error: cancelledOrMessage(err) };
   }
 }
 
 /**
- * Passwordless login with a passkey. The browser surfaces the user's available
- * passkeys; on success the server returns a minted Supabase session.
+ * Biometric login. Pass the credentialId enrolled on this device to fire a
+ * DIRECT Touch ID/Face ID prompt (no passkey chooser). Omit it to fall back to
+ * the usernameless/discoverable flow. On success the server returns a minted
+ * Supabase session.
  */
-export async function loginWithPasskey(): Promise<PasskeyLoginResult> {
+export async function loginWithPasskey(credentialId?: string): Promise<PasskeyLoginResult> {
   if (!passkeySupported()) {
-    return { success: false, error: 'This device does not support passkeys.' };
+    return { success: false, error: 'This device does not support biometric sign-in.' };
   }
   try {
-    const optRes = await fetch('/api/auth/webauthn/authenticate/options', { method: 'POST' });
+    const optRes = await fetch('/api/auth/webauthn/authenticate/options', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentialId ? { credentialId } : {}),
+    });
     const optJson = await optRes.json();
     if (!optRes.ok || !optJson.options) {
-      return { success: false, error: optJson.error || 'Could not start passkey sign-in.' };
+      return { success: false, error: optJson.error || 'Could not start biometric sign-in.' };
     }
 
     const assertion = await startAuthentication({ optionsJSON: optJson.options });
@@ -120,7 +176,7 @@ export async function loginWithPasskey(): Promise<PasskeyLoginResult> {
     });
     const verifyJson = await verifyRes.json();
     if (!verifyRes.ok || !verifyJson.success) {
-      return { success: false, error: verifyJson.error || 'Passkey sign-in failed.' };
+      return { success: false, error: verifyJson.error || 'Biometric sign-in failed.' };
     }
     return verifyJson as PasskeyLoginResult;
   } catch (err) {
@@ -156,6 +212,21 @@ export async function deletePasskey(id: string): Promise<boolean> {
     return res.ok;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Authorization header for the authenticated (enrollment / management) calls.
+ * The API's requireAuth() reads `Authorization: Bearer <access_token>`. The
+ * PUBLIC login ceremonies don't need this (the user isn't signed in yet).
+ */
+async function authHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data.session?.access_token;
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
   }
 }
 

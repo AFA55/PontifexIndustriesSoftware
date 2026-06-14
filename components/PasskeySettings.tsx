@@ -16,12 +16,15 @@ import {
   listPasskeys,
   deletePasskey,
   passkeySupported,
+  setEnrolledBiometric,
+  clearEnrolledBiometric,
+  biometricLabel,
   type SavedPasskey,
 } from '@/lib/webauthn-client';
 import { formatDay } from '@/lib/dates';
 import { isNativeApp } from '@/lib/is-native';
 
-export default function PasskeySettings() {
+export default function PasskeySettings({ email }: { email?: string }) {
   const [supported, setSupported] = useState<boolean | null>(null);
   const [passkeys, setPasskeys] = useState<SavedPasskey[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,12 @@ export default function PasskeySettings() {
     const result = await registerPasskey();
     setAdding(false);
     if (result.success) {
+      // Remember this enrollment on THIS device so the login screen shows the
+      // saved username + "Use Touch ID" button next time (same as the post-login
+      // prompt does). Needs the email to pre-fill the username.
+      if (result.credentialId && email) {
+        setEnrolledBiometric({ credentialId: result.credentialId, email, label: biometricLabel() });
+      }
       setJustAdded(true);
       setTimeout(() => setJustAdded(false), 3000);
       refresh();
@@ -62,7 +71,13 @@ export default function PasskeySettings() {
     const ok = await deletePasskey(id);
     setRemovingId(null);
     if (ok) {
-      setPasskeys((prev) => prev.filter((p) => p.id !== id));
+      setPasskeys((prev) => {
+        const next = prev.filter((p) => p.id !== id);
+        // If no passkeys remain, forget this device's "Use Touch ID" enrollment
+        // so the login button stops offering it.
+        if (next.length === 0) clearEnrolledBiometric();
+        return next;
+      });
     } else {
       setError('Could not remove that passkey.');
     }

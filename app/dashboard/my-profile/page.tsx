@@ -433,7 +433,7 @@ export default function MyProfilePage() {
             </div>
 
             {/* Fingerprint / passkey sign-in */}
-            <PasskeySettings />
+            <PasskeySettings email={profile.email} />
 
             {/* Save Button */}
             <button

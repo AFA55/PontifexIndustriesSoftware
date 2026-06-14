@@ -18,11 +18,25 @@ import {
 } from '@/lib/webauthn';
 
 export async function POST(request: NextRequest) {
+  // Optional: the client passes the credentialId enrolled on THIS device so we
+  // target it directly — that turns the OS prompt into a single Touch ID/Face ID
+  // unlock instead of the cross-device passkey chooser. Falls back to the
+  // discoverable (usernameless) flow when no id is supplied.
+  let credentialId: string | undefined;
+  try {
+    const body = await request.json();
+    if (typeof body?.credentialId === 'string' && body.credentialId) {
+      credentialId = body.credentialId;
+    }
+  } catch {
+    /* no body → discoverable flow */
+  }
+
   const options = await generateAuthenticationOptions({
     rpID: getRpID(request),
-    userVerification: 'preferred',
-    // Empty → discoverable-credential (usernameless) flow.
-    allowCredentials: [],
+    // Require the biometric/PIN check ('preferred' can be silently skipped).
+    userVerification: 'required',
+    allowCredentials: credentialId ? [{ id: credentialId }] : [],
   });
 
   const res = NextResponse.json({ success: true, options });

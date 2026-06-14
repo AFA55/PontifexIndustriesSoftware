@@ -1,16 +1,15 @@
 'use client';
 
 /**
- * "Sign in with fingerprint / Touch ID" button for the login screens.
+ * Bank-of-America-style "Use Touch ID / Face ID" sign-in button for the login
+ * screens. Renders ONLY when this device has a biometric enrolled (set up via
+ * the post-login prompt or My Profile) — otherwise nothing shows, matching how
+ * native apps reveal "Use Face ID" only after the first sign-in.
  *
- * Passwordless WebAuthn login (lib/webauthn-client.ts). Renders nothing on
- * browsers without WebAuthn support. On success it mints + applies a Supabase
- * session (identical post-login wiring to the password flow) and routes to the
- * dashboard. User-cancelled prompts are a silent no-op.
- *
- * This is the WEBSITE analogue of the native app's Face ID button — the native
- * app keeps its own Keychain-based path; this serves real browsers (desktop
- * Safari/Chrome Touch ID, Chrome on Android, Windows Hello, phone passkeys).
+ * Tapping it fires a DIRECT biometric prompt (we target the credential enrolled
+ * on this device, so no passkey chooser), then mints + applies a Supabase
+ * session and routes to the dashboard. Passwordless — no password is stored.
+ * Hidden on the native app, which has its own native Face ID path.
  */
 
 import { useEffect, useState } from 'react';
@@ -18,43 +17,53 @@ import { useRouter } from 'next/navigation';
 import { Fingerprint, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { isNativeApp } from '@/lib/is-native';
-import { loginWithPasskey, passkeySupported } from '@/lib/webauthn-client';
+import {
+  loginWithPasskey,
+  passkeySupported,
+  getEnrolledBiometric,
+  clearEnrolledBiometric,
+  type EnrolledBiometric,
+} from '@/lib/webauthn-client';
 
 interface Props {
   className?: string;
-  /** Tailwind accent (defaults to a neutral dark style that fits both login pages). */
   variant?: 'light' | 'dark';
 }
 
 export default function PasskeyLoginButton({ className = '', variant = 'dark' }: Props) {
   const router = useRouter();
-  const [supported, setSupported] = useState(false);
+  const [enrolled, setEnrolled] = useState<EnrolledBiometric | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Hide on the native iOS app — it has its own native Face ID button, and
-    // WebAuthn in the remote webview would compete with it. Web browsers only.
-    setSupported(passkeySupported() && !isNativeApp());
+    // Show only on a real browser that supports WebAuthn AND has an enrollment
+    // saved on this device.
+    if (isNativeApp() || !passkeySupported()) return;
+    setEnrolled(getEnrolledBiometric());
   }, []);
 
-  if (!supported) return null;
+  if (!enrolled) return null;
 
   const handleClick = async () => {
     setLoading(true);
     setError(null);
-    const result = await loginWithPasskey();
+    const result = await loginWithPasskey(enrolled.credentialId);
 
     if (!result.success || !result.session || !result.user) {
       setLoading(false);
-      if (result.error && result.error !== 'cancelled') {
+      // A "not recognized" credential means the enrollment is stale (e.g. the
+      // passkey was removed) — forget it locally so the button stops lying.
+      if (result.error && /not recognized|verification failed/i.test(result.error)) {
+        clearEnrolledBiometric();
+        setEnrolled(null);
+      } else if (result.error && result.error !== 'cancelled') {
         setError(result.error);
       }
       return;
     }
 
     try {
-      // Passkey sign-in implies "remember me" (the credential IS the convenience).
       localStorage.setItem('pontifex.rememberMe', 'true');
       await supabase.auth.setSession({
         access_token: result.session.access_token,
@@ -89,12 +98,8 @@ export default function PasskeyLoginButton({ className = '', variant = 'dark' }:
         disabled={loading}
         className={`w-full min-h-[48px] flex items-center justify-center gap-2 rounded-xl border font-semibold text-sm transition-all disabled:opacity-60 ${base} ${className}`}
       >
-        {loading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          <Fingerprint className="w-5 h-5" />
-        )}
-        {loading ? 'Verifying…' : 'Sign in with fingerprint'}
+        {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Fingerprint className="w-5 h-5" />}
+        {loading ? 'Verifying…' : `Use ${enrolled.label}`}
       </button>
       {error && <p className="mt-2 text-xs text-red-500 text-center">{error}</p>}
     </div>

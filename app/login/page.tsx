@@ -11,7 +11,9 @@ import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, Sca
 import { motion } from 'framer-motion';
 import { biometricAvailable, biometryLabel, clearCredentials, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
 import PasskeyLoginButton from '@/components/PasskeyLoginButton';
+import BiometricEnrollPrompt from '@/components/BiometricEnrollPrompt';
 import { isNativeApp } from '@/lib/is-native';
+import { getEnrolledBiometric, passkeySupported, platformPasskeyAvailable } from '@/lib/webauthn-client';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
@@ -89,6 +91,9 @@ function LoginPageInner() {
   const [bioLabel, setBioLabel] = useState('Face ID');
   // Guards the one-shot Face ID auto-prompt on native app launch.
   const faceIdAutoTried = useRef(false);
+  // Post-login "enable Touch ID?" prompt (website). When set, we hold the
+  // role-based redirect until the user enables or skips.
+  const [enrollPrompt, setEnrollPrompt] = useState<{ email: string; redirect: string } | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
@@ -178,6 +183,13 @@ function LoginPageInner() {
     defaultValues: { remember: true }, // "Remember me" checked by default
   });
 
+  // Bank-of-America style: pre-fill the saved username on return, so the user
+  // sees their email + the "Use Touch ID" button instead of a blank form.
+  useEffect(() => {
+    const enrolled = getEnrolledBiometric();
+    if (enrolled?.email) setValue('email', enrolled.email);
+  }, [setValue]);
+
   const onSubmit = async (data: FormData) => {
     console.log('🚀 Starting login process...');
     setLoading(true);
@@ -254,18 +266,39 @@ function LoginPageInner() {
         upsertLastCompany(tenantId, tenantBranding || {}, { createIfMissing: true });
       }
 
-      // Redirect based on role. The platform owner (super_admin) lands in the
-      // Pontifex Hub; office/shop roles → admin dashboard; field roles → field dashboard.
+      // Resolve the role-based landing page. The platform owner (super_admin)
+      // lands in the Pontifex Hub; office/shop roles → admin dashboard; field
+      // roles → field dashboard.
+      let target: string | null = null;
       if (result.user.role === 'super_admin') {
-        router.push('/dashboard/platform');
+        target = '/dashboard/platform';
       } else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(result.user.role)) {
-        router.push('/dashboard/admin');
+        target = '/dashboard/admin';
       } else if (['operator', 'apprentice'].includes(result.user.role)) {
-        router.push('/dashboard');
-      } else {
+        target = '/dashboard';
+      }
+      if (!target) {
         setError('Invalid user role');
         setLoading(false);
+        return;
       }
+
+      // Website only: after the first password login on a biometric-capable
+      // browser, offer "Use Touch ID next time?" (Bank-of-America style) BEFORE
+      // redirecting. Skipped on the native app (it has native Face ID), when
+      // "Remember me" is off, or if this device is already enrolled.
+      const eligibleForBiometric =
+        !isNativeApp() &&
+        data.remember !== false &&
+        passkeySupported() &&
+        !getEnrolledBiometric() &&
+        (await platformPasskeyAvailable());
+      if (eligibleForBiometric) {
+        setEnrollPrompt({ email: data.email, redirect: target });
+        return; // the prompt's onDone performs the redirect
+      }
+
+      router.push(target);
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);
@@ -296,6 +329,18 @@ function LoginPageInner() {
         background: `linear-gradient(to bottom right, ${branding.login_bg_gradient_from || '#0f172a'}, ${branding.login_bg_gradient_to || '#1e1b4b'})`,
       }}
     >
+      {/* Post-login "Use Touch ID next time?" prompt (website). Redirects on done. */}
+      {enrollPrompt && (
+        <BiometricEnrollPrompt
+          email={enrollPrompt.email}
+          onDone={() => {
+            const target = enrollPrompt.redirect;
+            setEnrollPrompt(null);
+            router.push(target);
+          }}
+        />
+      )}
+
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
