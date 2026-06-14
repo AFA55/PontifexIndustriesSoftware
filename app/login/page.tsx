@@ -245,10 +245,28 @@ function LoginPageInner() {
         email: result.user.email,
         role: result.user.role,
       }));
-      // Remember the username so the login form pre-fills it next time (the
-      // browser's password manager handles the password / passkey).
+      // Remember the username so the login form pre-fills it next time.
       try { localStorage.setItem('pontifex.lastEmail', data.email); } catch { /* non-fatal */ }
       console.log('💾 User stored in localStorage');
+
+      // ── Make the browser OFFER TO SAVE the password ──────────────────────
+      // A fetch/SPA login never triggers the native "Save password?" prompt
+      // because nothing navigates. Chromium (Chrome/Edge/Android): push the
+      // credential into the password manager via the Credential Management API.
+      // Safari/iOS + Firefox don't support it — for them the FULL navigation
+      // below (window.location.assign, not router.push) fires WebKit/Gecko's
+      // save heuristic. (autocomplete username/current-password already set.)
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const PC = (window as any).PasswordCredential;
+        if (PC && navigator.credentials?.store) {
+          await navigator.credentials.store(
+            new PC({ id: data.email, name: data.email, password: data.password })
+          );
+        }
+      } catch {
+        /* credential store unsupported / declined — non-fatal */
+      }
 
       // Native app: save credentials to the iOS Keychain so the user can sign in
       // with Face ID next time (only when "Remember me" is on). Unchecking
@@ -284,7 +302,9 @@ function LoginPageInner() {
         return;
       }
 
-      router.push(target);
+      // Full navigation (not router.push) so Safari/iOS + Firefox treat this as
+      // a completed login and fire their native "Save password?" prompt.
+      window.location.assign(target);
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);
