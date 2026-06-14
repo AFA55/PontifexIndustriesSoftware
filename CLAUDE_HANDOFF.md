@@ -1,9 +1,31 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
-**Last updated:** Jun 14, 2026 | **Branch:** `main` | **HEAD (committed, NOT pushed):** `0f376e76` | **Last pushed:** `88efd8d3` | **Production:** ✅ LIVE | **iOS:** v1.0.2 live + v1.0.3/Build 8 (Face ID) Waiting for Review at Apple.
+**Last updated:** Jun 14, 2026 (PT 2) | **Branch:** `main` | **HEAD pushed:** `2e8c4df0` → Vercel deploying | **Production:** ✅ LIVE | **iOS:** v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight.
 
-## ⚡ START HERE (Jun 14, 2026) — Passkey login + real Remember Me + Maps console fix (3 commits, UNPUSHED — founder to test on localhost first)
+## ⚡ START HERE (Jun 14 PT 2) — in-app testing fixes SHIPPED to prod (`2e8c4df0`)
 
-**Three commits sit on `main` locally, not yet pushed** (`3f93659c` → `62d388e7` → `0f376e76`). Founder wanted to test on localhost before paying for a build. `npm run build` is GREEN; tsc 0 errors.
+Founder tested on the iOS app (v1.0.3/Build 8) and reported issues. **Key architecture fact: the app is a remote-URL webview loading prod, so all these are web fixes that ship via Vercel — the app gets them with NO App Store build.** All shipped in `2e8c4df0` (pushed; batch also carried the earlier passkey + remember-me + maps commits):
+
+- ✅ **Notification bell invisible in light mode** — was hardcoded white icon vs a theme-switching header; now theme-aware (`components/NotificationBell.tsx`).
+- ✅ **Clock-in "asks for Shop twice"** — removed the redundant "🏭 Shop Hours" checkbox for operators/apprentices (they have the Field/Shop toggle; `isShopHours` now derives from it). Other roles keep the checkbox. (`app/dashboard/page.tsx`)
+- ✅ **Operators' Manage-Profile hub** — `/dashboard/my-profile` (self-edit nickname/phone/DOB/photo/emergency contact) now live for operators; entry points on the operator dashboard.
+- ✅ **Face ID never surfaced** — root cause: the button only showed after a password login AND a return to the login screen, which auto-resuming users never see. The native app now **auto-prompts Face ID on launch** when saved creds exist + no active session (`app/login/page.tsx`). Web-only passkey UI hidden on native.
+
+### ⏳ FOUNDER: does Face ID need a new App Store build? Test this on your CURRENT Build 8 (after the deploy goes green, ~2 min):
+1. Open the app → sign in with **email + password, Remember me ON**.
+2. **Fully close** the app (swipe up), reopen it.
+3. It should now **auto-prompt Face ID**. 
+   - ✅ Prompts + signs you in → Build 8's native plugin works; **no new build needed**.
+   - ❌ Never prompts (even though you logged in) → Build 8's native plugin is broken → THEN we cut **Build 9** (`cap sync` + bump + Transporter via the `ios-release` skill). Only the native biometric ever needs a build.
+
+**Note on "didn't remember me":** the Supabase session persists in the webview's localStorage (remember-me adapter shipped). If it still drops on relaunch after this deploy, the robust fix is native `@capacitor/preferences` session storage (needs a build) — hold until confirmed.
+
+**"Passkey in the app":** WebAuthn doesn't work in the iOS webview; the app's native Face ID/Touch ID is the equivalent. Passkeys are a website-only feature (now live on `/login` + `/company-login` + My Profile on the web).
+
+---
+
+### Prior Jun 14 (PT 1) — passkey + remember-me + maps (shipped in the `2e8c4df0` push)
+
+These three commits (`3f93659c` → `62d388e7` → `0f376e76`) were built PT 1 and went out with the PT 2 push above. `npm run build` GREEN; tsc 0 errors.
 
 1. **Maps console errors KILLED (`62d388e7`).** Both errors came from `@react-google-maps/api`'s `useJsApiLoader` on pages where the script can't load (localhost = referrer-blocked key): the "unique key prop" warning AND a tight retry loop ("retrying in 2 ms") that flooded console + network. Removed the library entirely — `components/providers/GoogleMapsProvider.tsx` is now a single-flight bootstrap that injects ONE `<script id=gmaps-bootstrap loading=async libraries=places>` and rejects ONCE (no loop). On localhost `window.google` stays undefined → address field degrades to manual entry (expected; works on deployed domains). Also keyed the dashboard-layout children to silence a React-misattributed warning. Patterns documented in CLAUDE.md.
 2. **Passwordless passkey / fingerprint login (`0f376e76`)** — the web analogue of the app's Face ID. `@simplewebauthn` v13. New `webauthn_credentials` table (**migration already applied to prod**). Ceremonies `app/api/auth/webauthn/*`; verified assertion mints a Supabase session with NO password (`admin.generateLink` + `verifyOtp`). UI: **"Add a passkey" in My Profile** (`PasskeySettings`) + **"Sign in with fingerprint" on /login & /company-login** (`PasskeyLoginButton`, hidden on native app). Usernameless/discoverable → no company code needed to sign in. **Real biometric prompt is device-only — founder must test enroll+login on a real laptop/phone on the localhost or preview URL.**
