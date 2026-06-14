@@ -13,6 +13,7 @@ import {
 import { getCurrentUser, logout } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import Avatar from '@/components/Avatar';
+import PasskeySettings from '@/components/PasskeySettings';
 
 interface MyProfile {
   id: string;
@@ -430,6 +431,9 @@ export default function MyProfilePage() {
                 <ChevronRight className="w-5 h-5 text-gray-400 dark:text-gray-500 flex-shrink-0" />
               </Link>
             </div>
+
+            {/* Fingerprint / passkey sign-in */}
+            <PasskeySettings />
 
             {/* Save Button */}
             <button

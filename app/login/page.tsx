@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { biometricAvailable, biometryLabel, clearCredentials, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
+import PasskeyLoginButton from '@/components/PasskeyLoginButton';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
@@ -160,11 +161,11 @@ function LoginPageInner() {
     setError(null);
 
     // Persist the user's "Remember me" choice (default: true / persistent session).
-    // We intentionally do NOT reconfigure the global Supabase client here — the
-    // client persists sessions in localStorage as today. Unchecking just records
-    // the preference; a future enhancement can read this flag to clear the session
-    // on tab close (e.g. a sessionStorage-backed storage adapter) without touching
-    // the auth flow. The user-facing win is the reassuring UI + iOS Keychain save.
+    // This flag drives the rememberAwareStorage adapter in lib/supabase.ts: it is
+    // written HERE, before setSession() below, so the session token lands in the
+    // correct store immediately — localStorage when remembered (survives restart),
+    // sessionStorage when not (cleared when the browser/app fully closes). It also
+    // gates the auto-sign-in redirect on return visits.
     try {
       localStorage.setItem('pontifex.rememberMe', data.remember === false ? 'false' : 'true');
     } catch {
@@ -436,6 +437,9 @@ function LoginPageInner() {
               <ScanFace size={20} /> Sign in with {bioLabel}
             </motion.button>
           )}
+
+          {/* Website only: passwordless passkey (fingerprint / Touch ID / Windows Hello). */}
+          <PasskeyLoginButton />
 
           <motion.div
             initial={{ opacity: 0 }}

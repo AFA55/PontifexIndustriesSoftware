@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Building2, ArrowRight, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import SplashIntro from '@/components/SplashIntro';
+import PasskeyLoginButton from '@/components/PasskeyLoginButton';
 
 /**
  * Last company the user successfully signed in with (or looked up).
@@ -310,6 +311,19 @@ function CompanyLoginContent() {
               )}
             </button>
           </form>
+          )}
+
+          {/* Passwordless passkey (fingerprint / Touch ID) — no company code needed,
+              the credential resolves the user + tenant. Website only. */}
+          {(view === 'form' || view === 'fast') && (
+            <div className="mt-4">
+              <div className="flex items-center gap-3 my-4">
+                <div className="h-px flex-1 bg-white/10" />
+                <span className="text-[11px] uppercase tracking-wider text-slate-500">or</span>
+                <div className="h-px flex-1 bg-white/10" />
+              </div>
+              <PasskeyLoginButton variant="light" />
+            </div>
           )}
 
           {/* Pre-hydration placeholder — keeps the card from collapsing for one frame */}
