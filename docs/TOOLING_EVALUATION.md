@@ -64,6 +64,20 @@ Headline: **more than half this list was already installed** in our environment.
 |---|---|---|
 | **vercel/vercel-plugin** (official Vercel) | ✅ **Adopted** — installed user-scope via `npx plugins add vercel/vercel-plugin` (→ `vercel@claude-plugins-official`) | Verified against vercel.com/docs/agent-resources/vercel-plugin before install. 25+ skills (the ones we care about: `deployments-cicd`, `env-vars`, `vercel-cli`, `nextjs`, `react-best-practices`, `vercel-functions`), 3 specialist agents (`deployment-expert`, `performance-optimizer`, `ai-architect`), slash commands incl. `/vercel-plugin:deploy`, `/vercel-plugin:env`, `/vercel-plugin:status`. Hooks are lightweight (session-start context only in Next.js/Vercel projects — ours qualifies). Telemetry = one daily ping; disable with `VERCEL_PLUGIN_TELEMETRY=off` if desired. **Why adopted:** directly targets our two recurring Vercel pain points — env-var management (the RESEND_API_KEY fiasco) and deploy troubleshooting (the Jun 11 git-integration no-fire). CLI is already authed as the founder, so `/vercel-plugin:env` + `vercel env` workflows work. Requires session restart to load. |
 
+## UI component libraries — "build a website 10x faster" post (bestapps.ai IG, evaluated Jun 14, 2026)
+
+Founder flagged a post pushing 5 tools. **Context that drives every verdict:** we hand-roll Tailwind (no shadcn/Radix — confirmed: 0 component-lib deps, 322 files with bespoke `rounded-2xl` cards), we have a strong brand (`pontifex-brand`) and an explicit ANTI-templated-slop rule (`design-taste`/`frontend-design`). So these are **inspiration / copy-paste-and-rebrand sources, NOT wholesale adoptions** — pulling a shadcn-styled kit in raw would both clash with our system and read as generic slop. None installed.
+
+| Tool | What it is | Verdict |
+|---|---|---|
+| **21st.dev** | Open-source UI marketplace + a "Magic" **MCP** that lets the AI pull/scaffold components | 🟡 **Staged (inspiration; MCP maybe)** — the most useful of the five because of the MCP. Trigger to adopt the MCP: the **SEO/marketing homepage rewrite** (BACKLOG P2) where we build net-new public sections fast. Gate it to **marketing/landing only**, never product/dashboard UI, and rebrand every output through `pontifex-brand`. Verify the MCP's data-retention before connecting (it's a 3rd-party server). |
+| **Cult UI** | shadcn-"expanded", 78+ animated components, MIT, free | 🟡 **Staged (copy-paste individual pieces)** — good *animation* reference for marketing polish (hover/hero effects). Copy a specific component → port to our Tailwind + brand. Do NOT add as a dep. |
+| **Watermelon UI** | 260+ free Tailwind blocks (forms/dashboards/charts) | 🟡 **Staged (layout reference)** — same posture: mine for layout ideas, rebuild in our patterns ([UI_CATALOG.md](reference/UI_CATALOG.md)). |
+| **Skiper UI** | Fancy animated components, $129 one-time | ❌ **Rejected for now** — paid, and we already have free options + the design skills. Revisit only if a specific high-end animation need appears and free sources don't cover it. |
+| **Manus** | Autonomous "type it, it builds the whole app" agent | ❌ **Not applicable** — we already build with Claude Code; a second autonomous builder is exactly the "no second framework for a solved problem" rule. |
+
+**Net for productivity + uniformity (founder's actual goal):** the highest-leverage move wasn't installing any of these — it was creating **[docs/reference/UI_CATALOG.md](reference/UI_CATALOG.md)** so every session reuses our shipped patterns. Pull from 21st.dev/Cult/Watermelon as *inspiration* for net-new **marketing** pages, rebrand, then record the result in the catalog.
+
 ## House rules for future tool adoption
 
 1. **Verify before trusting** — fetch the actual repo; star counts and "official-sounding" names lie

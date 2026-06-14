@@ -82,7 +82,7 @@ npm run build      # Production build check (must pass with 0 errors)
 - `docs/DEVELOPMENT_PLAYBOOK.md` — how we build (executive engineer + builders + guardian)
 - `docs/TOOLING_EVALUATION.md` — third-party tool verdicts; consult + update BEFORE installing anything
 - `docs/SESSION_LOG.md` — historical sprint log (was in this file)
-- `docs/plans/` (future work) · `docs/playbooks/` (how-tos) · `docs/reference/` (deep context: CLAUDE_CONTEXT, CLAUDE_SESSION_CONTEXT, FEATURE_CATALOG, SCALING, DEV_TOOLING_RECOMMENDATIONS) · `docs/archive/` (history — don't update)
+- `docs/plans/` (future work) · `docs/playbooks/` (how-tos) · `docs/reference/` (deep context: CLAUDE_CONTEXT, CLAUDE_SESSION_CONTEXT, FEATURE_CATALOG, SCALING, DEV_TOOLING_RECOMMENDATIONS, **UI_CATALOG** = reusable Tailwind component patterns — check BEFORE building a card/button/modal, add to it AFTER shipping a new reusable pattern) · `docs/archive/` (history — don't update)
 - **Do not create new root-level MD files.** Plans → `docs/plans/`, how-tos → `docs/playbooks/`, finished-work reports → `docs/archive/`.
 
 ## Engineering Playbooks → now project SKILLS (don't re-derive, invoke)
