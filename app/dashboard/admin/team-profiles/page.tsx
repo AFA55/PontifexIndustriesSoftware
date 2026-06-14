@@ -609,11 +609,13 @@ function QuickActionsSection({
   isSuperAdmin,
   onEditPermissions,
   onToggleActive,
+  onRemove,
 }: {
   member: TeamMember;
   isSuperAdmin: boolean;
   onEditPermissions: () => void;
   onToggleActive: () => void;
+  onRemove: () => void;
 }) {
   // super_admin: no quick actions
   if (member.role === 'super_admin') return null;
@@ -630,6 +632,9 @@ function QuickActionsSection({
         onClick={onToggleActive}
         variant={member.active ? 'danger' : 'success'}
       />
+      {/* Permanent removal — frees the email for re-invite (vs. deactivate, which
+          keeps the account + email reserved). */}
+      <ActionButton label="Remove User" onClick={onRemove} variant="danger" />
     </div>
   );
 }
@@ -1990,6 +1995,7 @@ function MemberDetailPanel({
   onClose,
   onGrantSuperAdmin,
   onToggleActive,
+  onRemove,
   getAuthHeaders,
   onHireDateSaved,
   onMemberUpdated,
@@ -2001,6 +2007,7 @@ function MemberDetailPanel({
   onClose: () => void;
   onGrantSuperAdmin: (member: TeamMember) => void;
   onToggleActive: (member: TeamMember) => void;
+  onRemove: (member: TeamMember) => void;
   getAuthHeaders: () => Promise<Record<string, string>>;
   onHireDateSaved: (memberId: string, isoDate: string) => void;
   onMemberUpdated: (memberId: string, patch: Partial<TeamMember> & Record<string, any>) => void;
@@ -2151,6 +2158,7 @@ function MemberDetailPanel({
               isSuperAdmin={isSuperAdmin}
               onEditPermissions={() => setTab('permissions')}
               onToggleActive={() => onToggleActive(member)}
+              onRemove={() => onRemove(member)}
             />
 
             {/* Grant Super Admin — only for super admins editing non-super-admin users */}
@@ -2534,6 +2542,31 @@ export default function TeamProfilesPage() {
     }
   }, [getAuthHeaders, fetchMembers]);
 
+  // Permanently remove a user AND free their email for re-invite (soft-delete +
+  // email release; history preserved). Distinct from deactivate (which keeps the
+  // email reserved). Calls DELETE /api/admin/profiles/[id].
+  const handleRemoveMember = useCallback(async (member: TeamMember) => {
+    if (!window.confirm(
+      `Remove ${member.full_name}?\n\nThis frees their email (${member.email}) so it can be invited again, ` +
+      `and removes them from Team Profiles. Their work history is kept. You can't undo this here.`
+    )) return;
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/profiles/${member.id}`, { method: 'DELETE', headers });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        setSuccessMsg(json.message || `${member.full_name} removed. Their email is free to invite again.`);
+        setTimeout(() => setSuccessMsg(''), 5000);
+        await fetchMembers();
+        setSelectedMember(null);
+      } else {
+        alert(json.error || 'Failed to remove user');
+      }
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'An error occurred');
+    }
+  }, [getAuthHeaders, fetchMembers]);
+
   // Filtered + sorted members
   const allRoles = Array.from(new Set(members.map(m => m.role)))
     .sort((a, b) => {
@@ -2803,6 +2836,7 @@ export default function TeamProfilesPage() {
                 onClose={() => setSelectedMember(null)}
                 onGrantSuperAdmin={setGrantTarget}
                 onToggleActive={handleToggleActive}
+                onRemove={handleRemoveMember}
                 getAuthHeaders={getAuthHeaders}
                 onHireDateSaved={(memberId, isoDate) => {
                   setMembers(prev => prev.map(m => m.id === memberId ? { ...m, hire_date: isoDate } : m));

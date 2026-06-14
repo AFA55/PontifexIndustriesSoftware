@@ -67,6 +67,7 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('id, full_name, role, email, active, phone_number, phone, profile_picture_url, created_at, date_of_birth, hire_date, next_review_date, nickname')
       .eq('active', true)
+      .is('deleted_at', null) // never show removed users
       .order('full_name');
 
     // Scope to tenant

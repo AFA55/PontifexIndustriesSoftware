@@ -26,6 +26,7 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, created_at')
       .in('role', ['operator', 'apprentice'])
+      .is('deleted_at', null) // hide removed users
       .order('full_name');
 
     query = query.eq('tenant_id', tenantId);
