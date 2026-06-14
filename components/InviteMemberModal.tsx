@@ -10,7 +10,7 @@ const ROLES: { value: string; label: string; description: string; isFieldRole?: 
   { value: 'apprentice',         label: 'Team Member',     description: 'Helper with simplified field dashboard', isFieldRole: true },
   { value: 'salesman',           label: 'Project Manager', description: 'Schedule requests, job views, customer directory' },
   { value: 'supervisor',         label: 'Supervisor',      description: 'Schedule views, notes, forms, assigned jobs' },
-  { value: 'inventory_manager',  label: 'Office Admin',    description: 'View-only schedule, timecards, invoicing' },
+  { value: 'inventory_manager',  label: 'Office Staff',    description: 'View-only schedule, timecards, invoicing (NOT an admin)' },
   { value: 'admin',              label: 'Admin',           description: 'Customizable admin dashboard access' },
   { value: 'operations_manager', label: 'Management',      description: 'Full system access' },
 ];
@@ -59,7 +59,7 @@ const PRESETS_BY_ROLE: Record<string, Preset[]> = {
   inventory_manager: [
     {
       key: 'office_admin',
-      label: 'Office Admin',
+      label: 'Office Staff',
       description: 'View schedule, timecards, customers, invoicing',
       flags: {
         can_view_schedule_board: true,

@@ -275,7 +275,7 @@ export const ROLES_WITH_LABELS: RoleOption[] = [
   { value: 'salesman', label: 'Project Manager', description: 'Can request jobs, submit forms, view assigned jobs', tier: 'office' },
   { value: 'supervisor', label: 'Supervisor', description: 'View schedule, leave notes, fill forms, view assigned jobs', tier: 'office' },
   { value: 'shop_manager', label: 'Shop Manager', description: 'Owns equipment + fleet. Triages maintenance. Pulls equipment for upcoming jobs.', tier: 'office' },
-  { value: 'inventory_manager', label: 'Office Admin', description: 'View-only schedule, timecards, customers, invoicing', tier: 'office' },
+  { value: 'inventory_manager', label: 'Office Staff', description: 'View-only schedule, timecards, customers, invoicing', tier: 'office' },
   { value: 'admin', label: 'Admin', description: 'Customizable admin dashboard access', tier: 'office' },
   { value: 'operations_manager', label: 'Operations Manager', description: 'Full system access with diagnostics', tier: 'management' },
   { value: 'super_admin', label: 'Owner / Super Admin', description: 'Full control over entire system', tier: 'management' },

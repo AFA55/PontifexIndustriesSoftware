@@ -46,8 +46,8 @@ const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin',
   supervisor: 'Supervisor',
   salesman: 'Project Manager',
-  inventory_manager: 'Office Admin',
-  shop_manager: 'Office Admin',
+  inventory_manager: 'Office Staff',
+  shop_manager: 'Shop Manager',
   operator: 'Operator',
   apprentice: 'Team Member',
 };

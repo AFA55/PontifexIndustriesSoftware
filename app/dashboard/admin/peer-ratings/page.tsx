@@ -45,7 +45,7 @@ const ROLE_LABELS: Record<string, string> = {
   salesman: 'Project Mgr',
   shop_manager: 'Shop Manager',
   shop_help: 'Shop Helper',
-  inventory_manager: 'Office Admin',
+  inventory_manager: 'Office Staff',
   operator: 'Operator',
   apprentice: 'Team Member',
 };
