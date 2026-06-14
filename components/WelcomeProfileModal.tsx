@@ -54,6 +54,11 @@ export default function WelcomeProfileModal() {
         const p = json?.data;
         if (!p || cancelled) return;
 
+        // Smart, one-time: once the user has dismissed the nudge (persisted
+        // server-side), never show it again — no matter how many times they log
+        // in. Completing the profile (below) also stops it naturally.
+        if (p.welcome_dismissed_at) return;
+
         const m: Missing = {
           photo: !p.profile_picture_url,
           nickname: !p.nickname,
@@ -73,14 +78,31 @@ export default function WelcomeProfileModal() {
 
   if (!open) return null;
 
-  const snooze = () => {
+  // Persist the dismissal server-side so the nudge never returns on future
+  // logins (the "smart backend" — not just a per-session snooze). Fire-and-forget.
+  const persistDismissal = async () => {
     try { sessionStorage.setItem(SNOOZE_KEY, 'true'); } catch { /* non-fatal */ }
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) return;
+      await fetch('/api/my-profile/dismiss-welcome', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      /* never block on the nudge */
+    }
+  };
+
+  const snooze = () => {
     setOpen(false);
+    persistDismissal();
   };
 
   const goToProfile = () => {
-    try { sessionStorage.setItem(SNOOZE_KEY, 'true'); } catch { /* non-fatal */ }
     setOpen(false);
+    persistDismissal();
     router.push('/dashboard/my-profile');
   };
 

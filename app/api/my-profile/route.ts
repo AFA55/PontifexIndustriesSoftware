@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
 
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, role, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
+      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, role, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, welcome_dismissed_at')
       .eq('id', auth.userId)
       .single();
 
@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest) {
       .from('profiles')
       .update(updateData)
       .eq('id', auth.userId)
-      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, role, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship')
+      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, role, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, welcome_dismissed_at')
       .single();
 
     if (error) {
