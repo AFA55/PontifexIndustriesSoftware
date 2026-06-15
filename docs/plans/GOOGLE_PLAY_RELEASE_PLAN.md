@@ -41,9 +41,32 @@
    - **Privacy policy URL:** `https://www.pontifexindustries.com/privacy-policy` (already live).
    - **Graphics:** app icon 512×512, **feature graphic 1024×500**, ≥2 phone screenshots (+ 7"/10" tablet recommended). I can generate the icon/feature-graphic from the brand assets — ask.
    - **Content rating** questionnaire, **Data safety** form (declare: location, camera/photos, push token; for clock-in/jobs), **Target audience** (not for children).
-   - **App access:** provide Play reviewers a **demo login** (e.g. the demo admin/operator creds) since the whole app is behind auth — Google WILL reject if they can't log in.
+   - **App access:** the whole app is behind login — Google WILL reject without working credentials. Paste-ready instructions in the "App access (reviewer login)" section below. ✅ prepared.
 
 **E. Upload + roll out** — create an **Internal testing** track first (instant, test on your own device), then Production. Upload the `.aab` from step 2.
+
+## 📋 App access (reviewer login) — paste into Play Console
+Play Console → **App content → App access** → choose **"All or some functionality is restricted"** → add an instruction with this (verified live Jun 15, 2026 — admin@pontifex.com is active, tenant Patriot, code PATRIOT):
+
+```
+The entire app requires login. Use this demo account to access all functionality:
+
+  Company code: PATRIOT
+  Email:        admin@pontifex.com
+  Password:     PontifexDemo2026!
+
+Steps: launch the app → on the login screen enter the Company code (PATRIOT),
+then the email and password above → sign in. This is an admin demo account with
+full access to scheduling, jobs, crews, timecards, and invoicing.
+
+Field-worker (operator) demo, if needed:
+  Company code: PATRIOT
+  Email:        zack@demopontifex.com
+  Password:     Patriot2026!
+```
+
+## 🎨 Store graphics — generated (`assets/play/`)
+- `icon-512.png` (512×512 high-res icon) and `feature-graphic-1024x500.png` (dark brand banner + P tile + wordmark). Built by `scripts/build-play-graphics.mjs`. Still need **≥2 phone screenshots** (capture from the running app/emulator once the AAB installs). Full store description copy available on request.
 
 ## ⚠️ Risk to know
 Play policy **4.2 (minimum functionality / "webpage repackaged as an app")** can flag thin webview wrappers. We should pass — the app adds real native value (push, GPS clock-in, camera, biometric, NFC) — but the listing should emphasize those native features, and the demo login (App access) must work for reviewers.
