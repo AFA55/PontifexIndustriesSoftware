@@ -36,7 +36,7 @@ const bg = Buffer.from(`<svg width="${W}" height="${H}" xmlns="http://www.w3.org
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
   <rect x="0" y="${H - 8}" width="${W}" height="8" fill="url(#brand)"/>
   <text x="420" y="208" font-family="Helvetica, Arial, sans-serif" font-size="52" font-weight="bold" fill="#ffffff">Pontifex Industries</text>
-  <text x="422" y="262" font-family="Helvetica, Arial, sans-serif" font-size="28" fill="#cfc9ec">Concrete-cutting operations, managed.</text>
+  <text x="422" y="262" font-family="Helvetica, Arial, sans-serif" font-size="28" fill="#cfc9ec">Construction operations software</text>
   <text x="422" y="306" font-family="Helvetica, Arial, sans-serif" font-size="23" fill="#9c95c6">Scheduling &#183; crews &#183; time tracking &#183; invoicing</text>
 </svg>`);
 

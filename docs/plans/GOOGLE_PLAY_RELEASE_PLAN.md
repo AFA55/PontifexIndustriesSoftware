@@ -66,7 +66,31 @@ Field-worker (operator) demo, if needed:
 ```
 
 ## 🎨 Store graphics — generated (`assets/play/`)
-- `icon-512.png` (512×512 high-res icon) and `feature-graphic-1024x500.png` (dark brand banner + P tile + wordmark). Built by `scripts/build-play-graphics.mjs`. Still need **≥2 phone screenshots** (capture from the running app/emulator once the AAB installs). Full store description copy available on request.
+- `icon-512.png` (512×512 high-res icon) and `feature-graphic-1024x500.png` (dark brand banner + P tile + wordmark, tagline "Construction operations software"). Built by `scripts/build-play-graphics.mjs`. Still need **≥2 phone screenshots** (capture from the running app/emulator once the AAB installs).
+
+## ✍️ Store description — paste into Play Console (deliberately BROAD)
+Kept generic ("construction operations software") at the founder's request — no niche/employer specifics (non-compete). Edit anytime.
+
+**Short description (≤80 chars):**
+```
+Construction operations software: jobs, crews, time tracking, and invoicing.
+```
+
+**Full description:**
+```
+Pontifex Industries is operations software for construction and field-service
+teams. Run your day-to-day work in one place — from the office or the field.
+
+• Schedule and dispatch jobs
+• Manage crews and team members
+• Track time and timecards
+• Keep customer and job records
+• Create and send invoices
+• Get real-time notifications
+• Works on phone and desktop
+
+Streamline how your team plans the day, tracks the work, and bills for it.
+```
 
 ## ⚠️ Risk to know
 Play policy **4.2 (minimum functionality / "webpage repackaged as an app")** can flag thin webview wrappers. We should pass — the app adds real native value (push, GPS clock-in, camera, biometric, NFC) — but the listing should emphasize those native features, and the demo login (App access) must work for reviewers.
