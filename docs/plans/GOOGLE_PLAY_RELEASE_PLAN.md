@@ -13,18 +13,21 @@
 - **Version** → `1.0.0` (code 1).
 - **Verified already-good:** targetSdk **36** (Play requires ≥35), permissions (location, camera, push, media, vibrate, NFC optional), `google-services:4.4.4` classpath present, all 11 plugins sync for Android (incl. push + biometric).
 
+## ✅ Done this session (part 2 — Firebase + push backend)
+- **Firebase Android app registered** — project `pontifex-ind-1dc89`, app `com.pontifexindustries.app` (a placeholder `com.mycompany.pontifexind` app also exists in the project — harmless, delete later). `google-services.json` is in `android/app/` (gitignored — public repo — but present for local builds). Spark/free plan; FCM is free.
+- **FCM HTTP v1 sender written** — `lib/send-push.ts` rewritten from the dead legacy `fcm/send` API to **HTTP v1** (`/v1/projects/<id>/messages:send`) with an OAuth2 access token minted from the service account (RS256 JWT via `node:crypto`, no new deps; token cached). iOS APNs untouched. tsc clean. **Activates once `FIREBASE_SERVICE_ACCOUNT_JSON` is set (founder step B2).**
+
 ## 🔧 Claude can do next (code — just say go)
-1. **FCM HTTP v1 sender (REQUIRED for Android push).** `lib/send-push.ts` currently calls the **legacy `fcm.googleapis.com/fcm/send` + `FCM_SERVER_KEY`** API, which **Google shut down June 2024 — it no longer works.** Rewrite to **FCM HTTP v1** (`/v1/projects/<id>/messages:send`) using a Firebase **service-account** JSON → OAuth2 token. iOS APNs path is untouched. *(Needs the founder's Firebase service account — step B below — to actually send, but I can write + ship the code now.)*
-2. **Build the signed `.aab`** once the keystore exists (`cd android && ./gradlew bundleRelease`) — needs Android SDK locally, or do it in CI.
+1. **Build the signed `.aab`** once the keystore exists (`cd android && ./gradlew bundleRelease`) — needs Android SDK locally, or do it in CI.
+2. **Store listing copy + graphics** (512 icon, 1024×500 feature graphic) and the **App access** demo-login section.
 
 ## 🔑 Founder-only steps (accounts, secrets, store listing — I can't do these)
 
 **A. Google Play Developer account** — one-time **$25**. https://play.google.com/console → register (use the business identity; Play now requires D-U-N-S / org verification for company accounts, allow a few days).
 
-**B. Firebase project (for Android push)** — https://console.firebase.google.com →
-   - Create/ös use a project → **Add Android app**, package `com.pontifexindustries.app`.
-   - Download **`google-services.json`** → drop it into **`android/app/`** (native push then works; it's gitignored-safe to keep local, or commit — it's not a secret).
-   - Project Settings → Service accounts → **Generate new private key** → send me that JSON (or set it as a Vercel env var) so I can wire the HTTP v1 sender. **This is a secret — store it safely.**
+**B. Firebase project (for Android push)** — project `pontifex-ind-1dc89`.
+   - ✅ B1: Android app registered + `google-services.json` placed in `android/app/`. (Done.)
+   - ⬜ **B2 (the one push blocker left):** Firebase Console → ⚙️ Project settings → **Service accounts** → **Generate new private key** → a JSON downloads. In **Vercel → Project → Settings → Environment Variables**, add `FIREBASE_SERVICE_ACCOUNT_JSON` = the entire JSON file's contents (Production scope). **This is a secret — store it safely; never commit it.** The v1 sender activates the moment this is set.
 
 **C. Upload keystore** — run ONCE from repo root, then back it up (1Password):
    ```
