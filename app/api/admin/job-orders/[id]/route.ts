@@ -99,6 +99,9 @@ export async function PATCH(
       'estimated_hours', 'estimated_cost', 'operator_name', 'status', 'priority',
       'is_will_call', 'difficulty_rating',
       'ppe_required', 'additional_safety_requirements',
+      // Direct column names that the schedule-form + schedule-board edit panels
+      // send and previously had silently dropped on save.
+      'po_number', 'customer_id', 'customer_contact', 'site_contact_phone',
     ];
 
     allowedFields.forEach(field => {
@@ -106,6 +109,29 @@ export async function PATCH(
         updateFields[field] = updates[field];
       }
     });
+
+    // Schedule-form edit payload → job_orders columns. The form sends JSONB +
+    // relational fields the basic allowlist omits, and uses different keys than
+    // the columns for three of them. Map them explicitly so editing a job no
+    // longer silently drops scope / scheduling / compliance / conditions /
+    // equipment selections / customer link / contact / location on re-save.
+    const jsonbPassthrough = [
+      'scope_details',
+      'scheduling_flexibility',
+      'site_compliance',
+      'jobsite_conditions',
+      'equipment_selections',
+    ];
+    for (const f of jsonbPassthrough) {
+      if (f in updates) updateFields[f] = updates[f];
+    }
+    if ('location_name' in updates) updateFields.location = updates.location_name;
+    if ('site_address' in updates) updateFields.address = updates.site_address;
+    if ('site_contact' in updates) updateFields.customer_contact = updates.site_contact;
+    if ('contact_phone' in updates) {
+      updateFields.site_contact_phone = updates.contact_phone;
+      updateFields.foreman_phone = updates.contact_phone; // keep legacy column in sync (matches create route)
+    }
 
     // Update job order (scoped to tenant)
     let updateQuery = supabaseAdmin

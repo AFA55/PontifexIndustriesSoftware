@@ -61,7 +61,16 @@ export async function GET(request: NextRequest, context: RouteContext) {
         commission_rate,
         photo_urls,
         ppe_required,
-        additional_safety_requirements
+        additional_safety_requirements,
+        customer_id,
+        site_contact_phone,
+        estimated_cost,
+        scope_details,
+        scheduling_flexibility,
+        site_compliance,
+        jobsite_conditions,
+        equipment_needed,
+        equipment_selections
       `)
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
@@ -368,6 +377,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
           additional_safety_requirements: Array.isArray((job as any).additional_safety_requirements)
             ? (job as any).additional_safety_requirements
             : [],
+          // Schedule-form edit-load reads these to repopulate Steps 1-4 + 6 + 8.
+          // Three column names differ from the form keys (customer_contact→
+          // site_contact, site_contact_phone→contact_phone, location→location_name).
+          // Without them the edit form showed blanks and a re-save dropped the values.
+          customer_id: (job as any).customer_id ?? null,
+          site_contact: (job as any).customer_contact ?? null,
+          contact_phone: (job as any).site_contact_phone ?? (job as any).foreman_phone ?? null,
+          location_name: (job as any).location ?? null,
+          estimated_cost: (job as any).estimated_cost ?? null,
+          scope_details: (job as any).scope_details ?? {},
+          scheduling_flexibility: (job as any).scheduling_flexibility ?? {},
+          site_compliance: (job as any).site_compliance ?? {},
+          jobsite_conditions: (job as any).jobsite_conditions ?? {},
+          equipment_needed: Array.isArray((job as any).equipment_needed) ? (job as any).equipment_needed : [],
+          equipment_selections: (job as any).equipment_selections ?? {},
         },
         scope: {
           items: enrichedScopeItems,

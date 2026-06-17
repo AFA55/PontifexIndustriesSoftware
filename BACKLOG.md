@@ -56,7 +56,7 @@
 - [ ] **Remove dead dep `use-places-autocomplete`** (`npm uninstall`) — zero imports after the Maps fix.
 - [ ] **GoogleAddressAutocomplete dark-mode** — component is light-only (pre-existing, not a regression
       from the rewrite); add dark: variants when convenient.
-- [ ] **🟠 Schedule-form EDIT MODE is lossy (pre-existing, guardian-found Jun 12)** —
+- [x] **🟠 Schedule-form EDIT MODE is lossy** ✅ Jun 16 — FIXED both sides (summary read + PATCH write):
       `/api/admin/jobs/[id]/summary` builds an explicit `job` object the edit-load reads, but it
       OMITS ~12 fields the form maps: scope_details, scheduling_flexibility, site_compliance,
       jobsite_conditions, equipment_needed/details/selections, customer_id, location_name,
