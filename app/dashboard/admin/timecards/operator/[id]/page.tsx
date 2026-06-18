@@ -72,6 +72,9 @@ interface TimecardEntry {
   clock_out_gps_lng: number | null;
   nfc_clock_in: boolean;
   nfc_clock_out: boolean;
+  is_late?: boolean | null;
+  late_minutes?: number | null;
+  scheduled_start_time?: string | null;
   clock_in_method: string | null;
   requires_approval: boolean | null;
   remote_verified: boolean | null;
@@ -112,6 +115,12 @@ interface WeekStats {
     lateCountMonth: number;
     avgMinutesLate: number;
     lastLateDate: string | null;
+    weekLateCount?: number;
+    weekLateMinutes?: number;
+    monthLateCount?: number;
+    monthLateMinutes?: number;
+    ytdLateCount?: number;
+    ytdLateMinutes?: number;
   };
 }
 
@@ -1366,6 +1375,51 @@ function OperatorTimecardDetailPageInner() {
               );
             })()}
 
+            {/* Lateness rollups — This Week / This Month / YTD */}
+            {(() => {
+              const p = stats.punctuality;
+              const lateColor = (n: number) =>
+                n === 0
+                  ? { value: 'text-emerald-600 dark:text-emerald-400', sub: 'text-gray-400 dark:text-slate-500' }
+                  : n <= 2
+                    ? { value: 'text-amber-600 dark:text-amber-400', sub: 'text-amber-500 dark:text-amber-400' }
+                    : { value: 'text-red-600 dark:text-red-400', sub: 'text-red-500 dark:text-red-400' };
+              const rows: { label: string; count: number; minutes: number }[] = [
+                { label: 'This Week', count: p?.weekLateCount ?? 0, minutes: p?.weekLateMinutes ?? 0 },
+                { label: 'This Month', count: p?.monthLateCount ?? 0, minutes: p?.monthLateMinutes ?? 0 },
+                { label: 'YTD', count: p?.ytdLateCount ?? 0, minutes: p?.ytdLateMinutes ?? 0 },
+              ];
+              const worst = Math.max(...rows.map(r => r.count));
+              return (
+                <div className={`bg-white dark:bg-slate-800/60 rounded-xl p-3.5 border shadow-sm ${worst >= 3 ? 'border-red-200 dark:border-red-500/30 ring-1 ring-red-100 dark:ring-red-500/20' : 'border-gray-100 dark:border-white/10'}`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider">Late Arrivals</span>
+                    <div className="w-7 h-7 rounded-lg bg-rose-500/10 flex items-center justify-center">
+                      <AlertTriangle size={13} className="text-rose-400" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    {rows.map((r) => {
+                      const c = lateColor(r.count);
+                      return (
+                        <div key={r.label} className="flex items-baseline justify-between gap-2">
+                          <span className="text-[11px] text-gray-500 dark:text-slate-400">{r.label}</span>
+                          <span className="flex items-baseline gap-1.5">
+                            <span className={`text-sm font-bold tabular-nums ${c.value}`}>
+                              {r.count === 0 ? '0' : `${r.count}×`}
+                            </span>
+                            {r.count > 0 && (
+                              <span className={`text-[10px] tabular-nums ${c.sub}`}>{r.minutes}m total</span>
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Subsistence Nights — count of overnight stays this week (OT-exempt) */}
             {(() => {
               const nights = subsistenceNights.length;
@@ -1731,6 +1785,19 @@ function OperatorTimecardDetailPageInner() {
                                   {renderGpsLink(entry.clock_in_gps_lat || entry.clock_in_latitude, entry.clock_in_gps_lng || entry.clock_in_longitude, 'GPS')}
                                   {entry.nfc_clock_in && (
                                     <span className="px-1 py-0.5 rounded text-[8px] font-bold bg-cyan-500/10 text-cyan-400">NFC</span>
+                                  )}
+                                  {entry.is_late && (
+                                    <span
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-100 dark:bg-red-500/15 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30"
+                                      title={
+                                        entry.scheduled_start_time
+                                          ? `${entry.late_minutes ?? 0}m late (scheduled ${entry.scheduled_start_time})`
+                                          : `${entry.late_minutes ?? 0}m late`
+                                      }
+                                    >
+                                      <AlertTriangle size={10} />
+                                      {entry.late_minutes ? `${entry.late_minutes}m late` : 'Late'}
+                                    </span>
                                   )}
                                 </div>
                                 <span className="text-gray-400 dark:text-slate-500">&rarr;</span>

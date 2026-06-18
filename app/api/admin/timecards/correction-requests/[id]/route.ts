@@ -4,13 +4,21 @@ export const dynamic = 'force-dynamic';
  * PATCH /api/admin/timecards/correction-requests/[id]
  * Admin approves or rejects a timecard correction request.
  *
- * Body: { action: 'approve' | 'reject', reviewer_notes?: string }
+ * Body: {
+ *   action: 'approve' | 'reject',
+ *   reviewer_notes?: string,
+ *   override_clock_in?: string | null,   // ISO — admin-adjusted time (Modify & Approve)
+ *   override_clock_out?: string | null,  // ISO — admin-adjusted time (Modify & Approve)
+ * }
  *
  * On approve:
  *   1. Updates correction request status to 'approved'
  *   2. Updates the actual timecard clock_in_time and/or clock_out_time
- *   3. Recalculates total_hours
+ *      — using admin overrides when supplied, else the operator's requested values
+ *   3. Recalculates total_hours (lunch deduction preserved)
  *   4. Notifies the worker
+ *   5. Appends "[admin adjusted times]" to reviewer_notes when an override
+ *      differs from what the operator requested (audit trail)
  *
  * On reject:
  *   1. Updates correction request status to 'rejected'
@@ -20,6 +28,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { parseYMDLocal } from '@/lib/dates';
 
 export async function PATCH(
   request: NextRequest,
@@ -39,13 +48,27 @@ export async function PATCH(
 
     const { id: correctionId } = await params;
     const body = await request.json();
-    const { action, reviewer_notes } = body;
+    const { action, reviewer_notes, override_clock_in, override_clock_out } = body;
 
     if (!action || !['approve', 'reject'].includes(action)) {
       return NextResponse.json(
         { error: 'action must be "approve" or "reject"' },
         { status: 400 }
       );
+    }
+
+    // Validate admin override timestamps (Modify & Approve). Only meaningful on approve.
+    const hasOverrideIn = override_clock_in !== undefined && override_clock_in !== null && override_clock_in !== '';
+    const hasOverrideOut = override_clock_out !== undefined && override_clock_out !== null && override_clock_out !== '';
+
+    if (hasOverrideIn && isNaN(Date.parse(override_clock_in))) {
+      return NextResponse.json({ error: 'override_clock_in must be a valid timestamp' }, { status: 400 });
+    }
+    if (hasOverrideOut && isNaN(Date.parse(override_clock_out))) {
+      return NextResponse.json({ error: 'override_clock_out must be a valid timestamp' }, { status: 400 });
+    }
+    if (hasOverrideIn && hasOverrideOut && Date.parse(override_clock_out) <= Date.parse(override_clock_in)) {
+      return NextResponse.json({ error: 'override_clock_out must be after override_clock_in' }, { status: 400 });
     }
 
     // Fetch the correction request (scoped to tenant)
@@ -99,8 +122,23 @@ export async function PATCH(
     const workerProfile = (correction as any).profiles;
     const workerName = workerProfile?.full_name || 'Team member';
     const dateFormatted = timecard?.date
-      ? new Date(timecard.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+      ? parseYMDLocal(timecard.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       : 'unknown date';
+
+    // Determine whether the admin adjusted the proposed times (audit marker).
+    // An override "differs" when it is supplied AND not equal to the operator's request.
+    const inDiffers = action === 'approve' && hasOverrideIn &&
+      (!correction.requested_clock_in ||
+        Date.parse(override_clock_in) !== Date.parse(correction.requested_clock_in));
+    const outDiffers = action === 'approve' && hasOverrideOut &&
+      (!correction.requested_clock_out ||
+        Date.parse(override_clock_out) !== Date.parse(correction.requested_clock_out));
+    const adminAdjusted = inDiffers || outDiffers;
+
+    const baseNotes = (reviewer_notes && String(reviewer_notes).trim()) || '';
+    const finalNotes = adminAdjusted
+      ? `${baseNotes} [admin adjusted times]`.trim()
+      : (baseNotes || null);
 
     // Update the correction request
     const { error: updateCorrectionError } = await supabaseAdmin
@@ -109,7 +147,7 @@ export async function PATCH(
         status: action === 'approve' ? 'approved' : 'rejected',
         reviewed_by: auth.userId,
         reviewed_at: now,
-        reviewer_notes: reviewer_notes || null,
+        reviewer_notes: finalNotes,
         updated_at: now,
       })
       .eq('id', correctionId);
@@ -120,17 +158,21 @@ export async function PATCH(
     }
 
     if (action === 'approve' && timecard) {
-      // Calculate new times (use requested values where provided, fall back to current)
-      const newClockIn = correction.requested_clock_in || timecard.clock_in_time;
-      const newClockOut = correction.requested_clock_out !== undefined
-        ? correction.requested_clock_out
-        : timecard.clock_out_time;
+      // Effective times: admin override wins, then operator request, then current value.
+      const effClockIn = hasOverrideIn
+        ? override_clock_in
+        : (correction.requested_clock_in || timecard.clock_in_time);
+      const effClockOut = hasOverrideOut
+        ? override_clock_out
+        : (correction.requested_clock_out !== undefined && correction.requested_clock_out !== null
+            ? correction.requested_clock_out
+            : timecard.clock_out_time);
 
-      // Recalculate total_hours from updated times minus lunch deduction
+      // Recalculate total_hours from effective times minus lunch deduction
       let newTotalHours: number | null = null;
-      if (newClockIn && newClockOut) {
-        const inMs = new Date(newClockIn).getTime();
-        const outMs = new Date(newClockOut).getTime();
+      if (effClockIn && effClockOut) {
+        const inMs = new Date(effClockIn).getTime();
+        const outMs = new Date(effClockOut).getTime();
         if (outMs > inMs) {
           const rawHours = (outMs - inMs) / 3600000;
           const lunchMinutes = timecard.lunch_deducted ? (timecard.lunch_minutes || 0) : 0;
@@ -140,9 +182,17 @@ export async function PATCH(
         }
       }
 
+      // Persist clock_in if the admin overrode it or the operator requested it.
+      // Persist clock_out if the admin overrode it or the operator requested it.
       const timecardUpdate: Record<string, unknown> = {};
-      if (correction.requested_clock_in) timecardUpdate.clock_in_time = correction.requested_clock_in;
-      if (correction.requested_clock_out !== undefined && correction.requested_clock_out !== null) {
+      if (hasOverrideIn) {
+        timecardUpdate.clock_in_time = override_clock_in;
+      } else if (correction.requested_clock_in) {
+        timecardUpdate.clock_in_time = correction.requested_clock_in;
+      }
+      if (hasOverrideOut) {
+        timecardUpdate.clock_out_time = override_clock_out;
+      } else if (correction.requested_clock_out !== undefined && correction.requested_clock_out !== null) {
         timecardUpdate.clock_out_time = correction.requested_clock_out;
       }
       if (newTotalHours !== null) timecardUpdate.total_hours = newTotalHours;

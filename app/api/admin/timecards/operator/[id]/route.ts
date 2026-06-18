@@ -17,6 +17,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { toLocalYMD, mondayOf } from '@/lib/dates';
 
 export async function GET(
   request: NextRequest,
@@ -88,7 +89,7 @@ export async function GET(
     // Also fetch from the base timecards table for extra columns (segments, admin_notes, entry_type, etc.)
     let baseQuery = supabaseAdmin
       .from('timecards')
-      .select('id, segments, admin_notes, employee_notes, entry_type, break_minutes, coworkers, clock_in_gps_lat, clock_in_gps_lng, clock_out_gps_lat, clock_out_gps_lng, nfc_clock_in, nfc_clock_out, edited_by, rejected_by, rejected_at')
+      .select('id, segments, admin_notes, employee_notes, entry_type, break_minutes, coworkers, clock_in_gps_lat, clock_in_gps_lng, clock_out_gps_lat, clock_out_gps_lng, nfc_clock_in, nfc_clock_out, edited_by, rejected_by, rejected_at, is_late, late_minutes, scheduled_start_time')
       .eq('user_id', operatorId)
       .gte('date', startDateStr)
       .lte('date', endDateStr);
@@ -115,6 +116,9 @@ export async function GET(
         clock_out_gps_lng: (base as any).clock_out_gps_lng || entry.clock_out_longitude,
         nfc_clock_in: (base as any).nfc_clock_in || false,
         nfc_clock_out: (base as any).nfc_clock_out || false,
+        is_late: (base as any).is_late ?? false,
+        late_minutes: (base as any).late_minutes ?? 0,
+        scheduled_start_time: (base as any).scheduled_start_time ?? null,
       };
     });
 
@@ -182,32 +186,85 @@ export async function GET(
       // Table may not exist
     }
 
-    // 6a. Punctuality stats — last 30 days
-    const thirtyDaysAgo = new Date();
+    // 6a. Punctuality stats — late arrivals across multiple windows.
+    // All bounds are LOCAL calendar dates (timecards.date is a bare YYYY-MM-DD).
+    // Use lib/dates so we never UTC-shift the boundary by a day.
+    const today = new Date();
+    const todayStr = toLocalYMD(today);                 // upper bound (inclusive)
+    const weekStartStr = mondayOf(today);               // current week (Mon-based)
+    const monthStartStr = toLocalYMD(
+      new Date(today.getFullYear(), today.getMonth(), 1) // 1st of current month, local
+    );
+    const ytdStartStr = `${today.getFullYear()}-01-01`; // Jan 1 of current year
+    // 30-day rolling window (kept for backward-compat fields)
+    const thirtyDaysAgo = new Date(today);
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split('T')[0];
+    const thirtyDaysAgoStr = toLocalYMD(thirtyDaysAgo);
 
     let punctualityStats = {
+      // backward-compat (30-day rolling)
       lateCountMonth: 0,
       avgMinutesLate: 0,
       lastLateDate: null as string | null,
+      // new rollups
+      weekLateCount: 0,
+      weekLateMinutes: 0,
+      monthLateCount: 0,
+      monthLateMinutes: 0,
+      ytdLateCount: 0,
+      ytdLateMinutes: 0,
     };
     try {
-      const { data: lateEntries } = await supabaseAdmin
+      // One query: pull every late entry YTD (earliest boundary), then bucket
+      // locally. YTD is the widest window so it covers week/month/30-day too.
+      const earliestStr = ytdStartStr < thirtyDaysAgoStr ? ytdStartStr : thirtyDaysAgoStr;
+      let lateQuery = supabaseAdmin
         .from('timecards')
         .select('date, late_minutes')
         .eq('user_id', operatorId)
         .eq('is_late', true)
-        .gte('date', thirtyDaysAgoStr)
+        .gte('date', earliestStr)
+        .lte('date', todayStr)
         .order('date', { ascending: false });
+      lateQuery = lateQuery.eq('tenant_id', tenantId);
+
+      const { data: lateEntries } = await lateQuery;
 
       if (lateEntries && lateEntries.length > 0) {
-        const totalMinutes = lateEntries.reduce((sum: number, e: any) => sum + (e.late_minutes || 0), 0);
-        punctualityStats = {
-          lateCountMonth: lateEntries.length,
-          avgMinutesLate: Math.round(totalMinutes / lateEntries.length),
-          lastLateDate: lateEntries[0].date,
-        };
+        const inRange = (d: string, start: string) => d >= start && d <= todayStr;
+
+        let last30Count = 0;
+        let last30Minutes = 0;
+        let last30LastDate: string | null = null;
+
+        for (const e of lateEntries as any[]) {
+          const d: string = e.date;
+          const mins = e.late_minutes || 0;
+
+          // 30-day rolling (backward-compat). Entries are ordered desc by date,
+          // so the first match is the most recent late date.
+          if (inRange(d, thirtyDaysAgoStr)) {
+            last30Count += 1;
+            last30Minutes += mins;
+            if (last30LastDate === null) last30LastDate = d;
+          }
+          if (inRange(d, weekStartStr)) {
+            punctualityStats.weekLateCount += 1;
+            punctualityStats.weekLateMinutes += mins;
+          }
+          if (inRange(d, monthStartStr)) {
+            punctualityStats.monthLateCount += 1;
+            punctualityStats.monthLateMinutes += mins;
+          }
+          if (inRange(d, ytdStartStr)) {
+            punctualityStats.ytdLateCount += 1;
+            punctualityStats.ytdLateMinutes += mins;
+          }
+        }
+
+        punctualityStats.lateCountMonth = last30Count;
+        punctualityStats.avgMinutesLate = last30Count > 0 ? Math.round(last30Minutes / last30Count) : 0;
+        punctualityStats.lastLateDate = last30LastDate;
       }
     } catch {
       // Non-critical

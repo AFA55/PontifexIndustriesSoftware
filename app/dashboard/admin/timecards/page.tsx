@@ -689,16 +689,16 @@ export default function AdminTimecardsPage() {
             </button>
 
             <button
-              onClick={() => setShowCorrections(true)}
+              onClick={() => router.push('/dashboard/admin/timecards/corrections')}
               className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${
                 pendingCorrectionCount > 0
                   ? 'bg-violet-600 hover:bg-violet-700 text-white border-violet-600 shadow-md shadow-violet-500/30'
                   : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border-gray-200 dark:border-white/10'
               }`}
-              title="Time Correction Requests"
+              title="Time Edit Requests"
             >
               <ClipboardEdit size={14} />
-              <span className="hidden sm:inline">Corrections</span>
+              <span className="hidden sm:inline">Time Edit Requests</span>
               {pendingCorrectionCount > 0 && (
                 <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
                   {pendingCorrectionCount > 9 ? '9+' : pendingCorrectionCount}

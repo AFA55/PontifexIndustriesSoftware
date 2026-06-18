@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
         message: `${requesterName} submitted a time correction for ${dateFormatted}.`,
         tenant_id: tenantId,
         read: false,
+        action_url: '/dashboard/admin/timecards/corrections',
         metadata: {
           correction_request_id: correctionReq.id,
           timecard_id,

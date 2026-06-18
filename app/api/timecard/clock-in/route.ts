@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
       // If settings table doesn't exist, fall back to defaults below
     }
     // Late grace period (minutes past scheduled start before flagged late). Default 15.
-    const graceMinutes = tcSettings?.late_grace_minutes ?? 15;
+    const graceMinutes = tcSettings?.late_grace_minutes ?? 7;
 
     // --- Server-side bypass_nfc verification ---
     // If NFC is required by settings but user is using GPS method, verify they have
