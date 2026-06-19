@@ -88,6 +88,7 @@ npm run build      # Production build check (must pass with 0 errors)
 - **Do not create new root-level MD files.** Plans → `docs/plans/`, how-tos → `docs/playbooks/`, finished-work reports → `docs/archive/`.
 
 ## Engineering Playbooks → now project SKILLS (don't re-derive, invoke)
+- **`dev-decisions`** — **FIRST-PRINCIPLES DECISION FRAMEWORK. Read this BEFORE any significant technical or product decision** (architecture, schema/migration, security, API shape, a build/deploy, an account/vendor path, any "which option" question). Decision procedure: gather facts → enumerate ALL options w/ real timelines+cost+reversibility → pick cheapest reversible step → verify end-to-end. Includes the HONEST-OPTIONS rule (never answer a "fastest/best way" with one route — give the full table) + per-domain checklists + anti-patterns.
 - **`ios-release`** (.claude/skills/) — full App Store/TestFlight ship procedure incl. manual signing, Transporter automation, 6.9″ screenshot gotchas
 - **`prod-deploy`** — the verification gate + cost confirmation + push + deploy-watch sequence
 - **`guardian-review`** — the architecture-guardian checklist (run after EVERY builder)
