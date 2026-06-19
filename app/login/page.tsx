@@ -302,9 +302,19 @@ function LoginPageInner() {
         return;
       }
 
-      // Full navigation (not router.push) so Safari/iOS + Firefox treat this as
-      // a completed login and fire their native "Save password?" prompt.
-      window.location.assign(target);
+      // NATIVE APP: use SPA navigation so we stay INSIDE the webview. A full
+      // window.location.assign can hit a www↔apex (or any host) redirect that
+      // Capacitor treats as an external URL and kicks the user out to Safari
+      // (the "logged in → opened in browser" bug). The native app remembers the
+      // user via Face ID / Keychain, so it doesn't need the web save-password
+      // full-navigation trick at all.
+      if (isNativeApp()) {
+        router.replace(target);
+      } else {
+        // WEB: full navigation (not router.push) so Safari/iOS + Firefox treat
+        // this as a completed login and fire their native "Save password?" prompt.
+        window.location.assign(target);
+      }
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);
