@@ -209,15 +209,19 @@ export async function PATCH(
         }
       }
 
-      // Fire-and-forget: notify the worker
+      // Fire-and-forget: notify the worker (in the `notifications` table the bell
+      // reads, with a deep-link to their timecard).
       Promise.resolve(
-        supabaseAdmin.from('schedule_notifications').insert({
-          recipient_id: correction.requested_by,
+        supabaseAdmin.from('notifications').insert({
+          user_id: correction.requested_by,
           type: 'correction_approved',
+          notification_type: 'correction_approved',
           title: 'Time Correction Approved',
           message: `Your time correction for ${dateFormatted} was approved.`,
           tenant_id: tenantId,
           read: false,
+          is_read: false,
+          action_url: '/dashboard/timecard',
           metadata: {
             correction_request_id: correctionId,
             timecard_id: correction.timecard_id,
@@ -230,13 +234,16 @@ export async function PATCH(
         ? ` Reason: ${reviewer_notes}.`
         : '';
       Promise.resolve(
-        supabaseAdmin.from('schedule_notifications').insert({
-          recipient_id: correction.requested_by,
+        supabaseAdmin.from('notifications').insert({
+          user_id: correction.requested_by,
           type: 'correction_rejected',
+          notification_type: 'correction_rejected',
           title: 'Time Correction Not Approved',
           message: `Your time correction for ${dateFormatted} was not approved.${reasonText}`,
           tenant_id: tenantId,
           read: false,
+          is_read: false,
+          action_url: '/dashboard/timecard',
           metadata: {
             correction_request_id: correctionId,
             timecard_id: correction.timecard_id,

@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { parseYMDLocal } from '@/lib/dates';
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,8 +89,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to submit correction request' }, { status: 500 });
     }
 
-    // Fire-and-forget: notify all admins/ops_managers/super_admins in the tenant
-    const dateFormatted = new Date(timecard.date).toLocaleDateString('en-US', {
+    // Fire-and-forget: notify all admins/ops_managers/super_admins in the tenant.
+    // IMPORTANT: write to `notifications` (the table the in-app bell reads via
+    // /api/notifications) — NOT `schedule_notifications` (which the bell never
+    // reads and has no action_url column). Including action_url makes the bell's
+    // "View" deep-link to the corrections approval page.
+    const dateFormatted = parseYMDLocal(timecard.date).toLocaleDateString('en-US', {
       weekday: 'short', month: 'short', day: 'numeric'
     });
 
@@ -102,12 +107,14 @@ export async function POST(request: NextRequest) {
     ).then(({ data: adminProfiles }) => {
       if (!adminProfiles || adminProfiles.length === 0) return;
       const notifications = adminProfiles.map((p: { id: string }) => ({
-        recipient_id: p.id,
+        user_id: p.id,
         type: 'correction_request',
+        notification_type: 'correction_request',
         title: 'Time Correction Request',
         message: `${requesterName} submitted a time correction for ${dateFormatted}.`,
         tenant_id: tenantId,
         read: false,
+        is_read: false,
         action_url: '/dashboard/admin/timecards/corrections',
         metadata: {
           correction_request_id: correctionReq.id,
@@ -117,7 +124,7 @@ export async function POST(request: NextRequest) {
           timecard_date: timecard.date,
         },
       }));
-      return supabaseAdmin.from('schedule_notifications').insert(notifications);
+      return supabaseAdmin.from('notifications').insert(notifications);
     }).catch(() => {});
 
     return NextResponse.json(

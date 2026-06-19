@@ -448,7 +448,9 @@ export async function POST(request: NextRequest) {
     }
 
     // -- Late detection --
-    // Look up the operator's job for today and check if they arrived late (≥15 min)
+    // Look up the operator's job for today and flag a late arrival when the
+    // clock-in is at least `graceMinutes` (default 7) past the scheduled start,
+    // computed in the TENANT'S timezone (not the server's — Vercel runs UTC).
     try {
       const { data: todayJobs } = await supabaseAdmin
         .from('job_orders')
@@ -465,11 +467,23 @@ export async function POST(request: NextRequest) {
 
         if (expectedTimeStr) {
           const [hours, minutes] = expectedTimeStr.split(':').map(Number);
-          const expectedTime = new Date();
-          expectedTime.setHours(hours, minutes, 0, 0);
+          // Resolve the expected-arrival INSTANT for today's tenant-local date at
+          // HH:MM in the tenant's timezone. A naive `new Date().setHours()` uses
+          // the server tz (UTC on Vercel) and would mis-flag on-time operators by
+          // the whole tz offset (e.g. ~4-5h for America/New_York).
+          const pad = (n: number) => String(n).padStart(2, '0');
+          const wallUtcMs = Date.parse(`${todayDate}T${pad(hours)}:${pad(minutes)}:00Z`);
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: tenantTz, hourCycle: 'h23',
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+          }).formatToParts(new Date(wallUtcMs));
+          const tp: Record<string, string> = {};
+          for (const p of parts) { if (p.type !== 'literal') tp[p.type] = p.value; }
+          const seenAsTzMs = Date.UTC(+tp.year, +tp.month - 1, +tp.day, +tp.hour, +tp.minute, +tp.second);
+          const expectedMs = wallUtcMs - (seenAsTzMs - wallUtcMs);
 
-          const lateMs = now.getTime() - expectedTime.getTime();
-          const lateMinutes = Math.floor(lateMs / 60000);
+          const lateMinutes = Math.floor((now.getTime() - expectedMs) / 60000);
 
           if (lateMinutes >= graceMinutes) {
             // Mark the timecard as late
