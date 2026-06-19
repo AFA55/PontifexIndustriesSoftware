@@ -1,6 +1,6 @@
 ---
 name: dev-decisions
-description: First-principles decision framework for the Pontifex platform. CONSULT THIS before any significant technical or product decision — architecture, schema/migrations, security, API shape, a build/deploy, a vendor/account path, or any "which option do we pick" question. Encodes how a senior full-stack engineer decides, grounded in facts not guesses. (v1 — being enriched by a deep-research pass on Next.js/Supabase/Capacitor/Vercel best practices.)
+description: First-principles decision framework for the Pontifex platform. CONSULT THIS before any significant technical or product decision — architecture, schema/migrations, security, API shape, a build/deploy, a vendor/account path, or any "which option do we pick" question. Encodes how a senior full-stack engineer decides, grounded in facts not guesses. (v2 — §11 carries primary-source-verified facts from a 113-agent deep-research pass on Next.js 15/Supabase/Capacitor/Vercel.)
 ---
 
 # How I make software decisions (Pontifex)
@@ -66,6 +66,25 @@ description: First-principles decision framework for the Pontifex platform. CONS
 
 ## 10. HONEST-OPTIONS RULE (the Play Store lesson)
 When the founder asks "what's the fastest/best way," NEVER answer with a single route. Give a table of every viable route with real timeline + cost + reversibility + the hidden permanent constraint, flag the irreversible ones, then recommend. The founder is non-technical and is trusting the *completeness* of the analysis, not just the recommendation.
+
+## 11. VERIFIED FACTS — primary sources (deep-research Jun 19 2026; 10 facts, each 3-0 adversarially verified)
+**Security / RLS**
+- authz data NEVER in `user_metadata` — it's user-writable via `supabase.auth.update()` (Supabase linter `0015` = ERROR). Use `app_metadata` (server-only) or SECURITY DEFINER helpers off `public.profiles`.
+- RLS enabled on EVERY Data-API-exposed table/view; with RLS on, no rows are readable via anon/publishable key until a policy exists. Roles: `anon` + `authenticated` are RLS-filtered; `service_role` has BYPASSRLS → backend only, never shipped to client.
+- RLS perf: write `(select auth.uid())` (caches per-statement, not per-row); push join/tenant/role lookups into a SECURITY DEFINER function (private schema, owner has BYPASSRLS). Benchmarked 95–99.99% — but magnitude is schema-dependent (others saw 15–61%); the mechanism is what matters.
+**Frontend (App Router, Next 15 + React 19)**
+- Components are **Server Components by default**. `'use client'` is a *boundary*: that file + everything it imports/renders ships to the client; don't repeat it on descendants. (Refuted framing: there is NO rigid "Server MUST do X / Client MUST do Y" list — it's default-server, opt-into-client.)
+- You **cannot import a Server Component into a Client Component** — pass it as a prop/`children` (it renders on the server, passed in as output).
+- Next 15 BREAKING (re-verify on any upgrade): (1) fetch / GET route handlers / client router nav are **no longer cached by default** — opt in explicitly; (2) `cookies/headers/draftMode/params/searchParams` are **async** — `await` them.
+- Hydration errors = server render ≠ client first render (window/localStorage/Date used in render). Fix: gate client-only behind `useEffect` (isClient flag), or `dynamic(… ssr:false)`.
+- Server-only secrets: env vars without `NEXT_PUBLIC_` are blanked on the client; import the `server-only` package so a leak into a client bundle fails the build.
+**Mobile / Capacitor (this remote-webview app)**
+- Tokens/keys live ONLY in memory or native **Keychain/Keystore** — Capacitor Preferences/localStorage is NOT secure storage. (Confirms the biometric plan: store the Supabase *refresh token*, Keychain/biometric-gated.)
+- No secrets in the client bundle (it's inspectable) — secret-key ops are server-side.
+- Deep-link routing is NOT automatic — handle the App API `appUrlOpen` event and parse the URL to navigate.
+- OAuth2: PKCE mandatory; prefer Universal/App Links over custom URL schemes (interception risk).
+
+*Sources: supabase.com/docs (row-level-security, securing-your-api, roles, rls-performance); nextjs.org/docs (server/client components, caching, async request APIs, hydration, server-only); capacitorjs.com; OWASP MASVS; IETF RFC 8252.*
 
 ---
 *Anti-patterns seen this session (learn from them): asserting before verifying; read/write path mismatch; a single-route answer to a "fastest path" question; a full-nav login that externalized to Safari; a UTC-vs-tenant-tz time comparison. Each maps to a principle above.*
