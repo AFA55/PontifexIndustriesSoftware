@@ -89,6 +89,21 @@ export function calculateDistance(
  * @param shopOverride - Optional per-tenant shop coordinates + radius
  * @returns Object with isWithinRange boolean and distance in meters
  */
+/**
+ * Format a distance (meters) in US units for operator/admin-facing display:
+ * feet under ~0.1 mi (covers nearly every on-site case), miles beyond. Patriot's
+ * crews + office think in feet + miles, not meters/km. Single source of truth so
+ * clock-in, clock-out, and the time-edit-request screens all read the same.
+ */
+export function formatDistanceUS(distanceMeters: number): string {
+  const feet = distanceMeters * 3.28084;
+  if (feet < 528) {
+    return `${Math.round(feet)} ft`;
+  }
+  const miles = distanceMeters / 1609.344;
+  return `${miles.toFixed(miles < 10 ? 2 : 1)} mi`;
+}
+
 export function isWithinShopRadius(
   userLocation: Coordinates,
   shopOverride?: ShopOverride,
@@ -110,13 +125,8 @@ export function isWithinShopRadius(
 
   const isWithinRange = distance <= radius;
 
-  // Format distance for display
-  let distanceFormatted: string;
-  if (distance < 1000) {
-    distanceFormatted = `${Math.round(distance)}m`;
-  } else {
-    distanceFormatted = `${(distance / 1000).toFixed(2)}km`;
-  }
+  // Format distance for display (US units — feet/miles, not meters/km)
+  const distanceFormatted = formatDistanceUS(distance);
 
   return {
     isWithinRange,
@@ -148,9 +158,7 @@ export function isWithinShopRadiusForClockout(
     shopLon,
   );
   const isWithinRange = distance <= radius;
-  const distanceFormatted = distance < 1000
-    ? `${Math.round(distance)}m`
-    : `${(distance / 1000).toFixed(2)}km`;
+  const distanceFormatted = formatDistanceUS(distance);
   return { isWithinRange, distance, distanceFormatted };
 }
 
@@ -259,7 +267,7 @@ export async function verifyShopLocation(): Promise<{
         accuracy: 0,
       },
       distance: 0,
-      distanceFormatted: '0m (testing bypass)',
+      distanceFormatted: '0 ft (testing bypass)',
     };
   }
 
@@ -288,7 +296,7 @@ export async function verifyShopLocation(): Promise<{
       verified: false,
       location: { latitude: 0, longitude: 0 },
       distance: 0,
-      distanceFormatted: '0m',
+      distanceFormatted: '0 ft',
       error: error.message || 'Failed to verify location',
     };
   }

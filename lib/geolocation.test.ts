@@ -47,7 +47,7 @@ describe('Geolocation Utilities', () => {
 
       expect(result.isWithinRange).toBe(true);
       expect(result.distance).toBe(0);
-      expect(result.distanceFormatted).toBe('0m');
+      expect(result.distanceFormatted).toBe('0 ft');
     });
 
     it('should return false when location is outside allowed radius', () => {
@@ -61,22 +61,22 @@ describe('Geolocation Utilities', () => {
       expect(result.distance).toBeGreaterThan(ALLOWED_RADIUS_METERS);
     });
 
-    it('should format distance in meters when less than 1km', () => {
+    it('should format short distances in feet (US units)', () => {
       const result = isWithinShopRadius({
         latitude: SHOP_LOCATION.latitude + 0.001,
         longitude: SHOP_LOCATION.longitude,
       });
 
-      expect(result.distanceFormatted).toMatch(/^\d+m$/);
+      expect(result.distanceFormatted).toMatch(/^\d+ ft$/);
     });
 
-    it('should format distance in kilometers when greater than 1km', () => {
+    it('should format long distances in miles (US units)', () => {
       const result = isWithinShopRadius({
         latitude: SHOP_LOCATION.latitude + 0.01,
         longitude: SHOP_LOCATION.longitude + 0.01,
       });
 
-      expect(result.distanceFormatted).toMatch(/^\d+\.\d{2}km$/);
+      expect(result.distanceFormatted).toMatch(/^\d+\.\d+ mi$/);
     });
 
     it('should handle edge case at exactly the allowed radius', () => {
