@@ -176,14 +176,15 @@ function CompanyLoginContent() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-[#1e1b4b]">
       {/* Premium launch intro — overlays once per app launch, then fades to reveal login */}
       <SplashIntro />
 
-      {/* Background blobs */}
+      {/* Background aurora — matches the SplashIntro colorway (purple→magenta→red on #1e1b4b) */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-violet-600/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-indigo-600/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#7c3aed]/25 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#ef4444]/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-80 h-80 bg-[#db2777]/15 rounded-full blur-3xl animate-pulse delay-500" />
       </div>
 
       <motion.div
@@ -242,7 +243,7 @@ function CompanyLoginContent() {
                 type="button"
                 onClick={handleContinue}
                 disabled={continuing}
-                className="w-full min-h-[56px] py-4 px-5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide flex items-center justify-center gap-3 transition-all shadow-lg shadow-indigo-900/40"
+                className="w-full min-h-[56px] py-4 px-5 rounded-xl bg-gradient-to-r from-[#7C3AED] via-[#DB2777] to-[#EF4444] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide flex items-center justify-center gap-3 transition-all shadow-lg shadow-fuchsia-900/40"
               >
                 {continuing ? (
                   <><Loader2 className="w-4 h-4 animate-spin shrink-0" /> Opening sign in…</>
@@ -276,14 +277,14 @@ function CompanyLoginContent() {
           {view === 'form' && (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="relative">
-              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-indigo-400" />
+              <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-violet-400" />
               <input
                 type="text"
                 value={code}
                 onChange={e => { setCode(e.target.value.replace(/\s/g, '').toUpperCase()); setError(null); }}
                 placeholder="COMPANY CODE"
                 autoComplete="organization"
-                className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-500 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all uppercase"
+                className="w-full pl-12 pr-4 py-4 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-500 font-mono tracking-widest text-sm focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-fuchsia-500 transition-all uppercase"
                 required
               />
             </div>
@@ -301,7 +302,7 @@ function CompanyLoginContent() {
             <button
               type="submit"
               disabled={loading || !code.trim()}
-              className="w-full py-4 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg shadow-indigo-900/40"
+              className="w-full py-4 rounded-xl bg-gradient-to-r from-[#7C3AED] via-[#DB2777] to-[#EF4444] hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm tracking-wide flex items-center justify-center gap-2 transition-all shadow-lg shadow-fuchsia-900/40"
             >
               {loading ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Looking up company…</>
