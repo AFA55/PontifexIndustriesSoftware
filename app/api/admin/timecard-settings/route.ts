@@ -40,7 +40,27 @@ const DEFAULT_SETTINGS = {
   break_is_paid: false,
   late_grace_minutes: 15,
   subsistence_rate: 0,
+  // Standard start time lives on tenants.default_start_time (NOT timecard_settings_v2).
+  // It is the baseline the late-detection resolution chain falls back to when an
+  // operator has no job ticket and no per-day override. See lib/timecard-start.ts.
+  default_start_time: '07:00',
 };
+
+// Reads the tenant's standard start time (tenants.default_start_time). Returns the
+// DEFAULT_SETTINGS value when unset so the UI always has something to show.
+async function getTenantStartTime(tenantId: string): Promise<string> {
+  try {
+    const { data } = await supabaseAdmin
+      .from('tenants')
+      .select('default_start_time')
+      .eq('id', tenantId)
+      .maybeSingle();
+    const t = data?.default_start_time as string | null | undefined;
+    return (t ? String(t).slice(0, 5) : DEFAULT_SETTINGS.default_start_time);
+  } catch {
+    return DEFAULT_SETTINGS.default_start_time;
+  }
+}
 
 // Sensible defaults for required NOT NULL v2 columns when inserting a fresh row.
 const V2_INSERT_DEFAULTS = {
@@ -111,7 +131,7 @@ export async function GET(request: NextRequest) {
         // Table doesn't exist yet - return defaults
         return NextResponse.json({
           success: true,
-          data: { ...DEFAULT_SETTINGS, tenant_id: tenantId },
+          data: { ...DEFAULT_SETTINGS, tenant_id: tenantId, default_start_time: await getTenantStartTime(tenantId) },
           defaults: true,
         });
       }
@@ -127,8 +147,11 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Map v2 columns → page-facing field names.
-    return NextResponse.json({ success: true, data: v2ToPage(data) });
+    // Map v2 columns → page-facing field names, plus the tenant standard start time.
+    return NextResponse.json({
+      success: true,
+      data: { ...v2ToPage(data), default_start_time: await getTenantStartTime(tenantId) },
+    });
   } catch (error: unknown) {
     console.error('Unexpected error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -145,6 +168,25 @@ export async function PUT(request: NextRequest) {
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
 
+    // Standard start time persists on tenants.default_start_time (NOT
+    // timecard_settings_v2). Handle it separately from the v2 mapping.
+    let startTimeUpdated = false;
+    if (body.default_start_time !== undefined) {
+      const t = String(body.default_start_time);
+      if (!/^\d{2}:\d{2}(:\d{2})?$/.test(t)) {
+        return NextResponse.json({ error: 'default_start_time must be HH:MM' }, { status: 400 });
+      }
+      const { error: tErr } = await supabaseAdmin
+        .from('tenants')
+        .update({ default_start_time: t.slice(0, 5) })
+        .eq('id', tenantId);
+      if (tErr) {
+        console.error('Error updating default_start_time:', tErr);
+        return NextResponse.json({ error: 'Failed to update start time' }, { status: 500 });
+      }
+      startTimeUpdated = true;
+    }
+
     // Build a v2-column update object from the page's friendly field names.
     // Page fields with no v2 column (allow_remote, night_shift_start,
     // shop_radius_meters) are silently ignored — they never persisted before.
@@ -156,6 +198,14 @@ export async function PUT(request: NextRequest) {
     }
 
     if (Object.keys(updates).length === 0) {
+      // Allow a start-time-only update (no v2 fields supplied).
+      if (startTimeUpdated) {
+        return NextResponse.json({
+          success: true,
+          message: 'Start time updated',
+          data: { default_start_time: await getTenantStartTime(tenantId) },
+        });
+      }
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
@@ -212,7 +262,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({
       success: true,
       message: 'Timecard settings updated',
-      data: v2ToPage(result),
+      data: { ...v2ToPage(result), default_start_time: await getTenantStartTime(tenantId) },
     });
   } catch (error: unknown) {
     console.error('Unexpected error:', error);
