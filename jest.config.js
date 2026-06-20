@@ -11,6 +11,10 @@ const customJestConfig = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   testEnvironment: 'jest-environment-jsdom',
   moduleNameMapper: {
+    // Mock @react-email/render v2 — it uses `await import("react-dom/server")` internally
+    // which fails in Jest's CJS transform with "dynamic import callback without
+    // --experimental-vm-modules". The mock uses renderToStaticMarkup (sync) instead.
+    '^@react-email/render$': '<rootDir>/__mocks__/@react-email/render.js',
     // Handle module aliases (this will be automatically configured for you soon)
     '^@/(.*)$': '<rootDir>/$1',
   },

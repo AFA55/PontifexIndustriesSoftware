@@ -36,6 +36,14 @@ if (typeof Headers === 'undefined') {
   global.Headers = Map
 }
 
+// Polyfill MessageChannel for React 19 react-dom/server in jsdom
+// (react-dom/server.browser uses MessageChannel for concurrent rendering;
+// jsdom doesn't include it by default but Node.js >= 15 has it globally).
+if (typeof MessageChannel === 'undefined') {
+  const { MessageChannel: NodeMessageChannel } = require('worker_threads')
+  global.MessageChannel = NodeMessageChannel
+}
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,

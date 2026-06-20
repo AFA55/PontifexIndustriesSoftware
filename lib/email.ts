@@ -6,6 +6,13 @@
 import { Resend } from 'resend';
 import { resolveAppOrigin } from '@/lib/app-url';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import {
+  renderInviteEmail,
+  renderApprovalEmail,
+  renderAccessRequestReceivedEmail,
+  renderNotificationEmail,
+  renderPasswordResetEmail,
+} from '@/emails/renderers';
 
 // ── Platform-default brand (the historical purple look). Used whenever no tenant
 // context is available OR a lookup fails — emails must NEVER throw on branding.
@@ -85,6 +92,9 @@ export async function getTenantEmailBranding(
  * background so the logo reads correctly; the red→navy bar gives the brand pop
  * (true red/white/blue for Patriot). Used by every transactional email so they
  * all match the company the recipient is joining.
+ *
+ * NOTE: This function is kept for backward compatibility with any callers that
+ * still reference it. New emails use the BrandedEmail react-email component.
  */
 export function emailHeader(
   b: { companyName: string; brandColor: string; accentColor: string; logoUrl: string | null },
@@ -110,48 +120,6 @@ export function emailHeader(
               <p style="margin:8px 0 0; color:#64748b; font-size:13px; font-weight:500;">${subtitle}</p>
             </td>
           </tr>`;
-}
-
-/**
- * Plain, straightforward EVENT notification email (job assigned, time-off result,
- * etc.) — the email channel of sendNotification(). Shared branded header + the
- * title/message + an optional "View" button. Deliberately simple, not marketing.
- */
-export function generateNotificationEmail(opts: {
-  title: string;
-  message: string;
-  actionUrl?: string;
-  branding?: EmailBranding;
-}): string {
-  const branding = opts.branding ?? DEFAULT_EMAIL_BRANDING;
-  const title = escapeHtml(opts.title);
-  const message = escapeHtml(opts.message);
-  const brand = escapeHtml(branding.brandColor);
-  let url = opts.actionUrl || '';
-  if (url && url.startsWith('/')) url = `${resolveAppOrigin()}${url}`;
-  url = escapeHtml(url);
-  const button = url
-    ? `<table role="presentation" style="border-collapse:collapse; margin:24px 0 0;"><tr><td>
-         <a href="${url}" style="display:inline-block; padding:13px 32px; background-color:${brand}; color:#ffffff; text-decoration:none; border-radius:8px; font-size:15px; font-weight:600;">View details</a>
-       </td></tr></table>`
-    : '';
-  return `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light"><title>${title}</title></head>
-<body style="margin:0; padding:0; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif; background-color:#f8fafc; color:#1e293b;">
-  <table role="presentation" style="width:100%; border-collapse:collapse; background-color:#f8fafc;" bgcolor="#f8fafc"><tr><td style="padding:40px 20px;">
-    <table role="presentation" style="width:100%; max-width:600px; margin:0 auto; background-color:#ffffff; border-radius:8px; box-shadow:0 1px 3px rgba(0,0,0,0.1); overflow:hidden;" bgcolor="#ffffff">
-${emailHeader(branding, escapeHtml(branding.companyName))}
-      <tr><td style="padding:36px 40px;">
-        <h2 style="margin:0 0 16px; color:#0f172a; font-size:20px; font-weight:700;">${title}</h2>
-        <p style="margin:0; color:#475569; font-size:15px; line-height:1.6;">${message}</p>
-        ${button}
-      </td></tr>
-      <tr><td bgcolor="#f8fafc" style="background-color:#f8fafc; padding:20px 40px; text-align:center; border-top:1px solid #e2e8f0;">
-        <p style="margin:0; color:#94a3b8; font-size:12px;">You're receiving this because email notifications are on for your account. Manage them in Settings → Notifications.</p>
-      </td></tr>
-    </table>
-  </td></tr></table>
-</body></html>`;
 }
 
 // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
@@ -234,8 +202,8 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
     const payload: any = {
       // VERIFIED Resend sender — `admin.pontifexindustries.com` is the verified domain;
       // the root `pontifexindustries.com` is NOT verified (Resend 403). Hardcoded
-      // because the RESEND_FROM_EMAIL env var was misconfigured to the unverified root,
-      // which silently broke every outbound email (invites, password resets, etc.).
+      // because the RESEND_FROM_EMAIL env var was misconfigured (in Vercel) to the unverified root
+      // domain, which silently broke every invite + password-reset email.
       from: 'Pontifex Industries <noreply@admin.pontifexindustries.com>',
       to: [to],
       subject: subject,
@@ -265,7 +233,7 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
 }
 
 /** Escape user-supplied values interpolated into email HTML. */
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -277,15 +245,12 @@ function escapeHtml(value: string): string {
 /**
  * Generate team invite email HTML (used by POST + PUT /api/admin/invite).
  *
- * Light-theme, table-based, inline-styled — same family as the other templates
- * in this file. `color-scheme: light only` hints keep Apple Mail / Gmail dark
- * mode from inverting it into mud. The CTA is a bulletproof table-wrapped <a>
- * with a raw-link fallback below it (same pattern as the password-reset email).
- *
  * White-label: the header carries the TENANT'S name (never hardcoded Patriot /
  * Pontifex); Pontifex appears only as "Powered by" in the footer.
+ *
+ * Now async — returns Promise<string> via react-email render.
  */
-export function generateInviteEmail(opts: {
+export async function generateInviteEmail(opts: {
   inviteeName: string;
   inviterName: string;
   tenantName: string;
@@ -299,492 +264,88 @@ export function generateInviteEmail(opts: {
   accentColor?: string;
   /** Optional tenant logo rendered above the company name in the header. */
   logoUrl?: string | null;
-}): string {
-  const inviteeName = escapeHtml(opts.inviteeName);
-  const inviterName = escapeHtml(opts.inviterName);
-  const tenantName = escapeHtml(opts.tenantName);
-  const roleLabel = escapeHtml(opts.roleLabel);
-  const companyCode = opts.companyCode ? escapeHtml(opts.companyCode) : '';
-  // setupUrl is built server-side from APP_URL + token (never user input), but
-  // escape anyway so a stray ampersand in future params can't break markup.
-  const setupUrl = escapeHtml(opts.setupUrl);
-  // White-label colors — fall back to the historical purple so existing callers
-  // are byte-identical when they pass nothing.
-  const brandColor = escapeHtml(opts.brandColor || DEFAULT_BRAND_COLOR);
-  const accentColor = escapeHtml(opts.accentColor || DEFAULT_ACCENT_COLOR);
-  const logoUrl = opts.logoUrl ? escapeHtml(opts.logoUrl) : '';
-  const logoTag = logoUrl
-    ? `<img src="${logoUrl}" alt="${tenantName}" height="40" style="max-height:40px;margin:0 auto 10px;display:block;">`
-    : '';
-
-  const steps: Array<[string, string]> = [
-    ['1', 'Tap the &ldquo;Set Up My Account&rdquo; button'],
-    ['2', 'Add your photo and create a password'],
-    ['3', "You're in — your dashboard is ready"],
-  ];
-
-  const stepsRows = steps
-    .map(
-      ([n, label]) => `
-                <tr>
-                  <td style="padding: 6px 0; vertical-align: top; width: 36px;">
-                    <table role="presentation" style="border-collapse: collapse;">
-                      <tr>
-                        <td bgcolor="#ede9fe" style="background-color: #ede9fe; border-radius: 50%; width: 26px; height: 26px; text-align: center; vertical-align: middle; color: ${brandColor}; font-size: 13px; font-weight: 700; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;">${n}</td>
-                      </tr>
-                    </table>
-                  </td>
-                  <td style="padding: 6px 0 6px 4px; color: #334155; font-size: 15px; line-height: 26px; vertical-align: middle;">${label}</td>
-                </tr>`
-    )
-    .join('');
-
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light">
-  <meta name="supported-color-schemes" content="light">
-  <title>You're invited to join ${tenantName}</title>
-  <style>
-    :root { color-scheme: light only; supported-color-schemes: light only; }
-  </style>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;" bgcolor="#f8fafc">
-    <tr>
-      <td style="padding: 48px 20px;">
-        <!-- Main Container -->
-        <table role="presentation" style="width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;" bgcolor="#ffffff">
-
-${emailHeader({ companyName: opts.tenantName, brandColor: opts.brandColor || DEFAULT_BRAND_COLOR, accentColor: opts.accentColor || DEFAULT_ACCENT_COLOR, logoUrl: opts.logoUrl ?? null }, "You're invited to join the team")}
-
-          <!-- Main Content -->
-          <tr>
-            <td style="padding: 44px 40px;">
-              <!-- Greeting -->
-              <p style="margin: 0 0 20px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Hi <strong style="color: #0f172a; font-weight: 600;">${inviteeName}</strong>,
-              </p>
-
-              <!-- Main Message -->
-              <p style="margin: 0 0 28px; color: #475569; font-size: 16px; line-height: 1.6;">
-                <strong style="color: #0f172a; font-weight: 600;">${inviterName}</strong> set up an account for you on the ${tenantName} platform as <strong style="color: ${brandColor}; font-weight: 600;">${roleLabel}</strong>. Finish setup in about 2 minutes.
-              </p>
-
-              <!-- CTA Button (bulletproof: table-wrapped, inline-styled) -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 20px;">
-                <tr>
-                  <td style="text-align: center;">
-                    <a href="${setupUrl}" style="display: inline-block; padding: 16px 48px; background-color: ${brandColor}; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px; line-height: 1.2;">
-                      Set Up My Account
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Alternative Link -->
-              <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px 20px; margin-bottom: 28px;">
-                <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; font-weight: 600;">
-                  Button not working?
-                </p>
-                <p style="margin: 0; font-size: 12px; word-break: break-all; line-height: 1.5;">
-                  <a href="${setupUrl}" style="color: ${brandColor}; text-decoration: underline;">${setupUrl}</a>
-                </p>
-              </div>
-
-              <!-- What Happens Next -->
-              <p style="margin: 0 0 12px; color: #0f172a; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                What happens next
-              </p>
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 28px;">${stepsRows}
-              </table>
-
-              <!-- Expiry Notice -->
-              <div style="background-color: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; padding: 14px 18px; margin-bottom: 24px;">
-                <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
-                  This invitation expires in <strong>7 days</strong>.${companyCode ? ` Your company code is <strong>${companyCode}</strong> &mdash; you'll use it to log in.` : ''}
-                </p>
-              </div>
-
-              <!-- Help Notice -->
-              <div style="background-color: #f1f5f9; border-left: 3px solid #94a3b8; border-radius: 4px; padding: 14px 18px;">
-                <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.5;">
-                  <strong style="color: #334155;">Need help?</strong> Contact ${inviterName} or your administrator. If you weren't expecting this invitation, you can safely ignore this email.
-                </p>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td bgcolor="#f8fafc" style="background-color: #f8fafc; padding: 28px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">${tenantName}</strong><br>
-                Powered by Pontifex Industries
-              </p>
-              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                This is an automated message. Please do not reply.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
+}): Promise<string> {
+  return renderInviteEmail({
+    branding: {
+      companyName: opts.tenantName,
+      brandColor: opts.brandColor || DEFAULT_BRAND_COLOR,
+      accentColor: opts.accentColor || DEFAULT_ACCENT_COLOR,
+      logoUrl: opts.logoUrl ?? null,
+    },
+    inviteeName: opts.inviteeName,
+    inviterName: opts.inviterName,
+    tenantName: opts.tenantName,
+    roleLabel: opts.roleLabel,
+    companyCode: opts.companyCode,
+    setupUrl: opts.setupUrl,
+  });
 }
 
 /**
- * Generate approval confirmation email HTML
+ * Generate approval confirmation email HTML.
+ * Now async — returns Promise<string> via react-email render.
  */
-export function generateApprovalEmail(
+export async function generateApprovalEmail(
   fullName: string,
   email: string,
   role: string,
   branding: EmailBranding = DEFAULT_EMAIL_BRANDING
-): string {
+): Promise<string> {
   const loginUrl = `${resolveAppOrigin()}/login`;
-  const companyName = escapeHtml(branding.companyName);
-  const brandColor = escapeHtml(branding.brandColor);
-  const accentColor = escapeHtml(branding.accentColor);
-  const logoUrl = branding.logoUrl ? escapeHtml(branding.logoUrl) : '';
-  const logoTag = logoUrl
-    ? `<img src="${logoUrl}" alt="${companyName}" height="40" style="max-height:40px;margin:0 auto 10px;display:block;">`
-    : '';
-
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <title>Access Approved - Patriot Concrete Cutting</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
-    <tr>
-      <td style="padding: 48px 20px;">
-        <!-- Main Container -->
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;">
-
-${emailHeader(branding, 'Concrete Cutting Management System')}
-
-          <!-- Main Content -->
-          <tr>
-            <td style="padding: 48px 40px;">
-              <!-- Title -->
-              <h2 style="margin: 0 0 32px; color: #0f172a; font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.2;">
-                Access Approved
-              </h2>
-
-              <!-- Greeting -->
-              <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Hi <strong style="color: #0f172a; font-weight: 600;">${fullName}</strong>,
-              </p>
-
-              <!-- Main Message -->
-              <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Your access request has been approved. You now have <strong style="color: ${brandColor}; font-weight: 600;">${role}</strong> access to the platform.
-              </p>
-
-              <!-- Account Details -->
-              <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
-                <tr>
-                  <td style="padding: 0 24px 24px;">
-                    <p style="margin: 0 0 16px; color: #0f172a; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Account Details
-                    </p>
-                    <table style="width: 100%; border-collapse: collapse;">
-                      <tr>
-                        <td style="padding: 10px 0; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">Email</td>
-                        <td style="padding: 10px 0; color: #0f172a; font-size: 14px; font-weight: 600; text-align: right; border-top: 1px solid #e2e8f0;">${email}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 10px 0; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">Role</td>
-                        <td style="padding: 10px 0; color: ${brandColor}; font-size: 14px; font-weight: 600; text-align: right; text-transform: capitalize; border-top: 1px solid #e2e8f0;">${role}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Instructions -->
-              <p style="margin: 0 0 32px; color: #475569; font-size: 15px; line-height: 1.6;">
-                Your account is now active! Use the password you provided during registration to log in using the button below.
-              </p>
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 32px;">
-                <tr>
-                  <td style="text-align: center;">
-                    <a href="${loginUrl}" style="display: inline-block; padding: 16px 48px; background-color: ${brandColor}; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px;">
-                      Login to Your Account
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Help Notice -->
-              <div style="background-color: #f1f5f9; border-left: 3px solid #94a3b8; border-radius: 4px; padding: 16px 20px; margin-top: 32px;">
-                <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.5;">
-                  <strong style="color: #334155;">Need assistance?</strong> If you have questions or didn't request this access, contact your administrator.
-                </p>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">${companyName}</strong><br>
-                Concrete Cutting Management System
-              </p>
-              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                This is an automated message. Please do not reply.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
+  return renderApprovalEmail({
+    branding,
+    fullName,
+    email,
+    role,
+    loginUrl,
+  });
 }
 
 /**
- * Generate access request received confirmation email HTML
+ * Generate access request received confirmation email HTML.
+ * Now async — returns Promise<string> via react-email render.
  */
-export function generateAccessRequestReceivedEmail(
+export async function generateAccessRequestReceivedEmail(
   fullName: string,
   email: string,
   branding: EmailBranding = DEFAULT_EMAIL_BRANDING
-): string {
-  const companyName = escapeHtml(branding.companyName);
-  const brandColor = escapeHtml(branding.brandColor);
-  const accentColor = escapeHtml(branding.accentColor);
-  const logoUrl = branding.logoUrl ? escapeHtml(branding.logoUrl) : '';
-  const logoTag = logoUrl
-    ? `<img src="${logoUrl}" alt="${companyName}" height="40" style="max-height:40px;margin:0 auto 10px;display:block;">`
-    : '';
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <title>Access Request Received - Patriot Concrete Cutting</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
-    <tr>
-      <td style="padding: 48px 20px;">
-        <!-- Main Container -->
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;">
-
-${emailHeader(branding, 'Concrete Cutting Management System')}
-
-          <!-- Main Content -->
-          <tr>
-            <td style="padding: 48px 40px;">
-              <!-- Title -->
-              <h2 style="margin: 0 0 32px; color: #0f172a; font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.2;">
-                Request Received
-              </h2>
-
-              <!-- Greeting -->
-              <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Hi <strong style="color: #0f172a; font-weight: 600;">${fullName}</strong>,
-              </p>
-
-              <!-- Main Message -->
-              <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Thank you for requesting access to the ${companyName} platform. We've received your request and our team will review it shortly.
-              </p>
-
-              <!-- Request Details -->
-              <table style="width: 100%; border-collapse: collapse; background-color: #f8fafc; border-radius: 8px; padding: 24px; margin-bottom: 32px;">
-                <tr>
-                  <td style="padding: 0 24px 24px;">
-                    <p style="margin: 0 0 16px; color: #0f172a; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                      Request Details
-                    </p>
-                    <table style="width: 100%; border-collapse: collapse;">
-                      <tr>
-                        <td style="padding: 10px 0; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">Email</td>
-                        <td style="padding: 10px 0; color: #0f172a; font-size: 14px; font-weight: 600; text-align: right; border-top: 1px solid #e2e8f0;">${email}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 10px 0; color: #64748b; font-size: 14px; border-top: 1px solid #e2e8f0;">Status</td>
-                        <td style="padding: 10px 0; color: #f59e0b; font-size: 14px; font-weight: 600; text-align: right; border-top: 1px solid #e2e8f0;">Under Review</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Next Steps -->
-              <div style="background-color: #fffbeb; border-left: 3px solid #f59e0b; border-radius: 4px; padding: 20px 24px; margin-bottom: 32px;">
-                <p style="margin: 0 0 12px; color: #92400e; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                  What Happens Next
-                </p>
-                <ul style="margin: 0; padding-left: 20px; color: #78350f; font-size: 14px; line-height: 1.7;">
-                  <li style="margin-bottom: 8px;">Administrator will review your request</li>
-                  <li style="margin-bottom: 8px;">You'll receive email notification when processed</li>
-                  <li style="margin-bottom: 8px;">If approved, you'll get login credentials</li>
-                  <li>Typical review time: 1-2 business days</li>
-                </ul>
-              </div>
-
-              <!-- Help Notice -->
-              <div style="background-color: #f1f5f9; border-left: 3px solid #94a3b8; border-radius: 4px; padding: 16px 20px;">
-                <p style="margin: 0; color: #475569; font-size: 14px; line-height: 1.5;">
-                  <strong style="color: #334155;">Questions or concerns?</strong> If you didn't submit this request, contact your administrator.
-                </p>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">${companyName}</strong><br>
-                Concrete Cutting Management System
-              </p>
-              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                This is an automated message. Please do not reply.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
+): Promise<string> {
+  return renderAccessRequestReceivedEmail({
+    branding,
+    fullName,
+    email,
+  });
 }
 
 /**
- * Generate password reset email HTML
+ * Generate a plain event notification email HTML (job assigned, time-off result, etc.).
+ * Now async — returns Promise<string> via react-email render.
  */
-export function generatePasswordResetEmail(fullName: string, resetLink: string): string {
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="color-scheme" content="light dark">
-  <meta name="supported-color-schemes" content="light dark">
-  <title>Password Reset - Patriot Concrete Cutting</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; background-color: #f8fafc; color: #1e293b;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
-    <tr>
-      <td style="padding: 48px 20px;">
-        <!-- Main Container -->
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1); overflow: hidden;">
+export async function generateNotificationEmail(opts: {
+  title: string;
+  message: string;
+  actionUrl?: string;
+  branding?: EmailBranding;
+}): Promise<string> {
+  return renderNotificationEmail({
+    branding: opts.branding ?? DEFAULT_EMAIL_BRANDING,
+    title: opts.title,
+    message: opts.message,
+    actionUrl: opts.actionUrl,
+  });
+}
 
-          <!-- Header -->
-          <tr>
-            <td style="background: linear-gradient(135deg, #2563eb 0%, #dc2626 100%); padding: 48px 40px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 28px; font-weight: 700; letter-spacing: -0.5px;">
-                Patriot Concrete Cutting
-              </h1>
-              <p style="margin: 8px 0 0; color: rgba(255, 255, 255, 0.9); font-size: 14px; font-weight: 500;">
-                Concrete Cutting Management System
-              </p>
-            </td>
-          </tr>
-
-          <!-- Main Content -->
-          <tr>
-            <td style="padding: 48px 40px;">
-              <!-- Title -->
-              <h2 style="margin: 0 0 32px; color: #0f172a; font-size: 32px; font-weight: 700; letter-spacing: -1px; line-height: 1.2;">
-                Password Reset
-              </h2>
-
-              <!-- Greeting -->
-              <p style="margin: 0 0 24px; color: #475569; font-size: 16px; line-height: 1.6;">
-                Hi <strong style="color: #0f172a; font-weight: 600;">${fullName}</strong>,
-              </p>
-
-              <!-- Main Message -->
-              <p style="margin: 0 0 32px; color: #475569; font-size: 16px; line-height: 1.6;">
-                We received a request to reset your password. Click the button below to create a new password for your account.
-              </p>
-
-              <!-- Security Notice -->
-              <div style="background-color: #fef3c7; border-left: 3px solid #f59e0b; border-radius: 4px; padding: 20px 24px; margin-bottom: 32px;">
-                <p style="margin: 0 0 8px; color: #92400e; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">
-                  Security Notice
-                </p>
-                <p style="margin: 0; color: #78350f; font-size: 14px; line-height: 1.6;">
-                  This link expires in <strong>1 hour</strong>. If you didn't request this reset, ignore this email and your password will remain unchanged.
-                </p>
-              </div>
-
-              <!-- CTA Button -->
-              <table role="presentation" style="width: 100%; border-collapse: collapse; margin: 0 0 32px;">
-                <tr>
-                  <td style="text-align: center;">
-                    <a href="${resetLink}" style="display: inline-block; padding: 16px 48px; background-color: #dc2626; color: #ffffff; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: 600; letter-spacing: 0.3px;">
-                      Reset Password
-                    </a>
-                  </td>
-                </tr>
-              </table>
-
-              <!-- Alternative Link -->
-              <div style="background-color: #f8fafc; border-radius: 4px; padding: 20px; margin-bottom: 24px;">
-                <p style="margin: 0 0 12px; color: #64748b; font-size: 13px; font-weight: 600;">
-                  Button not working?
-                </p>
-                <p style="margin: 0; color: #2563eb; font-size: 12px; word-break: break-all; line-height: 1.5;">
-                  ${resetLink}
-                </p>
-              </div>
-
-              <!-- Warning Notice -->
-              <div style="background-color: #fef2f2; border-left: 3px solid #dc2626; border-radius: 4px; padding: 16px 20px;">
-                <p style="margin: 0; color: #991b1b; font-size: 14px; line-height: 1.5;">
-                  <strong style="color: #7f1d1d;">Didn't request this?</strong> Someone may be attempting to access your account. Contact your administrator immediately.
-                </p>
-              </div>
-            </td>
-          </tr>
-
-          <!-- Footer -->
-          <tr>
-            <td style="background-color: #f8fafc; padding: 32px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-                <strong style="color: #475569;">Patriot Concrete Cutting</strong><br>
-                Concrete Cutting Management System
-              </p>
-              <p style="margin: 0; color: #94a3b8; font-size: 12px;">
-                This is an automated message. Please do not reply.
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
+/**
+ * Generate password reset email HTML.
+ * Now async — returns Promise<string> via react-email render.
+ */
+export async function generatePasswordResetEmail(
+  fullName: string,
+  resetLink: string
+): Promise<string> {
+  return renderPasswordResetEmail({
+    branding: DEFAULT_EMAIL_BRANDING,
+    fullName,
+    resetLink,
+  });
 }

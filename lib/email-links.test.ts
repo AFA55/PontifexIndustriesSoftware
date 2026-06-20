@@ -7,6 +7,8 @@
  * clients didn't render it as a hyperlink and the copied URL hit the wrong
  * site. These tests assert that whatever URL is passed into the templates
  * comes out as a clean, whitespace-free, parseable `<a href>`.
+ *
+ * Both generators are now async (react-email render) — every call is awaited.
  */
 
 import { generateInviteEmail, generatePasswordResetEmail } from './email';
@@ -46,16 +48,16 @@ const REALISTIC_OPTS = {
 };
 
 describe('generateInviteEmail link integrity', () => {
-  it('renders a CTA <a> whose href equals the setupUrl passed in', () => {
-    const html = generateInviteEmail(REALISTIC_OPTS);
+  it('renders a CTA <a> whose href equals the setupUrl passed in', async () => {
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     const hrefs = extractHrefs(html).map(decodeEntities);
 
     expect(hrefs.length).toBeGreaterThanOrEqual(1);
     expect(hrefs).toContain(SETUP_URL);
   });
 
-  it('renders the raw fallback link as an <a> with the SAME href as the CTA', () => {
-    const html = generateInviteEmail(REALISTIC_OPTS);
+  it('renders the raw fallback link as an <a> with the SAME href as the CTA', async () => {
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     const setupHrefs = extractHrefs(html)
       .map(decodeEntities)
       .filter((href) => href === SETUP_URL);
@@ -64,8 +66,8 @@ describe('generateInviteEmail link integrity', () => {
     expect(setupHrefs.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows the full URL as visible text in the fallback (copyable)', () => {
-    const html = generateInviteEmail(REALISTIC_OPTS);
+  it('shows the full URL as visible text in the fallback (copyable)', async () => {
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     // The fallback anchor's inner text is the URL itself: <a href="...">URL</a>
     const re = /<a\s[^>]*href="([^"]*)"[^>]*>\s*([^<]*?)\s*<\/a>/g;
     let match: RegExpExecArray | null;
@@ -76,24 +78,24 @@ describe('generateInviteEmail link integrity', () => {
     expect(found).toBe(true);
   });
 
-  it('hrefs contain no whitespace, newlines, or double spaces', () => {
-    const html = generateInviteEmail(REALISTIC_OPTS);
+  it('hrefs contain no whitespace, newlines, or double spaces', async () => {
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     for (const href of extractHrefs(html)) {
       expect(href).not.toMatch(/\s/); // covers spaces, \n, \t — and thus '  '
       expect(decodeEntities(href)).not.toMatch(/\s/);
     }
   });
 
-  it('every href parses with new URL()', () => {
-    const html = generateInviteEmail(REALISTIC_OPTS);
+  it('every href parses with new URL()', async () => {
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     for (const href of extractHrefs(html).map(decodeEntities)) {
       expect(() => new URL(href)).not.toThrow();
     }
   });
 
-  it('a 43-char base64url token survives the template intact', () => {
+  it('a 43-char base64url token survives the template intact', async () => {
     expect(TOKEN).toHaveLength(43);
-    const html = generateInviteEmail(REALISTIC_OPTS);
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     const setupHref = extractHrefs(html)
       .map(decodeEntities)
       .find((href) => href.includes('/setup-account'));
@@ -102,23 +104,23 @@ describe('generateInviteEmail link integrity', () => {
     expect(new URL(setupHref as string).searchParams.get('token')).toBe(TOKEN);
   });
 
-  it('survives a setupUrl with an extra query param (&amp; entity decodes back)', () => {
+  it('survives a setupUrl with an extra query param (&amp; entity decodes back)', async () => {
     const urlWithParam = `${SETUP_URL}&source=invite`;
-    const html = generateInviteEmail({ ...REALISTIC_OPTS, setupUrl: urlWithParam });
+    const html = await generateInviteEmail({ ...REALISTIC_OPTS, setupUrl: urlWithParam });
     const hrefs = extractHrefs(html).map(decodeEntities);
 
     expect(hrefs).toContain(urlWithParam);
   });
 
-  it('never contains the literal strings "undefined" or "null" with realistic opts', () => {
-    const html = generateInviteEmail(REALISTIC_OPTS);
+  it('never contains the literal strings "undefined" or "null" with realistic opts', async () => {
+    const html = await generateInviteEmail(REALISTIC_OPTS);
     expect(html).not.toMatch(/\bundefined\b/);
     expect(html).not.toMatch(/\bnull\b/);
   });
 
-  it('never contains "undefined"/"null" when optional companyCode is omitted', () => {
+  it('never contains "undefined"/"null" when optional companyCode is omitted', async () => {
     const { companyCode: _omitted, ...optsWithoutCode } = REALISTIC_OPTS;
-    const html = generateInviteEmail(optsWithoutCode);
+    const html = await generateInviteEmail(optsWithoutCode);
     expect(html).not.toMatch(/\bundefined\b/);
     expect(html).not.toMatch(/\bnull\b/);
   });
@@ -127,24 +129,24 @@ describe('generateInviteEmail link integrity', () => {
 describe('generatePasswordResetEmail link integrity', () => {
   const RESET_LINK = `https://www.pontifexindustries.com/reset-password?token=${TOKEN}`;
 
-  it('renders a CTA <a> whose href equals the resetLink passed in', () => {
-    const html = generatePasswordResetEmail('Jane Operator', RESET_LINK);
+  it('renders a CTA <a> whose href equals the resetLink passed in', async () => {
+    const html = await generatePasswordResetEmail('Jane Operator', RESET_LINK);
     const hrefs = extractHrefs(html).map(decodeEntities);
 
     expect(hrefs.length).toBeGreaterThanOrEqual(1);
     expect(hrefs).toContain(RESET_LINK);
   });
 
-  it('hrefs contain no whitespace, newlines, or double spaces', () => {
-    const html = generatePasswordResetEmail('Jane Operator', RESET_LINK);
+  it('hrefs contain no whitespace, newlines, or double spaces', async () => {
+    const html = await generatePasswordResetEmail('Jane Operator', RESET_LINK);
     for (const href of extractHrefs(html)) {
       expect(href).not.toMatch(/\s/);
       expect(decodeEntities(href)).not.toMatch(/\s/);
     }
   });
 
-  it('every href parses with new URL() and the token survives intact', () => {
-    const html = generatePasswordResetEmail('Jane Operator', RESET_LINK);
+  it('every href parses with new URL() and the token survives intact', async () => {
+    const html = await generatePasswordResetEmail('Jane Operator', RESET_LINK);
     const hrefs = extractHrefs(html).map(decodeEntities);
 
     for (const href of hrefs) {
@@ -155,8 +157,8 @@ describe('generatePasswordResetEmail link integrity', () => {
     expect(new URL(resetHref as string).searchParams.get('token')).toBe(TOKEN);
   });
 
-  it('never contains the literal strings "undefined" or "null" with realistic args', () => {
-    const html = generatePasswordResetEmail('Jane Operator', RESET_LINK);
+  it('never contains the literal strings "undefined" or "null" with realistic args', async () => {
+    const html = await generatePasswordResetEmail('Jane Operator', RESET_LINK);
     expect(html).not.toMatch(/\bundefined\b/);
     expect(html).not.toMatch(/\bnull\b/);
   });

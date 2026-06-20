@@ -35,6 +35,8 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.1",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.9",
     "@react-google-maps/api": "^2.20.8",
     "@react-pdf/renderer": "^4.3.2",
     "@sentry/nextjs": "^9.47.1",

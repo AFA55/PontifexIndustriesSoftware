@@ -69,7 +69,7 @@ async function sendInviteEmail(opts: {
     from: 'Pontifex Industries <noreply@admin.pontifexindustries.com>',
     to: opts.to,
     subject: `You're invited to join ${opts.tenantName}`,
-    html: generateInviteEmail({
+    html: await generateInviteEmail({
       inviteeName: opts.inviteeName,
       inviterName: opts.inviterName,
       tenantName: opts.tenantName,

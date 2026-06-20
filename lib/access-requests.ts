@@ -46,7 +46,7 @@ const makeApprovalInviteEmailSender =
   (tenantId: string) =>
   async (p: InviteEmailPayload): Promise<{ error: unknown }> => {
     const branding = await getTenantEmailBranding(tenantId);
-    const html = generateInviteEmail({
+    const html = await generateInviteEmail({
       inviteeName: p.inviteeName,
       inviterName: p.inviterName,
       tenantName: p.tenantName,

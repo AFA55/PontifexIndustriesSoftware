@@ -134,7 +134,7 @@ export async function sendNotification(opts: ReminderOptions): Promise<DeliveryR
         result.email = await sendEmail({
           to: prof.email,
           subject: opts.title,
-          html: generateNotificationEmail({
+          html: await generateNotificationEmail({
             title: opts.title,
             message: opts.message,
             actionUrl: opts.actionUrl,

@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Reset link generated');
 
-    const resetEmailHtml = generatePasswordResetEmail(
+    const resetEmailHtml = await generatePasswordResetEmail(
       profile.full_name || 'there',
       resetData.properties.action_link
     );

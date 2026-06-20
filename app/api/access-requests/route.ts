@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       // keep platform defaults
     }
 
-    const confirmationEmailHtml = generateAccessRequestReceivedEmail(
+    const confirmationEmailHtml = await generateAccessRequestReceivedEmail(
       fullName,
       email,
       receivedBranding
