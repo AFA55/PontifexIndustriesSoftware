@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS, ShopOverride } from '@/lib/geolocation';
+import { resolveEffectiveStart } from '@/lib/timecard-start';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
@@ -270,7 +271,7 @@ export async function POST(request: NextRequest) {
     // -- Check for active clock-in --
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('full_name, email')
+      .select('full_name, email, role')
       .eq('id', user.id)
       .single();
 
@@ -452,18 +453,22 @@ export async function POST(request: NextRequest) {
     // clock-in is at least `graceMinutes` (default 7) past the scheduled start,
     // computed in the TENANT'S timezone (not the server's — Vercel runs UTC).
     try {
-      const { data: todayJobs } = await supabaseAdmin
-        .from('job_orders')
-        .select('id, arrival_time, shop_arrival_time, customer_name')
-        .eq('assigned_to', user.id)
-        .eq('scheduled_date', todayDate)
-        .in('status', ['assigned', 'dispatched', 'in_route', 'on_site', 'in_progress', 'scheduled'])
-        .limit(1);
+      // Resolve the operator's effective scheduled start via the precedence chain
+      // (job ticket > per-day override > tenant standard). Previously this only
+      // looked at an assigned job, so operators with no job today were never
+      // late-checked — the "clocked in at 8 but not flagged" bug.
+      const eff = await resolveEffectiveStart({
+        supabaseAdmin,
+        tenantId: tenantId || '',
+        operatorId: user.id,
+        role: profile?.role ?? null,
+        localDate: todayDate,
+        isShopHours: is_shop_hours,
+      });
 
-      if (todayJobs && todayJobs.length > 0) {
-        const job = todayJobs[0];
-        // Use shop_arrival_time for shop clock-ins, arrival_time for jobsite clock-ins
-        const expectedTimeStr: string | null = is_shop_hours ? job.shop_arrival_time : job.arrival_time;
+      {
+        const expectedTimeStr: string | null = eff.startTime;
+        const job = eff.job;
 
         if (expectedTimeStr) {
           const [hours, minutes] = expectedTimeStr.split(':').map(Number);
@@ -493,6 +498,7 @@ export async function POST(request: NextRequest) {
                 is_late: true,
                 late_minutes: lateMinutes,
                 scheduled_start_time: expectedTimeStr,
+                late_source: eff.source,
                 late_notified_at: now.toISOString(),
               })
               .eq('id', timecard.id);
@@ -506,14 +512,17 @@ export async function POST(request: NextRequest) {
 
             const operatorName = profile?.full_name || user.email;
             const actualTimeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            // Job context only exists when the baseline came from an assigned job;
+            // a per-day-override / standard-start late arrival has no job.
+            const jobLabel = job?.customer_name ? ` — Job: ${job.customer_name}` : '';
 
             const notifications = (adminProfiles || []).map((p: { id: string }) => ({
               recipient_id: p.id,
               type: 'late_arrival',
               title: 'Late Clock-In',
-              message: `${operatorName} clocked in ${lateMinutes} min late (scheduled: ${expectedTimeStr}, actual: ${actualTimeStr}) — Job: ${job.customer_name}`,
+              message: `${operatorName} clocked in ${lateMinutes} min late (scheduled: ${expectedTimeStr}, actual: ${actualTimeStr})${jobLabel}`,
               tenant_id: tenantId,
-              job_order_id: job.id,
+              job_order_id: job?.id ?? null,
               read: false,
               metadata: {
                 operator_id: user.id,
@@ -521,6 +530,7 @@ export async function POST(request: NextRequest) {
                 minutes_late: lateMinutes,
                 scheduled_start: expectedTimeStr,
                 actual_clock_in: actualTimeStr,
+                start_source: eff.source,
               },
             }));
 
