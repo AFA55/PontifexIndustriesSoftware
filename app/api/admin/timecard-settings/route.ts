@@ -38,7 +38,10 @@ const DEFAULT_SETTINGS = {
   break_duration_minutes: 30,
   break_threshold_hours: 6,
   break_is_paid: false,
-  late_grace_minutes: 15,
+  // 7 min matches the clock-in route's fallback + the 20260618_late_grace_7min
+  // migration. (Was 15 here — a fresh tenant would see 15 in the UI but be
+  // enforced at 7 by clock-in. Aligned to 7.)
+  late_grace_minutes: 7,
   subsistence_rate: 0,
   // Standard start time lives on tenants.default_start_time (NOT timecard_settings_v2).
   // It is the baseline the late-detection resolution chain falls back to when an
@@ -72,7 +75,7 @@ const V2_INSERT_DEFAULTS = {
   break_threshold_hours: 6,
   break_is_paid: false,
   overtime_threshold_weekly: 40,
-  late_grace_minutes: 15,
+  late_grace_minutes: 7,
   subsistence_rate: 0,
 };
 
