@@ -6,7 +6,7 @@
 > and take actions** — and is sold as a **per-tenant add-on** to other companies.
 > Founder's bar: "a TRUE Jarvis feel — not static, real live, makes analysis and makes things happen."
 
-**Status:** PLANNING / Phase 1 shipped. **Deep-research in flight** (`wf_54908403-68e`, launched Jun 21) — its verified 2026 architecture (agentic tool-use, data grounding, the security model, the voice pipeline, productization, phasing) will be folded into §Architecture + the phase specs when it lands.
+**Status:** PLANNING / Phase 1 shipped. **Deep-research DONE** (`wf_54908403-68e`, 113 agents) — verified findings on agentic architecture + security are in §Verified below. The research did NOT fully cover voice / cost-metering / RAG specifics / copilot teardowns → those need a focused follow-up pass (voice + phasing are already covered in the JARVIS plan).
 
 **Reference the founder gave:** "Fable 5 OS" by chase.h.ai (Instagram) — a Claude-Code-based personal "Jarvis": voice command word, V.A.U.L.T. memory/token system, a skills marketplace, agentic. It's a *developer's* Claude wrapper, not a SaaS feature — Artifex takes that **live voice-agent feel** and grounds it in our multi-tenant business data as a productized feature.
 
@@ -26,6 +26,21 @@ The deep-research will harden this with verified specifics (Anthropic tool-use/A
 3. **Read-only until Phase 4** — write/action tools come later, behind typed confirmation + rank check + audit.
 4. **Cost ceiling + rate limit** server-enforced (Claude + ElevenLabs both cost per call; no runaway loop).
 5. **Prompt-injection hardening** — company data is data, not instructions; answer ONLY from tool results, cite provenance, never invent numbers. No secrets/PII in logs.
+
+## Verified architecture & security (deep-research, primary sources — all 3-0 verified)
+**Agentic core**
+- Build on **Claude tool use** (client tools execute in our app: `stop_reason:'tool_use'` → run → return `tool_result`; loop until done), optionally orchestrated by the **Claude Agent SDK** (same loop as Claude Code, no CLI). This loop = "agentic, not a static chatbot."
+- **Design tools FOR the agent, not as APIs:** `strict:true` JSON schemas; keep a **FEW high-signal, consolidated tools** — tool-selection accuracy *collapses* as the set grows (benchmarks 43%→<14%). Prefer `get_customer_context` / `search_jobs` over many `list_*` dumps; just-in-time loading; return the smallest high-signal token set.
+- **NO generic `execute_sql` tool.** Scoped custom tools = parameterized RPCs/views with the tenant/role filter set OUTSIDE the agent; allowlist the functions/tables in BOTH the system prompt and the backend. (`strict:true` is structural only — still server-validate values/business rules.)
+
+**Security — the load-bearing decision (OWASP LLM06 Excessive Agency)**
+- **The agent is NEVER the gatekeeper.** Authorization is enforced **downstream in Supabase** (RLS + SECURITY DEFINER helpers + least-privilege Postgres roles) — "complete mediation." Every tool runs in the **asking user's authorization context** with minimum privileges.
+- **Do NOT use a generic high-privileged (service-role) identity that can reach all tenants.** ⚠️ This differs from our current `supabaseAdmin`-everywhere pattern: Artifex's data tools should execute **RLS-enforced** (per-request client with the user's JWT, or `security_invoker=true` RPCs/views) so the DB is the gatekeeper, not a manual `tenant_id` filter the agent could be tricked around. Defense-in-depth: a dedicated minimal DB role for the agent.
+- **Supabase footguns to avoid:** views bypass RLS unless `security_invoker=true`; never `user_metadata` for authz (user-editable → `app_metadata`/helpers); never expose service_role to the client.
+- **Prompt-injection:** deliver ALL untrusted content (customer notes, emails, OCR, tool outputs) to Claude ONLY inside `tool_result` blocks — never in the system prompt or plain user text. Least privilege so a successful injection does minimal damage. (This is one layer, not a complete defense.)
+- **Actions (Phase 4):** gate via the Agent SDK permission system — `allowed_tools` (auto-approve) / `disallowed_tools` (block) / `permission_mode` (uncovered), command-level scoping, **PreToolUse hooks** that intercept/modify/block before execution, MCP `allowedTools` allowlist. Destructive ops require explicit typed confirmation + rank check + audit. NOTE: a *pure* action-selector can't do read-heavy report Q&A (it blocks tool outputs feeding back) → use the **hybrid** (read tools feed the model; write tools gated).
+
+**Still to research (focused follow-up):** the voice pipeline (ElevenLabs Conversational AI vs roll-your-own, STT, barge-in, latency), per-tenant cost metering/billing + Claude tier selection + prompt-caching savings, RAG specifics (chunking/embedding/citation format) for notes vs live metrics, and real B2B copilot teardowns (Sierra/Glean/Fin/Agentforce/Copilot).
 
 ## Phases (progress tracker — keep this current)
 - [x] **Phase 1 — HUD shell** (route, ArcReactor, tabs, live right rail from real data; no AI/voice). Shipped `88efd8d`.
