@@ -51,6 +51,7 @@ export async function resolveEffectiveStart(params: {
     const { data: jobs } = await supabaseAdmin
       .from('job_orders')
       .select('id, customer_name, arrival_time, shop_arrival_time')
+      .eq('tenant_id', tenantId)
       .eq('assigned_to', operatorId)
       .eq('scheduled_date', localDate)
       .in('status', ACTIVE_JOB_STATUSES)
