@@ -86,8 +86,7 @@ export async function PATCH(
           date,
           clock_in_time,
           clock_out_time,
-          lunch_minutes,
-          lunch_deducted
+          lunch_duration_minutes
         ),
         profiles!requested_by (
           id,
@@ -175,7 +174,7 @@ export async function PATCH(
         const outMs = new Date(effClockOut).getTime();
         if (outMs > inMs) {
           const rawHours = (outMs - inMs) / 3600000;
-          const lunchMinutes = timecard.lunch_deducted ? (timecard.lunch_minutes || 0) : 0;
+          const lunchMinutes = Number(timecard.lunch_duration_minutes) || 0;
           newTotalHours = Math.max(0, rawHours - lunchMinutes / 60);
           // Round to 2 decimal places
           newTotalHours = Math.round(newTotalHours * 100) / 100;
