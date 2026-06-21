@@ -341,10 +341,11 @@ export async function generateNotificationEmail(opts: {
  */
 export async function generatePasswordResetEmail(
   fullName: string,
-  resetLink: string
+  resetLink: string,
+  branding: EmailBranding = DEFAULT_EMAIL_BRANDING
 ): Promise<string> {
   return renderPasswordResetEmail({
-    branding: DEFAULT_EMAIL_BRANDING,
+    branding,
     fullName,
     resetLink,
   });

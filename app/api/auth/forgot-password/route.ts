@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import * as Sentry from '@sentry/nextjs';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { sendEmail, generatePasswordResetEmail } from '@/lib/email';
+import { sendEmail, generatePasswordResetEmail, getTenantEmailBranding } from '@/lib/email';
 import { resolveAppOrigin } from '@/lib/app-url';
 
 // Generic response so the client can never tell whether an email exists.
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // Case-insensitive lookup; .maybeSingle() returns null (no throw) on 0 rows.
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, active')
+      .select('id, full_name, email, active, tenant_id')
       .ilike('email', email)
       .maybeSingle();
 
@@ -96,9 +96,15 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Reset link generated');
 
+    // White-label: resolve the user's tenant branding (logo + company name +
+    // colors) so the reset email matches the company they belong to — the same
+    // tenant behind the company code they log in with. Never throws.
+    const branding = await getTenantEmailBranding(profile.tenant_id ?? null);
+
     const resetEmailHtml = await generatePasswordResetEmail(
       profile.full_name || 'there',
-      resetData.properties.action_link
+      resetData.properties.action_link,
+      branding
     );
 
     const emailSent = await sendEmail({
