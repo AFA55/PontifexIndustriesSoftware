@@ -13,7 +13,7 @@
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
 | **In flight** | Jarvis Phase 1 LIVE ✅ → Phase 2 (Claude brain, text) next — awaiting founder AI-Gateway greenlight |
-| **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Supabase Pro upgrade · Sentry DSN |
+| **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Sentry DSN |
 | **Unpushed commits** | 🟡 `7e444909`→`19b72561` (Jun-20 batch: correction-404 fix, km→miles, start-time+late-entries, react-email redesign) — HOLDING for founder "push it" |
 | **Last groomed** | Jun 13, 2026 |
 
@@ -38,8 +38,8 @@
       → **200** (was 502 before the sanitizer). Email outage CONFIRMED resolved. Adam Ingalls'
       invite went out — confirm he received it.
 - [x] ~~Revert temp invite diagnostic~~ — ✅ Jun 10: EMAIL DIAG logging + raw-error response removed.
-- [ ] **Supabase Free → Pro ($25/mo)** — founder action. Payroll data currently has NO automated
-      backups. Highest-leverage 5 minutes available. (See docs/plans/BACKUP_AND_CLOUD_STRATEGY.md.)
+- [x] ~~**Supabase Free → Pro ($25/mo)**~~ — ✅ DONE Jun 21. Payroll data now has automated daily
+      backups + PITR-eligible. (Was the top data-safety gap.)
 
 ## 🟠 P1 — This week
 
