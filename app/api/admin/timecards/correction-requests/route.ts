@@ -7,11 +7,15 @@ export const dynamic = 'force-dynamic';
  * Query params:
  *   status — 'pending' | 'approved' | 'rejected' | 'all' (default: 'pending')
  *   page   — page index (default: 0, page size: 50)
+ *
+ * Each request now also carries clock-in/out times, location coords, and a
+ * server-computed clock-out distance from the tenant shop (Part A).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { calculateDistance, formatDistanceUS } from '@/lib/geolocation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +35,16 @@ export async function GET(request: NextRequest) {
     const page = Math.max(0, parseInt(params.get('page') || '0'));
     const pageSize = 50;
 
+    // Fetch tenant shop coords once for distance computation
+    const { data: tenantRow } = await supabaseAdmin
+      .from('tenants')
+      .select('shop_latitude, shop_longitude, clock_out_radius_meters')
+      .eq('id', tenantId)
+      .maybeSingle();
+
+    const shopLat = tenantRow?.shop_latitude ?? null;
+    const shopLon = tenantRow?.shop_longitude ?? null;
+
     let query = supabaseAdmin
       .from('timecard_correction_requests')
       .select(`
@@ -49,7 +63,14 @@ export async function GET(request: NextRequest) {
           date,
           clock_in_time,
           clock_out_time,
-          total_hours
+          total_hours,
+          clock_in_latitude,
+          clock_in_longitude,
+          clock_in_method,
+          clock_out_latitude,
+          clock_out_longitude,
+          clock_out_outside_radius,
+          remote_photo_url
         ),
         profiles!requested_by (
           full_name,
@@ -72,25 +93,51 @@ export async function GET(request: NextRequest) {
     }
 
     // Shape the response for easier consumption
-    const requests = (data || []).map((row: any) => ({
-      id: row.id,
-      timecard_id: row.timecard_id,
-      requested_by: row.requested_by,
-      worker_name: row.profiles?.full_name || 'Unknown',
-      worker_role: row.profiles?.role || '',
-      timecard_date: row.timecards?.date || null,
-      current_clock_in: row.timecards?.clock_in_time || null,
-      current_clock_out: row.timecards?.clock_out_time || null,
-      current_total_hours: row.timecards?.total_hours || null,
-      requested_clock_in: row.requested_clock_in,
-      requested_clock_out: row.requested_clock_out,
-      reason: row.reason,
-      status: row.status,
-      reviewed_by: row.reviewed_by,
-      reviewed_at: row.reviewed_at,
-      reviewer_notes: row.reviewer_notes,
-      created_at: row.created_at,
-    }));
+    const requests = (data || []).map((row: any) => {
+      const tc = row.timecards;
+      const coLat: number | null = tc?.clock_out_latitude ?? null;
+      const coLon: number | null = tc?.clock_out_longitude ?? null;
+
+      // Compute clock-out distance from shop only when we have both sets of coords
+      let clockOutDistanceMeters: number | null = null;
+      let clockOutDistanceFormatted: string | null = null;
+      if (shopLat != null && shopLon != null && coLat != null && coLon != null) {
+        clockOutDistanceMeters = calculateDistance(coLat, coLon, shopLat, shopLon);
+        clockOutDistanceFormatted = formatDistanceUS(clockOutDistanceMeters);
+      }
+
+      return {
+        id: row.id,
+        timecard_id: row.timecard_id,
+        requested_by: row.requested_by,
+        worker_name: row.profiles?.full_name || 'Unknown',
+        worker_role: row.profiles?.role || '',
+        timecard_date: tc?.date || null,
+        current_clock_in: tc?.clock_in_time || null,
+        current_clock_out: tc?.clock_out_time || null,
+        current_total_hours: tc?.total_hours || null,
+        // Location & method fields
+        clock_in_latitude: tc?.clock_in_latitude ?? null,
+        clock_in_longitude: tc?.clock_in_longitude ?? null,
+        clock_in_method: tc?.clock_in_method ?? null,
+        clock_out_latitude: coLat,
+        clock_out_longitude: coLon,
+        clock_out_outside_radius: tc?.clock_out_outside_radius ?? false,
+        remote_photo_url: tc?.remote_photo_url ?? null,
+        // Computed distance
+        clock_out_distance_meters: clockOutDistanceMeters,
+        clock_out_distance_formatted: clockOutDistanceFormatted,
+        // Requested times
+        requested_clock_in: row.requested_clock_in,
+        requested_clock_out: row.requested_clock_out,
+        reason: row.reason,
+        status: row.status,
+        reviewed_by: row.reviewed_by,
+        reviewed_at: row.reviewed_at,
+        reviewer_notes: row.reviewer_notes,
+        created_at: row.created_at,
+      };
+    });
 
     return NextResponse.json({ success: true, data: { requests, page, pageSize } });
   } catch (error) {
