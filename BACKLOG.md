@@ -9,12 +9,12 @@
 | | |
 |---|---|
 | **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
-| **Prod** | ✅ LIVE — pontifexindustries.com (`88efd8d3` deployed READY Jun 13 — Jarvis Command Center Phase 1) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (`a0bf8bcb` deployed READY Jun 21 — timecards batch + react-email white-label + start-time/late-entries + geofence/remote review) |
 | **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
 | **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
 | **In flight** | Jarvis Phase 1 LIVE ✅ → Phase 2 (Claude brain, text) next — awaiting founder AI-Gateway greenlight |
 | **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Sentry DSN |
-| **Unpushed commits** | 🟡 `7e444909`→`19b72561` (Jun-20 batch: correction-404 fix, km→miles, start-time+late-entries, react-email redesign) — HOLDING for founder "push it" |
+| **Unpushed commits** | 🟢 Jun-20 batch PUSHED + LIVE (`a0bf8bcb`). Only `4c95d061` (iOS Build-9 version bump, native-only) unpushed — rides the next web push. |
 | **Last groomed** | Jun 13, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
@@ -24,7 +24,7 @@
 - [ ] **Operators need a Manage-Profile hub** — exists in committed code (`/dashboard/my-profile` + self-edit PATCH) but UNPUSHED; verify completeness + ship.
 - [ ] **Clock-in card asks for Shop twice** — Field/🏭Shop toggle AND a separate "🏭 Shop Hours" checkbox for operators/apprentices. Remove the redundant checkbox when the toggle is shown; derive `isShopHours` from `workLocation === 'shop'`.
 - [ ] **App didn't remember me / never offered Face ID** — Face ID button only appears after a password login THEN a return to the login screen; most users auto-resume and never see it. Fix: auto-trigger Face ID on app launch when saved creds exist (web; native plugin already in Build 8). Harden remember-me persistence.
-- [ ] **Cut iOS Build 9** — version bump + `cap sync` to guarantee the native biometric plugin; submit to App Store (only the native part needs a build — UI fixes ship via Vercel instantly).
+- [~] **Cut iOS Build 9** — ✅ CODE PREPPED (`4c95d061`): bumped 1.0.3/8 → **1.0.4/9**, `cap sync ios` run (11 plugins incl. `@capgo/capacitor-native-biometric` Face ID + new gradient-P splash). **FOUNDER-ONLY remaining** (Mac/Apple): xcodebuild archive + export (MANUAL signing, profile "Pontifex App Store Distribution") → Transporter upload → ASC attach build + What's New + Submit. ⚠️ May need to re-accept the Apple Developer License Agreement in ASC first. (Web features already live in the app via Vercel — Build 9 is only for the native splash + plugin.)
 
 ### Jun 20 — founder weekend batch (timecards + email + remember-me) — UNPUSHED
 - [x] ~~**Time-edit Approve/Modify/Deny → "Correction request not found"**~~ — ✅ FIXED `7e444909`. PATCH route embedded-selected non-existent `timecards` columns (`lunch_minutes`/`lunch_deducted`) → PostgREST 404'd the whole query. Now selects `lunch_duration_minutes`. DB-verified root cause; the LIST worked because it selects `total_hours`.
