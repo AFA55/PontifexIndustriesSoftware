@@ -1,6 +1,6 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jun 22, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (web at `a0bf8bcb`; local HEAD `c5e4cd50`) | **iOS:** Build 9 in App Store review | **Android:** in Google Play review
+**Last updated:** Jun 22, 2026 (PT2) | **Branch:** `main` | **Prod:** ✅ LIVE (web deployed at `a0bf8bcb`; local HEAD `2e4af405` — 4 NEW web-affecting commits unpushed, see below) | **iOS:** Build 9 in App Store review | **Android:** in Google Play review
 
 > **New session? Read this top-to-bottom once, then work from [BACKLOG.md](BACKLOG.md).**
 > This file = where we are + how we work. BACKLOG.md = what to do next. [CLAUDE.md](CLAUDE.md) = the hard conventions (RLS, dates, auth, email, push-cost). [docs/SESSION_LOG.md](docs/SESSION_LOG.md) = older history.
@@ -20,10 +20,19 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 **The mobile apps are a remote-URL Capacitor webview that loads `pontifexindustries.com`.** This is the single most important architectural fact: **web/UI/API changes ship to BOTH apps instantly via a Vercel deploy — no App Store / Play build needed.** Only *native* changes (icon, splash, plugins, Info.plist/AndroidManifest, Capacitor config) require a store build.
 
 ### Unpushed commits (local only — push held per cost rule)
-Three commits sit on local `main`, all **native/tooling-only** (they do NOT change the live web app, so there's no urgency — they ride the next web push):
+**Jun 22 PT2 — NEW, web-affecting (a push deploys these to prod + both apps):**
+- `b2e68357` — **email white-label migration** (all 13 raw-HTML transactional emails → react-email; removed hardcoded-Patriot leaks; demo-request off raw fetch). Guardian PASS. Previews in `docs/reference/email-previews/`.
+- `a5fdc9df` — **notifications deep-link** (schedule-board bell now routes on click; deleted broken dupe).
+- `20b1df36` — **remote clock-in/out photos fixed** (new PRIVATE `timecard-photos` bucket + server upload + signed URLs; client aborts on fail, no more `photo-upload-failed` sentinel) + **out-of-radius clock-out auto-creates an edit request** + **storage RLS security fix** (dropped cross-tenant-leaking policies). Guardian PASS, rls-auditor verified.
+- `2e4af405` — **late flag recomputes on edit** (all 4 edit routes, shared `computeLate`, strict `>7`, tenant-tz, timecard's own date). Guardian PASS, 17/17 tests.
+
+Older **native/tooling-only** commits (no web effect, ride the same push):
 - `4c95d061` — iOS Build 9 version bump (MARKETING 1.0.4 / BUILD 9)
 - `1f730b02` — Android manifest fix (removed `READ_MEDIA_IMAGES`/`VIDEO` to pass Play policy; versionCode 2)
 - `c5e4cd50` — `scripts/play-upload.mjs` (Play Developer API uploader)
+
+> **4 new DB migrations already applied to prod** (additive/idempotent): `timecard_photos_bucket`, `timecard_photos_drop_broad_policies`, `timecard_corrections_metadata`, `notifications_action_url`.
+> **Address-autocomplete (founder bug):** NOT a code bug — code is correct & wired. Blocked on founder enabling **Places API (New)** in Google Cloud (+ confirm `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is in Vercel Production). Verifiable only on the deployed domain, not localhost.
 
 ### What shipped recently (the launch arc, Jun 20–22)
 - **Timecards batch** (live `a0bf8bcb`): correction-request 404 fix, km→**miles** distance everywhere, **configurable start-time + late-entries** system (`lib/timecard-start.ts` resolution chain: job ticket > per-day override > tenant standard; new `/dashboard/admin/timecards/late` page + `timecard_day_overrides` table), geofence detail + remote-clock-in review tab.

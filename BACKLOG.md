@@ -12,11 +12,11 @@
 | **Prod** | ✅ LIVE — pontifexindustries.com (web `a0bf8bcb` — timecards batch + react-email white-label + start-time/late-entries + geofence/remote review) |
 | **iOS** | Build 9 / v1.0.4 — **submitted, "Waiting for Review"** (v1.0.2 currently public). May be gated on Apple Developer Agreement re-acceptance. |
 | **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). Managed publishing OFF → auto-publishes on approval. Photo-permission block fixed; uploaded via new `scripts/play-upload.mjs`. |
-| **Open** | P0: ~0 (launch done) · P1: ~6 · P2: ~14 · P3: ~8 |
+| **Open** | P0: ~0 (launch done) · P1: ~6 · P2: ~15 · P3: ~9 |
 | **In flight** | Jarvis Phase 1 LIVE ✅ → Phase 2 (Claude brain, text) next — awaiting founder AI-Gateway greenlight |
-| **Blocked on founder** | 🔴 Apple Developer Agreement re-accept (ASC) · Enable Places API (New) in Google Cloud · Approve Bryan's request · Sentry DSN |
-| **Unpushed commits** | 🟢 All web LIVE. 3 native/tooling-only commits unpushed (`4c95d061` iOS bump · `1f730b02` Android manifest fix · `c5e4cd50` Play API script) — ride the next web push, no urgency. |
-| **Last groomed** | Jun 22, 2026 |
+| **Blocked on founder** | 🔴 Apple Developer Agreement re-accept (ASC) · **Enable Places API (New) in Google Cloud (THE address-autocomplete fix — code is correct, this is the only blocker)** · Approve Bryan's request · Sentry DSN |
+| **Unpushed commits** | 🟡 **NEW (Jun 22 PT2, web-affecting — need a push to go live):** `b2e68357` email white-label migration · `a5fdc9df` notif-bell deep-link · `20b1df36` remote-photo storage + out-of-radius auto-edit-request (+ storage RLS security fix) · `2e4af405` late-recompute-on-edit. Plus the older 15 native/tooling/docs commits. One push deploys all. |
+| **Last groomed** | Jun 22, 2026 (PT2) |
 
 ## 🔴 P0 — Verify / unblock now
 
@@ -49,6 +49,7 @@
 - [ ] **Sentry DSN** — code is fully wired & gated; founder sets `SENTRY_DSN` +
       `NEXT_PUBLIC_SENTRY_DSN` in Vercel → instant prod error visibility. (Phase A, docs/plans/PHASE_A_KICKOFF.md)
 - [ ] **Supabase Auth rate limits** — Dashboard → Auth → Settings (HIGH-2 from security audit).
+- [ ] **🔒 SECURITY: `voice-checkouts` storage bucket has the same cross-tenant leak** just fixed on `timecard-photos` — its `authenticated` storage policies are bucket-only (not tenant-scoped), so any authenticated user could read another tenant's voice notes directly via the Storage API. All access is server-side via `supabaseAdmin`, so drop the broad authenticated SELECT/INSERT/DELETE policies (mirror `20260622_timecard_photos_drop_broad_policies.sql`). Flagged by rls-policy-auditor Jun 22.
 - [x] ~~Clean up Vercel env vars~~ — ✅ Jun 12 via authed CLI: deleted unused `RESEND_FROM_EMAIL` +
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
@@ -141,7 +142,14 @@
 - [ ] **Understand-Anything pilot** — founder runs `/plugin install understand-anything` in Claude
       Code → `/understand` → commit the JSON graph → visual codebase dashboard for the team.
 
-## 🟢 P3 — Someday / strategic
+## 🟢 P3 — Someday / strategic (small follow-ups from Jun 22 PT2)
+
+- [ ] **One un-migrated email remains:** `app/api/admin/notifications/send/route.ts` still builds inline HTML with hardcoded "Patriot" — migrate to the react-email system like the other 13 (email-guardian NIT).
+- [ ] **`timecard_settings_v2.late_grace_minutes` column default is 15** while code fallback is 7 — only affects brand-new tenants who never open Late settings. Consider changing the column default to 7 for consistency with the "more than 7 min" intent (Patriot is already 7).
+- [ ] **Dedupe the signed-URL helper** — identical `signTimecardPhoto`/`signPath` now in `remote-verify/route.ts` + `operator/[id]/route.ts`; extract to `lib/timecard-photos.ts` to prevent drift.
+- [ ] **Delete stale legacy `components/GoogleAddressAutocomplete.tsx`** (classic Autocomplete) — dead duplicate-name footgun; the active one is `components/ui/GoogleAddressAutocomplete.tsx`.
+
+
 
 - [ ] **APNs**: wire `lib/send-push.ts` into `/api/push/route.ts` end-to-end + confirm token registration.
 - [ ] **Android app** (`npx cap add android`, $25 Google Play) — after iOS settles.
@@ -155,6 +163,12 @@
 
 ## ✅ Recently shipped (context for current work)
 
+- **Jun 22 (PT2) — committed, UNPUSHED (one push deploys all):**
+  - **Email white-label migration** (`b2e68357`) — migrated all 13 remaining raw-HTML transactional emails (invoices send/remind/payment, signature, completion+liability PDFs, customer survey, portal, silica, schedule, clock-in reminder, salesperson, demo) to the react-email `BrandedEmail` system; removed every hardcoded "Patriot"/`billing@patriotconcretecutting.com`/hex/phone leak (now `getTenantEmailBranding`); routed `demo-request` through `sendEmail()` (was a raw fetch w/ raw key). Guardian PASS. Previews regenerated in `docs/reference/email-previews/`.
+  - **Notifications deep-link** (`a5fdc9df`) — schedule-board had a 2nd broken `NotificationBell` that never routed on click; replaced with the shared bell + deleted the dupe. Fixes "clicked the out-of-radius alert, went nowhere."
+  - **Remote clock-in/out photos** (`20b1df36`) — were 100% broken (uploaded to a bucket that never existed → stored `'photo-upload-failed'`; all 14 rows lost). New PRIVATE `timecard-photos` bucket + server-side upload route + signed-URL reads on corrections + operator pages; client aborts on upload failure (no sentinel). **Security:** dropped over-broad authenticated storage policies (cross-tenant PII leak caught by rls-policy-auditor). Guardian PASS.
+  - **Out-of-radius clock-out** (`20b1df36`) — already allowed+flagged+notified; now ALSO auto-creates a `timecard_correction_requests` row (`metadata.source='auto_out_of_radius'`, dedup-guarded) + the notification deep-links to /corrections.
+  - **Late flag recompute on edit** (`2e4af405`) — editing a clock-in time never recomputed `is_late` (blind-cleared or ignored); now all 4 edit routes recompute via a shared `computeLate` helper using strict `>grace` ("more than 7 min", Patriot grace already 7), tenant tz, and the timecard's own date. Guardian PASS, 17/17 tests.
 - **Jun 9:** `RESEND_API_KEY` defensive sanitizer — self-heals the malformed Vercel env var that
   502'd ALL outbound email; 9 unit tests; deployed READY (`a56a2322`).
 - **Jun 9:** Docs reorganization — 119 root MDs → organized `docs/` tree + ARCHITECTURE.md +
