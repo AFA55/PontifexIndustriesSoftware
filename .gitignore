@@ -1,5 +1,5 @@
 *.log
-.DS_Store.claude/worktrees/
+.DS_Store
 .claude/worktrees/
 .env
 .env*.local
@@ -17,3 +17,16 @@ node_modules/
 .claude-flow/data/
 .claude/memory.db
 .swarm/
+
+# Agent/swarm tooling artifacts (machine-specific, not source) — Jun 22 2026 cleanup
+.claude-flow/
+.claire/
+agentdb.rvf
+agentdb.rvf.lock
+ruvector.db
+
+# TypeScript incremental build cache (regenerated on build)
+tsconfig.tsbuildinfo
+
+# Stray generated icon set — the real served PWA icons live in public/
+/icons/
