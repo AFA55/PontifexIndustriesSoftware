@@ -8,24 +8,22 @@
 
 | | |
 |---|---|
-| **Phase** | Launched → **Fine-tuning & productization** (post-App-Store) |
-| **Prod** | ✅ LIVE — pontifexindustries.com (`a0bf8bcb` deployed READY Jun 21 — timecards batch + react-email white-label + start-time/late-entries + geofence/remote review) |
-| **iOS** | v1.0.2 live · v1.0.3/Build 8 (Face ID) in TestFlight → **submitting to App Store review** |
-| **Open** | P0: 1 · P1: 6 · P2: 14 · P3: 8 |
+| **Phase** | 🚀 **LAUNCHING** — web live; both mobile apps in store review |
+| **Prod** | ✅ LIVE — pontifexindustries.com (web `a0bf8bcb` — timecards batch + react-email white-label + start-time/late-entries + geofence/remote review) |
+| **iOS** | Build 9 / v1.0.4 — **submitted, "Waiting for Review"** (v1.0.2 currently public). May be gated on Apple Developer Agreement re-acceptance. |
+| **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). Managed publishing OFF → auto-publishes on approval. Photo-permission block fixed; uploaded via new `scripts/play-upload.mjs`. |
+| **Open** | P0: ~0 (launch done) · P1: ~6 · P2: ~14 · P3: ~8 |
 | **In flight** | Jarvis Phase 1 LIVE ✅ → Phase 2 (Claude brain, text) next — awaiting founder AI-Gateway greenlight |
-| **Blocked on founder** | 🔴 Enable Places API (New) in Google Cloud (autocomplete) · Approve Bryan's request · Sentry DSN |
-| **Unpushed commits** | 🟢 Jun-20 batch PUSHED + LIVE (`a0bf8bcb`). Only `4c95d061` (iOS Build-9 version bump, native-only) unpushed — rides the next web push. |
-| **Last groomed** | Jun 13, 2026 |
+| **Blocked on founder** | 🔴 Apple Developer Agreement re-accept (ASC) · Enable Places API (New) in Google Cloud · Approve Bryan's request · Sentry DSN |
+| **Unpushed commits** | 🟢 All web LIVE. 3 native/tooling-only commits unpushed (`4c95d061` iOS bump · `1f730b02` Android manifest fix · `c5e4cd50` Play API script) — ride the next web push, no urgency. |
+| **Last groomed** | Jun 22, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
 
-### Jun 14 — in-app testing (founder on iOS v1.0.3/Build 8) — batch into ONE push
-- [ ] **Notification bell invisible in light mode** — `components/NotificationBell.tsx` hardcodes `variant="dark"` (white icon) but the operator header (`app/dashboard/page.tsx`) is `bg-white dark:bg-white/[0.03]` → white-on-white in light mode. Fix: theme-aware contrast (web → ships via Vercel).
-- [ ] **Operators need a Manage-Profile hub** — exists in committed code (`/dashboard/my-profile` + self-edit PATCH) but UNPUSHED; verify completeness + ship.
-- [ ] **Clock-in card asks for Shop twice** — Field/🏭Shop toggle AND a separate "🏭 Shop Hours" checkbox for operators/apprentices. Remove the redundant checkbox when the toggle is shown; derive `isShopHours` from `workLocation === 'shop'`.
-- [ ] **App didn't remember me / never offered Face ID** — Face ID button only appears after a password login THEN a return to the login screen; most users auto-resume and never see it. Fix: auto-trigger Face ID on app launch when saved creds exist (web; native plugin already in Build 8). Harden remember-me persistence.
-- [x] ~~**Cut iOS Build 9**~~ — ✅ **SUBMITTED FOR REVIEW Jun 21** (1.0.4/9, "Waiting for Review", ~48h ETA). Built + signed (manual) + Transporter upload + ASC submit all done. Build 9 = native splash + Face ID plugin (web features already live via Vercel).
-- [~] **Google Play first release** — ✅ app CREATED on business account (id 4973761380467352338, package **com.pontifexindustries.platform** — old `.app` was reserved on the founder's personal account; new package avoids a multi-day transfer). ✅ signed `.aab` REBUILT for new package (`~/Desktop/Pontifex-Android-v1.0.0.aab`, jar-verified; google-services.json has a local `.platform` client). Short description set in listing. **REMAINING (founder, Play Console UI — automation can't drive Google's file-pickers/questionnaires):** upload .aab to Internal testing → full description (paste from plan) + icon/feature-graphic (`assets/play/`) + 2 screenshots → App access (reviewer login from plan) + Data safety + Content rating → Production. **Push v1.0.1:** register `com.pontifexindustries.platform` in Firebase for a clean google-services.json. (prev: ✅ signed `.aab` BUILT Jun 21 (`~/Desktop/Pontifex-Android-v1.0.0.aab`, versionCode 1/1.0.0, jar verified). Org account (PontifexIndustriesLLC) exists; signing/keystore/icons/Firebase/graphics/description/reviewer-login all prepped (`docs/plans/GOOGLE_PLAY_RELEASE_PLAN.md`). **FOUNDER (Play Console, web):** create app → Internal testing → upload the .aab → complete listing (graphics ready; need ≥2 phone screenshots) → content rating + Data safety + App access (reviewer login prepared) → Production. **Push:** set `FIREBASE_SERVICE_ACCOUNT_JSON` in Vercel to activate Android push (not blocking the listing).
+### ✅ LAUNCH — DONE (Jun 21–22) — both apps submitted, web live
+- [x] ~~Jun-14 in-app fixes~~ — ✅ shipped & live (`2e8c4df0`/`a0bf8bcb`): notification-bell light-mode contrast, operator Manage-Profile hub, clock-in "asks Shop twice" removed, Face ID auto-prompt on launch.
+- [x] ~~**Cut iOS Build 9**~~ — ✅ **SUBMITTED Jun 21** (1.0.4/9, "Waiting for Review"). Manual signing + Transporter + ASC submit done.
+- [x] ~~**Google Play first release**~~ — ✅ **IN REVIEW Jun 22** (v1.0.1/vc2, production, US). Business account, package `com.pontifexindustries.platform`, all declarations + listing done. Google's pre-review check blocked vc1 for `READ_MEDIA_IMAGES` → removed it (manifest `tools:node="remove"`) → rebuilt vc2 → resubmitted, passed. Uploaded via new **`scripts/play-upload.mjs`** (Play Developer API; SA `firebase-adminsdk-fbsvc@…` granted Admin, Android Publisher API enabled on `pontifex-ind-1dc89`). Managed publishing OFF → auto-publishes on approval. Details in memory `android-play-release.md`.
 
 ### Jun 20 — founder weekend batch (timecards + email + remember-me) — UNPUSHED
 - [x] ~~**Time-edit Approve/Modify/Deny → "Correction request not found"**~~ — ✅ FIXED `7e444909`. PATCH route embedded-selected non-existent `timecards` columns (`lunch_minutes`/`lunch_deducted`) → PostgREST 404'd the whole query. Now selects `lunch_duration_minutes`. DB-verified root cause; the LIST worked because it selects `total_hours`.

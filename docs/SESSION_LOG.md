@@ -4,6 +4,12 @@
 > the latest session detail lives in [CLAUDE_HANDOFF.md](../CLAUDE_HANDOFF.md). Append new entries here
 > only when pruning the handoff.
 
+## Jun 2026 — LAUNCH SPRINT (web + both app stores)
+
+- **Jun 9–14:** docs reorg (BACKLOG = single source of truth; playbooks → skills); demo-funnel repair; time-off system rebuild; GPS-only clock-in; tenant-branded emails; "Save password" full-navigation fix; request-access account-creation fix (listUsers-pagination bug); Jarvis Command Center Phase 1; **web Touch ID built then removed** (browser password manager already covers it — iOS native Face ID kept).
+- **Jun 20–21:** founder weekend batch shipped & pushed LIVE (`a0bf8bcb`): correction-request 404 fix, km→miles distance, **configurable start-time + late-entries** (`lib/timecard-start.ts`, `timecard_day_overrides` table, `/dashboard/admin/timecards/late`), **react-email** redesign of all 5 transactional emails (white-label, dark-mode-proof), geofence detail + remote-clock-in review tab. **Supabase Free→Pro** (backups + PITR). **iOS Build 9** archived/signed/uploaded/submitted to App Store review.
+- **Jun 22:** **Google Play taken to in-review.** App on business account (`com.pontifexindustries.platform`), all 11 App-content declarations + 11 setup tasks + store listing (PII-scrubbed screenshots). First submit (vc1) **blocked** by Google's pre-review check for `READ_MEDIA_IMAGES` (infrequent photo use must use the system picker) → removed the perm via `tools:node="remove"` (app uses web `<input type=file>`, not the unused `@capacitor/camera`), rebuilt **vc2**, resubmitted — passed. Built **`scripts/play-upload.mjs`** (Play Developer API uploader) to bypass the file-pick wall: enabled Android Publisher API on GCP `pontifex-ind-1dc89`, granted SA `firebase-adminsdk-fbsvc@…` Admin in Play. Both apps now in review. Docs (this log, handoff, BACKLOG, memory) updated to launch state.
+
 ## Sprint Backlog (Target: April 2, 2026)
 
 ### Week 1 — Core Feature Completion (March 19–25) ✅ COMPLETE
