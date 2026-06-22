@@ -11,7 +11,11 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { sendEmail } from '@/lib/email';
+import {
+  sendEmail,
+  getTenantEmailBranding,
+  generateSalespersonNotificationEmail,
+} from '@/lib/email';
 import { sendPushToUser } from '@/lib/send-push';
 import { resolveAppOrigin } from '@/lib/app-url';
 
@@ -80,66 +84,6 @@ function renderEvent(args: NotifyArgs): RenderedEvent {
   }
 }
 
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
-
-function buildEmailHtml(title: string, message: string, actionUrl: string): string {
-  const safeTitle = escapeHtml(title);
-  const safeMessage = escapeHtml(message);
-  const appUrl = resolveAppOrigin();
-  const link = actionUrl ? encodeURI(`${appUrl}${actionUrl}`) : '';
-
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${safeTitle}</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc;">
-  <table role="presentation" style="width: 100%; border-collapse: collapse; background-color: #f8fafc;">
-    <tr>
-      <td style="padding: 48px 20px;">
-        <table role="presentation" style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden;">
-          <tr>
-            <td style="background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); padding: 32px 40px; text-align: center;">
-              <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 700;">Patriot Concrete Cutting</h1>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding: 40px;">
-              <h2 style="margin: 0 0 16px; color: #0f172a; font-size: 20px; font-weight: 700;">${safeTitle}</h2>
-              <p style="margin: 0 0 28px; color: #475569; font-size: 16px; line-height: 1.6;">${safeMessage}</p>
-              ${link ? `
-              <table role="presentation" style="width: 100%; margin: 0 0 16px;">
-                <tr>
-                  <td style="text-align: center;">
-                    <a href="${link}" style="display: inline-block; padding: 12px 32px; background-color: #7c3aed; color: #ffffff; text-decoration: none; border-radius: 8px; font-size: 15px; font-weight: 600;">Open in Dashboard</a>
-                  </td>
-                </tr>
-              </table>` : ''}
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color: #f8fafc; padding: 20px 40px; text-align: center; border-top: 1px solid #e2e8f0;">
-              <p style="margin: 0; color: #94a3b8; font-size: 12px;">Automated salesperson notification. Please do not reply.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`;
-}
-
 /**
  * Insert an in-app notification for the salesperson and best-effort email.
  *
@@ -189,7 +133,14 @@ export async function notifySalesperson(args: NotifyArgs): Promise<void> {
       const { data: userResult } = await supabaseAdmin.auth.admin.getUserById(args.recipientUserId);
       const email = userResult?.user?.email;
       if (email) {
-        const html = buildEmailHtml(title, message, action_url);
+        const branding = await getTenantEmailBranding(args.tenantId || null);
+        const appUrl = resolveAppOrigin();
+        const html = await generateSalespersonNotificationEmail({
+          branding,
+          title,
+          message,
+          actionUrl: action_url ? encodeURI(`${appUrl}${action_url}`) : undefined,
+        });
         // Don't await further inside fire-and-forget — but sendEmail returns
         // a promise we already wrap below. Awaiting here is fine since the
         // outer try/catch absorbs all errors.

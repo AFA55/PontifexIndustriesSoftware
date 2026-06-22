@@ -12,7 +12,20 @@ import {
   renderAccessRequestReceivedEmail,
   renderNotificationEmail,
   renderPasswordResetEmail,
+  renderInvoiceEmail,
+  renderSignatureRequestEmail,
+  renderCompletionThankYouEmail,
+  renderCustomerSurveyThankYouEmail,
+  renderPortalAccessEmail,
+  renderSilicaPlanDeliveryEmail,
+  renderOperatorScheduleEmail,
+  renderClockInReminderEmail,
+  renderSalespersonNotificationEmail,
+  renderDemoRequestNotificationEmail,
 } from '@/emails/renderers';
+import type { InvoiceVariant, InvoiceLineItem } from '@/emails/InvoiceEmail';
+import type { CompletionVariant } from '@/emails/CompletionThankYouEmail';
+import type { ScheduleJob } from '@/emails/OperatorScheduleEmail';
 
 // ── Platform-default brand (the historical purple look). Used whenever no tenant
 // context is available OR a lookup fails — emails must NEVER throw on branding.
@@ -348,5 +361,213 @@ export async function generatePasswordResetEmail(
     branding,
     fullName,
     resetLink,
+  });
+}
+
+/**
+ * Generate a customer invoice email (send / remind / receipt variants).
+ *
+ * White-label: pass the recipient tenant's branding (via getTenantEmailBranding).
+ * The billing/reply email is the tenant's billing contact when known — never a
+ * hardcoded Patriot address.
+ */
+export async function generateInvoiceEmail(opts: {
+  variant: InvoiceVariant;
+  branding?: EmailBranding;
+  customerName: string;
+  invoiceNumber: string;
+  invoiceDate?: string | null;
+  dueDate?: string | null;
+  poNumber?: string | null;
+  lineItems?: InvoiceLineItem[];
+  subtotal?: number;
+  taxAmount?: number;
+  discountAmount?: number;
+  totalAmount?: number;
+  balanceDue?: number;
+  status?: string;
+  notes?: string | null;
+  isOverdue?: boolean;
+  daysOverdue?: number;
+  amountPaid?: number;
+  paymentDate?: string | null;
+  paymentMethod?: string | null;
+  referenceNumber?: string | null;
+  billingEmail?: string | null;
+  companyPhone?: string | null;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderInvoiceEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a customer signature-request email (sign your completion form).
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateSignatureRequestEmail(opts: {
+  branding?: EmailBranding;
+  customerName: string;
+  jobNumber: string;
+  jobLabel: string;
+  jobDate?: string | null;
+  jobLocation?: string | null;
+  signingUrl: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderSignatureRequestEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a completion thank-you email (completion sign-off or liability release).
+ * The PDF attachment is wired separately by the caller via sendEmail().
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateCompletionThankYouEmail(opts: {
+  variant: CompletionVariant;
+  branding?: EmailBranding;
+  jobNumber: string;
+  customerName?: string | null;
+  location?: string | null;
+  scopeOfWork?: string | null;
+  operatorName?: string | null;
+  companyPhone?: string | null;
+  supportEmail?: string | null;
+  signedDate?: string | null;
+  referencePhotos?: string[];
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderCompletionThankYouEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a customer survey thank-you email (echoes back the ratings given).
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateCustomerSurveyThankYouEmail(opts: {
+  branding?: EmailBranding;
+  jobNumber: string;
+  customerName?: string | null;
+  cleanliness?: number | null;
+  communication?: number | null;
+  likelyAgain?: number | null;
+  notes?: string | null;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderCustomerSurveyThankYouEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a customer portal magic-link email.
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generatePortalAccessEmail(opts: {
+  branding?: EmailBranding;
+  customerName: string;
+  portalUrl: string;
+  expiryDate: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderPortalAccessEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a silica exposure control plan delivery email (PDF attached by caller).
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateSilicaPlanDeliveryEmail(opts: {
+  branding?: EmailBranding;
+  jobNumber: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderSilicaPlanDeliveryEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate an operator's daily schedule email (list of jobs + reminders).
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateOperatorScheduleEmail(opts: {
+  branding?: EmailBranding;
+  operatorName: string;
+  scheduleDateLabel: string;
+  earliestShopTimeLabel?: string | null;
+  jobs: ScheduleJob[];
+  scheduleUrl: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderOperatorScheduleEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a clock-in reminder email.
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateClockInReminderEmail(opts: {
+  branding?: EmailBranding;
+  name: string;
+  actionUrl: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderClockInReminderEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate an internal salesperson milestone notification email.
+ * White-label: pass the recipient tenant's branding.
+ */
+export async function generateSalespersonNotificationEmail(opts: {
+  branding?: EmailBranding;
+  title: string;
+  message: string;
+  actionUrl?: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderSalespersonNotificationEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate the INTERNAL Pontifex demo-lead alert email.
+ * This stays Pontifex-branded (DEFAULT) — it is NOT a tenant email.
+ */
+export async function generateDemoRequestNotificationEmail(opts: {
+  name: string;
+  company: string;
+  email: string;
+  phone?: string | null;
+  tradeType?: string | null;
+  companySize?: string | null;
+  message?: string | null;
+  manageUrl?: string | null;
+}): Promise<string> {
+  return renderDemoRequestNotificationEmail({
+    branding: DEFAULT_EMAIL_BRANDING,
+    ...opts,
   });
 }

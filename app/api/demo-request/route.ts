@@ -2,17 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { DEFAULT_EMAIL_FROM, getResendApiKey } from '@/lib/email';
-
-// SECURITY: Sanitize user input before inserting into HTML emails
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}
+import { sendEmail, generateDemoRequestNotificationEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,15 +30,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Message too long' }, { status: 400 });
     }
 
-    // Sanitize all inputs for HTML email
-    const safeName = escapeHtml(name);
-    const safeCompany = escapeHtml(company);
-    const safeEmail = escapeHtml(email);
-    const safePhone = escapeHtml(phone || 'Not provided');
-    const safeTradeType = escapeHtml(tradeType);
-    const safeCompanySize = escapeHtml(companySize);
-    const safeMessage = message ? escapeHtml(message) : '';
-
     // Try to save to Supabase
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -73,44 +54,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Try to send notification email via Resend
-    const resendKey = getResendApiKey();
-    // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
-    const fromEmail = DEFAULT_EMAIL_FROM;
-
-    if (resendKey) {
-      try {
-        await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: fromEmail,
-            // Platform-demo leads belong to Pontifex (the software company), not Patriot (a tenant).
-            to: ['pontifexindustries@gmail.com'],
-            subject: `New Demo Request: ${safeName} - ${safeCompany}`,
-            html: `
-              <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #3b82f6;">New Demo Request</h2>
-                <table style="width: 100%; border-collapse: collapse;">
-                  <tr><td style="padding: 8px 0; color: #666; width: 120px;">Name</td><td style="padding: 8px 0; font-weight: 600;">${safeName}</td></tr>
-                  <tr><td style="padding: 8px 0; color: #666;">Company</td><td style="padding: 8px 0; font-weight: 600;">${safeCompany}</td></tr>
-                  <tr><td style="padding: 8px 0; color: #666;">Email</td><td style="padding: 8px 0;"><a href="mailto:${safeEmail}">${safeEmail}</a></td></tr>
-                  <tr><td style="padding: 8px 0; color: #666;">Phone</td><td style="padding: 8px 0;">${safePhone}</td></tr>
-                  <tr><td style="padding: 8px 0; color: #666;">Trade</td><td style="padding: 8px 0;">${safeTradeType}</td></tr>
-                  <tr><td style="padding: 8px 0; color: #666;">Company Size</td><td style="padding: 8px 0;">${safeCompanySize}</td></tr>
-                </table>
-                ${safeMessage ? `<div style="margin-top: 16px; padding: 16px; background: #f3f4f6; border-radius: 8px;"><strong>Message:</strong><br/>${safeMessage}</div>` : ''}
-                <p style="color: #999; font-size: 12px; margin-top: 24px;">Sent from the Patriot Concrete Cutting landing page</p>
-              </div>
-            `,
-          }),
-        });
-      } catch (emailErr) {
-        console.warn('[demo-request] Email notification failed:', emailErr);
-      }
+    // Send notification email through the sanitized sendEmail() path (inherits the
+    // sanitized Resend key + verified domain — no more raw fetch with a raw key).
+    // INTERNAL Pontifex alert → stays Pontifex-branded (NOT tenant-scoped).
+    try {
+      const html = await generateDemoRequestNotificationEmail({
+        name,
+        company,
+        email,
+        phone: phone || null,
+        tradeType,
+        companySize,
+        message: message || null,
+      });
+      await sendEmail({
+        // Platform-demo leads belong to Pontifex (the software company), not a tenant.
+        to: 'pontifexindustries@gmail.com',
+        subject: `New Demo Request: ${name} - ${company}`,
+        html,
+      });
+    } catch (emailErr) {
+      console.warn('[demo-request] Email notification failed:', emailErr);
     }
 
     return NextResponse.json({ success: true });

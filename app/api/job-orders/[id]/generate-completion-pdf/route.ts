@@ -20,7 +20,7 @@ import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import React from 'react';
 import CompletionSignOffPDF, { type CompletionPDFData } from '@/components/pdf/CompletionSignOffPDF';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, getTenantEmailBranding, generateCompletionThankYouEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -83,17 +83,19 @@ export async function POST(
       helperName = helpProfile?.full_name || '';
     }
 
-    // ── Fetch branding ───────────────────────────────────────────────────────
-    let companyName = 'Patriot Concrete Cutting';
+    // ── Fetch branding (tenant-scoped; generic fallback — no hardcoded tenant) ──
+    let companyName = 'Your Service Provider';
     let companyAddress = '';
     let companyPhone = '';
 
     try {
-      const { data: branding } = await supabaseAdmin
+      let brandingQuery = supabaseAdmin
         .from('tenant_branding')
-        .select('company_name, support_phone, company_address, company_city, company_state, company_zip')
-        .limit(1)
-        .single();
+        .select('company_name, support_phone, company_address, company_city, company_state, company_zip');
+      brandingQuery = tenantId
+        ? brandingQuery.eq('tenant_id', tenantId)
+        : brandingQuery.limit(1);
+      const { data: branding } = await brandingQuery.single();
       if (branding) {
         companyName = branding.company_name || companyName;
         const addr = [branding.company_address, branding.company_city, branding.company_state, branding.company_zip]
@@ -191,8 +193,10 @@ export async function POST(
     if (customerEmailTrimmed) {
       try {
         const referencePhotos = Array.isArray(reference_photo_urls) ? reference_photo_urls : [];
-        const html = buildThankYouEmailHtml({
-          companyName,
+        const branding = await getTenantEmailBranding(tenantId);
+        const html = await generateCompletionThankYouEmail({
+          variant: 'completion',
+          branding,
           companyPhone,
           jobNumber: job.job_number,
           customerName: job.customer_name,
@@ -231,115 +235,3 @@ export async function POST(
   }
 }
 
-// ──────────────────────────────────────────────────────────────────────────────
-// Branded thank-you email body (used when the operator provides a customer email
-// at sign-off time). Fire-and-forget — we never block the API response on it.
-// ──────────────────────────────────────────────────────────────────────────────
-function buildThankYouEmailHtml(args: {
-  companyName: string;
-  companyPhone: string;
-  jobNumber: string;
-  customerName?: string | null;
-  location?: string | null;
-  scopeOfWork?: string | null;
-  operatorName?: string | null;
-  referencePhotos: string[];
-}): string {
-  const {
-    companyName,
-    companyPhone,
-    jobNumber,
-    customerName,
-    location,
-    scopeOfWork,
-    operatorName,
-    referencePhotos,
-  } = args;
-
-  const escape = (s: string) =>
-    s
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-
-  const photoCells = (referencePhotos || [])
-    .slice(0, 6)
-    .map(
-      (url) =>
-        `<td style="padding:4px;width:33.33%;"><img src="${escape(url)}" alt="Job photo" style="display:block;width:100%;height:auto;border-radius:8px;border:1px solid #e2e8f0;"/></td>`
-    )
-    .join('');
-
-  // Pack into rows of 3
-  const photoRows: string[] = [];
-  if (photoCells) {
-    const cells = (referencePhotos || [])
-      .slice(0, 6)
-      .map(
-        (url) =>
-          `<td style="padding:4px;width:33.33%;vertical-align:top;"><img src="${escape(url)}" alt="Job photo" style="display:block;width:100%;height:auto;border-radius:8px;border:1px solid #e2e8f0;"/></td>`
-      );
-    for (let i = 0; i < cells.length; i += 3) {
-      photoRows.push(`<tr>${cells.slice(i, i + 3).join('')}</tr>`);
-    }
-  }
-
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank you from ${escape(companyName)}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;background-color:#f8fafc;color:#1e293b;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;background-color:#f8fafc;">
-    <tr>
-      <td style="padding:40px 20px;">
-        <table role="presentation" style="max-width:640px;margin:0 auto;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.08);overflow:hidden;">
-          <tr>
-            <td style="background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%);padding:36px 32px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.4px;">Thank you for choosing ${escape(companyName)}</h1>
-              <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">Your job is complete — sign-off attached.</p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:32px;">
-              ${customerName ? `<p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:1.6;">Hi <strong style="color:#0f172a;">${escape(customerName)}</strong>,</p>` : ''}
-              <p style="margin:0 0 20px;color:#475569;font-size:15px;line-height:1.6;">
-                Thank you for trusting us with your concrete cutting work. We&rsquo;ve attached a PDF copy of your signed completion record for your files.
-              </p>
-
-              <table style="width:100%;border-collapse:collapse;background-color:#f8fafc;border-radius:8px;margin:0 0 24px;">
-                <tr><td style="padding:14px 18px;color:#64748b;font-size:13px;border-bottom:1px solid #e2e8f0;">Job #</td><td style="padding:14px 18px;color:#0f172a;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${escape(jobNumber)}</td></tr>
-                ${location ? `<tr><td style="padding:14px 18px;color:#64748b;font-size:13px;border-bottom:1px solid #e2e8f0;">Location</td><td style="padding:14px 18px;color:#0f172a;font-size:14px;font-weight:600;text-align:right;border-bottom:1px solid #e2e8f0;">${escape(location)}</td></tr>` : ''}
-                ${operatorName ? `<tr><td style="padding:14px 18px;color:#64748b;font-size:13px;">Lead operator</td><td style="padding:14px 18px;color:#0f172a;font-size:14px;font-weight:600;text-align:right;">${escape(operatorName)}</td></tr>` : ''}
-              </table>
-
-              ${scopeOfWork ? `<div style="margin:0 0 24px;padding:18px 20px;background-color:#f1f5f9;border-left:3px solid #7c3aed;border-radius:6px;"><p style="margin:0 0 6px;color:#0f172a;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Scope of work</p><p style="margin:0;color:#475569;font-size:14px;line-height:1.6;">${escape(scopeOfWork)}</p></div>` : ''}
-
-              ${photoRows.length ? `<p style="margin:24px 0 8px;color:#0f172a;font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Site photos</p><table style="width:100%;border-collapse:collapse;margin:0 0 24px;">${photoRows.join('')}</table>` : ''}
-
-              <p style="margin:0 0 8px;color:#475569;font-size:14px;line-height:1.6;">
-                If you have any questions about this job or need additional services, please don&rsquo;t hesitate to reach out${companyPhone ? ` at <strong style="color:#0f172a;">${escape(companyPhone)}</strong>` : ''}.
-              </p>
-              <p style="margin:24px 0 0;color:#0f172a;font-size:14px;line-height:1.6;">
-                With appreciation,<br/>
-                <strong>The ${escape(companyName)} Team</strong>
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:20px 32px;text-align:center;border-top:1px solid #e2e8f0;">
-              <p style="margin:0;color:#94a3b8;font-size:12px;">This is an automated message from ${escape(companyName)}. Please do not reply.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-  `;
-}

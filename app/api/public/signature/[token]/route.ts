@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendSMS, formatPhoneNumber } from '@/lib/sms';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, getTenantEmailBranding, generateCustomerSurveyThankYouEmail } from '@/lib/email';
 import { generateAndUploadCompletionPdf } from '@/lib/generate-completion-pdf';
 
 export async function GET(
@@ -400,10 +400,11 @@ export async function POST(
           .then(() => {})
           .catch(() => {});
       } else if (deliveryChannel === 'email' && sendToEmail) {
-        const html = buildSurveyEmailHtml({
+        const branding = await getTenantEmailBranding(job?.tenant_id || null);
+        const html = await generateCustomerSurveyThankYouEmail({
+          branding,
           jobNumber: job?.job_number || '',
           customerName: job?.customer_name || '',
-          companyName: surveyTenantName,
           cleanliness,
           communication,
           likelyAgain,
@@ -528,104 +529,3 @@ function buildSurveySmsMessage({
   return parts.join(' ');
 }
 
-function buildSurveyEmailHtml({
-  jobNumber,
-  customerName,
-  companyName,
-  cleanliness,
-  communication,
-  likelyAgain,
-  notes,
-}: {
-  jobNumber: string;
-  customerName: string;
-  companyName: string;
-  cleanliness: number | null;
-  communication: number | null;
-  likelyAgain: number | null;
-  notes: string | null;
-}): string {
-  const escape = (s: string) =>
-    String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-
-  const ratingRow = (label: string, val: number | null, max: number) =>
-    val
-      ? `<tr>
-          <td style="padding:10px 0;color:#64748b;font-size:14px;border-top:1px solid #e2e8f0;">${label}</td>
-          <td style="padding:10px 0;color:#0f172a;font-size:14px;font-weight:600;text-align:right;border-top:1px solid #e2e8f0;">${val} / ${max}</td>
-        </tr>`
-      : '';
-
-  return `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank you from ${escape(companyName)}</title>
-</head>
-<body style="margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background-color:#f8fafc;color:#1e293b;">
-  <table role="presentation" style="width:100%;border-collapse:collapse;background-color:#f8fafc;">
-    <tr>
-      <td style="padding:48px 20px;">
-        <table role="presentation" style="max-width:600px;margin:0 auto;background-color:#ffffff;border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,0.1);overflow:hidden;">
-          <tr>
-            <td style="background:linear-gradient(135deg,#7c3aed 0%,#4f46e5 100%);padding:40px;text-align:center;">
-              <h1 style="margin:0;color:#ffffff;font-size:24px;font-weight:700;letter-spacing:-0.3px;">
-                Thank you for your feedback
-              </h1>
-              <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">
-                ${escape(companyName)} &middot; Job ${escape(jobNumber)}
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="padding:40px;">
-              <p style="margin:0 0 20px;color:#475569;font-size:16px;line-height:1.6;">
-                ${customerName ? `Hi <strong style="color:#0f172a;">${escape(customerName)}</strong>,` : 'Hi,'}
-              </p>
-              <p style="margin:0 0 24px;color:#475569;font-size:16px;line-height:1.6;">
-                We appreciate you taking a moment to share how we did. Here's a copy of your feedback:
-              </p>
-              <table style="width:100%;border-collapse:collapse;background-color:#f8fafc;border-radius:8px;margin-bottom:24px;">
-                <tr><td style="padding:0 20px;">
-                  <table style="width:100%;border-collapse:collapse;">
-                    ${ratingRow('Cleanliness', cleanliness, 5)}
-                    ${ratingRow('Communication', communication, 5)}
-                    ${ratingRow('Likely to use us again', likelyAgain, 10)}
-                  </table>
-                </td></tr>
-              </table>
-              ${
-                notes
-                  ? `<div style="background-color:#f5f3ff;border-left:3px solid #7c3aed;border-radius:4px;padding:16px 20px;margin-bottom:24px;">
-                      <p style="margin:0 0 6px;color:#5b21b6;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;">Your notes</p>
-                      <p style="margin:0;color:#312e81;font-size:14px;line-height:1.6;white-space:pre-wrap;">${escape(notes)}</p>
-                    </div>`
-                  : ''
-              }
-              <p style="margin:0;color:#475569;font-size:15px;line-height:1.6;">
-                Your comments help us improve every single day. Thank you for trusting ${escape(companyName)}.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:24px 40px;text-align:center;border-top:1px solid #e2e8f0;">
-              <p style="margin:0;color:#64748b;font-size:13px;line-height:1.5;">
-                <strong style="color:#475569;">${escape(companyName)}</strong><br>
-                Licensed &middot; Insured &middot; Professional
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`.trim();
-}

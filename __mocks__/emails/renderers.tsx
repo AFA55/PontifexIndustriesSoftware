@@ -22,6 +22,32 @@ import AccessRequestReceivedEmail, {
 } from '../../emails/AccessRequestReceivedEmail';
 import NotificationEmail, { NotificationEmailProps } from '../../emails/NotificationEmail';
 import PasswordResetEmail, { PasswordResetEmailProps } from '../../emails/PasswordResetEmail';
+import InvoiceEmail, { InvoiceEmailProps } from '../../emails/InvoiceEmail';
+import SignatureRequestEmail, {
+  SignatureRequestEmailProps,
+} from '../../emails/SignatureRequestEmail';
+import CompletionThankYouEmail, {
+  CompletionThankYouEmailProps,
+} from '../../emails/CompletionThankYouEmail';
+import CustomerSurveyThankYouEmail, {
+  CustomerSurveyThankYouEmailProps,
+} from '../../emails/CustomerSurveyThankYouEmail';
+import PortalAccessEmail, { PortalAccessEmailProps } from '../../emails/PortalAccessEmail';
+import SilicaPlanDeliveryEmail, {
+  SilicaPlanDeliveryEmailProps,
+} from '../../emails/SilicaPlanDeliveryEmail';
+import OperatorScheduleEmail, {
+  OperatorScheduleEmailProps,
+} from '../../emails/OperatorScheduleEmail';
+import ClockInReminderEmail, {
+  ClockInReminderEmailProps,
+} from '../../emails/ClockInReminderEmail';
+import SalespersonNotificationEmail, {
+  SalespersonNotificationEmailProps,
+} from '../../emails/SalespersonNotificationEmail';
+import DemoRequestNotificationEmail, {
+  DemoRequestNotificationEmailProps,
+} from '../../emails/DemoRequestNotificationEmail';
 
 const DOCTYPE =
   '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
@@ -51,4 +77,60 @@ export async function renderNotificationEmail(props: NotificationEmailProps): Pr
 
 export async function renderPasswordResetEmail(props: PasswordResetEmailProps): Promise<string> {
   return renderEmailToHtml(<PasswordResetEmail {...props} />);
+}
+
+export async function renderInvoiceEmail(props: InvoiceEmailProps): Promise<string> {
+  return renderEmailToHtml(<InvoiceEmail {...props} />);
+}
+
+export async function renderSignatureRequestEmail(
+  props: SignatureRequestEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<SignatureRequestEmail {...props} />);
+}
+
+export async function renderCompletionThankYouEmail(
+  props: CompletionThankYouEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<CompletionThankYouEmail {...props} />);
+}
+
+export async function renderCustomerSurveyThankYouEmail(
+  props: CustomerSurveyThankYouEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<CustomerSurveyThankYouEmail {...props} />);
+}
+
+export async function renderPortalAccessEmail(props: PortalAccessEmailProps): Promise<string> {
+  return renderEmailToHtml(<PortalAccessEmail {...props} />);
+}
+
+export async function renderSilicaPlanDeliveryEmail(
+  props: SilicaPlanDeliveryEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<SilicaPlanDeliveryEmail {...props} />);
+}
+
+export async function renderOperatorScheduleEmail(
+  props: OperatorScheduleEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<OperatorScheduleEmail {...props} />);
+}
+
+export async function renderClockInReminderEmail(
+  props: ClockInReminderEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<ClockInReminderEmail {...props} />);
+}
+
+export async function renderSalespersonNotificationEmail(
+  props: SalespersonNotificationEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<SalespersonNotificationEmail {...props} />);
+}
+
+export async function renderDemoRequestNotificationEmail(
+  props: DemoRequestNotificationEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<DemoRequestNotificationEmail {...props} />);
 }

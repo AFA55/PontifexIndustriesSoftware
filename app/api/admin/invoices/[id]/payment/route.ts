@@ -10,7 +10,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { Resend } from 'resend';
-import { VERIFIED_EMAIL_DOMAIN, getResendApiKey } from '@/lib/email';
+import {
+  VERIFIED_EMAIL_DOMAIN,
+  getResendApiKey,
+  getTenantEmailBranding,
+  generateInvoiceEmail,
+} from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
@@ -130,51 +135,28 @@ export async function POST(
 
     // Fire-and-forget: send payment receipt email when fully paid
     if (fullyPaid && invoice.customer_email) {
-      // Resolve sender + signoff line from tenant_branding so the email is
-      // white-labeled per tenant. Fall back to env var, then to a generic name.
-      let companyName = 'Your Service Provider';
-      try {
-        const { data: branding } = await supabaseAdmin
-          .from('tenant_branding')
-          .select('company_name')
-          .eq('tenant_id', invoice.tenant_id)
-          .maybeSingle();
-        if (branding?.company_name) companyName = branding.company_name;
-      } catch {
-        // ignore — keep generic fallback
-      }
+      // Resolve white-label branding from the tenant (logo/colors/name) so the
+      // receipt matches the company the customer paid — never hardcoded Patriot.
+      const branding = await getTenantEmailBranding(invoice.tenant_id);
       // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
-      const fromAddress = `${companyName} <noreply@${VERIFIED_EMAIL_DOMAIN}>`;
-      const fmt$ = (n: number) =>
-        new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+      const fromAddress = `${branding.companyName} <noreply@${VERIFIED_EMAIL_DOMAIN}>`;
       const resend = new Resend(getResendApiKey());
+      const html = await generateInvoiceEmail({
+        variant: 'receipt',
+        branding,
+        customerName: invoice.customer_name || '',
+        invoiceNumber: invoice.invoice_number,
+        amountPaid: parsedAmount,
+        paymentDate: resolvedPaymentDate,
+        paymentMethod: payment_method,
+        referenceNumber: reference_number || null,
+      });
       Promise.resolve(
         resend.emails.send({
           from: fromAddress,
           to: invoice.customer_email,
           subject: `Payment Receipt — Invoice ${invoice.invoice_number}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
-              <div style="background: linear-gradient(135deg, #10b981, #059669); padding: 24px; border-radius: 12px 12px 0 0;">
-                <h1 style="color: white; margin: 0; font-size: 24px;">Payment Received</h1>
-                <p style="color: rgba(255,255,255,0.9); margin: 4px 0 0; font-size: 14px;">Thank you for your payment</p>
-              </div>
-              <div style="background: #f8fafc; padding: 24px; border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0;">
-                <p style="margin: 0 0 16px; font-size: 15px;">Hi ${invoice.customer_name || 'Valued Customer'},</p>
-                <p style="margin: 0 0 20px; color: #475569;">We've received your payment and your account is now paid in full.</p>
-                <div style="background: white; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-                  <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="padding: 6px 0; color: #64748b;">Invoice</td><td style="padding: 6px 0; text-align: right; font-weight: bold;">${invoice.invoice_number}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #64748b;">Payment Date</td><td style="padding: 6px 0; text-align: right;">${resolvedPaymentDate}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #64748b;">Payment Method</td><td style="padding: 6px 0; text-align: right; text-transform: capitalize;">${payment_method}${reference_number ? ` · #${reference_number}` : ''}</td></tr>
-                    <tr style="border-top: 1px solid #e2e8f0;"><td style="padding: 10px 0 4px; font-weight: bold; font-size: 15px;">Amount Paid</td><td style="padding: 10px 0 4px; text-align: right; font-weight: bold; font-size: 15px; color: #059669;">${fmt$(parsedAmount)}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #64748b;">Remaining Balance</td><td style="padding: 4px 0; text-align: right; font-weight: bold; color: #059669;">$0.00 — Paid in Full</td></tr>
-                  </table>
-                </div>
-                <p style="margin: 0; color: #64748b; font-size: 13px;">Thank you for choosing ${companyName}. We look forward to working with you again.</p>
-              </div>
-            </div>
-          `,
+          html,
         })
       ).catch(() => {});
     }

@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { sendEmail } from '@/lib/email';
+import { sendEmail, generateDemoRequestNotificationEmail } from '@/lib/email';
 import { requireSuperAdmin } from '@/lib/api-auth';
 
 /** Where new platform-demo leads are sent. These are PONTIFEX software leads (not tenant traffic). */
@@ -83,26 +83,25 @@ export async function POST(request: NextRequest) {
     ).then(() => {}).catch(() => {});
 
     // Fire-and-forget founder notification — a lead should never sit unseen.
-    const esc = (s: string) =>
-      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    // INTERNAL Pontifex alert → stays Pontifex-branded (NOT tenant-scoped).
     Promise.resolve(
-      sendEmail({
-        to: DEMO_LEAD_NOTIFY_EMAIL,
-        subject: `🔔 New demo request: ${company_name.trim()}`,
-        html: `
-          <h2>New demo request</h2>
-          <table style="border-collapse:collapse">
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Name</td><td>${esc(fullName)}</td></tr>
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Company</td><td>${esc(company_name.trim())}</td></tr>
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Email</td><td><a href="mailto:${esc(email.trim())}">${esc(email.trim())}</a></td></tr>
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Phone</td><td>${esc(phone?.trim() || '—')}</td></tr>
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Type</td><td>${esc(company_type || '—')}</td></tr>
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Team size</td><td>${esc(team_size || '—')}</td></tr>
-            <tr><td style="padding:6px 12px 6px 0;color:#666">Challenge</td><td>${esc(biggest_challenge || '—')}</td></tr>
-          </table>
-          <p>View &amp; manage: <a href="https://www.pontifexindustries.com/dashboard/platform/demo-requests">Platform Hub → Demo Requests</a></p>
-        `,
-      })
+      (async () => {
+        const html = await generateDemoRequestNotificationEmail({
+          name: fullName,
+          company: company_name.trim(),
+          email: email.trim(),
+          phone: phone?.trim() || null,
+          tradeType: company_type || null,
+          companySize: team_size || null,
+          message: biggest_challenge || null,
+          manageUrl: 'https://www.pontifexindustries.com/dashboard/platform/demo-requests',
+        });
+        await sendEmail({
+          to: DEMO_LEAD_NOTIFY_EMAIL,
+          subject: `🔔 New demo request: ${company_name.trim()}`,
+          html,
+        });
+      })()
     ).then(() => {}).catch(() => {});
 
     return NextResponse.json({

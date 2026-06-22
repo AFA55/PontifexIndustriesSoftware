@@ -12,7 +12,13 @@ import { requireAuth } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { Resend } from 'resend';
-import { VERIFIED_EMAIL_DOMAIN, getResendApiKey } from '@/lib/email';
+import {
+  VERIFIED_EMAIL_DOMAIN,
+  getResendApiKey,
+  getTenantEmailBranding,
+  generateCompletionThankYouEmail,
+} from '@/lib/email';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -136,47 +142,31 @@ export async function POST(request: NextRequest) {
     console.log('[LIABILITY PDF] Sending email to:', customerEmail);
 
     try {
-      const emailCompanyName = (pdfBranding.company_name as string) || 'Pontifex Industries';
-      const emailPhone = (pdfBranding.support_phone as string) || '(833) 695-4288';
-      const emailSupportAddr = (pdfBranding.support_email as string) || 'support@pontifexindustries.com';
+      // White-label branding (logo/colors/name) from the job's tenant — never a
+      // hardcoded Patriot/Pontifex. Fall back to the platform default on lookup miss.
+      const liabilityTenantId = await getTenantId(auth.userId);
+      const branding = await getTenantEmailBranding(liabilityTenantId);
+      const emailCompanyName = branding.companyName;
+      const emailPhone = (pdfBranding.support_phone as string) || null;
+      const emailSupportAddr = (pdfBranding.support_email as string) || null;
       const resend = new Resend(getResendApiKey());
+      const html = await generateCompletionThankYouEmail({
+        variant: 'liability',
+        branding,
+        jobNumber: jobNumber || jobId,
+        customerName,
+        location: jobAddress || 'N/A',
+        operatorName,
+        companyPhone: emailPhone,
+        supportEmail: emailSupportAddr,
+        signedDate: new Date().toLocaleDateString(),
+      });
       const emailResult = await resend.emails.send({
         // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
         from: `${emailCompanyName} <noreply@${VERIFIED_EMAIL_DOMAIN}>`,
         to: customerEmail,
         subject: `Liability Release - Job #${jobNumber || jobId}`,
-        html: `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #EA580C;">${emailCompanyName}</h1>
-            <h2 style="color: #334155;">Liability Release & Indemnification</h2>
-
-            <p>Dear ${customerName},</p>
-
-            <p>Thank you for working with ${emailCompanyName}. This email confirms that the Liability Release & Indemnification agreement has been signed for:</p>
-
-            <div style="background: #F1F5F9; padding: 16px; border-radius: 8px; margin: 20px 0;">
-              <p style="margin: 4px 0;"><strong>Job Number:</strong> ${jobNumber || jobId}</p>
-              <p style="margin: 4px 0;"><strong>Location:</strong> ${jobAddress || 'N/A'}</p>
-              <p style="margin: 4px 0;"><strong>Operator:</strong> ${operatorName}</p>
-              <p style="margin: 4px 0;"><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
-            </div>
-
-            <p>Please find the signed liability release document attached to this email for your records.</p>
-
-            <p>If you have any questions or concerns, please don't hesitate to contact us:</p>
-
-            <div style="margin: 20px 0;">
-              <p style="margin: 4px 0;"><strong>Phone:</strong> ${emailPhone}</p>
-              <p style="margin: 4px 0;"><strong>Email:</strong> ${emailSupportAddr}</p>
-            </div>
-
-            <p>Thank you for choosing ${emailCompanyName}.</p>
-
-            <p style="margin-top: 30px; color: #64748B; font-size: 14px;">
-              This is an automated message. Please do not reply to this email.
-            </p>
-          </div>
-        `,
+        html,
         attachments: [
           {
             filename: `Liability_Release_${jobNumber || jobId}_${new Date().toISOString().split('T')[0]}.pdf`,

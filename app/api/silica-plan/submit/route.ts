@@ -9,7 +9,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { Resend } from 'resend';
-import { DEFAULT_EMAIL_FROM, getResendApiKey } from '@/lib/email';
+import {
+  DEFAULT_EMAIL_FROM,
+  getResendApiKey,
+  getTenantEmailBranding,
+  generateSilicaPlanDeliveryEmail,
+} from '@/lib/email';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,20 +66,19 @@ export async function POST(request: NextRequest) {
       // VERIFIED Resend domain — do not use RESEND_FROM_EMAIL (was misconfigured to the unverified root).
       const fromAddress = DEFAULT_EMAIL_FROM;
       try {
+        // White-labeled from the caller's tenant — never hardcoded Patriot.
+        const tenantId = await getTenantId(auth.userId);
+        const branding = await getTenantEmailBranding(tenantId);
+        const html = await generateSilicaPlanDeliveryEmail({
+          branding,
+          jobNumber: String(jobId),
+        });
         const resend = new Resend(getResendApiKey());
         await resend.emails.send({
           from: fromAddress,
           to: customerEmail,
           subject: `Silica Exposure Control Plan — Job #${jobId}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #1e293b;">
-              <h2 style="color: #0f172a;">Silica Exposure Control Plan</h2>
-              <p>Please find attached the Silica Exposure Control Plan for your job.</p>
-              <p>This document outlines the safety measures and dust control procedures in place to protect workers and comply with OSHA silica regulations.</p>
-              <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-              <p style="color: #64748b; font-size: 13px;">Patriot Concrete Cutting<br/>Questions? Contact us at your project manager's number.</p>
-            </div>
-          `,
+          html,
           attachments: [
             {
               filename: `Silica_Plan_Job_${jobId}.pdf`,
