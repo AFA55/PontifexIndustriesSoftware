@@ -38,6 +38,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A REMOTE clock-out is verified by its photo, so a real uploaded photo path
+    // is required. Reject empty AND the legacy 'photo-upload-failed' sentinel.
+    if (isRemoteOut && (!clock_out_photo_url || clock_out_photo_url === 'photo-upload-failed')) {
+      return NextResponse.json(
+        { error: 'A photo is required for a remote clock-out. Please retake the photo and try again.' },
+        { status: 400 }
+      );
+    }
+
     // Rate limit: reject if last clock-out was < 60 seconds ago
     const { data: recentOut } = await supabaseAdmin
       .from('timecards')
@@ -326,7 +335,7 @@ export async function POST(request: NextRequest) {
         clock_out_longitude: typeof longitude === 'number' ? longitude : null,
         clock_out_accuracy: accuracy || null,
         clock_out_method: clock_out_method || 'gps',
-        clock_out_photo_url: clock_out_photo_url || null,
+        clock_out_photo_url: (clock_out_photo_url && clock_out_photo_url !== 'photo-upload-failed') ? clock_out_photo_url : null,
         clock_out_outside_radius: clockedOutOutsideRadius,
         nfc_tag_uid: nfc_tag_uid || null,
         nfc_tag_id: nfc_tag_id || null,
@@ -359,12 +368,53 @@ export async function POST(request: NextRequest) {
     console.log(`Clock out: ${profileForName?.full_name || auth.userEmail} at ${now.toLocaleTimeString()}, ${totalHours.toFixed(2)} hrs`);
 
     // Out-of-radius or remote clock-out → notify admins/ops to review & approve (fire-and-forget).
+    // For an OUT-OF-RADIUS clock-out we also auto-create an edit-time (correction)
+    // request so the admin can fix the recorded time through the standard
+    // corrections approval flow. The request is marked metadata.source =
+    // 'auto_out_of_radius' so that flow can distinguish auto-flagged vs.
+    // worker-submitted requests.
     if (needsClockOutReview && auth.tenantId) {
       Promise.resolve((async () => {
         const who = profileForName?.full_name || auth.userEmail || 'An employee';
         const reason = clockedOutOutsideRadius
           ? `clocked out ${locationCheck.distanceFormatted} from ${shopName} — outside the allowed radius`
           : 'submitted a remote clock-out (photo)';
+
+        // Auto-create a correction request ONLY for the out-of-radius case
+        // (the existing remote-photo review path is handled by remote-verify).
+        let correctionRequestId: string | null = null;
+        if (clockedOutOutsideRadius) {
+          // Dedup: skip if a pending auto_out_of_radius request already exists
+          // for this timecard.
+          const { data: existingCorrections } = await supabaseAdmin
+            .from('timecard_correction_requests')
+            .select('id, metadata')
+            .eq('timecard_id', updatedTimecard.id)
+            .eq('status', 'pending');
+
+          const hasAuto = (existingCorrections || []).some(
+            (c: { metadata: Record<string, unknown> | null }) =>
+              c.metadata?.source === 'auto_out_of_radius'
+          );
+
+          if (!hasAuto) {
+            const { data: inserted } = await supabaseAdmin
+              .from('timecard_correction_requests')
+              .insert({
+                tenant_id: auth.tenantId,
+                timecard_id: updatedTimecard.id,
+                requested_by: auth.userId,
+                requested_clock_out: now.toISOString(),
+                reason: `Auto-flagged: clocked out ${locationCheck.distanceFormatted} from ${shopName} (outside radius)`,
+                status: 'pending',
+                metadata: { source: 'auto_out_of_radius' },
+              })
+              .select('id')
+              .single();
+            correctionRequestId = inserted?.id ?? null;
+          }
+        }
+
         const { data: admins } = await supabaseAdmin
           .from('profiles')
           .select('id')
@@ -380,9 +430,15 @@ export async function POST(request: NextRequest) {
               tenant_id: auth.tenantId,
               related_entity_type: 'timecard',
               related_entity_id: updatedTimecard.id,
-              action_url: `/dashboard/admin/timecards/operator/${auth.userId}`,
+              // Deep-link to the corrections approval page (where the auto
+              // correction request now lives) instead of the operator detail.
+              action_url: '/dashboard/admin/timecards/corrections',
               read: false,
               is_read: false,
+              metadata: {
+                timecard_id: updatedTimecard.id,
+                ...(correctionRequestId ? { correction_request_id: correctionRequestId } : {}),
+              },
             }))
           );
         }

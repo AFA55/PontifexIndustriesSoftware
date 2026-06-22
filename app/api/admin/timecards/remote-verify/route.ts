@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       .from('timecards')
       .select(`
         id, user_id, clock_in_time, date,
-        remote_photo_url, remote_verified, clock_in_method,
+        remote_photo_url, clock_out_photo_url, remote_verified, clock_in_method,
         is_shop_hours, hour_type,
         clock_in_latitude, clock_in_longitude, clock_in_accuracy,
         requires_approval, approval_note
@@ -99,14 +99,31 @@ export async function GET(request: NextRequest) {
     const nameMap: Record<string, string> = {};
     (profiles || []).forEach(p => { nameMap[p.id] = p.full_name; });
 
-    const enriched = (data || []).map(t => ({
+    // timecard-photos is a PRIVATE bucket, so the stored *_photo_url values are
+    // storage PATHS (e.g. "<tenant>/<user>/<ts>.jpg"), not viewable URLs. Mint a
+    // short-lived (1 hr) signed URL for each real path. Legacy rows hold the
+    // 'photo-upload-failed' sentinel or a full http(s) public URL — leave those
+    // alone (the UI hardens the sentinel to a placeholder).
+    const signPath = async (val: string | null): Promise<string | null> => {
+      if (!val) return null;
+      if (val === 'photo-upload-failed') return null;
+      if (val.startsWith('http://') || val.startsWith('https://')) return null;
+      const { data: signed } = await supabaseAdmin.storage
+        .from('timecard-photos')
+        .createSignedUrl(val, 3600);
+      return signed?.signedUrl ?? null;
+    };
+
+    const enriched = await Promise.all((data || []).map(async t => ({
       ...t,
       employee_name: nameMap[t.user_id] || 'Unknown',
       is_gps_remote: t.clock_in_method === 'gps_remote',
+      remote_photo_signed_url: await signPath(t.remote_photo_url),
+      clock_out_photo_signed_url: await signPath(t.clock_out_photo_url),
       maps_url: (t.clock_in_latitude && t.clock_in_longitude)
         ? `https://maps.google.com/maps?q=${t.clock_in_latitude},${t.clock_in_longitude}`
         : null,
-    }));
+    })));
 
     return NextResponse.json({ success: true, data: enriched });
   } catch (error) {

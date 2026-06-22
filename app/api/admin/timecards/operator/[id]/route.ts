@@ -89,7 +89,7 @@ export async function GET(
     // Also fetch from the base timecards table for extra columns (segments, admin_notes, entry_type, etc.)
     let baseQuery = supabaseAdmin
       .from('timecards')
-      .select('id, segments, admin_notes, employee_notes, entry_type, break_minutes, coworkers, clock_in_gps_lat, clock_in_gps_lng, clock_out_gps_lat, clock_out_gps_lng, nfc_clock_in, nfc_clock_out, edited_by, rejected_by, rejected_at, is_late, late_minutes, scheduled_start_time')
+      .select('id, segments, admin_notes, employee_notes, entry_type, break_minutes, coworkers, clock_in_gps_lat, clock_in_gps_lng, clock_out_gps_lat, clock_out_gps_lng, nfc_clock_in, nfc_clock_out, edited_by, rejected_by, rejected_at, is_late, late_minutes, scheduled_start_time, remote_photo_url, clock_out_photo_url')
       .eq('user_id', operatorId)
       .gte('date', startDateStr)
       .lte('date', endDateStr);
@@ -119,6 +119,9 @@ export async function GET(
         is_late: (base as any).is_late ?? false,
         late_minutes: (base as any).late_minutes ?? 0,
         scheduled_start_time: (base as any).scheduled_start_time ?? null,
+        // Prefer the base-table photo columns (the view only exposes remote_photo_url).
+        remote_photo_url: (base as any).remote_photo_url ?? entry.remote_photo_url ?? null,
+        clock_out_photo_url: (base as any).clock_out_photo_url ?? null,
       };
     });
 
@@ -289,15 +292,32 @@ export async function GET(
     const approvedCount = enrichedEntries.filter((e: any) => e.is_approved).length;
     const pendingCount = enrichedEntries.filter((e: any) => !e.is_approved).length;
 
-    // 7. Attach GPS logs and coworkers to each entry
-    const finalEntries = enrichedEntries.map((entry: any) => {
+    // 7. Attach GPS logs and coworkers to each entry.
+    // timecard-photos is a PRIVATE bucket, so the stored *_photo_url values are
+    // storage PATHS (e.g. "<tenant>/<user>/<ts>.jpg"), not viewable URLs. Mint a
+    // short-lived (1 hr) signed URL for each real path. Legacy rows hold the
+    // 'photo-upload-failed' sentinel or a full http(s) public URL — leave those
+    // alone (the UI hardens the sentinel/null to a "No photo" placeholder).
+    const signTimecardPhoto = async (val: string | null | undefined): Promise<string | null> => {
+      if (!val) return null;
+      if (val === 'photo-upload-failed') return null;
+      if (val.startsWith('http://') || val.startsWith('https://')) return null;
+      const { data: signed } = await supabaseAdmin.storage
+        .from('timecard-photos')
+        .createSignedUrl(val, 3600);
+      return signed?.signedUrl ?? null;
+    };
+
+    const finalEntries = await Promise.all(enrichedEntries.map(async (entry: any) => {
       const jobKey = `${entry.job_order_id}_${entry.date}`;
       return {
         ...entry,
         gps_logs: gpsLogsByTimecard[entry.id] || [],
         found_coworkers: coworkersByJob[jobKey] || [],
+        remote_photo_signed_url: await signTimecardPhoto(entry.remote_photo_url),
+        clock_out_photo_signed_url: await signTimecardPhoto(entry.clock_out_photo_url),
       };
-    });
+    }));
 
     // Determine overall week status
     const hasActive = enrichedEntries.some((e: any) => !e.clock_out_time);

@@ -80,6 +80,10 @@ interface TimecardEntry {
   remote_verified: boolean | null;
   remote_photo_url: string | null;
   clock_out_photo_url: string | null;
+  // Short-lived signed URLs minted server-side for the PRIVATE timecard-photos
+  // bucket. Render these (NOT the raw *_photo_url path, which is not viewable).
+  remote_photo_signed_url: string | null;
+  clock_out_photo_signed_url: string | null;
   clock_out_outside_radius: boolean | null;
   clock_out_verified: boolean | null;
   job_order_id: string | null;
@@ -2048,26 +2052,28 @@ function OperatorTimecardDetailPageInner() {
                             </div>
                           )}
 
-                          {/* Verification photos — clock-in selfie + clock-out photo */}
-                          {((entry.remote_photo_url && entry.remote_photo_url !== 'photo-upload-failed') ||
-                            (entry.clock_out_photo_url && entry.clock_out_photo_url !== 'photo-upload-failed')) && (
+                          {/* Verification photos — clock-in selfie + clock-out photo.
+                              Render the server-minted signed URLs only; legacy rows
+                              (sentinel / raw private path / null) have no signed URL
+                              and are simply not shown. */}
+                          {(entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) && (
                             <div className="mt-2 px-2 py-1.5 bg-gray-50 dark:bg-white/5 rounded-md border border-gray-200 dark:border-white/10">
                               <div className="flex items-center gap-1.5 mb-1.5">
                                 <Camera size={10} className="text-gray-400 dark:text-slate-500" />
                                 <span className="text-[9px] font-bold text-gray-500 dark:text-slate-400 uppercase">Verification Photos</span>
                               </div>
                               <div className="flex gap-3">
-                                {entry.remote_photo_url && entry.remote_photo_url !== 'photo-upload-failed' && (
-                                  <a href={entry.remote_photo_url} target="_blank" rel="noopener noreferrer" className="block">
+                                {entry.remote_photo_signed_url && (
+                                  <a href={entry.remote_photo_signed_url} target="_blank" rel="noopener noreferrer" className="block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={entry.remote_photo_url} alt="Clock-in photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-white/10" />
+                                    <img src={entry.remote_photo_signed_url} alt="Clock-in photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-white/10" />
                                     <span className="text-[8px] text-gray-400 dark:text-slate-500 block text-center mt-0.5">Clock-in</span>
                                   </a>
                                 )}
-                                {entry.clock_out_photo_url && entry.clock_out_photo_url !== 'photo-upload-failed' && (
-                                  <a href={entry.clock_out_photo_url} target="_blank" rel="noopener noreferrer" className="block">
+                                {entry.clock_out_photo_signed_url && (
+                                  <a href={entry.clock_out_photo_signed_url} target="_blank" rel="noopener noreferrer" className="block">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img src={entry.clock_out_photo_url} alt="Clock-out photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-white/10" />
+                                    <img src={entry.clock_out_photo_signed_url} alt="Clock-out photo" className="w-20 h-20 object-cover rounded-lg border border-gray-200 dark:border-white/10" />
                                     <span className="text-[8px] text-gray-400 dark:text-slate-500 block text-center mt-0.5">Clock-out</span>
                                   </a>
                                 )}

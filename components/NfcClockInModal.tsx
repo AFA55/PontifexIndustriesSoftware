@@ -73,6 +73,35 @@ function isNearShop(lat: number, lng: number): boolean {
   return distM <= SHOP_RADIUS_M;
 }
 
+/**
+ * Uploads a clock-in/out selfie to the PRIVATE timecard-photos bucket via the
+ * server-side route and returns the storage PATH. Throws on any failure so the
+ * caller aborts the clock-in/out instead of writing a sentinel — a missing photo
+ * is never silently swallowed.
+ */
+async function uploadTimecardPhoto(file: File): Promise<string> {
+  const { supabase } = await import('@/lib/supabase');
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.access_token) {
+    throw new Error('Your session expired. Please sign in again.');
+  }
+
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  const res = await fetch('/api/timecard/photo-upload', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    body: formData,
+  });
+
+  const result = await res.json().catch(() => ({}));
+  if (!res.ok || !result?.path) {
+    throw new Error(result?.error || 'Photo upload failed. Please try again.');
+  }
+  return result.path as string;
+}
+
 function distanceFromShopFt(lat: number, lng: number): number {
   return calculateDistance(lat, lng, SHOP_LAT, SHOP_LNG) * 3.28084;
 }
@@ -250,27 +279,18 @@ export default function NfcClockInModal({
     setFlow('processing');
     setGlobalError(null);
     try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: { session } } = await supabase.auth.getSession();
-
-      // Upload photo
-      const path = `remote-clockin/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { error: uploadErr } = await supabase.storage
-        .from('timecard-photos')
-        .upload(path, photoFile, { contentType: photoFile.type });
-
-      let photoUrl = '';
-      if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from('timecard-photos').getPublicUrl(path);
-        photoUrl = publicUrl;
-      }
+      // Upload the selfie server-side to the PRIVATE timecard-photos bucket.
+      // The route returns a storage PATH (not a public URL); admins view it via
+      // a short-lived signed URL. If the upload fails we ABORT the clock-in and
+      // surface the error — we never write a 'photo-upload-failed' sentinel.
+      const photoPath = await uploadTimecardPhoto(photoFile);
 
       // Delegate entirely to the parent callback — it owns the API call.
       // Passing null coords when GPS was unavailable; the backend accepts null
       // for remote/gps_remote methods and will flag for admin review.
       await onClockIn({
         method: 'remote',
-        remote_photo_url: photoUrl || 'photo-upload-failed',
+        remote_photo_url: photoPath,
         latitude: jobsiteCoords?.latitude ?? 0,
         longitude: jobsiteCoords?.longitude ?? 0,
         accuracy: jobsiteCoords?.accuracy,
@@ -308,21 +328,12 @@ export default function NfcClockInModal({
     setFlow('processing');
     setGlobalError(null);
     try {
-      const { supabase } = await import('@/lib/supabase');
-      const path = `remote-clockout/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
-      const { error: uploadErr } = await supabase.storage
-        .from('timecard-photos')
-        .upload(path, photoFile, { contentType: photoFile.type });
-
-      let photoUrl = '';
-      if (!uploadErr) {
-        const { data: { publicUrl } } = supabase.storage.from('timecard-photos').getPublicUrl(path);
-        photoUrl = publicUrl;
-      }
+      // Same server-side private upload as remote clock-in. Abort on failure.
+      const photoPath = await uploadTimecardPhoto(photoFile);
 
       await onClockOut({
         method: 'remote',
-        clock_out_photo_url: photoUrl || 'photo-upload-failed',
+        clock_out_photo_url: photoPath,
         latitude: jobsiteCoords?.latitude ?? 0,
         longitude: jobsiteCoords?.longitude ?? 0,
         accuracy: jobsiteCoords?.accuracy,

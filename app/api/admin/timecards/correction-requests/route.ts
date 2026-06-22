@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
         reviewed_at,
         reviewer_notes,
         created_at,
+        metadata,
         timecards!timecard_id (
           date,
           clock_in_time,
@@ -136,6 +137,9 @@ export async function GET(request: NextRequest) {
         reviewed_at: row.reviewed_at,
         reviewer_notes: row.reviewer_notes,
         created_at: row.created_at,
+        metadata: row.metadata ?? null,
+        // Convenience flag for the UI: auto-flagged (out-of-radius) vs. worker-submitted.
+        is_auto: row.metadata?.source === 'auto_out_of_radius',
       };
     });
 

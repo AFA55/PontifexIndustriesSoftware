@@ -222,9 +222,12 @@ export async function POST(request: NextRequest) {
         );
       }
     } else if (clock_in_method === 'remote') {
-      if (!remote_photo_url) {
+      // Require a real uploaded photo path. Reject empty AND the legacy
+      // 'photo-upload-failed' sentinel (which used to be written when the
+      // client-side upload to a non-existent bucket silently failed).
+      if (!remote_photo_url || remote_photo_url === 'photo-upload-failed') {
         return NextResponse.json(
-          { error: 'A selfie photo is required for remote clock-in.' },
+          { error: 'A selfie photo is required for remote clock-in. Please retake the photo and try again.' },
           { status: 400 }
         );
       }
@@ -370,7 +373,7 @@ export async function POST(request: NextRequest) {
       nfc_tag_id: nfc_tag_id || null,
       nfc_tag_uid: nfc_tag_uid || null,
       nfc_tag_serial: nfc_tag_serial || null,
-      remote_photo_url: remote_photo_url || null,
+      remote_photo_url: (remote_photo_url && remote_photo_url !== 'photo-upload-failed') ? remote_photo_url : null,
       requires_approval: needsApproval,
       work_location,
     };

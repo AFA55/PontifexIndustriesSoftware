@@ -41,6 +41,9 @@ interface CorrectionRequest {
   remote_photo_url: string | null;
   clock_out_distance_meters: number | null;
   clock_out_distance_formatted: string | null;
+  // Auto-flagged out-of-radius requests carry metadata.source = 'auto_out_of_radius'.
+  metadata?: Record<string, unknown> | null;
+  is_auto?: boolean;
 }
 
 // Remote clock-in entry from /api/admin/timecards/remote-verify GET
@@ -52,6 +55,10 @@ interface RemoteClockIn {
   clock_in_time: string; // ISO timestamp
   clock_in_method: string;
   remote_photo_url: string | null;
+  // Short-lived signed URLs minted server-side for the PRIVATE timecard-photos
+  // bucket. Render these (NOT the raw *_photo_url path, which is not viewable).
+  remote_photo_signed_url: string | null;
+  clock_out_photo_signed_url: string | null;
   clock_in_latitude: number | null;
   clock_in_longitude: number | null;
   clock_in_accuracy: number | null;
@@ -514,11 +521,14 @@ export default function TimecardCorrectionsPage() {
                       </span>
                     </div>
 
-                    {/* Selfie photo */}
+                    {/* Selfie photo — render the server-minted signed URL only.
+                        Legacy rows have the 'photo-upload-failed' sentinel or a
+                        raw private path (no signed URL) → fall through to the
+                        "No photo" placeholder instead of a broken <img>. */}
                     <div className="mb-4">
-                      {entry.remote_photo_url ? (
+                      {(entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) ? (
                         <img
-                          src={entry.remote_photo_url}
+                          src={(entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) as string}
                           alt={`${entry.employee_name} clock-in selfie`}
                           className="w-28 h-28 object-cover rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5"
                         />
