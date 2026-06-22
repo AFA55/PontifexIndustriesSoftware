@@ -15,7 +15,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
 import OperatorRow from './_components/OperatorRow';
 import Toast from './_components/Toast';
-import NotificationBell from './_components/NotificationBell';
+import NotificationBell from '@/components/NotificationBell';
 import type { QuickAddData } from './_components/QuickAddModal';
 import ScheduleDatePicker from './_components/ScheduleDatePicker';
 import DailyNotesSection from './_components/DailyNotesSection';
@@ -1684,7 +1684,7 @@ export default function ScheduleBoardPage() {
                 wraps neatly instead of collapsing to icon-only buttons. */}
             <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end flex-wrap">
               {/* Notification bell for all users */}
-              <NotificationBell />
+              <NotificationBell variant="light" />
 
               {canEdit && (
                 <button onClick={() => setShowPendingQueue(true)} className="relative h-9 px-3 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg text-orange-700 text-sm font-semibold transition-all flex items-center gap-1.5">
