@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { recomputeLateForEdit } from '@/lib/timecard-start';
 
 // Fetch timecard settings for a tenant (night_shift_multiplier, weekly_ot_threshold_hours, etc.)
 async function fetchSettings(tenantId: string | null) {
@@ -280,6 +281,33 @@ export async function PUT(
 
     if (clock_in_time) updateData.clock_in_time = clock_in_time;
     if (clock_out_time !== undefined) updateData.clock_out_time = clock_out_time;
+
+    // Recompute the late flag whenever the clock-in time is edited (tenant-tz aware,
+    // strict `>` grace, the timecard's OWN date). Notification-free — no re-alert.
+    if (clock_in_time) {
+      try {
+        const { data: operator } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('id', existingTimecard.user_id)
+          .maybeSingle();
+        const late = await recomputeLateForEdit({
+          supabaseAdmin,
+          tenantId,
+          operatorId: existingTimecard.user_id as string,
+          role: operator?.role ?? null,
+          clockInIso: new Date(clock_in_time).toISOString(),
+          localDate: existingTimecard.date as string,
+          isShopHours: existingTimecard.is_shop_hours === true,
+        });
+        updateData.is_late = late.is_late;
+        updateData.late_minutes = late.late_minutes;
+        updateData.scheduled_start_time = late.scheduled_start_time;
+        updateData.late_source = late.late_source;
+      } catch {
+        // Late recompute is non-critical; never block the edit.
+      }
+    }
     if (notes !== undefined) updateData.notes = notes;
     if (total_hours !== null) updateData.total_hours = total_hours;
     if (typeof is_shop_hours === 'boolean') updateData.is_shop_hours = is_shop_hours;

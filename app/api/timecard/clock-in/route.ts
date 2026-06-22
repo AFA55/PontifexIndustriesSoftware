@@ -23,7 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS, ShopOverride } from '@/lib/geolocation';
-import { resolveEffectiveStart } from '@/lib/timecard-start';
+import { resolveEffectiveStart, computeLate } from '@/lib/timecard-start';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
@@ -474,26 +474,19 @@ export async function POST(request: NextRequest) {
         const job = eff.job;
 
         if (expectedTimeStr) {
-          const [hours, minutes] = expectedTimeStr.split(':').map(Number);
-          // Resolve the expected-arrival INSTANT for today's tenant-local date at
-          // HH:MM in the tenant's timezone. A naive `new Date().setHours()` uses
-          // the server tz (UTC on Vercel) and would mis-flag on-time operators by
-          // the whole tz offset (e.g. ~4-5h for America/New_York).
-          const pad = (n: number) => String(n).padStart(2, '0');
-          const wallUtcMs = Date.parse(`${todayDate}T${pad(hours)}:${pad(minutes)}:00Z`);
-          const parts = new Intl.DateTimeFormat('en-US', {
-            timeZone: tenantTz, hourCycle: 'h23',
-            year: 'numeric', month: '2-digit', day: '2-digit',
-            hour: '2-digit', minute: '2-digit', second: '2-digit',
-          }).formatToParts(new Date(wallUtcMs));
-          const tp: Record<string, string> = {};
-          for (const p of parts) { if (p.type !== 'literal') tp[p.type] = p.value; }
-          const seenAsTzMs = Date.UTC(+tp.year, +tp.month - 1, +tp.day, +tp.hour, +tp.minute, +tp.second);
-          const expectedMs = wallUtcMs - (seenAsTzMs - wallUtcMs);
+          // Shared late computation (tenant-tz aware, strict `>` grace). Identical
+          // logic is used by the admin edit routes so a corrected time recomputes
+          // the same way the original clock-in did.
+          const late = computeLate({
+            clockInIso: now.toISOString(),
+            effectiveStart: { startTime: eff.startTime, source: eff.source },
+            graceMinutes,
+            tenantTz,
+            localDate: todayDate,
+          });
+          const lateMinutes = late.lateMinutes;
 
-          const lateMinutes = Math.floor((now.getTime() - expectedMs) / 60000);
-
-          if (lateMinutes >= graceMinutes) {
+          if (late.isLate) {
             // Mark the timecard as late
             await supabaseAdmin
               .from('timecards')

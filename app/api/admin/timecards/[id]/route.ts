@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { recomputeLateForEdit } from '@/lib/timecard-start';
 
 export async function GET(
   request: NextRequest,
@@ -134,7 +135,7 @@ export async function PATCH(
     // Fetch existing record so we can recalculate hours and check late status
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('timecards')
-      .select('clock_in_time, clock_out_time, break_minutes, is_late, scheduled_start_time')
+      .select('user_id, clock_in_time, clock_out_time, break_minutes, is_late, scheduled_start_time, date, is_shop_hours')
       .eq('id', timecardId)
       .eq('tenant_id', tenantId)
       .single();
@@ -162,10 +163,34 @@ export async function PATCH(
       updates.total_hours = Math.max(0, rawHours - breakHours);
     }
 
-    // Clear late flags if admin corrects clock-in time (assume the correction makes it on-time)
-    if (clock_in_time && existing.is_late) {
-      updates.is_late = false;
-      updates.late_minutes = 0;
+    // Recompute the late flag whenever the clock-in time is corrected. Do NOT blindly
+    // clear it — a correction to a still-late time must stay flagged (founder bug:
+    // "I edited their time but it still says late" — and its inverse). Late =
+    // clock-in STRICTLY more than the configurable grace past the resolved start,
+    // computed in the tenant's tz using the timecard's OWN date. Notification-free.
+    if (clock_in_time) {
+      try {
+        const { data: operator } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('id', existing.user_id)
+          .maybeSingle();
+        const late = await recomputeLateForEdit({
+          supabaseAdmin,
+          tenantId: tenantId || '',
+          operatorId: existing.user_id,
+          role: operator?.role ?? null,
+          clockInIso: new Date(clock_in_time).toISOString(),
+          localDate: existing.date,
+          isShopHours: existing.is_shop_hours === true,
+        });
+        updates.is_late = late.is_late;
+        updates.late_minutes = late.late_minutes;
+        updates.scheduled_start_time = late.scheduled_start_time;
+        updates.late_source = late.late_source;
+      } catch {
+        // Late recompute is non-critical; never block the correction.
+      }
     }
 
     const { data, error: updateError } = await supabaseAdmin

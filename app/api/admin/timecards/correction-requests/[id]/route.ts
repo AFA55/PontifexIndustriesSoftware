@@ -29,6 +29,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { parseYMDLocal } from '@/lib/dates';
+import { recomputeLateForEdit } from '@/lib/timecard-start';
 
 export async function PATCH(
   request: NextRequest,
@@ -83,7 +84,9 @@ export async function PATCH(
         status,
         timecards!timecard_id (
           id,
+          user_id,
           date,
+          is_shop_hours,
           clock_in_time,
           clock_out_time,
           lunch_duration_minutes
@@ -195,6 +198,34 @@ export async function PATCH(
         timecardUpdate.clock_out_time = correction.requested_clock_out;
       }
       if (newTotalHours !== null) timecardUpdate.total_hours = newTotalHours;
+
+      // Recompute the late flag whenever the clock-in time is being changed (works
+      // the same regardless of correction source — auto out-of-radius or manual).
+      // Tenant-tz aware, strict `>` grace, the timecard's OWN date. Notification-free.
+      if (timecardUpdate.clock_in_time !== undefined && timecardUpdate.clock_in_time) {
+        try {
+          const { data: operator } = await supabaseAdmin
+            .from('profiles')
+            .select('role')
+            .eq('id', timecard.user_id)
+            .maybeSingle();
+          const late = await recomputeLateForEdit({
+            supabaseAdmin,
+            tenantId,
+            operatorId: timecard.user_id,
+            role: operator?.role ?? null,
+            clockInIso: new Date(timecardUpdate.clock_in_time as string).toISOString(),
+            localDate: timecard.date,
+            isShopHours: timecard.is_shop_hours === true,
+          });
+          timecardUpdate.is_late = late.is_late;
+          timecardUpdate.late_minutes = late.late_minutes;
+          timecardUpdate.scheduled_start_time = late.scheduled_start_time;
+          timecardUpdate.late_source = late.late_source;
+        } catch {
+          // Late recompute is non-critical; never block the approval.
+        }
+      }
 
       if (Object.keys(timecardUpdate).length > 0) {
         const { error: timecardUpdateError } = await supabaseAdmin

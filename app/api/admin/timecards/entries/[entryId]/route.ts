@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import type { PayCategory } from '@/lib/pay-calculator';
+import { recomputeLateForEdit } from '@/lib/timecard-start';
 
 const VALID_PAY_CATEGORIES: PayCategory[] = ['regular', 'night_shift', 'shop', 'overtime'];
 
@@ -150,7 +151,7 @@ export async function PATCH(
     // Fall back to legacy timecards table
     const { data: legacyRow } = await supabaseAdmin
       .from('timecards')
-      .select('id, tenant_id, clock_in_time, clock_out_time')
+      .select('id, tenant_id, user_id, date, is_shop_hours, clock_in_time, clock_out_time')
       .eq('id', entryId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
@@ -232,6 +233,34 @@ export async function PATCH(
         effectiveTotal = existingHours?.total_hours ?? 0;
       }
       updates.night_shift_premium_hours = is_night_shift ? effectiveTotal : 0;
+    }
+
+    // Recompute the late flag whenever the clock-in time changed (legacy timecards
+    // table only — the new timecard_entries table has no late columns). Tenant-tz
+    // aware, strict `>` grace, the timecard's OWN date. Notification-free.
+    if (clock_in !== undefined && clock_in) {
+      try {
+        const { data: operator } = await supabaseAdmin
+          .from('profiles')
+          .select('role')
+          .eq('id', legacyRow.user_id)
+          .maybeSingle();
+        const late = await recomputeLateForEdit({
+          supabaseAdmin,
+          tenantId,
+          operatorId: legacyRow.user_id as string,
+          role: operator?.role ?? null,
+          clockInIso: new Date(clock_in).toISOString(),
+          localDate: legacyRow.date as string,
+          isShopHours: legacyRow.is_shop_hours === true,
+        });
+        updates.is_late = late.is_late;
+        updates.late_minutes = late.late_minutes;
+        updates.scheduled_start_time = late.scheduled_start_time;
+        updates.late_source = late.late_source;
+      } catch {
+        // Late recompute is non-critical; never block the edit.
+      }
     }
 
     const { data, error } = await supabaseAdmin
