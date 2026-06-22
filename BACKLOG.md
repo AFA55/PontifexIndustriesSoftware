@@ -56,11 +56,20 @@
 
 ## 🟠 P1 (added Jun 12 — schedule-form session)
 
-- [ ] **🔴 FOUNDER: enable "Places API (New)" in Google Cloud Console** for the project behind
-      NEXT_PUBLIC_GOOGLE_MAPS_API_KEY (+ keep "Maps JavaScript API"; ensure the key's HTTP-referrer
-      + API restrictions allow pontifexindustries.com/* and *.vercel.app/*). The address-autocomplete
-      code fix (`451b124a`) migrated to Places API (New) + degrades to manual entry, but suggestions
-      only work once this API is enabled. Add localhost:3000/* to referrers for local dev.
+- [ ] **🔴 FOUNDER: set a BILLING ACCOUNT on the Maps project (root cause found Jun 22 PT2).**
+      The Maps key (`AIzaSyB4kg…`, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) belongs to GCP project
+      **"My Maps Project" (`quantum-conduit-482219-a1`)** — NOT the Firebase project. Diagnosis via
+      live console + network: Maps JavaScript API IS enabled there, but the **project has no active
+      billing account** (the live `maps/api/js` request from www.pontifexindustries.com returns **503**;
+      a no-referrer direct fetch returns a valid loader). This is almost certainly why maps/autocomplete
+      "worked before then stopped" — **billing lapsed.** Claude began enabling **Places API (New)**
+      (`places.googleapis.com`) on that project but Google requires a billing account first → the
+      "Set the billing account for 'My Maps Project'" dialog was left open for the founder (financial
+      action, founder-only). **DO:** pick the Maps Platform billing account → "Set account" (this also
+      finishes enabling Places API New). **THEN verify:** the key's HTTP-referrer allow-list includes
+      `www.pontifexindustries.com/*` (the app loads from the www subdomain), plus `pontifexindustries.com/*`,
+      `*.vercel.app/*`, `localhost:3000/*`. Code fix `451b124a` already migrated to Places API (New);
+      no code change needed.
 - [ ] **Remove dead dep `use-places-autocomplete`** (`npm uninstall`) — zero imports after the Maps fix.
 - [ ] **GoogleAddressAutocomplete dark-mode** — component is light-only (pre-existing, not a regression
       from the rewrite); add dark: variants when convenient.
