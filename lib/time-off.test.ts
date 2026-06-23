@@ -2,6 +2,10 @@ import {
   canDecideTimeOff,
   businessDaysBetween,
   MANAGEMENT_REQUESTER_ROLES,
+  isAttendanceFactType,
+  ATTENDANCE_FACT_TYPES,
+  MANAGEMENT_NOTIFY_ROLES,
+  APPROVER_NOTIFY_ROLES,
 } from './time-off';
 
 describe('canDecideTimeOff — rank-based approval authority', () => {
@@ -94,5 +98,51 @@ describe('businessDaysBetween', () => {
   it('returns at least 1 for a weekend-only range', () => {
     // Sat 2026-06-27 → Sun 2026-06-28 = 0 weekdays → clamps to 1
     expect(businessDaysBetween('2026-06-27', '2026-06-28')).toBe(1);
+  });
+});
+
+describe('type split — attendance FACTS vs planned REQUESTS', () => {
+  // Drives the admin-log POST branch: facts → recorded immediately + notify ALL
+  // management; requests → pending + notify approvers only.
+  it('callout and no_show are attendance facts (recorded immediately)', () => {
+    expect(isAttendanceFactType('callout')).toBe(true);
+    expect(isAttendanceFactType('no_show')).toBe(true);
+    expect([...ATTENDANCE_FACT_TYPES].sort()).toEqual(['callout', 'no_show'].sort());
+  });
+
+  it('planned types are NOT attendance facts (stay pending → approval)', () => {
+    for (const t of ['pto', 'vacation', 'sick', 'personal', 'personal_day', 'unpaid', 'bereavement', 'other']) {
+      expect(isAttendanceFactType(t)).toBe(false);
+    }
+  });
+
+  it('an unknown type defaults to a request, not a fact (fail-safe to approval)', () => {
+    expect(isAttendanceFactType('totally_unknown')).toBe(false);
+  });
+});
+
+describe('notification audiences by type', () => {
+  it('attendance facts notify ALL management (incl. supervisor + project manager)', () => {
+    expect([...MANAGEMENT_NOTIFY_ROLES].sort()).toEqual(
+      ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].sort()
+    );
+    // Crew-supervising roles are present so a no-show reaches the field leads.
+    expect(MANAGEMENT_NOTIFY_ROLES).toContain('supervisor');
+    expect(MANAGEMENT_NOTIFY_ROLES).toContain('salesman'); // "Project Manager"
+  });
+
+  it('planned requests notify ONLY approvers (admin + super_admin + ops_manager)', () => {
+    expect([...APPROVER_NOTIFY_ROLES].sort()).toEqual(
+      ['admin', 'super_admin', 'operations_manager'].sort()
+    );
+    // Crew leads who CANNOT approve are deliberately excluded from request pings.
+    expect(APPROVER_NOTIFY_ROLES).not.toContain('supervisor');
+    expect(APPROVER_NOTIFY_ROLES).not.toContain('salesman');
+  });
+
+  it('the approver-notify set is a subset of the management-notify set', () => {
+    for (const r of APPROVER_NOTIFY_ROLES) {
+      expect(MANAGEMENT_NOTIFY_ROLES).toContain(r);
+    }
   });
 });

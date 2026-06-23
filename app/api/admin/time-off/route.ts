@@ -11,6 +11,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { sendPushToUser } from '@/lib/send-push';
+import {
+  isAttendanceFactType,
+  MANAGEMENT_NOTIFY_ROLES,
+  APPROVER_NOTIFY_ROLES,
+} from '@/lib/time-off';
 
 // Canonical type list (matches DB constraint)
 export const VALID_TYPES = [
@@ -135,6 +140,14 @@ export async function POST(request: NextRequest) {
     const paid = typeof is_paid === 'boolean' ? is_paid : PAID_BY_DEFAULT.includes(type);
     const isCallout = CALLOUT_TYPES.includes(type);
 
+    // ── Behavior split by TYPE (founder's rule) ──────────────────────────
+    // After-the-fact ATTENDANCE FACTS (callout / no_show) are NOT requests:
+    //   record them IMMEDIATELY (status 'approved') + notify ALL management.
+    // Planned TIME-OFF REQUESTS (everything else — vacation/sick/personal/…):
+    //   land PENDING → rank-based approval, notify ONLY approvers (admin +
+    //   super_admin). PTO debit happens on approval in PATCH, not here.
+    const isAttendanceFact = isAttendanceFactType(type);
+
     // Calculate business days for PTO balance tracking
     const ptoDaysUsed = ['pto', 'vacation', 'bereavement', 'personal'].includes(type)
       ? calcBusinessDays(new Date(date), end_date ? new Date(end_date) : new Date(date))
@@ -149,16 +162,17 @@ export async function POST(request: NextRequest) {
       is_callout: isCallout,
       callout_reason: isCallout ? (reason || null) : null,
       pto_days_used: ptoDaysUsed,
-      // NEVER auto-approve (founder's rule): an admin logging an absence still
-      // routes the request through the SAME rank-based approval as a self-service
-      // request. A manager's absence logged by an admin will require a
-      // super_admin to approve, per canDecideTimeOff. Approval/timecard sync
-      // happens only in PATCH /api/admin/time-off/[id].
-      status: 'pending',
+      // Attendance facts (callout/no_show) are recorded immediately; planned
+      // requests stay pending and flow through PATCH rank-based approval.
+      status: isAttendanceFact ? 'approved' : 'pending',
       notes: notes || null,
       created_by: auth.userId,
       tenant_id: tenantId,
     };
+    if (isAttendanceFact) {
+      insertRow.approved_by = auth.userId;
+      insertRow.approved_at = new Date().toISOString();
+    }
     if (end_date && end_date !== date) insertRow.end_date = end_date;
 
     // For multi-day ranges we insert one row per day so the schedule board sees each day blocked
@@ -185,19 +199,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Sync operator_pto_balance (fire-and-forget on failure).
-    // The entry is created PENDING, so we do NOT debit pto_days_used here — the
-    // PTO debit happens on approval in PATCH /api/admin/time-off/[id] (and is
-    // credited back on deny/cancel). We DO still bump callout_count for
-    // attendance incidents (callout / no_show), which is an incident counter
-    // independent of the approval/PTO flow.
-    if (isCallout) {
+    // Bump callout_count ONLY for attendance facts (callout / no_show) — an
+    // incident counter independent of the approval/PTO flow. Planned requests
+    // (incl. sick / personal_day) do NOT debit PTO here; that happens on
+    // approval in PATCH /api/admin/time-off/[id] (credited back on deny/cancel).
+    if (isAttendanceFact) {
       const currentYear = new Date(date).getFullYear();
       Promise.resolve(upsertPtoBalance(operator_id, tenantId, currentYear, true, 0))
         .catch(() => {});
     }
 
-    // Notify admins for callout/no_show types
-    if (CALLOUT_TYPES.includes(type)) {
+    // ── Notifications, split by type ────────────────────────────────────
+    // Attendance facts (callout/no_show)   → notify ALL management.
+    // Planned requests (everything else)   → notify ONLY approvers (admin +
+    //                                         super_admin), who decide them.
+    {
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('full_name')
@@ -205,33 +221,48 @@ export async function POST(request: NextRequest) {
         .single();
       const operatorName = profile?.full_name ?? 'An operator';
       const label = type.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-      const msg = `${operatorName} logged ${label} on ${date}${end_date && end_date !== date ? ` – ${end_date}` : ''}${notes ? ` — ${notes}` : ''}`;
+
+      // Attendance facts → notify ALL management; planned requests → notify
+      // only the approvers. Role sets are single-sourced in lib/time-off.ts.
+      const notifyRoles = isAttendanceFact
+        ? [...MANAGEMENT_NOTIFY_ROLES]
+        : [...APPROVER_NOTIFY_ROLES];
+
+      const verb = isAttendanceFact ? 'logged' : 'requested';
+      const msg = `${operatorName} ${verb} ${label} on ${date}${end_date && end_date !== date ? ` – ${end_date}` : ''}${notes ? ` — ${notes}` : ''}`;
+      const notifTitle = isAttendanceFact ? 'Callout / Absence Logged' : 'New Time-Off Request';
+      const notifKind = isAttendanceFact ? 'warning' : 'info';
+      const notifType = isAttendanceFact ? 'operator_callout' : 'time_off_request';
 
       const { data: admins } = await supabaseAdmin
         .from('profiles')
         .select('id')
         .eq('tenant_id', tenantId)
-        .in('role', ['admin', 'super_admin', 'operations_manager']);
+        .in('role', notifyRoles);
 
-      if (admins && admins.length > 0) {
-        const notifRows = admins.map((a: { id: string }) => ({
+      // Never notify the person the entry is about (e.g. an admin logging their
+      // own request shouldn't ping themselves as an approver).
+      const recipients = (admins ?? []).filter((a: { id: string }) => a.id !== operator_id);
+
+      if (recipients.length > 0) {
+        const notifRows = recipients.map((a: { id: string }) => ({
           user_id: a.id,
           tenant_id: tenantId,
-          type: 'warning',
-          title: 'Callout / Absence Logged',
+          type: notifKind,
+          title: notifTitle,
           message: msg,
-          notification_type: 'operator_callout',
+          notification_type: notifType,
           related_entity_type: 'operator_time_off',
           action_url: '/dashboard/admin/time-off',
         }));
         Promise.resolve(supabaseAdmin.from('notifications').insert(notifRows))
           .catch(() => {});
 
-        // Parallel native push to each notified admin — fire-and-forget,
+        // Parallel native push to each recipient — fire-and-forget,
         // never blocks or alters the API response.
-        for (const a of admins as { id: string }[]) {
+        for (const a of recipients as { id: string }[]) {
           sendPushToUser(a.id, {
-            title: 'Callout / Absence Logged',
+            title: notifTitle,
             body: msg,
             data: { route: '/dashboard/admin/time-off' },
           }).catch(() => {});

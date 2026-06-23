@@ -62,6 +62,40 @@ export function canDecideTimeOff(approverRole: string, requesterRole: string): b
   return requesterRank < ADMIN_RANK;
 }
 
+// ── Type split: attendance FACTS vs planned REQUESTS (founder's rule) ──────
+//
+// Attendance facts are after-the-fact records, NOT requests. They are recorded
+// immediately (status 'approved') and notify ALL management. Everything else is
+// a planned request that lands pending → rank-based approval and notifies only
+// the approvers.
+
+/** After-the-fact attendance facts — recorded immediately, never pending. */
+export const ATTENDANCE_FACT_TYPES = ['callout', 'no_show'] as const;
+
+/** True when a time-off type is an attendance fact (callout / no_show). */
+export function isAttendanceFactType(type: string): boolean {
+  return (ATTENDANCE_FACT_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * Roles notified when an attendance FACT (callout/no_show) is logged — the
+ * oversight roles who run crews and need to know immediately. Superset of the
+ * approver set plus the crew-supervising roles (supervisor, salesman ==
+ * "Project Manager").
+ */
+export const MANAGEMENT_NOTIFY_ROLES = [
+  'admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman',
+] as const;
+
+/**
+ * Roles notified for a planned time-off REQUEST — only the approvers who can
+ * actually decide it (admin + super_admin, with operations_manager included
+ * because it shares admin's approval authority per canDecideTimeOff).
+ */
+export const APPROVER_NOTIFY_ROLES = [
+  'admin', 'super_admin', 'operations_manager',
+] as const;
+
 /**
  * Count business days (Mon–Fri) between two bare YYYY-MM-DD dates, inclusive.
  * Minimum 1. Parses local (never `new Date('YYYY-MM-DD')` — that's UTC).
