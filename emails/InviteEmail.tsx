@@ -65,7 +65,7 @@ export default function InviteEmail({
       preview={`${inviterName} invited you to join ${tenantName}`}
       subtitle="You're invited to join the team"
     >
-      <Section style={{ padding: '40px 40px 0' }}>
+      <Section style={{ padding: '40px 0 0' }}>
         <Text
           style={{
             margin: '0 0 20px',
@@ -92,14 +92,14 @@ export default function InviteEmail({
       </Section>
 
       {/* CTA — the primary action link (also tested by email-links.test.ts) */}
-      <Section style={{ padding: '0 40px 20px' }}>
+      <Section style={{ padding: '0 0 20px' }}>
         <CTAButton href={setupUrl} label="Set Up My Account" color={brandColor} />
       </Section>
 
       {/* Fallback raw link — must appear as an <a> with the URL as visible text */}
       <Section
         style={{
-          margin: '0 40px 28px',
+          margin: '0 0 28px',
           backgroundColor: '#f8fafc',
           borderRadius: '6px',
           padding: '14px 18px',
@@ -124,7 +124,7 @@ export default function InviteEmail({
       </Section>
 
       {/* What happens next steps */}
-      <Section style={{ padding: '0 40px 24px' }}>
+      <Section style={{ padding: '0 0 24px' }}>
         <Text
           style={{
             margin: '0 0 12px',
@@ -137,41 +137,44 @@ export default function InviteEmail({
         >
           What happens next
         </Text>
-        {steps.map(({ n, label }) => (
-          <div
-            key={n}
-            style={{ display: 'flex', alignItems: 'flex-start', marginBottom: '10px' }}
-          >
-            <span
-              style={{
-                display: 'inline-block',
-                width: '26px',
-                height: '26px',
-                minWidth: '26px',
-                borderRadius: '50%',
-                backgroundColor: '#ede9fe',
-                color: brandColor,
-                fontSize: '13px',
-                fontWeight: '700',
-                textAlign: 'center',
-                lineHeight: '26px',
-                marginRight: '10px',
-                verticalAlign: 'middle',
-              }}
-            >
-              {n}
-            </span>
-            <Text style={{ margin: 0, color: '#334155', fontSize: '15px', lineHeight: '26px' }}>
-              {label}
-            </Text>
-          </div>
-        ))}
+        {/* Table-cell layout (Outlook ignores flex) */}
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <tbody>
+            {steps.map(({ n, label }) => (
+              <tr key={n}>
+                <td style={{ width: '36px', verticalAlign: 'top', paddingBottom: '10px' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '26px',
+                      height: '26px',
+                      borderRadius: '50%',
+                      backgroundColor: '#f1f5f9',
+                      color: brandColor,
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      textAlign: 'center',
+                      lineHeight: '26px',
+                    }}
+                  >
+                    {n}
+                  </span>
+                </td>
+                <td style={{ verticalAlign: 'top', paddingBottom: '10px' }}>
+                  <Text style={{ margin: 0, color: '#334155', fontSize: '15px', lineHeight: '26px' }}>
+                    {label}
+                  </Text>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </Section>
 
       {/* Info card: expiry + company code */}
       <Section
         style={{
-          margin: '0 40px 16px',
+          margin: '0 0 16px',
           backgroundColor: '#fffbeb',
           borderLeft: '3px solid #f59e0b',
           borderRadius: '4px',
@@ -191,7 +194,7 @@ export default function InviteEmail({
 
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           backgroundColor: '#f1f5f9',
           borderLeft: '3px solid #94a3b8',
           borderRadius: '4px',
@@ -205,9 +208,9 @@ export default function InviteEmail({
         </Text>
       </Section>
 
-      <Hr style={{ borderColor: '#e2e8f0', margin: '0 40px' }} />
+      <Hr style={{ borderColor: '#e2e8f0', margin: 0 }} />
 
-      <Section style={{ padding: '16px 40px', textAlign: 'center' }}>
+      <Section style={{ padding: '16px 0', textAlign: 'center' }}>
         <Text style={{ margin: 0, color: '#64748b', fontSize: '13px', lineHeight: '1.5' }}>
           <strong style={{ color: '#475569' }}>{tenantName}</strong>
           <br />

@@ -43,7 +43,7 @@ export default function ClockInReminderEmail({
       preview="Clock-In Reminder — you have not clocked in yet today"
       subtitle="Clock-In Reminder"
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text style={{ margin: '0 0 16px', color: '#475569', fontSize: '16px' }}>
           Hi <strong style={{ color: '#0f172a' }}>{name}</strong>,
         </Text>
@@ -55,7 +55,7 @@ export default function ClockInReminderEmail({
 
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#fef3c7',
           borderLeft: '3px solid #f59e0b',
           borderRadius: '4px',
@@ -68,7 +68,7 @@ export default function ClockInReminderEmail({
         </Text>
       </Section>
 
-      <Section style={{ padding: '0 40px 40px' }}>
+      <Section style={{ padding: '0 0 40px' }}>
         <CTAButton href={actionUrl} label="Clock In Now" color={brandColor} />
       </Section>
     </BrandedEmail>

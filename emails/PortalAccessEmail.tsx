@@ -46,7 +46,7 @@ export default function PortalAccessEmail({
       preview={`View your jobs & documents — ${companyName}`}
       subtitle="Customer Job Portal"
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text style={{ margin: '0 0 20px', color: '#475569', fontSize: '16px', lineHeight: '1.6' }}>
           Hi <strong style={{ color: '#0f172a' }}>{customerName}</strong>,
         </Text>
@@ -57,14 +57,14 @@ export default function PortalAccessEmail({
       </Section>
 
       {/* CTA */}
-      <Section style={{ padding: '0 40px 24px' }}>
+      <Section style={{ padding: '0 0 24px' }}>
         <CTAButton href={portalUrl} label="View Your Jobs & Sign Documents" color={brandColor} />
       </Section>
 
       {/* Info box */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#f8fafc',
           borderRadius: '8px',
           padding: '20px 24px',
@@ -93,7 +93,7 @@ export default function PortalAccessEmail({
       {/* Fallback link */}
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           backgroundColor: '#f1f5f9',
           borderRadius: '6px',
           padding: '14px 18px',

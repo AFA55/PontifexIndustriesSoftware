@@ -95,9 +95,9 @@ export default function DemoRequestNotificationEmail({
       preview={`New demo request: ${company}`}
       subtitle="New Demo Request"
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text
-          style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '22px', fontWeight: '700' }}
+          style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '22px', fontWeight: '600', letterSpacing: '-0.3px' }}
         >
           New demo request
         </Text>
@@ -106,7 +106,7 @@ export default function DemoRequestNotificationEmail({
         </Text>
       </Section>
 
-      <Section style={{ margin: '0 40px 24px' }}>
+      <Section style={{ margin: '0 0 24px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <tbody>
             <Row label="Name">{name}</Row>
@@ -126,7 +126,7 @@ export default function DemoRequestNotificationEmail({
       {message ? (
         <Section
           style={{
-            margin: '0 40px 24px',
+            margin: '0 0 24px',
             padding: '16px 18px',
             backgroundColor: '#f8fafc',
             borderRadius: '8px',
@@ -152,11 +152,11 @@ export default function DemoRequestNotificationEmail({
       ) : null}
 
       {manageUrl ? (
-        <Section style={{ padding: '0 40px 40px' }}>
+        <Section style={{ padding: '0 0 40px' }}>
           <CTAButton href={manageUrl} label="View & Manage in Platform Hub" color={brandColor} />
         </Section>
       ) : (
-        <Section style={{ padding: '0 40px 40px' }} />
+        <Section style={{ padding: '0 0 40px' }} />
       )}
     </BrandedEmail>
   );

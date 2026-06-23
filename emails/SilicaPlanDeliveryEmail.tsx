@@ -39,9 +39,9 @@ export default function SilicaPlanDeliveryEmail({
       preview={`Silica Exposure Control Plan — Job ${jobNumber}`}
       subtitle={`Silica Exposure Control Plan · Job ${jobNumber}`}
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text
-          style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '20px', fontWeight: '700', lineHeight: '1.3' }}
+          style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '20px', fontWeight: '600', letterSpacing: '-0.3px', lineHeight: '1.3' }}
         >
           Silica Exposure Control Plan
         </Text>
@@ -54,7 +54,7 @@ export default function SilicaPlanDeliveryEmail({
         </Text>
       </Section>
 
-      <Section style={{ padding: '0 40px 40px' }}>
+      <Section style={{ padding: '0 0 40px' }}>
         <Text style={{ margin: 0, color: '#64748b', fontSize: '13px', lineHeight: '1.6' }}>
           Questions? Contact {companyName} or your project manager.
         </Text>

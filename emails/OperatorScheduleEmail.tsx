@@ -81,7 +81,7 @@ export default function OperatorScheduleEmail({
       preview={`Your schedule for ${scheduleDateLabel}`}
       subtitle={`Your Schedule · ${scheduleDateLabel}`}
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text style={{ margin: '0 0 16px', fontSize: '16px', color: '#475569', lineHeight: '1.6' }}>
           Hi <strong style={{ color: '#0f172a' }}>{operatorName}</strong>,
         </Text>
@@ -94,7 +94,7 @@ export default function OperatorScheduleEmail({
       {earliestShopTimeLabel ? (
         <Section
           style={{
-            margin: '0 40px 24px',
+            margin: '0 0 24px',
             backgroundColor: '#dcfce7',
             border: '2px solid #22c55e',
             borderRadius: '12px',
@@ -119,8 +119,8 @@ export default function OperatorScheduleEmail({
         </Section>
       ) : null}
 
-      <Section style={{ padding: '0 40px 0' }}>
-        <Text style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '18px', fontWeight: '700' }}>
+      <Section style={{ padding: '0' }}>
+        <Text style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '18px', fontWeight: '600', letterSpacing: '-0.3px' }}>
           Your Jobs
         </Text>
       </Section>
@@ -129,7 +129,7 @@ export default function OperatorScheduleEmail({
         <Section
           key={job.jobNumber + index}
           style={{
-            margin: '0 40px 16px',
+            margin: '0 0 16px',
             backgroundColor: '#f8fafc',
             borderLeft: `4px solid ${accentColor || brandColor}`,
             borderRadius: '8px',
@@ -210,13 +210,13 @@ export default function OperatorScheduleEmail({
         </Section>
       ))}
 
-      <Section style={{ padding: '24px 40px 16px' }}>
+      <Section style={{ padding: '24px 0 16px' }}>
         <CTAButton href={scheduleUrl} label="View Full Schedule in App" color={accentColor || brandColor} />
       </Section>
 
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           padding: '16px 18px',
           backgroundColor: '#f8fafc',
           borderRadius: '8px',

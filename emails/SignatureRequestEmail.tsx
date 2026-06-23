@@ -71,9 +71,9 @@ export default function SignatureRequestEmail({
       preview={`Please sign your work completion form — ${jobNumber}`}
       subtitle="Work Completion Sign-Off"
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text
-          style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '24px', fontWeight: '700' }}
+          style={{ margin: '0 0 8px', color: '#0f172a', fontSize: '24px', fontWeight: '600', letterSpacing: '-0.3px' }}
         >
           Your Signature is Requested
         </Text>
@@ -86,7 +86,7 @@ export default function SignatureRequestEmail({
       {/* Job details card */}
       <Section
         style={{
-          margin: '0 40px 28px',
+          margin: '0 0 28px',
           backgroundColor: '#f1f5f9',
           borderRadius: '8px',
           padding: '20px 24px',
@@ -133,14 +133,14 @@ export default function SignatureRequestEmail({
       </Section>
 
       {/* CTA */}
-      <Section style={{ padding: '0 40px 24px' }}>
+      <Section style={{ padding: '0 0 24px' }}>
         <CTAButton href={signingUrl} label="Sign Now →" color={accentColor || brandColor} />
       </Section>
 
       {/* Fallback link — URL as visible text */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#f8fafc',
           borderRadius: '6px',
           padding: '14px 18px',
@@ -159,7 +159,7 @@ export default function SignatureRequestEmail({
       {/* Notice */}
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           backgroundColor: '#fffbeb',
           borderLeft: '3px solid #f59e0b',
           borderRadius: '4px',

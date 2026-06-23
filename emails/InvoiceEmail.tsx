@@ -19,6 +19,7 @@
 import React from 'react';
 import { Section, Text } from '@react-email/components';
 import BrandedEmail, { EmailBrandingProps } from './components/BrandedEmail';
+import { parseYMDLocal, toLocalYMD } from '../lib/dates';
 
 export type InvoiceVariant = 'send' | 'remind' | 'receipt';
 
@@ -63,6 +64,32 @@ export interface InvoiceEmailProps {
 
 const fmt$ = (n: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+
+/**
+ * Format a date for display as "Jun 15, 2026". Inputs come from the DB as a bare
+ * 'YYYY-MM-DD' string (a Postgres `date`). We MUST parse it as LOCAL midnight —
+ * `new Date('2026-06-15')` is UTC and renders the previous day in US timezones
+ * (CLAUDE.md date rule). Non-bare-date strings (already-formatted, or a full
+ * timestamp) are passed through untouched.
+ */
+function fmtDate(value?: string | null): string | null {
+  if (!value) return null;
+  const ymd = /^\d{4}-\d{2}-\d{2}$/.exec(value)?.[0];
+  if (!ymd) return value;
+  return parseYMDLocal(ymd).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
+/** True when a bare 'YYYY-MM-DD' due date is strictly before today (local). */
+function isPastDue(dueDate?: string | null): boolean {
+  if (!dueDate) return false;
+  const ymd = /^\d{4}-\d{2}-\d{2}$/.exec(dueDate)?.[0];
+  if (!ymd) return false;
+  return ymd < toLocalYMD();
+}
 
 export const PreviewProps: InvoiceEmailProps = {
   branding: {
@@ -144,7 +171,7 @@ function SendBody({
       preview={`Invoice ${invoiceNumber} from ${companyName}`}
       subtitle={`Invoice ${invoiceNumber}`}
     >
-      <Section style={{ padding: '32px 40px 0' }}>
+      <Section style={{ padding: '32px 0 0' }}>
         <Text style={{ margin: '0 0 16px', fontSize: '15px', color: '#334155' }}>
           Dear <strong style={{ color: '#0f172a' }}>{customerName}</strong>,
         </Text>
@@ -157,7 +184,7 @@ function SendBody({
       {/* Invoice meta */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#f8fafc',
           borderRadius: '8px',
           padding: '16px 20px',
@@ -169,12 +196,13 @@ function SendBody({
             <tr>
               <td style={{ width: '50%', verticalAlign: 'top', paddingBottom: poNumber ? '12px' : 0 }}>
                 <p style={labelStyle}>Invoice Date</p>
-                <p style={valueStyle}>{invoiceDate || 'N/A'}</p>
+                <p style={valueStyle}>{fmtDate(invoiceDate) || 'N/A'}</p>
               </td>
               <td style={{ width: '50%', verticalAlign: 'top', paddingBottom: poNumber ? '12px' : 0 }}>
                 <p style={labelStyle}>Due Date</p>
-                <p style={{ ...valueStyle, color: dueDate ? '#dc2626' : '#1e293b' }}>
-                  {dueDate || 'Upon Receipt'}
+                {/* Only color the due date red when it's actually overdue. */}
+                <p style={{ ...valueStyle, color: isPastDue(dueDate) ? '#dc2626' : '#1e293b' }}>
+                  {fmtDate(dueDate) || 'Upon Receipt'}
                 </p>
               </td>
             </tr>
@@ -191,7 +219,7 @@ function SendBody({
       </Section>
 
       {/* Amount due banner */}
-      <Section style={{ margin: '0 40px 24px' }}>
+      <Section style={{ margin: '0 0 24px' }}>
         <p style={labelStyle}>Amount Due</p>
         <p style={{ margin: '4px 0 0', fontSize: '28px', fontWeight: '800', color: brandColor }}>
           {fmt$(totalAmount)}
@@ -199,7 +227,7 @@ function SendBody({
       </Section>
 
       {/* Line items */}
-      <Section style={{ margin: '0 40px 24px' }}>
+      <Section style={{ margin: '0 0 24px' }}>
         <p style={{ ...labelStyle, marginBottom: '10px', letterSpacing: '0.1em' }}>Line Items</p>
         <table
           style={{
@@ -288,7 +316,7 @@ function SendBody({
       {notes ? (
         <Section
           style={{
-            margin: '0 40px 24px',
+            margin: '0 0 24px',
             padding: '16px',
             backgroundColor: '#f8fafc',
             borderRadius: '8px',
@@ -305,7 +333,7 @@ function SendBody({
       {/* Payment instructions */}
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           padding: '20px',
           backgroundColor: '#f1f5f9',
           borderRadius: '10px',
@@ -357,7 +385,7 @@ function RemindBody({
       preview={`${urgencyLabel} — Invoice ${invoiceNumber}`}
       subtitle={`${urgencyLabel} — Invoice ${invoiceNumber}`}
     >
-      <Section style={{ padding: '32px 40px 0' }}>
+      <Section style={{ padding: '32px 0 0' }}>
         <Text style={{ margin: '0 0 16px', fontSize: '15px', color: '#334155' }}>
           Dear <strong style={{ color: '#0f172a' }}>{customerName}</strong>,
         </Text>
@@ -372,8 +400,8 @@ function RemindBody({
             </>
           ) : (
             <>
-              This is a friendly reminder that your invoice is due on <strong>{dueDate}</strong>.
-              Please remit payment at your earliest convenience.
+              This is a friendly reminder that your invoice is due on{' '}
+              <strong>{fmtDate(dueDate)}</strong>. Please remit payment at your earliest convenience.
             </>
           )}
         </Text>
@@ -382,7 +410,7 @@ function RemindBody({
       {/* Amount due box */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           padding: '20px',
           backgroundColor: '#fef2f2',
           border: `2px solid ${headerColor}`,
@@ -396,7 +424,7 @@ function RemindBody({
         </p>
         {dueDate ? (
           <p style={{ margin: '8px 0 0', fontSize: '13px', color: '#64748b' }}>
-            Due: <strong>{dueDate}</strong>
+            Due: <strong>{fmtDate(dueDate)}</strong>
             {isOverdue ? (
               <span style={{ color: headerColor, fontWeight: 700 }}>
                 {' '}
@@ -410,7 +438,7 @@ function RemindBody({
       {/* Invoice reference */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#f8fafc',
           borderRadius: '8px',
           padding: '16px 20px',
@@ -426,7 +454,7 @@ function RemindBody({
               </td>
               <td style={{ width: '50%', verticalAlign: 'top', paddingBottom: poNumber ? '12px' : 0 }}>
                 <p style={labelStyle}>Invoice Date</p>
-                <p style={valueStyle}>{invoiceDate || 'N/A'}</p>
+                <p style={valueStyle}>{fmtDate(invoiceDate) || 'N/A'}</p>
               </td>
             </tr>
             {poNumber ? (
@@ -444,7 +472,7 @@ function RemindBody({
       {/* Payment instructions */}
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           padding: '20px',
           backgroundColor: '#fff7ed',
           borderRadius: '10px',
@@ -494,11 +522,13 @@ function ReceiptBody({
       preview={`Payment received — Invoice ${invoiceNumber}`}
       subtitle={`Payment Receipt — Invoice ${invoiceNumber}`}
     >
-      {/* Success banner */}
+      {/* Success banner — solid fallback BEFORE the gradient so Outlook (which
+          strips linear-gradient) still shows a green band, not white-on-white. */}
       <Section
         style={{
-          margin: '32px 40px 24px',
+          margin: '32px 0 24px',
           padding: '20px 24px',
+          backgroundColor: '#059669',
           background: 'linear-gradient(135deg, #10b981, #059669)',
           borderRadius: '12px',
         }}
@@ -511,7 +541,7 @@ function ReceiptBody({
         </Text>
       </Section>
 
-      <Section style={{ padding: '0 40px' }}>
+      <Section style={{ padding: '0' }}>
         <Text style={{ margin: '0 0 16px', fontSize: '15px', color: '#334155' }}>
           Hi <strong style={{ color: '#0f172a' }}>{customerName || 'Valued Customer'}</strong>,
         </Text>
@@ -522,7 +552,7 @@ function ReceiptBody({
 
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#ffffff',
           border: '1px solid #e2e8f0',
           borderRadius: '8px',
@@ -540,7 +570,7 @@ function ReceiptBody({
             <tr>
               <td style={{ padding: '6px 0', color: '#64748b' }}>Payment Date</td>
               <td style={{ padding: '6px 0', textAlign: 'right', color: '#0f172a' }}>
-                {paymentDate || 'N/A'}
+                {fmtDate(paymentDate) || 'N/A'}
               </td>
             </tr>
             <tr>
@@ -583,7 +613,7 @@ function ReceiptBody({
         </table>
       </Section>
 
-      <Section style={{ padding: '0 40px 40px' }}>
+      <Section style={{ padding: '0 0 40px' }}>
         <Text style={{ margin: 0, fontSize: '13px', color: '#64748b', lineHeight: '1.6' }}>
           Thank you for choosing {companyName}. We look forward to working with you again.
         </Text>

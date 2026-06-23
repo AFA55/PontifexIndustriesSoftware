@@ -46,14 +46,14 @@ export default function ApprovalEmail({
       preview={`Your access to ${companyName} has been approved`}
       subtitle="Concrete Cutting Management System"
     >
-      <Section style={{ padding: '40px 40px 0' }}>
+      <Section style={{ padding: '40px 0 0' }}>
         <Text
           style={{
             margin: '0 0 8px',
             color: '#0f172a',
-            fontSize: '28px',
-            fontWeight: '700',
-            letterSpacing: '-0.5px',
+            fontSize: '26px',
+            fontWeight: '600',
+            letterSpacing: '-0.3px',
             lineHeight: '1.2',
           }}
         >
@@ -87,7 +87,7 @@ export default function ApprovalEmail({
       {/* Account details info card */}
       <Section
         style={{
-          margin: '0 40px 28px',
+          margin: '0 0 28px',
           backgroundColor: '#f8fafc',
           borderRadius: '8px',
           padding: '20px 24px',
@@ -161,7 +161,7 @@ export default function ApprovalEmail({
         </table>
       </Section>
 
-      <Section style={{ padding: '0 40px 24px' }}>
+      <Section style={{ padding: '0 0 24px' }}>
         <Text
           style={{
             margin: '0 0 24px',
@@ -179,7 +179,7 @@ export default function ApprovalEmail({
 
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           backgroundColor: '#f1f5f9',
           borderLeft: '3px solid #94a3b8',
           borderRadius: '4px',

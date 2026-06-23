@@ -43,13 +43,14 @@ export default function NotificationEmail({
       preview={title}
       subtitle={companyName}
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text
           style={{
             margin: '0 0 16px',
             color: '#0f172a',
             fontSize: '20px',
-            fontWeight: '700',
+            fontWeight: '600',
+            letterSpacing: '-0.3px',
             lineHeight: '1.3',
           }}
         >
@@ -68,14 +69,14 @@ export default function NotificationEmail({
       </Section>
 
       {actionUrl && (
-        <Section style={{ padding: '0 40px 24px' }}>
+        <Section style={{ padding: '0 0 24px' }}>
           <CTAButton href={actionUrl} label="View details" color={brandColor} />
         </Section>
       )}
 
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           backgroundColor: '#f8fafc',
           borderRadius: '6px',
           padding: '14px 18px',

@@ -47,14 +47,14 @@ export default function PasswordResetEmail({
       preview="Reset your password — link expires in 1 hour"
       subtitle="Concrete Cutting Management System"
     >
-      <Section style={{ padding: '40px 40px 0' }}>
+      <Section style={{ padding: '40px 0 0' }}>
         <Text
           style={{
             margin: '0 0 8px',
             color: '#0f172a',
-            fontSize: '28px',
-            fontWeight: '700',
-            letterSpacing: '-0.5px',
+            fontSize: '26px',
+            fontWeight: '600',
+            letterSpacing: '-0.3px',
             lineHeight: '1.2',
           }}
         >
@@ -88,7 +88,7 @@ export default function PasswordResetEmail({
       {/* Security notice info card */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#fef3c7',
           borderLeft: '3px solid #f59e0b',
           borderRadius: '4px',
@@ -114,14 +114,14 @@ export default function PasswordResetEmail({
       </Section>
 
       {/* CTA — must appear as <a href={resetLink}> for the test */}
-      <Section style={{ padding: '0 40px 20px' }}>
+      <Section style={{ padding: '0 0 20px' }}>
         <CTAButton href={resetLink} label="Reset Password" color={brandColor} />
       </Section>
 
       {/* Raw fallback link */}
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#f8fafc',
           borderRadius: '6px',
           padding: '14px 18px',
@@ -138,7 +138,7 @@ export default function PasswordResetEmail({
           Button not working?
         </Text>
         <Text style={{ margin: 0, fontSize: '12px', lineHeight: '1.5', wordBreak: 'break-all' }}>
-          <Link href={resetLink} style={{ color: '#2563eb', textDecoration: 'underline' }}>
+          <Link href={resetLink} style={{ color: brandColor, textDecoration: 'underline' }}>
             {resetLink}
           </Link>
         </Text>
@@ -146,7 +146,7 @@ export default function PasswordResetEmail({
 
       <Section
         style={{
-          margin: '0 40px 40px',
+          margin: '0 0 40px',
           backgroundColor: '#fef2f2',
           borderLeft: '3px solid #dc2626',
           borderRadius: '4px',

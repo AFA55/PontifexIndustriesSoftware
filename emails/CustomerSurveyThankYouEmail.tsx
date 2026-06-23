@@ -78,7 +78,7 @@ export default function CustomerSurveyThankYouEmail({
       preview={`Thank you from ${companyName}`}
       subtitle={`Thank you for your feedback · Job ${jobNumber}`}
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text style={{ margin: '0 0 20px', color: '#475569', fontSize: '16px', lineHeight: '1.6' }}>
           {customerName ? (
             <>
@@ -95,7 +95,7 @@ export default function CustomerSurveyThankYouEmail({
 
       <Section
         style={{
-          margin: '0 40px 24px',
+          margin: '0 0 24px',
           backgroundColor: '#f8fafc',
           borderRadius: '8px',
           padding: '0 20px',
@@ -113,8 +113,8 @@ export default function CustomerSurveyThankYouEmail({
       {notes ? (
         <Section
           style={{
-            margin: '0 40px 24px',
-            backgroundColor: '#f5f3ff',
+            margin: '0 0 24px',
+            backgroundColor: '#f8fafc',
             borderLeft: `3px solid ${brandColor}`,
             borderRadius: '4px',
             padding: '16px 20px',
@@ -123,7 +123,7 @@ export default function CustomerSurveyThankYouEmail({
           <Text
             style={{
               margin: '0 0 6px',
-              color: '#5b21b6',
+              color: '#475569',
               fontSize: '12px',
               fontWeight: '600',
               textTransform: 'uppercase',
@@ -132,13 +132,13 @@ export default function CustomerSurveyThankYouEmail({
           >
             Your notes
           </Text>
-          <Text style={{ margin: 0, color: '#312e81', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+          <Text style={{ margin: 0, color: '#475569', fontSize: '14px', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
             {notes}
           </Text>
         </Section>
       ) : null}
 
-      <Section style={{ padding: '0 40px 40px' }}>
+      <Section style={{ padding: '0 0 40px' }}>
         <Text style={{ margin: 0, color: '#475569', fontSize: '15px', lineHeight: '1.6' }}>
           Your comments help us improve every single day. Thank you for trusting {companyName}.
         </Text>

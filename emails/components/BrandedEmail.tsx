@@ -53,6 +53,10 @@ export default function BrandedEmail({
         <style>{`
           :root { color-scheme: light only; supported-color-schemes: light only; }
           * { box-sizing: border-box; }
+          /* Mobile: shrink the single content gutter so narrow phones don't waste width */
+          @media (max-width: 480px) {
+            .email-content-wrapper { padding-left: 24px !important; padding-right: 24px !important; }
+          }
         `}</style>
       </Head>
       <Preview>{preview}</Preview>
@@ -151,8 +155,13 @@ export default function BrandedEmail({
               )}
             </Section>
 
-            {/* Main content slot */}
-            {children}
+            {/* Main content slot — single horizontal gutter owned here so no
+                inner <Section> needs its own 40px inset (margin on a 100%-width
+                table overflows the container). Templates keep only vertical
+                margins/padding; this wrapper supplies the 40px side gutter. */}
+            <Section className="email-content-wrapper" style={{ padding: '0 40px' }}>
+              {children}
+            </Section>
 
             {/* Footer */}
             <Hr style={{ borderColor: '#e2e8f0', margin: 0 }} />

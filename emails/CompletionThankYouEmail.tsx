@@ -94,9 +94,9 @@ function CompletionBody({
       preview={`Thank you from ${companyName} — Job ${jobNumber} sign-off`}
       subtitle="Your job is complete — sign-off attached"
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         <Text
-          style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '22px', fontWeight: '700', lineHeight: '1.3' }}
+          style={{ margin: '0 0 16px', color: '#0f172a', fontSize: '22px', fontWeight: '600', letterSpacing: '-0.3px', lineHeight: '1.3' }}
         >
           Thank you for choosing {companyName}
         </Text>
@@ -112,7 +112,7 @@ function CompletionBody({
       </Section>
 
       {/* Job meta */}
-      <Section style={{ margin: '0 40px 24px' }}>
+      <Section style={{ margin: '0 0 24px' }}>
         <table
           style={{
             width: '100%',
@@ -145,7 +145,7 @@ function CompletionBody({
       {scopeOfWork ? (
         <Section
           style={{
-            margin: '0 40px 24px',
+            margin: '0 0 24px',
             padding: '18px 20px',
             backgroundColor: '#f1f5f9',
             borderLeft: `3px solid ${brandColor}`,
@@ -171,7 +171,7 @@ function CompletionBody({
       ) : null}
 
       {photoRows.length ? (
-        <Section style={{ margin: '0 40px 24px' }}>
+        <Section style={{ margin: '0 0 24px' }}>
           <Text
             style={{
               margin: '0 0 8px',
@@ -210,7 +210,7 @@ function CompletionBody({
         </Section>
       ) : null}
 
-      <Section style={{ padding: '0 40px 40px' }}>
+      <Section style={{ padding: '0 0 40px' }}>
         <Text style={{ margin: '0 0 8px', color: '#475569', fontSize: '14px', lineHeight: '1.6' }}>
           If you have any questions about this job or need additional services, please don&apos;t
           hesitate to reach out
@@ -251,7 +251,7 @@ function LiabilityBody({
       preview={`Liability Release — Job ${jobNumber}`}
       subtitle="Liability Release & Indemnification"
     >
-      <Section style={{ padding: '36px 40px 0' }}>
+      <Section style={{ padding: '36px 0 0' }}>
         {customerName ? (
           <Text style={{ margin: '0 0 16px', color: '#475569', fontSize: '16px', lineHeight: '1.6' }}>
             Dear <strong style={{ color: '#0f172a' }}>{customerName}</strong>,
@@ -263,7 +263,7 @@ function LiabilityBody({
         </Text>
       </Section>
 
-      <Section style={{ margin: '0 40px 24px' }}>
+      <Section style={{ margin: '0 0 24px' }}>
         <table
           style={{
             width: '100%',
@@ -293,7 +293,7 @@ function LiabilityBody({
         </table>
       </Section>
 
-      <Section style={{ padding: '0 40px 16px' }}>
+      <Section style={{ padding: '0 0 16px' }}>
         <Text style={{ margin: '0 0 16px', color: '#475569', fontSize: '14px', lineHeight: '1.6' }}>
           Please find the signed liability release document attached to this email for your records.
         </Text>
@@ -317,7 +317,7 @@ function LiabilityBody({
         ) : null}
       </Section>
 
-      <Section style={{ padding: '0 40px 40px' }}>
+      <Section style={{ padding: '0 0 40px' }}>
         <Text style={{ margin: 0, color: '#0f172a', fontSize: '14px', lineHeight: '1.6' }}>
           Thank you for choosing {companyName}.
         </Text>
