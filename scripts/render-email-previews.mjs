@@ -74,6 +74,14 @@ const PONTIFEX_BRANDING = {
   logoUrl: null,
 };
 
+// Patriot branding WITH a real public logo — exercises the header logo branch
+// (the no-logo wordmark branch is covered by every BRANDING preview).
+const BRANDING_WITH_LOGO = {
+  ...BRANDING,
+  logoUrl:
+    'https://klatddoyncxidgqtcjnu.supabase.co/storage/v1/object/public/tenant-logos/patriot-logo.png',
+};
+
 // ── Render each template ────────────────────────────────────────────────────
 const previews = [
   {
@@ -81,6 +89,21 @@ const previews = [
     html: renderEmailToHtml(
       React.createElement(InviteEmail, {
         branding: BRANDING,
+        inviteeName: 'Jane Operator',
+        inviterName: 'Andres Altamirano',
+        tenantName: 'Patriot Concrete Cutting',
+        roleLabel: 'Operator',
+        companyCode: 'PATRIOT',
+        setupUrl: `https://www.pontifexindustries.com/setup-account?token=${TOKEN}`,
+      })
+    ),
+  },
+  {
+    // Same invite, branded WITH a logo — spot-check the header logo render path.
+    name: 'invite-with-logo',
+    html: renderEmailToHtml(
+      React.createElement(InviteEmail, {
+        branding: BRANDING_WITH_LOGO,
         inviteeName: 'Jane Operator',
         inviterName: 'Andres Altamirano',
         tenantName: 'Patriot Concrete Cutting',

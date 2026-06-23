@@ -56,6 +56,8 @@ export default function BrandedEmail({
           /* Mobile: shrink the single content gutter so narrow phones don't waste width */
           @media (max-width: 480px) {
             .email-content-wrapper { padding-left: 24px !important; padding-right: 24px !important; }
+            /* Header gutter matches the body gutter on narrow phones */
+            .email-header { padding-left: 24px !important; padding-right: 24px !important; }
           }
         `}</style>
       </Head>
@@ -93,65 +95,89 @@ export default function BrandedEmail({
               &nbsp;
             </Section>
 
-            {/* White header band: logo + company name + subtitle */}
+            {/* White header band. With a logo: logo + subtitle only (the logo
+                carries the wordmark — no duplicate company name). Without a logo:
+                a clean wordmark heading + subtitle (white-label fallback). */}
             <Section
+              className="email-header"
               style={{
                 backgroundColor: '#ffffff',
-                padding: '32px 40px 24px',
+                padding: '40px 40px 28px',
                 textAlign: 'center',
               }}
             >
               {logoUrl ? (
-                <Img
-                  src={logoUrl}
-                  alt={companyName}
-                  height={72}
-                  style={{
-                    maxHeight: '72px',
-                    maxWidth: '220px',
-                    margin: '0 auto 16px',
-                    display: 'block',
-                  }}
-                />
+                <>
+                  {/* Outlook-safe centering: a 100%-width presentation table with a
+                      center-aligned cell. margin:0 auto is ignored by Outlook. */}
+                  <table
+                    role="presentation"
+                    width="100%"
+                    cellPadding={0}
+                    cellSpacing={0}
+                    style={{ borderCollapse: 'collapse' }}
+                  >
+                    <tbody>
+                      <tr>
+                        <td align="center" style={{ paddingBottom: subtitle ? '16px' : '0' }}>
+                          <Img
+                            src={logoUrl}
+                            alt={companyName}
+                            height={56}
+                            style={{
+                              height: '56px',
+                              width: 'auto',
+                              maxWidth: '200px',
+                              border: 0,
+                              outline: 'none',
+                              textDecoration: 'none',
+                              display: 'inline-block',
+                            }}
+                          />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                  {subtitle && (
+                    <Text
+                      style={{
+                        margin: 0,
+                        color: '#64748b',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                      }}
+                    >
+                      {subtitle}
+                    </Text>
+                  )}
+                </>
               ) : (
-                <Heading
-                  as="h1"
-                  style={{
-                    margin: '0 0 8px',
-                    color: '#0f172a',
-                    fontSize: '26px',
-                    fontWeight: '800',
-                    letterSpacing: '-0.5px',
-                  }}
-                >
-                  {companyName}
-                </Heading>
-              )}
-              {logoUrl && (
-                <Heading
-                  as="h1"
-                  style={{
-                    margin: '0 0 4px',
-                    color: '#0f172a',
-                    fontSize: '22px',
-                    fontWeight: '700',
-                    letterSpacing: '-0.3px',
-                  }}
-                >
-                  {companyName}
-                </Heading>
-              )}
-              {subtitle && (
-                <Text
-                  style={{
-                    margin: 0,
-                    color: '#64748b',
-                    fontSize: '13px',
-                    fontWeight: '500',
-                  }}
-                >
-                  {subtitle}
-                </Text>
+                <>
+                  <Heading
+                    as="h1"
+                    style={{
+                      margin: subtitle ? '0 0 8px' : '0',
+                      color: '#0f172a',
+                      fontSize: '28px',
+                      fontWeight: '800',
+                      letterSpacing: '-0.6px',
+                    }}
+                  >
+                    {companyName}
+                  </Heading>
+                  {subtitle && (
+                    <Text
+                      style={{
+                        margin: 0,
+                        color: '#64748b',
+                        fontSize: '13px',
+                        fontWeight: '500',
+                      }}
+                    >
+                      {subtitle}
+                    </Text>
+                  )}
+                </>
               )}
             </Section>
 
