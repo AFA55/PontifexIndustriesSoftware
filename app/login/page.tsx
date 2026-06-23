@@ -114,7 +114,11 @@ function LoginPageInner() {
     let cancelled = false;
     (async () => {
       try {
-        const remember = localStorage.getItem('pontifex.rememberMe') !== 'false';
+        // Default-OFF: only auto-resume when the user explicitly opted in
+        // (flag === 'true'). A missing flag (brand-new device) is treated as
+        // NOT remembered. Existing users who previously checked remember already
+        // have the flag set to 'true', so they're unaffected.
+        const remember = localStorage.getItem('pontifex.rememberMe') === 'true';
         const storedUser = localStorage.getItem('supabase-user');
         if (!remember || !storedUser) return;
         const { data: { session } } = await supabase.auth.getSession();
@@ -176,7 +180,7 @@ function LoginPageInner() {
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { remember: true }, // "Remember me" checked by default
+    defaultValues: { remember: false }, // "Remember me" unchecked by default — user opts in
   });
 
   // Remember the last username on this device so the email field is pre-filled
@@ -193,7 +197,7 @@ function LoginPageInner() {
     setLoading(true);
     setError(null);
 
-    // Persist the user's "Remember me" choice (default: true / persistent session).
+    // Persist the user's "Remember me" choice (default: false / session-only).
     // This flag drives the rememberAwareStorage adapter in lib/supabase.ts: it is
     // written HERE, before setSession() below, so the session token lands in the
     // correct store immediately — localStorage when remembered (survives restart),

@@ -81,9 +81,12 @@ function CompanyLoginContent() {
 
     (async () => {
       try {
-        // Respect an explicit opt-out: unchecking "Remember me" disables auto
-        // sign-in (the user chose to re-authenticate each visit).
-        const remember = localStorage.getItem('pontifex.rememberMe') !== 'false';
+        // Default-OFF: only auto-resume when the user explicitly opted in
+        // (flag === 'true'). Unchecking "Remember me" writes 'false' and a
+        // brand-new device has no flag at all — both disable auto sign-in so
+        // the user re-authenticates. Existing users who previously checked
+        // remember already have 'true' stored, so they're unaffected.
+        const remember = localStorage.getItem('pontifex.rememberMe') === 'true';
         // Dashboard guards read this profile blob; without it they'd bounce
         // the user back here, so only resume when BOTH halves are present.
         const storedUser = localStorage.getItem('supabase-user');

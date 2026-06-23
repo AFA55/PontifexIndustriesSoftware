@@ -32,7 +32,10 @@ const REMEMBER_KEY = 'pontifex.rememberMe';
 function rememberPersistent(): boolean {
   if (typeof window === 'undefined') return true;
   try {
-    return window.localStorage.getItem(REMEMBER_KEY) !== 'false';
+    // Default OFF: only persistent when the user explicitly opted in ('true').
+    // Matches the login pages' auto-resume guard (=== 'true') so an absent flag
+    // is treated as not-remembered consistently across the app.
+    return window.localStorage.getItem(REMEMBER_KEY) === 'true';
   } catch {
     return true;
   }
