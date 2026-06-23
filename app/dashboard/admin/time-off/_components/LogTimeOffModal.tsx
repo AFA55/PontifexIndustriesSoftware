@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, CalendarOff, Loader2, Bell, ToggleLeft, ToggleRight } from 'lucide-react';
+import { getRoleLabel } from '@/lib/rbac';
 
 interface Operator {
   id: string;
@@ -73,18 +74,19 @@ export default function LogTimeOffModal({
     if (opt) setIsPaid(opt.paidDefault);
   }, [type]);
 
-  // Fetch operators using the active-operators endpoint
+  // Fetch ALL active tenant-scoped profiles (every role) so anyone in the
+  // company can have time off logged — management included. (No ?role= filter →
+  // /api/admin/users returns all active profiles in the caller's tenant.)
   useEffect(() => {
     if (!token) return;
-    fetch('/api/admin/operators/active', {
+    fetch('/api/admin/users', {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(r => r.json())
       .then(json => {
-        const all = (json.data ?? json ?? []) as any[];
+        const all = (json.data ?? []) as any[];
         setOperators(
           all
-            .filter((p: any) => ['operator', 'apprentice'].includes(p.role))
             .map((p: any) => ({ id: p.id, full_name: p.full_name ?? p.name ?? 'Unknown', role: p.role }))
             .sort((a: Operator, b: Operator) => a.full_name.localeCompare(b.full_name))
         );
@@ -96,7 +98,7 @@ export default function LogTimeOffModal({
   const selectedType = TYPE_OPTIONS.find(o => o.value === type);
 
   const handleSubmit = async () => {
-    if (!operatorId) { setError('Please select an operator'); return; }
+    if (!operatorId) { setError('Please select a person'); return; }
     if (!startDate) { setError('Please select a date'); return; }
 
     setSaving(true);
@@ -173,15 +175,15 @@ export default function LogTimeOffModal({
               </div>
             )}
 
-            {/* Operator selector */}
+            {/* Person selector — anyone in the company (every role) */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 dark:text-white/70 mb-1.5">
-                Operator <span className="text-red-400">*</span>
+                Person / Team Member <span className="text-red-400">*</span>
               </label>
               {loadingOps ? (
                 <div className="flex items-center gap-2 px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 text-sm text-gray-400 dark:text-white/30">
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Loading operators...
+                  Loading people...
                 </div>
               ) : (
                 <select
@@ -189,10 +191,10 @@ export default function LogTimeOffModal({
                   onChange={e => setOperatorId(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-900/50 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
                 >
-                  <option value="">Select operator...</option>
+                  <option value="">Select person...</option>
                   {operators.map(op => (
                     <option key={op.id} value={op.id}>
-                      {op.full_name} ({op.role})
+                      {op.full_name} ({getRoleLabel(op.role)})
                     </option>
                   ))}
                 </select>

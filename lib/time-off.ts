@@ -3,33 +3,63 @@
  * (/api/operator/time-off) and the approval route (/api/admin/time-off/[id]).
  *
  * Approval rank rules (enforced SERVER-SIDE, never trust the client):
- *   - Requester is management (admin, operations_manager, salesman, supervisor)
- *     → ONLY super_admin may approve/deny.
- *   - Requester is field/shop staff (operator, apprentice, shop_help,
- *     shop_manager, inventory_manager, …)
- *     → admin, operations_manager, or super_admin may approve/deny.
+ *   - Founder's rule: time-off is NEVER auto-approved; approval authority is
+ *     rank-based.
+ *   - admin / operations_manager may approve requests from anyone whose role
+ *     ranks STRICTLY BELOW admin — i.e. operators, apprentices, AND
+ *     project-manager-level roles (project manager == the `salesman` role key;
+ *     see lib/rbac.ts ROLES_WITH_LABELS) and everything below them.
+ *   - super_admin may approve EVERYONE (incl. admin / operations_manager).
+ *   - No self-approval (enforced in the route).
+ *
+ * "Project manager" maps to role key `salesman` (rank 5 in ROLE_RANK). Because
+ * the rule is expressed in terms of rank-below-admin, any role at or above admin
+ * (admin, operations_manager, super_admin) can ONLY be decided by a super_admin
+ * — fail-safe: an unknown role gets rank 0 (treated as low) but the approver
+ * still needs to outrank it, and only super_admin can clear management.
  */
+
+import { ROLE_RANK } from '@/lib/rbac';
 
 /** Types a requester can pick. vacation/pto are paid; unpaid is not. */
 export const REQUESTABLE_TYPES = ['vacation', 'pto', 'unpaid'] as const;
 export type RequestableType = (typeof REQUESTABLE_TYPES)[number];
 
-/** Roles whose own time-off requests can only be decided by a super_admin. */
-export const MANAGEMENT_REQUESTER_ROLES: string[] = [
-  'admin',
-  'operations_manager',
-  'salesman',
-  'supervisor',
-];
+/** Roles at/above which a request can ONLY be decided by super_admin. */
+export const ADMIN_RANK = ROLE_RANK['admin']; // 6
+
+/**
+ * Roles whose own time-off requests can only be decided by a super_admin
+ * (management tier: admin and above).
+ */
+export const MANAGEMENT_REQUESTER_ROLES: string[] = Object.keys(ROLE_RANK).filter(
+  (r) => (ROLE_RANK[r] ?? 0) >= ADMIN_RANK
+);
 
 /** Required lead time for time-off requests (business rule). */
 export const ADVANCE_NOTICE_DAYS = 28;
 
-/** True when `approverRole` is allowed to decide a request from `requesterRole`. */
+/**
+ * True when `approverRole` is allowed to decide a request from `requesterRole`.
+ *
+ * - super_admin → always allowed.
+ * - admin / operations_manager → allowed ONLY when the requester ranks strictly
+ *   below admin (operators, apprentices, project-managers (`salesman`) and below).
+ *   Management-tier requesters (admin / operations_manager / super_admin) require
+ *   a super_admin approver.
+ * - Any other role → never allowed (fail-safe).
+ *
+ * Self-approval is blocked at the route, not here.
+ */
 export function canDecideTimeOff(approverRole: string, requesterRole: string): boolean {
   if (approverRole === 'super_admin') return true;
-  if (MANAGEMENT_REQUESTER_ROLES.includes(requesterRole)) return false;
-  return ['admin', 'operations_manager'].includes(approverRole);
+  // Only admin / operations_manager may approve at all (below super_admin).
+  if (!['admin', 'operations_manager'].includes(approverRole)) return false;
+  // ...and only for requesters who rank strictly below admin. Anything at or
+  // above admin (incl. unknown roles defensively kept out via the rank check)
+  // is reserved for super_admin.
+  const requesterRank = ROLE_RANK[requesterRole] ?? 0;
+  return requesterRank < ADMIN_RANK;
 }
 
 /**

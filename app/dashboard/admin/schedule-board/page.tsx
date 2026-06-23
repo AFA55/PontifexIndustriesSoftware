@@ -9,7 +9,7 @@ import {
   LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
   UserCheck, UserX, FolderOpen, Timer, Loader2, Settings, Search, X,
   Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw, KeyRound, Copy,
-  MessageSquareOff
+  MessageSquareOff, CalendarOff
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
@@ -107,6 +107,12 @@ export default function ScheduleBoardPage() {
 
   // ═══ TIME-OFF STATE ═══
   const [timeOffMap, setTimeOffMap] = useState<Record<string, { id: string; type: string; notes: string | null }>>({});
+  // Approved time-off for people who are NOT on the operator/helper roster
+  // (management / office staff). They have no schedule slot, so they render in
+  // the "Out Today" card instead of an in-slot OUT marker.
+  const [nonOperatorTimeOff, setNonOperatorTimeOff] = useState<
+    { id: string; operator_id: string; operator_name: string; type: string; notes: string | null }[]
+  >([]);
   const [rowNotesMap, setRowNotesMap] = useState<Record<string, string>>({}); // operatorId → note text
 
   // ═══ ROW ASSIGNMENTS — who's in which crew row (driven by capacityMaxSlots) ═══
@@ -611,15 +617,32 @@ export default function ScheduleBoardPage() {
         if (res.ok) {
           const json = await res.json();
           const map: Record<string, { id: string; type: string; notes: string | null }> = {};
+          // People on the operator/helper roster get an in-slot OUT marker.
+          const rosterIds = new Set<string>([
+            ...Object.values(operatorIdMap),
+            ...Object.values(helperIdMap),
+          ]);
+          const nonRoster: typeof nonOperatorTimeOff = [];
           for (const entry of json.data || []) {
             map[entry.operator_id] = { id: entry.id, type: entry.type, notes: entry.notes };
+            // Anyone NOT on the roster (management / office) → "Out Today" card.
+            if (!rosterIds.has(entry.operator_id)) {
+              nonRoster.push({
+                id: entry.id,
+                operator_id: entry.operator_id,
+                operator_name: entry.operator_name ?? 'Unknown',
+                type: entry.type,
+                notes: entry.notes,
+              });
+            }
           }
           setTimeOffMap(map);
+          setNonOperatorTimeOff(nonRoster);
         }
-      } catch { setTimeOffMap({}); }
+      } catch { setTimeOffMap({}); setNonOperatorTimeOff([]); }
     }
     fetchTimeOff();
-  }, [selectedDate]);
+  }, [selectedDate, operatorIdMap, helperIdMap]);
 
   // ═══ FETCH ROW NOTES ═══
   useEffect(() => {
@@ -1998,6 +2021,38 @@ export default function ScheduleBoardPage() {
                 placeholder="Who's working in the shop today, notes for the crew, special instructions..."
                 className="w-full h-20 px-3 py-2 border border-gray-200 dark:border-white/10 dark:bg-slate-700 dark:text-white dark:placeholder-white/40 rounded-xl text-sm resize-none focus:ring-2 focus:ring-blue-400 focus:border-transparent placeholder:text-gray-400"
               />
+            </div>
+          </div>
+        )}
+
+        {/* ═══ OUT TODAY (management / office on approved time-off) ════ */}
+        {nonOperatorTimeOff.length > 0 && (
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-lg border-2 border-dashed border-amber-300 dark:border-amber-500/40 overflow-hidden">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 px-5 py-2.5">
+              <div className="flex items-center gap-2 text-white">
+                <CalendarOff className="w-4 h-4" />
+                <h3 className="font-bold text-sm">Out Today</h3>
+                <span className="ml-1 text-xs font-semibold bg-white/20 px-2 py-0.5 rounded-full">
+                  {nonOperatorTimeOff.length}
+                </span>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="flex flex-wrap gap-2">
+                {nonOperatorTimeOff.map((p) => (
+                  <div
+                    key={p.id}
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/40"
+                  >
+                    <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                      {p.operator_name}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full bg-amber-200 dark:bg-amber-800/50 text-amber-800 dark:text-amber-200">
+                      {p.type.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}

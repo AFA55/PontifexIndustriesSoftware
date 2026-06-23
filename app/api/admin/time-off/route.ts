@@ -149,10 +149,13 @@ export async function POST(request: NextRequest) {
       is_callout: isCallout,
       callout_reason: isCallout ? (reason || null) : null,
       pto_days_used: ptoDaysUsed,
-      status: 'approved',
+      // NEVER auto-approve (founder's rule): an admin logging an absence still
+      // routes the request through the SAME rank-based approval as a self-service
+      // request. A manager's absence logged by an admin will require a
+      // super_admin to approve, per canDecideTimeOff. Approval/timecard sync
+      // happens only in PATCH /api/admin/time-off/[id].
+      status: 'pending',
       notes: notes || null,
-      approved_by: auth.userId,
-      approved_at: new Date().toISOString(),
       created_by: auth.userId,
       tenant_id: tenantId,
     };
@@ -181,10 +184,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to create time-off entry' }, { status: 500 });
     }
 
-    // Sync operator_pto_balance (fire-and-forget on failure)
-    const currentYear = new Date(date).getFullYear();
-    Promise.resolve(upsertPtoBalance(operator_id, tenantId, currentYear, isCallout, ptoDaysUsed))
-      .catch(() => {});
+    // Sync operator_pto_balance (fire-and-forget on failure).
+    // The entry is created PENDING, so we do NOT debit pto_days_used here — the
+    // PTO debit happens on approval in PATCH /api/admin/time-off/[id] (and is
+    // credited back on deny/cancel). We DO still bump callout_count for
+    // attendance incidents (callout / no_show), which is an incident counter
+    // independent of the approval/PTO flow.
+    if (isCallout) {
+      const currentYear = new Date(date).getFullYear();
+      Promise.resolve(upsertPtoBalance(operator_id, tenantId, currentYear, true, 0))
+        .catch(() => {});
+    }
 
     // Notify admins for callout/no_show types
     if (CALLOUT_TYPES.includes(type)) {
