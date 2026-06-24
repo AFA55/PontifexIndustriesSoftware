@@ -8,10 +8,12 @@ import Link from 'next/link';
 import {
   ChevronLeft, User, Phone, Calendar, Shield, Save,
   Loader2, CheckCircle, Camera, Upload, Bell, ChevronRight,
-  Trash2, AlertTriangle
+  Trash2, AlertTriangle, ScanFace
 } from 'lucide-react';
 import { getCurrentUser, logout } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { isNativeApp } from '@/lib/is-native';
+import { biometricAvailable, biometryLabel, disableBiometric, enrollBiometric, hasEnrolledBiometric } from '@/lib/biometric';
 import Avatar from '@/components/Avatar';
 
 interface MyProfile {
@@ -70,6 +72,58 @@ export default function MyProfilePage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  // Biometric ("Sign in with Face ID / Touch ID") — native app only.
+  const [bioShow, setBioShow] = useState(false);       // hardware available + native
+  const [bioLabel, setBioLabel] = useState('Face ID');
+  const [bioEnrolled, setBioEnrolled] = useState(false);
+  const [bioBusy, setBioBusy] = useState(false);
+  const [bioError, setBioError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!isNativeApp()) return;
+      const { available, biometryType } = await biometricAvailable();
+      if (cancelled || !available) return;
+      setBioShow(true);
+      setBioLabel(biometryLabel(biometryType));
+      setBioEnrolled(await hasEnrolledBiometric());
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const handleToggleBiometric = async () => {
+    setBioError('');
+    setBioBusy(true);
+    try {
+      if (bioEnrolled) {
+        await disableBiometric();
+        setBioEnrolled(false);
+      } else {
+        const { data } = await supabase.auth.getSession();
+        const refreshToken = data.session?.refresh_token;
+        const email = data.session?.user?.email || profile?.email || '';
+        if (!refreshToken || !email) {
+          setBioError('Could not read your session. Please sign in again, then try.');
+          return;
+        }
+        const ok = await enrollBiometric(email, refreshToken);
+        if (ok) {
+          setBioEnrolled(true);
+          // Enabling biometrics IS the durable "remember this device" opt-in — persist
+          // the session to localStorage so a biometric restore survives an app kill.
+          try { localStorage.setItem('pontifex.rememberMe', 'true'); } catch { /* non-fatal */ }
+        } else {
+          setBioError('Could not enable biometric sign-in.');
+        }
+      }
+    } catch {
+      setBioError('Something went wrong. Please try again.');
+    } finally {
+      setBioBusy(false);
+    }
+  };
 
   const handleDeleteAccount = async () => {
     if (deleteConfirm.trim().toUpperCase() !== 'DELETE') return;
@@ -413,6 +467,47 @@ export default function MyProfilePage() {
                 />
               </div>
             </div>
+
+            {/* Security — biometric sign-in toggle (native app only) */}
+            {bioShow && (
+              <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-gray-600 dark:text-gray-200 uppercase tracking-wider flex items-center gap-2 mb-4">
+                  <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  Security
+                </h3>
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                      <ScanFace className="w-4.5 h-4.5 text-blue-600 dark:text-blue-300" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Sign in with {bioLabel}</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {bioEnrolled ? `${bioLabel} sign-in is on for this device` : `Skip your password using ${bioLabel}`}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={bioEnrolled}
+                    aria-label={`Toggle ${bioLabel} sign-in`}
+                    onClick={handleToggleBiometric}
+                    disabled={bioBusy}
+                    className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
+                      bioEnrolled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                        bioEnrolled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+                {bioError && <p className="text-xs text-red-500 dark:text-red-400 mt-3">{bioError}</p>}
+              </div>
+            )}
 
             {/* Settings links */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden shadow-sm">

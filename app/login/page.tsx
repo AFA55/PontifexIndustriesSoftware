@@ -9,8 +9,12 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { biometricAvailable, biometryLabel, clearCredentials, hasSavedCredentials, saveCredentials, verifyAndGetCredentials } from '@/lib/biometric';
+import { biometricAvailable, biometryLabel, disableBiometric, enrolledBiometricEmail, enrollBiometric, hasEnrolledBiometric, verifyAndGetSession } from '@/lib/biometric';
 import { isNativeApp } from '@/lib/is-native';
+
+// localStorage flag (native-only) recording that the user declined the post-login
+// "enable Face ID?" prompt, so we don't nag them again. Distinct from being enrolled.
+const BIOMETRIC_DECLINED_KEY = 'pontifex.biometricDeclined';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
@@ -86,10 +90,15 @@ function LoginPageInner() {
   // Native Face ID / Touch ID sign-in (no-op on the website).
   const [faceIdReady, setFaceIdReady] = useState(false);
   const [bioLabel, setBioLabel] = useState('Face ID');
+  const [bioAvailable, setBioAvailable] = useState(false);
+  // Email the device's biometric entry is bound to (so the button shows whose it is).
+  const [bioEmail, setBioEmail] = useState<string | null>(null);
   // Guards the one-shot Face ID auto-prompt on native app launch.
   const faceIdAutoTried = useRef(false);
-  // Post-login "enable Touch ID?" prompt (website). When set, we hold the
-  // role-based redirect until the user enables or skips.
+  // Post-login "Sign in faster with Face ID?" enrollment prompt (native-only).
+  // When set, we hold the role-based redirect until the user enables or skips.
+  const [enrollPrompt, setEnrollPrompt] = useState<{ email: string; target: string } | null>(null);
+  const [enrolling, setEnrolling] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
@@ -158,9 +167,11 @@ function LoginPageInner() {
     (async () => {
       const { available, biometryType } = await biometricAvailable();
       if (!available) return;
+      setBioAvailable(true);
       setBioLabel(biometryLabel(biometryType));
-      if (!(await hasSavedCredentials())) return;
+      if (!(await hasEnrolledBiometric())) return;
       setFaceIdReady(true);
+      setBioEmail(enrolledBiometricEmail());
 
       if (!isNativeApp() || faceIdAutoTried.current) return;
       // Don't prompt if the user is already signed in (remember-me auto-resume
@@ -192,7 +203,22 @@ function LoginPageInner() {
     } catch { /* storage unavailable — non-fatal */ }
   }, [setValue]);
 
-  const onSubmit = async (data: FormData) => {
+  // Role-based redirect, shared by password + biometric login and the post-login
+  // enrollment prompt. NATIVE: SPA navigation so we stay inside the webview (a full
+  // window.location.assign can hit a host redirect that Capacitor treats as external
+  // and kicks the user to Safari). WEB: full navigation so Safari/iOS + Firefox fire
+  // their native "Save password?" prompt.
+  const navigateAfterLogin = (target: string) => {
+    if (isNativeApp()) {
+      router.replace(target);
+    } else {
+      window.location.assign(target);
+    }
+  };
+
+  // `fromBiometric` = this submit was triggered by a biometric sign-in (skip the
+  // post-login "enable Face ID?" prompt; the user is already enrolled).
+  const onSubmit = async (data: FormData, fromBiometric = false) => {
     console.log('🚀 Starting login process...');
     setLoading(true);
     setError(null);
@@ -272,15 +298,23 @@ function LoginPageInner() {
         /* credential store unsupported / declined — non-fatal */
       }
 
-      // Native app: save credentials to the iOS Keychain so the user can sign in
-      // with Face ID next time (only when "Remember me" is on). Unchecking
-      // "Remember me" also REMOVES any previously saved credentials so the
-      // Face ID button stops offering a sign-in the user opted out of.
-      // Both are no-ops on the website.
-      if (data.remember !== false) {
-        saveCredentials(data.email, data.password).catch(() => {});
-      } else {
-        clearCredentials().catch(() => {});
+      // NOTE: biometric enrollment is NO LONGER coupled to "Remember me". We store
+      // the Supabase refresh token (not the password) in the Keychain only when the
+      // user explicitly opts in via the post-login prompt below or the My Profile →
+      // Security toggle. See lib/biometric.ts + docs/plans/BIOMETRIC_LOGIN_ARCHITECTURE.md.
+
+      // SHARED-DEVICE SAFETY (native): the Keychain biometric entry is keyed only by
+      // app, so if a DIFFERENT user just signed in with a password than the one the
+      // device's Face ID is bound to, invalidate the stale entry — otherwise that
+      // user could later restore the PREVIOUS user's session via Face ID. Clearing it
+      // also lets the post-login enroll prompt below (gated on hasEnrolledBiometric)
+      // offer the NEW user enrollment. Skip when this submit IS a biometric login.
+      if (isNativeApp() && !fromBiometric) {
+        const boundEmail = enrolledBiometricEmail();
+        if (boundEmail && boundEmail.toLowerCase() !== data.email.toLowerCase()) {
+          await disableBiometric(); // also removes pontifex.biometricEmail
+          setFaceIdReady(false);
+        }
       }
 
       // Remember this company for the one-tap fast path on /company-login
@@ -306,19 +340,25 @@ function LoginPageInner() {
         return;
       }
 
-      // NATIVE APP: use SPA navigation so we stay INSIDE the webview. A full
-      // window.location.assign can hit a www↔apex (or any host) redirect that
-      // Capacitor treats as an external URL and kicks the user out to Safari
-      // (the "logged in → opened in browser" bug). The native app remembers the
-      // user via Face ID / Keychain, so it doesn't need the web save-password
-      // full-navigation trick at all.
-      if (isNativeApp()) {
-        router.replace(target);
-      } else {
-        // WEB: full navigation (not router.push) so Safari/iOS + Firefox treat
-        // this as a completed login and fire their native "Save password?" prompt.
-        window.location.assign(target);
+      // NATIVE APP: after a successful PASSWORD login, offer to enable biometric
+      // sign-in ONCE — if biometrics are available, the user isn't already enrolled,
+      // and they haven't previously declined. Hold the redirect until they choose.
+      // (Skip the prompt when this submit was itself triggered by a biometric login.)
+      if (isNativeApp() && bioAvailable && !fromBiometric) {
+        try {
+          const declined = localStorage.getItem(BIOMETRIC_DECLINED_KEY) === 'true';
+          const alreadyEnrolled = await hasEnrolledBiometric();
+          if (!declined && !alreadyEnrolled) {
+            setEnrollPrompt({ email: data.email, target });
+            setLoading(false);
+            return; // navigation happens after the user enables / skips
+          }
+        } catch {
+          /* localStorage / plugin unavailable — fall through to normal navigation */
+        }
       }
+
+      navigateAfterLogin(target);
       // Keep loading state true during navigation - it will unmount anyway
     } catch (err: any) {
       console.error('💥 Unexpected login error:', err);
@@ -331,18 +371,167 @@ function LoginPageInner() {
     }
   };
 
-  // Face ID / Touch ID sign-in: prompt biometrics → retrieve the stored credentials
-  // → run the normal login. Only shown in the native app when credentials are saved.
+  // Face ID / Touch ID sign-in: the OS-enforced biometric prompt releases the stored
+  // Supabase REFRESH TOKEN from the Keychain (the security gate is the accessControl
+  // on the Keychain item, not a JS boolean). We mint a fresh session from it via
+  // refreshSession, then re-store the rotated token (Supabase single-uses refresh
+  // tokens). Only shown in the native app when biometric sign-in is enrolled.
   const handleFaceIdLogin = async () => {
     setError(null);
-    const creds = await verifyAndGetCredentials(`Sign in to ${branding.company_name || 'Pontifex'}`);
-    if (!creds) return; // user cancelled or biometric failed
-    setValue('email', creds.email);
-    setValue('password', creds.password);
-    await onSubmit({ email: creds.email, password: creds.password, remember: true });
+    const result = await verifyAndGetSession(`Sign in to ${branding.company_name || 'Pontifex'}`);
+    if (!result) return; // user cancelled, biometric failed, or token invalidated
+    setLoading(true);
+    try {
+      // Enrolling biometrics IS the durable "remember this device" opt-in, so a
+      // biometric restore must persist. Set rememberMe=true BEFORE refreshSession so
+      // the rememberAwareStorage adapter writes the restored session to localStorage
+      // (survives app kill) instead of sessionStorage (default-OFF → dies on restart).
+      try { localStorage.setItem('pontifex.rememberMe', 'true'); } catch { /* non-fatal */ }
+
+      // Mint a fresh session from the stored refresh token. refreshSession() returns
+      // a new session regardless of access-token expiry, given a valid refresh token.
+      const { data, error: refreshError } = await supabase.auth.refreshSession({
+        refresh_token: result.refreshToken,
+      });
+      const session = data?.session;
+      if (refreshError || !session) {
+        // Token revoked / expired server-side (e.g. password changed, signed out
+        // elsewhere). Drop the stale Keychain entry and fall back to the password form.
+        await disableBiometric();
+        setFaceIdReady(false);
+        setError('Biometric sign-in expired. Please sign in with your password.');
+        setLoading(false);
+        return;
+      }
+
+      // Token rotation hygiene: Supabase rotated the refresh token on this refresh,
+      // so re-store the NEW one to keep the Keychain copy valid for next time.
+      if (session.refresh_token) {
+        enrollBiometric(result.email, session.refresh_token).catch(() => {});
+      }
+
+      // Resolve the dashboard profile blob the guards read, then route by role.
+      let role = '';
+      let target: string | null = null;
+      let profileWritten = false;
+      try {
+        const res = await fetch('/api/my-profile', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const json = await res.json();
+        role = json?.data?.role || '';
+        if (json?.data) {
+          localStorage.setItem('supabase-user', JSON.stringify({
+            id: json.data.id,
+            name: json.data.full_name,
+            email: json.data.email,
+            role: json.data.role,
+          }));
+          profileWritten = true;
+        }
+      } catch {
+        /* profile fetch failed — fall back to the minimal blob below */
+      }
+      // FALLBACK: if the profile fetch failed/empty, still write a minimal
+      // supabase-user blob from the restored session so the dashboard guard reads a
+      // non-null user and RENDERS instead of bouncing back to /login. Role is
+      // best-effort from app_metadata; the dashboard re-guards by role server-side.
+      if (!profileWritten) {
+        const u = session.user;
+        role = (u?.app_metadata?.role as string) || (u?.user_metadata?.role as string) || '';
+        try {
+          localStorage.setItem('supabase-user', JSON.stringify({
+            id: u?.id,
+            name: (u?.user_metadata?.full_name as string) || result.email,
+            email: u?.email || result.email,
+            role,
+          }));
+        } catch { /* non-fatal */ }
+      }
+      try { localStorage.setItem('pontifex.lastEmail', result.email); } catch { /* non-fatal */ }
+
+      if (role === 'super_admin') target = '/dashboard/platform';
+      else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(role)) target = '/dashboard/admin';
+      else if (['operator', 'apprentice'].includes(role)) target = '/dashboard';
+      else target = '/dashboard'; // safe default; the dashboard re-guards by role
+
+      navigateAfterLogin(target);
+    } catch {
+      setError('Biometric sign-in failed. Please sign in with your password.');
+      setLoading(false);
+    }
+  };
+
+  // Enrollment prompt handlers (native-only). On Enable → grab the CURRENT session's
+  // refresh token and store it behind biometrics. On Skip → remember the decline.
+  const handleEnableBiometric = async () => {
+    if (!enrollPrompt) return;
+    setEnrolling(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const refreshToken = data.session?.refresh_token;
+      if (refreshToken) {
+        await enrollBiometric(enrollPrompt.email, refreshToken);
+        try { localStorage.removeItem(BIOMETRIC_DECLINED_KEY); } catch { /* non-fatal */ }
+        // Enabling biometrics IS the durable "remember this device" opt-in — persist
+        // the session to localStorage so it survives an app kill (see M1).
+        try { localStorage.setItem('pontifex.rememberMe', 'true'); } catch { /* non-fatal */ }
+      }
+    } catch {
+      /* enrollment failed — proceed to the dashboard anyway */
+    } finally {
+      const target = enrollPrompt.target;
+      setEnrolling(false);
+      setEnrollPrompt(null);
+      navigateAfterLogin(target);
+    }
+  };
+
+  const handleSkipBiometric = () => {
+    if (!enrollPrompt) return;
+    try { localStorage.setItem(BIOMETRIC_DECLINED_KEY, 'true'); } catch { /* non-fatal */ }
+    const target = enrollPrompt.target;
+    setEnrollPrompt(null);
+    navigateAfterLogin(target);
   };
 
   return (
+    <>
+    {/* Native-only post-login enrollment prompt. Holds the redirect until the user
+        chooses to enable biometric sign-in or skip. */}
+    {enrollPrompt && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 text-center"
+        >
+          <div className="mx-auto mb-4 w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center">
+            <ScanFace className="w-7 h-7 text-blue-600" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900 mb-1">Sign in faster next time?</h2>
+          <p className="text-sm text-gray-600 mb-5">
+            Use {bioLabel} to sign in without typing your password.
+          </p>
+          <button
+            type="button"
+            onClick={handleEnableBiometric}
+            disabled={enrolling}
+            className="w-full py-3 rounded-xl text-white font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-2"
+          >
+            {enrolling ? 'Enabling…' : `Enable ${bioLabel}`}
+          </button>
+          <button
+            type="button"
+            onClick={handleSkipBiometric}
+            disabled={enrolling}
+            className="w-full py-3 rounded-xl text-gray-500 font-semibold hover:text-gray-700 transition-colors disabled:opacity-50"
+          >
+            Not now
+          </button>
+        </motion.div>
+      </div>
+    )}
     <div
       className="min-h-screen flex items-center justify-center relative overflow-hidden"
       style={{
@@ -403,7 +592,7 @@ function LoginPageInner() {
         </div>
 
         {/* Login Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3 sm:space-y-5">
+        <form onSubmit={handleSubmit((data) => onSubmit(data))} className="space-y-3 sm:space-y-5">
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
@@ -510,7 +699,7 @@ function LoginPageInner() {
               transition={{ delay: 0.75 }}
               className="w-full py-3 sm:py-3.5 rounded-xl border-2 border-gray-200 bg-white text-gray-700 font-semibold flex items-center justify-center gap-2 hover:border-blue-400 hover:text-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <ScanFace size={20} /> Sign in with {bioLabel}
+              <ScanFace size={20} /> Sign in{bioEmail ? ` as ${bioEmail.split('@')[0]}` : ''} with {bioLabel}
             </motion.button>
           )}
 
@@ -623,6 +812,7 @@ function LoginPageInner() {
         </motion.div>
       </motion.div>
     </div>
+    </>
   );
 }
 

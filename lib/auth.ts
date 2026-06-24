@@ -63,6 +63,17 @@ export const logout = async (): Promise<void> => {
     // Supabase signOut may fail if no session exists
   }
 
+  // Clear the biometric Keychain entry. We now store the Supabase REFRESH TOKEN
+  // (not the password) behind Face ID, and signOut() revokes that token server-side
+  // — so a preserved Keychain copy would be a dead/invalid token. The user re-enrolls
+  // on their next password login (the post-login prompt offers it again). No-op on web.
+  try {
+    const { disableBiometric } = await import('@/lib/biometric');
+    await disableBiometric();
+  } catch {
+    /* biometric plugin absent / web — non-fatal */
+  }
+
   localStorage.removeItem('patriot-user');
   localStorage.removeItem('supabase-user');
   localStorage.removeItem('platform-user');
@@ -79,8 +90,9 @@ export const logout = async (): Promise<void> => {
   //  - localStorage 'pontifex.lastCompany' → powers the one-tap "Continue to
   //    {Company}" fast path on /company-login (no re-typing the company code)
   //  - localStorage 'pontifex.rememberMe' → the user's remember-me preference
-  //  - iOS Keychain credentials (lib/biometric.ts) → powers "Sign in with Face ID"
-  //    after logout. Only an explicit "Remember me" opt-out clears them.
+  // NOTE: the iOS Keychain biometric entry is CLEARED above (it holds a Supabase
+  // refresh token that signOut() revokes, so keeping it would store a dead token).
+  // The user re-enrolls on their next password login via the post-login prompt.
   console.log('User logged out');
 };
 
