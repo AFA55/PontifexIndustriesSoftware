@@ -1629,6 +1629,7 @@ function OperatorTimecardDetailPageInner() {
               const hasActive = dayEntries.some(e => !e.clock_out_time);
               const hasPending = dayEntries.some(e => !e.is_approved);
               const isToday = date === new Date().toISOString().split('T')[0];
+              const hasSubsistence = subsistenceNights.includes(date);
 
               return (
                 <div
@@ -1681,6 +1682,14 @@ function OperatorTimecardDetailPageInner() {
                         {allApproved && hasEntries && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400">
                             <Check size={9} />
+                          </span>
+                        )}
+                        {hasSubsistence && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-700/50"
+                            title="Out-of-town overnight (subsistence)"
+                          >
+                            <Moon size={9} /> Subs.
                           </span>
                         )}
                       </div>

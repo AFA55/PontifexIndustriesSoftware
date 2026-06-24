@@ -9,7 +9,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
-import { toLocalYMD } from '@/lib/dates';
 
 export async function POST(
   request: NextRequest,
@@ -121,8 +120,24 @@ export async function POST(
     // This MUST NOT block or fail the operator's day-complete flow.
     const jobIsOutOfTown = job?.scheduling_flexibility?.out_of_town === true;
     if (jobIsOutOfTown && typeof stayed_overnight === 'boolean') {
-      // Local calendar date (NEVER the UTC `today` above — date-rule compliant).
-      const nightDate = toLocalYMD();
+      // Calendar night in the TENANT timezone — MUST match the clock-in route's
+      // derivation (app/api/timecard/clock-in/route.ts) exactly, or a late-night
+      // US clock-in and this day-complete write land on different night_date rows
+      // and the (operator_id, night_date) unique row never converges → a single
+      // night gets double-counted in payroll. NEVER toLocalYMD() (server-local =
+      // UTC on Vercel) here. Default tz mirrors the clock-in route.
+      let tenantTz = 'America/New_York';
+      try {
+        const { data: tzRow } = await supabaseAdmin
+          .from('tenants')
+          .select('timezone')
+          .eq('id', tenantId)
+          .maybeSingle();
+        if (tzRow?.timezone) tenantTz = tzRow.timezone;
+      } catch {
+        // Non-critical — fall back to the default tz (same as clock-in route).
+      }
+      const nightDate = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
       if (stayed_overnight === true) {
         // Idempotent: one subsistence night per operator per calendar date.
         Promise.resolve(

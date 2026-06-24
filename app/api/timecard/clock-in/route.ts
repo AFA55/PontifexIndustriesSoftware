@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
       // Remote / approval fields
       remote_photo_url,           // selfie URL for remote clock-in
       requires_approval,          // boolean — true for gps_remote clock-ins
+      out_of_town,                // boolean — asked on each remote clock-in (overnight per-diem)
     } = body;
 
     const work_location: 'field' | 'shop' =
@@ -376,6 +377,7 @@ export async function POST(request: NextRequest) {
       remote_photo_url: (remote_photo_url && remote_photo_url !== 'photo-upload-failed') ? remote_photo_url : null,
       requires_approval: needsApproval,
       work_location,
+      out_of_town: out_of_town === true,
     };
 
     if (clock_in_method === 'remote' || clock_in_method === 'gps_remote') {
@@ -400,6 +402,28 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to clock in' },
         { status: 500 }
       );
+    }
+
+    // -- Subsistence (out-of-town overnight) — fire-and-forget side effect --
+    // Recorded on a REMOTE clock-in when the operator says they're working out
+    // of town overnight. One night per operator per calendar date (idempotent on
+    // the unique (operator_id, night_date) constraint). night_date uses the same
+    // tenant-tz local date the timecard row already uses (todayDate). This MUST
+    // NEVER block the clock-in — mirrors daily-log/route.ts.
+    const isRemoteMethod = clock_in_method === 'remote' || clock_in_method === 'gps_remote';
+    if (out_of_town === true && isRemoteMethod) {
+      Promise.resolve(
+        supabaseAdmin.from('subsistence_nights').upsert(
+          {
+            tenant_id: tenantId,
+            operator_id: user.id,
+            night_date: todayDate,
+            job_order_id: null,
+            source: 'operator',
+          },
+          { onConflict: 'operator_id,night_date' }
+        )
+      ).then(() => {}).catch(() => {});
     }
 
     // -- GPS suspicious jump detection (fire-and-forget audit log) --

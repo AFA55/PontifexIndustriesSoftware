@@ -20,6 +20,7 @@ interface NfcClockInModalProps {
     nfc_tag_id?: string;
     nfc_tag_uid?: string;
     remote_photo_url?: string;
+    out_of_town?: boolean;
     latitude: number;
     longitude: number;
     accuracy?: number;
@@ -192,6 +193,9 @@ export default function NfcClockInModal({
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [jobsiteGpsStatus, setJobsiteGpsStatus] = useState<GpsStatus>('idle');
   const [jobsiteCoords, setJobsiteCoords] = useState<{ latitude: number; longitude: number; accuracy: number } | null>(null);
+  // Out-of-town (overnight) question — asked on EACH remote clock-IN. Must be
+  // answered before Clock In is enabled. null = unanswered.
+  const [outOfTown, setOutOfTown] = useState<boolean | null>(null);
 
   // Testing bypass code (for verifying flow at home, etc.)
   const [bypassCode, setBypassCode] = useState('');
@@ -207,6 +211,9 @@ export default function NfcClockInModal({
 
   // Clock-out convenience
   const isClockOut = isClockedIn && !!onClockOut;
+
+  // Out-of-town question gate (clock-IN only).
+  const outOfTownUnanswered = !isClockOut && outOfTown === null;
 
   // ── Clock-OUT mode: reuse GPS path directly ──
   useEffect(() => {
@@ -291,6 +298,7 @@ export default function NfcClockInModal({
       await onClockIn({
         method: 'remote',
         remote_photo_url: photoPath,
+        out_of_town: outOfTown === true,
         latitude: jobsiteCoords?.latitude ?? 0,
         longitude: jobsiteCoords?.longitude ?? 0,
         accuracy: jobsiteCoords?.accuracy,
@@ -471,6 +479,7 @@ export default function NfcClockInModal({
                         setPhotoPreview(null);
                         setJobsiteGpsStatus('idle');
                         setJobsiteCoords(null);
+                        setOutOfTown(null);
                         setFlow('jobsite_camera');
                       }}
                       className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-emerald-200 dark:border-emerald-700/40 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-800/30 transition-all text-left group"
@@ -564,6 +573,7 @@ export default function NfcClockInModal({
                           setPhotoPreview(null);
                           setJobsiteGpsStatus('idle');
                           setJobsiteCoords(null);
+                          setOutOfTown(null);
                           setFlow('jobsite_camera');
                         }}
                         className="w-full py-3 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold text-sm active:scale-[0.98] transition-all flex items-center justify-center gap-2"
@@ -778,9 +788,53 @@ export default function NfcClockInModal({
                   </p>
                 </div>
 
+                {/* Out-of-town (overnight) — asked on every remote clock-IN */}
+                {!isClockOut && (
+                  <div className="bg-white dark:bg-white/[0.05] rounded-xl border border-gray-200 dark:border-white/10 p-3">
+                    <div className="flex items-center gap-2.5 mb-2.5">
+                      <div className="p-1.5 bg-violet-100 dark:bg-violet-900/40 rounded-lg">
+                        <MapPin className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                      </div>
+                      <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Are you working out of town (overnight)?</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOutOfTown(true)}
+                        className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                          outOfTown === true
+                            ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/30 ring-1 ring-violet-400/30'
+                            : 'bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        {outOfTown === true && <CheckCircle className="w-4 h-4" />}
+                        Yes
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOutOfTown(false)}
+                        className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                          outOfTown === false
+                            ? 'bg-slate-700 dark:bg-white/20 text-white shadow-md ring-1 ring-slate-500/30'
+                            : 'bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        {outOfTown === false && <CheckCircle className="w-4 h-4" />}
+                        No
+                      </button>
+                    </div>
+                    {outOfTownUnanswered && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                        Please answer before clocking in.
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <button
                   onClick={isClockOut ? confirmRemoteClockOut : confirmJobsiteClockIn}
-                  disabled={!photoFile || jobsiteGpsStatus === 'acquiring' || jobsiteGpsStatus === 'idle'}
+                  disabled={!photoFile || jobsiteGpsStatus === 'acquiring' || jobsiteGpsStatus === 'idle' || outOfTownUnanswered}
                   className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:from-emerald-600 hover:to-teal-700 active:scale-[0.98] transition-all"
                 >
                   {isClockOut ? 'Clock Out (Needs Approval)' : 'Clock In (Needs Approval)'}

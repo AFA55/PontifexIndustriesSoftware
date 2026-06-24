@@ -97,6 +97,10 @@ function TimecardPage() {
   const [correctionSuccess, setCorrectionSuccess] = useState(false);
   // Operator's own PTO balance (read-only view)
   const [pto, setPto] = useState<{ allocated: number; used: number; remaining: number; callouts: number } | null>(null);
+  // Subsistence (per-diem) nights for the visible week + tenant rate ($/night).
+  // Operator-own RLS on subsistence_nights permits this direct read.
+  const [subsistenceNights, setSubsistenceNights] = useState<Set<string>>(new Set());
+  const [subsistenceRate, setSubsistenceRate] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -123,6 +127,41 @@ function TimecardPage() {
   }, []);
 
   const { monday, sunday } = useMemo(() => getWeekBounds(currentWeekOffset), [currentWeekOffset]);
+
+  // Fetch the visible week's subsistence nights (operator-own) + tenant rate.
+  useEffect(() => {
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const startStr = toLocalDateStr(monday);
+      const endStr = toLocalDateStr(sunday);
+
+      // Nights for the week (operator-own RLS scopes to this user).
+      const { data: nights } = await supabase
+        .from('subsistence_nights')
+        .select('night_date')
+        .gte('night_date', startStr)
+        .lte('night_date', endStr);
+      setSubsistenceNights(new Set((nights ?? []).map((n: { night_date: string }) => n.night_date)));
+
+      // Tenant subsistence rate ($/night). Resolve the user's tenant first
+      // (own-row RLS), then read that tenant's settings row — the settings
+      // read policy is not tenant-scoped, so filter explicitly.
+      const { data: prof } = await supabase
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', session.user.id)
+        .maybeSingle();
+      if (prof?.tenant_id) {
+        const { data: settings } = await supabase
+          .from('timecard_settings_v2')
+          .select('subsistence_rate')
+          .eq('tenant_id', prof.tenant_id)
+          .maybeSingle();
+        setSubsistenceRate(Number(settings?.subsistence_rate) || 0);
+      }
+    })().catch(() => {});
+  }, [monday, sunday]);
 
   useEffect(() => {
     const currentUser = getCurrentUser();
@@ -329,10 +368,11 @@ function TimecardPage() {
         totalHrs,
         isToday: dateStr === toLocalDateStr(new Date()),
         hasEntries: dayEntries.length > 0,
+        hasSubsistence: subsistenceNights.has(dateStr),
       });
     }
     return days;
-  }, [monday, weekData]);
+  }, [monday, weekData, subsistenceNights]);
 
   // Convert ISO timestamp to datetime-local value (YYYY-MM-DDTHH:MM)
   const toLocalDatetimeValue = (isoString: string): string => {
@@ -636,9 +676,27 @@ function TimecardPage() {
                   style={{ width: `${Math.min((day.totalHrs / 10) * 100, 100)}%` }}
                 />
               </div>
+              {/* Subsistence (overnight out-of-town) marker */}
+              {day.hasSubsistence && (
+                <span className="mt-1 inline-flex items-center justify-center gap-0.5 px-1 py-0.5 rounded text-[9px] font-semibold border bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-700/50 leading-none">
+                  <Moon size={9} /><span className="hidden sm:inline">Subs.</span>
+                </span>
+              )}
             </div>
           ))}
         </div>
+
+        {/* ── Subsistence week total ─────────────────────── */}
+        {subsistenceNights.size > 0 && (
+          <div className="mb-5 flex items-center gap-3 px-4 py-3 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700/50 rounded-lg">
+            <Moon size={16} className="text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+            <p className="text-sm text-indigo-700 dark:text-indigo-300">
+              <strong>Subsistence: {subsistenceNights.size} {subsistenceNights.size === 1 ? 'night' : 'nights'}</strong>
+              {subsistenceRate > 0 && ` · $${(subsistenceNights.size * subsistenceRate).toFixed(0)}`}
+              <span className="text-indigo-600/70 dark:text-indigo-400/70"> this week (out-of-town overnight)</span>
+            </p>
+          </div>
+        )}
 
         {/* ── PDF Download ──────────────────────────────── */}
         <div className="mb-5 flex justify-end">

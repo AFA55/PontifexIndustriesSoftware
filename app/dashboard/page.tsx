@@ -400,6 +400,7 @@ export default function Dashboard() {
     nfc_tag_id?: string;
     nfc_tag_uid?: string;
     remote_photo_url?: string;
+    out_of_town?: boolean;
     latitude: number;
     longitude: number;
     accuracy?: number;
@@ -431,6 +432,7 @@ export default function Dashboard() {
           nfc_tag_id: data.nfc_tag_id,
           nfc_tag_uid: data.nfc_tag_uid,
           remote_photo_url: data.remote_photo_url,
+          out_of_town: data.out_of_town,
         }),
       });
 
