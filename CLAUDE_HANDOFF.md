@@ -1,6 +1,6 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jun 22, 2026 (PT2) | **Branch:** `main` | **Prod:** ✅ LIVE (web deployed at `a0bf8bcb`; local HEAD `2e4af405` — 4 NEW web-affecting commits unpushed, see below) | **iOS:** Build 9 in App Store review | **Android:** in Google Play review
+**Last updated:** Jun 23, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (web deployed at `113cd77a`; only 1 docs commit unpushed) | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** in Google Play review
 
 > **New session? Read this top-to-bottom once, then work from [BACKLOG.md](BACKLOG.md).**
 > This file = where we are + how we work. BACKLOG.md = what to do next. [CLAUDE.md](CLAUDE.md) = the hard conventions (RLS, dates, auth, email, push-cost). [docs/SESSION_LOG.md](docs/SESSION_LOG.md) = older history.
@@ -13,26 +13,24 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 
 | Surface | Status |
 |---|---|
-| **Web** | ✅ LIVE — `pontifexindustries.com` (deployed `a0bf8bcb`). This is the product; the mobile apps are thin wrappers around it. |
-| **iOS** | Build 9 / **v1.0.4** — submitted, **"Waiting for Review."** (v1.0.2 is the currently-public version.) May be gated on the Apple **Developer Agreement re-acceptance** by the Account Holder. |
-| **Android** | **v1.0.1 / versionCode 2 — IN REVIEW** on Google Play (production track, United States). Managed publishing is OFF → **auto-publishes when Google approves** (first review on a new account: up to ~7 days). |
+| **Web** | ✅ LIVE — `pontifexindustries.com` (deployed `113cd77a`, Jun 23). This is the product; the mobile apps are thin wrappers around it. |
+| **iOS** | ✅ **v1.0.4 APPROVED — "Ready for Distribution"** + set to **Automatically release** (the Jun-24-11am date in ASC is the *unselected* third option, ignore it). Developer Agreement re-accept = DONE. Releasing v1.0.4 delivers the native Face ID plugin to users. |
+| **Android** | **v1.0.1 / versionCode 2 — IN REVIEW** on Google Play. Auto-publishes when Google approves. |
 
 **The mobile apps are a remote-URL Capacitor webview that loads `pontifexindustries.com`.** This is the single most important architectural fact: **web/UI/API changes ship to BOTH apps instantly via a Vercel deploy — no App Store / Play build needed.** Only *native* changes (icon, splash, plugins, Info.plist/AndroidManifest, Capacitor config) require a store build.
 
-### Unpushed commits (local only — push held per cost rule)
-**Jun 22 PT2 — NEW, web-affecting (a push deploys these to prod + both apps):**
-- `b2e68357` — **email white-label migration** (all 13 raw-HTML transactional emails → react-email; removed hardcoded-Patriot leaks; demo-request off raw fetch). Guardian PASS. Previews in `docs/reference/email-previews/`.
-- `a5fdc9df` — **notifications deep-link** (schedule-board bell now routes on click; deleted broken dupe).
-- `20b1df36` — **remote clock-in/out photos fixed** (new PRIVATE `timecard-photos` bucket + server upload + signed URLs; client aborts on fail, no more `photo-upload-failed` sentinel) + **out-of-radius clock-out auto-creates an edit request** + **storage RLS security fix** (dropped cross-tenant-leaking policies). Guardian PASS, rls-auditor verified.
-- `2e4af405` — **late flag recomputes on edit** (all 4 edit routes, shared `computeLate`, strict `>7`, tenant-tz, timecard's own date). Guardian PASS, 17/17 tests.
+### Shipped + LIVE (Jun 22–23) — all pushed, verified
+**Jun 23 batch (deployed `113cd77a`):**
+- **Maps address autocomplete FIXED** (`113cd77a`) — TRUE root cause was our **CSP in `middleware.ts`** (`script-src` lacked `maps.googleapis.com` → browser blocked the Maps script client-side; zero traffic reached Google). Added the Google origins to `script-src`/`connect-src`. **Verified live: `fetchAutocompleteSuggestions` returns 5 suggestions.** (Also done: dedicated website-restricted key "Pontifex Web Maps Key" in GCP project `quantum-conduit-482219-a1` w/ www referrer + Maps JS + Places New + billing; `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` swapped in Vercel. The old key `AIzaSyB4kg…` was orphaned/unmanageable — retired.)
+- **Time-off** (`b77ca30e`+`4d120ecd`) — Log modal lists ALL company profiles; rank approval (admin→below-admin incl. PM/salesman+supervisor, super_admin→all, no auto/self-approve); **callouts/no-shows immediate + notify ALL management**, planned requests pending + notify approvers; schedule-board **"Out Today"** card for non-operators.
+- **Email header** (`e67d39f2`) — logo renders/centers/spacing (Outlook-safe), no dup name, white-label-safe.
+- **Remember Me default OFF** (`c736406b`) — opt-in; existing remembered users unaffected.
+- **Secure biometric Face ID** (`dca49afd`) — stores Supabase **refresh token** (not password) in Keychain, **OS-enforced** (`BIOMETRY_CURRENT_SET`), decoupled from Remember Me, explicit opt-in (post-login prompt + My Profile→Security toggle), per-user-bound. **Web-only — no new iOS build** (Build 9 has plugin 8.4.5). Plan: `docs/plans/BIOMETRIC_LOGIN_ARCHITECTURE.md`.
 
-Older **native/tooling-only** commits (no web effect, ride the same push):
-- `4c95d061` — iOS Build 9 version bump (MARKETING 1.0.4 / BUILD 9)
-- `1f730b02` — Android manifest fix (removed `READ_MEDIA_IMAGES`/`VIDEO` to pass Play policy; versionCode 2)
-- `c5e4cd50` — `scripts/play-upload.mjs` (Play Developer API uploader)
+**Jun 22 batch (deployed `0aaf111d`):** email white-label migration · notif-bell deep-link · remote-photo storage + out-of-radius auto-edit-request + storage RLS fix · late-recompute-on-edit · email UI polish (invoice clipping).
 
-> **4 new DB migrations already applied to prod** (additive/idempotent): `timecard_photos_bucket`, `timecard_photos_drop_broad_policies`, `timecard_corrections_metadata`, `notifications_action_url`.
-> **Address-autocomplete (founder bug):** NOT a code bug — code is correct & wired. Blocked on founder enabling **Places API (New)** in Google Cloud (+ confirm `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` is in Vercel Production). Verifiable only on the deployed domain, not localhost.
+> **Only 1 unpushed commit:** `9faf1194` (BACKLOG.md doc note) — held to avoid a billed build for a doc-only change; rides the next real change.
+> **DB migrations applied to prod** (additive/idempotent): `timecard_photos_bucket`, `timecard_photos_drop_broad_policies`, `timecard_corrections_metadata`, `notifications_action_url` (Jun 22). No new migrations Jun 23.
 
 ### What shipped recently (the launch arc, Jun 20–22)
 - **Timecards batch** (live `a0bf8bcb`): correction-request 404 fix, km→**miles** distance everywhere, **configurable start-time + late-entries** system (`lib/timecard-start.ts` resolution chain: job ticket > per-day override > tenant standard; new `/dashboard/admin/timecards/late` page + `timecard_day_overrides` table), geofence detail + remote-clock-in review tab.
