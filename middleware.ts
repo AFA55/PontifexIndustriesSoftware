@@ -90,13 +90,18 @@ export function middleware(request: NextRequest) {
     'Content-Security-Policy',
     [
       "default-src 'self'",
+      // Google Maps JS (address autocomplete) injects an external <script> from
+      // maps.googleapis.com — it MUST be allowed here or the browser blocks it
+      // client-side (blocked:csp) and autocomplete silently falls back to manual entry.
       isDev
-        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"  // hot reload needs unsafe-eval in dev
-        : "script-src 'self' 'unsafe-inline'",
+        ? "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://maps.googleapis.com"  // hot reload needs unsafe-eval in dev
+        : "script-src 'self' 'unsafe-inline' https://maps.googleapis.com",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://maps.googleapis.com https://api.stripe.com",
+      // maps.gstatic.com serves Maps loader sub-resources; *.googleapis.com covers
+      // Places (New) autocomplete XHRs in addition to the Supabase/Stripe endpoints.
+      "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://maps.gstatic.com https://api.stripe.com",
       "frame-src 'none'",
       "object-src 'none'",
       "base-uri 'self'",
