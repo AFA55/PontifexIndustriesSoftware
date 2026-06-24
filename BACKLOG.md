@@ -9,14 +9,14 @@
 | | |
 |---|---|
 | **Phase** | 🚀 **LAUNCHING** — web live; both mobile apps in store review |
-| **Prod** | ✅ LIVE — pontifexindustries.com (web `a0bf8bcb` — timecards batch + react-email white-label + start-time/late-entries + geofence/remote review) |
-| **iOS** | Build 9 / v1.0.4 — **submitted, "Waiting for Review"** (v1.0.2 currently public). May be gated on Apple Developer Agreement re-acceptance. |
-| **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). Managed publishing OFF → auto-publishes on approval. Photo-permission block fixed; uploaded via new `scripts/play-upload.mjs`. |
-| **Open** | P0: ~0 (launch done) · P1: ~6 · P2: ~15 · P3: ~9 |
-| **In flight** | Jarvis Phase 1 LIVE ✅ → Phase 2 (Claude brain, text) next — awaiting founder AI-Gateway greenlight |
-| **Blocked on founder** | 🔴 Apple Developer Agreement re-accept (ASC) · **Enable Places API (New) in Google Cloud (THE address-autocomplete fix — code is correct, this is the only blocker)** · Approve Bryan's request · Sentry DSN |
-| **Unpushed commits** | 🟡 **NEW (Jun 22 PT2, web-affecting — need a push to go live):** `b2e68357` email white-label migration · `a5fdc9df` notif-bell deep-link · `20b1df36` remote-photo storage + out-of-radius auto-edit-request (+ storage RLS security fix) · `2e4af405` late-recompute-on-edit. Plus the older 15 native/tooling/docs commits. One push deploys all. |
-| **Last groomed** | Jun 22, 2026 (PT2) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (deployed `0aaf111d` — timecards batch + react-email white-label + email UI polish + remote-photo storage + late-recompute) |
+| **iOS** | ✅ **APPROVED — v1.0.4 / Build 9 "Ready for Distribution"** (Apple review passed Jun 23). Apple Developer Agreement re-accept = **DONE** (founder signed). |
+| **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). Auto-publishes on approval. |
+| **Open** | P0: ~0 · P1: ~5 · P2: ~15 · P3: ~9 |
+| **In flight** | Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
+| **Blocked on founder** | 🗺️ **Maps incognito/phone test** (503 traced to browser/network block, not config — verify it works for real users) · Approve Bryan's request · Sentry DSN · (AI-Gateway greenlight for Jarvis) |
+| **Unpushed commits** | 🟡 **5 staged (Jun 23, web-affecting — one push deploys all):** `b77ca30e`+`4d120ecd` time-off (all-profiles selector, rank approval, callout-immediate+notify-all-mgmt, schedule-board Out Today) · `e67d39f2` email header logo/centering · `c736406b` Remember-Me default-OFF · `dca49afd` secure biometric Face ID (refresh-token in Keychain). All guardian-PASS. |
+| **Last groomed** | Jun 23, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
 
@@ -56,7 +56,8 @@
 
 ## 🟠 P1 (added Jun 12 — schedule-form session)
 
-- [ ] **🔴 FOUNDER: set a BILLING ACCOUNT on the Maps project (root cause found Jun 22 PT2).**
+- [ ] **🗺️ Maps autocomplete — config FIXED Jun 23; 503 now traced to a browser/network block.** Resolution done: created a dedicated website-restricted key **"Pontifex Web Maps Key"** in project `quantum-conduit-482219-a1` (referrers incl. `www.` + apex + vercel + localhost; Maps JS + Places API New enabled; **billing linked**), swapped `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` in Vercel + redeployed. BUT the live app still 503s on `maps/api/js` while a no-referrer direct fetch returns 200 AND Google metrics show **zero traffic reaching Google** + no service worker → the request is being intercepted **in the founder's browser/network** (ad-block/privacy extension stripping Referer or a network filter), not a Google/app problem. **NEXT: founder tests in Incognito (extensions off) / phone on cellular** — works there → whitelist `maps.googleapis.com` in the blocker; fails there too → dig into client GoogleMapsProvider. The old orphaned key (`AIzaSyB4kg…`, not in either Google account) is retired.
+  <details><summary>(superseded) original "set billing" note</summary>
       The Maps key (`AIzaSyB4kg…`, NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) belongs to GCP project
       **"My Maps Project" (`quantum-conduit-482219-a1`)** — NOT the Firebase project. Diagnosis via
       live console + network: Maps JavaScript API IS enabled there, but the **project has no active
@@ -70,6 +71,7 @@
       `www.pontifexindustries.com/*` (the app loads from the www subdomain), plus `pontifexindustries.com/*`,
       `*.vercel.app/*`, `localhost:3000/*`. Code fix `451b124a` already migrated to Places API (New);
       no code change needed.
+  </details>
 - [ ] **Remove dead dep `use-places-autocomplete`** (`npm uninstall`) — zero imports after the Maps fix.
 - [ ] **GoogleAddressAutocomplete dark-mode** — component is light-only (pre-existing, not a regression
       from the rewrite); add dark: variants when convenient.
@@ -172,7 +174,13 @@
 
 ## ✅ Recently shipped (context for current work)
 
-- **Jun 22 (PT2) — committed, UNPUSHED (one push deploys all):**
+- **Jun 23 — committed, UNPUSHED (5 commits, one push deploys all; all guardian-PASS):**
+  - **Time-off overhaul** (`b77ca30e` + `4d120ecd`): Log modal now lists ALL company profiles (was empty — wrong endpoint + operator-only filter); rank-based approval, never auto-approved (admin approves below-admin incl. project-manager/salesman+supervisor, super_admin approves all, self-approval blocked); **callouts/no-shows recorded immediately + notify ALL management**, planned requests pending + notify approvers; approved non-operators show in a new schedule-board **"Out Today"** card (operators keep in-slot OUT marker). No migration. Security-reviewed (no privilege escalation, no PTO double-debit).
+  - **Email header fix** (`e67d39f2`): invite/email logo was a broken-image box, off-center, cramped → renders + centers (Outlook-safe table) + proper spacing + no duplicate name; white-label-safe.
+  - **Remember Me default OFF** (`c736406b`): unchecked by default, user opts in; consistent across login/company-login/`lib/supabase` adapter; existing remembered users unaffected.
+  - **Secure biometric Face ID** (`dca49afd`): deep-research-driven rework — stores the Supabase **refresh token** (not password) in the Keychain, **OS-enforced** (`BIOMETRY_CURRENT_SET`), decoupled from Remember Me, explicit opt-in (post-login prompt + My Profile→Security toggle), per-user binding (no cross-account restore on shared devices). **Ships via web — no new iOS build** (Build 9 already bundles plugin 8.4.5). Plan: `docs/plans/BIOMETRIC_LOGIN_ARCHITECTURE.md`.
+  - **iOS v1.0.4 APPROVED** by Apple review (Ready for Distribution); founder accepted the updated Developer Program License Agreement.
+- **Jun 22 (PT2) — ✅ PUSHED + LIVE (deployed `0aaf111d`):**
   - **Email white-label migration** (`b2e68357`) — migrated all 13 remaining raw-HTML transactional emails (invoices send/remind/payment, signature, completion+liability PDFs, customer survey, portal, silica, schedule, clock-in reminder, salesperson, demo) to the react-email `BrandedEmail` system; removed every hardcoded "Patriot"/`billing@patriotconcretecutting.com`/hex/phone leak (now `getTenantEmailBranding`); routed `demo-request` through `sendEmail()` (was a raw fetch w/ raw key). Guardian PASS. Previews regenerated in `docs/reference/email-previews/`.
   - **Notifications deep-link** (`a5fdc9df`) — schedule-board had a 2nd broken `NotificationBell` that never routed on click; replaced with the shared bell + deleted the dupe. Fixes "clicked the out-of-radius alert, went nowhere."
   - **Remote clock-in/out photos** (`20b1df36`) — were 100% broken (uploaded to a bucket that never existed → stored `'photo-upload-failed'`; all 14 rows lost). New PRIVATE `timecard-photos` bucket + server-side upload route + signed-URL reads on corrections + operator pages; client aborts on upload failure (no sentinel). **Security:** dropped over-broad authenticated storage policies (cross-tenant PII leak caught by rls-policy-auditor). Guardian PASS.
