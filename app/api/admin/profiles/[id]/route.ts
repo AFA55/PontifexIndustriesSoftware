@@ -156,10 +156,11 @@ export async function PATCH(
             { status: 409 }
           );
         }
-        const { data: authUsersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-        const emailTakenInAuth = authUsersPage?.users?.some(
-          (u) => u.id !== id && u.email?.toLowerCase() === newEmail
-        );
+        // Reliable email → auth uid lookup (RPC) instead of a single-page
+        // listUsers({perPage:1000}) scan that silently misses users past page 1.
+        const { data: authUidForEmail } = await supabaseAdmin
+          .rpc('auth_user_id_by_email', { p_email: newEmail });
+        const emailTakenInAuth = !!authUidForEmail && authUidForEmail !== id;
         if (emailTakenInAuth) {
           return NextResponse.json(
             { error: 'A user with this email already exists.' },
@@ -313,21 +314,56 @@ export async function DELETE(
       );
     }
 
-    // 1. Release the login email (auth first) so it's reusable immediately.
-    const freedEmail = `deleted+${id}@pontifex.invalid`;
-    const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(id, {
-      email: freedEmail,
-      email_confirm: true,
-    });
-    if (authErr) {
-      console.error('[profiles DELETE] failed to release auth email (no changes made):', authErr);
-      return NextResponse.json(
-        { error: 'Failed to remove user. No changes were saved.' },
-        { status: 500 }
+    // Capture the original email up front — used for the invite/access-request
+    // cleanup at the end (it gets overwritten on the rows below).
+    const originalEmail = (target.email || '').trim().toLowerCase();
+
+    // Single dead-sentinel address used at BOTH layers (auth + profile). Matches
+    // the address close_account() writes (`deleted+<id>@deleted.invalid`) so the
+    // two stores end consistent and the original email is freed everywhere.
+    const freedEmail = `deleted+${id}@deleted.invalid`;
+
+    // 1. Anonymize PII + revoke sessions + purge personal rows via the reusable
+    //    close_account() RPC (service-role only). Best-effort: if it errors we log
+    //    and continue (the email-freeing rename+ban below MUST still run), but we
+    //    track the outcome so we don't silently report a clean scrub that failed.
+    let piiScrubbed = true;
+    const { error: closeErr } = await supabaseAdmin.rpc('close_account', { p_user_id: id });
+    if (closeErr) {
+      piiScrubbed = false;
+      console.error(
+        '[profiles DELETE] close_account() FAILED — PII was NOT scrubbed; continuing to free the ' +
+        `email so the login is still killed. User ${id} retains personal data — manual scrub required.`,
+        closeErr
       );
     }
 
-    // 2. Soft-delete the profile + mirror the freed email.
+    // 2. Free the LOGIN EMAIL — the GUARANTEED, history-safe path. We do NOT
+    //    hard-delete the auth user: profiles_id_fkey is ON DELETE NO ACTION (so a
+    //    delete would fail anyway while the profile row exists), and deleting the
+    //    profile row would risk cascading away retained payroll/timecard history.
+    //    Instead, rename the auth email to a dead sentinel + permanently BAN the
+    //    identity (876000h ≈ 100 years) so it can never authenticate again.
+    let emailFreed = false;
+    const { error: banErr } = await supabaseAdmin.auth.admin.updateUserById(id, {
+      email: freedEmail,
+      email_confirm: true,
+      ban_duration: '876000h',
+    });
+    if (banErr) {
+      console.error('[profiles DELETE] failed to release/ban auth email (no changes made):', banErr);
+      return NextResponse.json(
+        { error: 'Failed to delete user. No changes were saved.' },
+        { status: 500 }
+      );
+    }
+    emailFreed = true;
+
+    // 3. Soft-delete the profile + mirror the freed sentinel email (NEVER hard-delete
+    //    the row — payroll/timecard FKs depend on it). close_account() already set
+    //    deleted_at/active/anonymized fields when it succeeded; stamp them here too
+    //    so the row is consistent even if that RPC errored, and align the profile
+    //    email to the same auth sentinel.
     const { error: profErr } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -338,16 +374,17 @@ export async function DELETE(
       })
       .eq('id', id);
     if (profErr) {
+      // The auth identity is already banned + renamed (email is freed regardless),
+      // so the user can't log in — but the profile row may still show. Log loudly.
       console.error('[profiles DELETE] profile soft-delete failed AFTER auth email release:', profErr);
       return NextResponse.json(
-        { error: 'User partially removed — contact support.' },
+        { error: 'User login was removed but their profile record could not be updated — contact support.' },
         { status: 500 }
       );
     }
 
-    // Clean up any lingering invitation / access-request rows for the original
-    // email so a fresh request/invite starts clean (best-effort).
-    const originalEmail = (target.email || '').trim().toLowerCase();
+    // 4. Clean up any lingering invitation / access-request rows for the original
+    //    email so a fresh request/invite starts clean (best-effort).
     if (originalEmail) {
       await supabaseAdmin.from('user_invitations').delete().ilike('email', originalEmail);
       await supabaseAdmin.from('access_requests').delete().ilike('email', originalEmail);
@@ -355,7 +392,11 @@ export async function DELETE(
 
     return NextResponse.json({
       success: true,
-      message: `${target.full_name || 'User'} removed. Their email is free to invite again.`,
+      message: piiScrubbed
+        ? `${target.full_name || 'User'} permanently deleted; email freed.`
+        : `${target.full_name || 'User'}'s login was removed and their email freed, but scrubbing their personal info failed — contact support to finish the scrub.`,
+      emailFreed,
+      piiScrubbed,
     });
   } catch (error) {
     console.error('Unexpected error in DELETE /api/admin/profiles/[id]:', error);

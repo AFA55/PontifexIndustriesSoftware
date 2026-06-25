@@ -627,14 +627,16 @@ function QuickActionsSection({
       {member.role === 'operator' && (
         <ActionButton label="View Timecards" href="/dashboard/admin/timecards" />
       )}
+      {/* Deactivate = REVERSIBLE pause (keeps the account + email reserved).
+          Kept visually NEUTRAL so it's not confused with Permanently Delete. */}
       <ActionButton
         label={member.active ? 'Deactivate Account' : 'Activate Account'}
         onClick={onToggleActive}
-        variant={member.active ? 'danger' : 'success'}
+        variant={member.active ? 'default' : 'success'}
       />
-      {/* Permanent removal — frees the email for re-invite (vs. deactivate, which
-          keeps the account + email reserved). */}
-      <ActionButton label="Remove User" onClick={onRemove} variant="danger" />
+      {/* Permanently Delete = IRREVERSIBLE. Removes the login, scrubs PII, and
+          frees the email for re-invite. Red/danger so the two are unmistakable. */}
+      <ActionButton label="Permanently Delete" onClick={onRemove} variant="danger" />
     </div>
   );
 }
@@ -2542,20 +2544,23 @@ export default function TeamProfilesPage() {
     }
   }, [getAuthHeaders, fetchMembers]);
 
-  // Permanently remove a user AND free their email for re-invite (soft-delete +
-  // email release; history preserved). Distinct from deactivate (which keeps the
-  // email reserved). Calls DELETE /api/admin/profiles/[id].
+  // Permanently delete a user AND free their email for re-invite (anonymize PII +
+  // remove/ban login + soft-delete profile; history preserved & de-identified).
+  // Distinct from deactivate (which is reversible and keeps the email reserved).
+  // Calls DELETE /api/admin/profiles/[id].
   const handleRemoveMember = useCallback(async (member: TeamMember) => {
     if (!window.confirm(
-      `Remove ${member.full_name}?\n\nThis frees their email (${member.email}) so it can be invited again, ` +
-      `and removes them from Team Profiles. Their work history is kept. You can't undo this here.`
+      `Permanently delete ${member.full_name}?\n\n` +
+      `This removes their login, scrubs their personal info, and frees ${member.email} ` +
+      `so it can be invited again. Work history is kept but de-identified.\n\n` +
+      `This can't be undone.`
     )) return;
     try {
       const headers = await getAuthHeaders();
       const res = await fetch(`/api/admin/profiles/${member.id}`, { method: 'DELETE', headers });
       const json = await res.json();
       if (res.ok && json.success) {
-        setSuccessMsg(json.message || `${member.full_name} removed. Their email is free to invite again.`);
+        setSuccessMsg(json.message || `${member.full_name} permanently deleted; email freed.`);
         setTimeout(() => setSuccessMsg(''), 5000);
         await fetchMembers();
         setSelectedMember(null);

@@ -178,10 +178,11 @@ export async function createOrRefreshInvitation(
     return { ok: false, status: 409, error: 'A user with this email already exists.' };
   }
 
-  const { data: authUsersPage } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-  const emailTakenInAuth = authUsersPage?.users?.some(
-    (u) => u.email?.toLowerCase() === email
-  );
+  // Reliable email → auth uid lookup (RPC) instead of a single-page
+  // listUsers({perPage:1000}) scan that silently misses users past page 1.
+  const { data: authUidForEmail } = await supabaseAdmin
+    .rpc('auth_user_id_by_email', { p_email: email });
+  const emailTakenInAuth = !!authUidForEmail;
   if (emailTakenInAuth) {
     return { ok: false, status: 409, error: 'A user with this email already exists.' };
   }
