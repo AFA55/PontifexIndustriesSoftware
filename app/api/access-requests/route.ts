@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
     // tenant (Patriot) by company_code. Falls back to platform defaults on failure.
     // TODO: thread real tenant context when the request form is tenant-aware
     let receivedBranding = await getTenantEmailBranding(null);
+    let targetTenantId: string | null = null;
     try {
       const { data: patriotTenant } = await supabaseAdmin
         .from('tenants')
@@ -120,10 +121,46 @@ export async function POST(request: NextRequest) {
         .eq('company_code', 'PATRIOT')
         .maybeSingle();
       if (patriotTenant?.id) {
+        targetTenantId = patriotTenant.id;
         receivedBranding = await getTenantEmailBranding(patriotTenant.id);
       }
     } catch {
       // keep platform defaults
+    }
+
+    // Fire-and-forget: drop an in-app bell notification for every admin /
+    // super_admin / ops manager so a new access request is actually surfaced
+    // (previously it only appeared in the team-management review list, easy to
+    // miss). Never block or fail the public submission. notification_type must be
+    // an allowed CHECK value ('general'); the event is keyed by `type`.
+    if (targetTenantId) {
+      Promise.resolve(
+        supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .eq('tenant_id', targetTenantId)
+          .in('role', ['admin', 'super_admin', 'operations_manager'])
+      ).then(({ data: admins }) => {
+        if (!admins || admins.length === 0) return;
+        const rows = admins.map((p: { id: string }) => ({
+          user_id: p.id,
+          type: 'access_request',
+          notification_type: 'general',
+          title: 'New access request',
+          message: `${fullName} requested access (${email.toLowerCase()}).`,
+          tenant_id: targetTenantId,
+          read: false,
+          is_read: false,
+          action_url: '/dashboard/admin/team-management',
+          metadata: {
+            access_request_id: data.id,
+            requester_name: fullName,
+            requester_email: email.toLowerCase(),
+            position: position || null,
+          },
+        }));
+        return supabaseAdmin.from('notifications').insert(rows);
+      }).catch(() => {});
     }
 
     const confirmationEmailHtml = await generateAccessRequestReceivedEmail(

@@ -82,6 +82,7 @@ export async function PATCH(
         requested_clock_in,
         requested_clock_out,
         status,
+        metadata,
         timecards!timecard_id (
           id,
           user_id,
@@ -122,6 +123,15 @@ export async function PATCH(
     const now = new Date().toISOString();
     const timecard = (correction as any).timecards;
     const workerProfile = (correction as any).profiles;
+
+    // Auto-flagged out-of-geofence clock-outs are NOT worker-submitted edit
+    // requests — the worker didn't ask for anything, they just clocked out beyond
+    // the shop radius. "Acknowledge" (approve with no admin override) is therefore
+    // a pure status flip: the recorded clock-out stands, we don't rewrite the
+    // timecard, and we don't tell the worker their "correction was approved".
+    // If the admin DID adjust the time (Modify), it's a real edit → behave normally.
+    const isAuto = (correction as any).metadata?.source === 'auto_out_of_radius';
+    const isAckOnly = isAuto && action === 'approve' && !hasOverrideIn && !hasOverrideOut;
     const workerName = workerProfile?.full_name || 'Team member';
     const dateFormatted = timecard?.date
       ? parseYMDLocal(timecard.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -159,7 +169,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Failed to update correction request' }, { status: 500 });
     }
 
-    if (action === 'approve' && timecard) {
+    if (action === 'approve' && timecard && !isAckOnly) {
       // Effective times: admin override wins, then operator request, then current value.
       const effClockIn = hasOverrideIn
         ? override_clock_in
@@ -245,7 +255,10 @@ export async function PATCH(
         supabaseAdmin.from('notifications').insert({
           user_id: correction.requested_by,
           type: 'correction_approved',
-          notification_type: 'correction_approved',
+          // notification_type has a CHECK constraint (only ~12 values); anything
+          // else is silently dropped by the fire-and-forget insert. Use the
+          // allowed 'general' value and keep the specific event key in `type`.
+          notification_type: 'general',
           title: 'Time Correction Approved',
           message: `Your time correction for ${dateFormatted} was approved.`,
           tenant_id: tenantId,
@@ -267,7 +280,7 @@ export async function PATCH(
         supabaseAdmin.from('notifications').insert({
           user_id: correction.requested_by,
           type: 'correction_rejected',
-          notification_type: 'correction_rejected',
+          notification_type: 'general', // allowed CHECK value (see approve branch)
           title: 'Time Correction Not Approved',
           message: `Your time correction for ${dateFormatted} was not approved.${reasonText}`,
           tenant_id: tenantId,

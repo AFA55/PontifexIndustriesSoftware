@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
-import { calculateDistance, formatDistanceUS } from '@/lib/geolocation';
+import { calculateDistance, formatDistanceUS, formatDriveTimeUS, SHOP_LOCATION } from '@/lib/geolocation';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,8 +42,13 @@ export async function GET(request: NextRequest) {
       .eq('id', tenantId)
       .maybeSingle();
 
-    const shopLat = tenantRow?.shop_latitude ?? null;
-    const shopLon = tenantRow?.shop_longitude ?? null;
+    // Fall back to the hardcoded shop pin when the tenant hasn't set coords.
+    // This MATTERS: Patriot's tenants.shop_latitude/longitude are NULL, but
+    // clock-out enforcement uses SHOP_LOCATION as the same fallback — so without
+    // this the distance/drive-time would never compute for the geofence review,
+    // even though the clock-out itself was correctly flagged against this pin.
+    const shopLat = tenantRow?.shop_latitude ?? SHOP_LOCATION.latitude;
+    const shopLon = tenantRow?.shop_longitude ?? SHOP_LOCATION.longitude;
 
     let query = supabaseAdmin
       .from('timecard_correction_requests')
@@ -102,9 +107,13 @@ export async function GET(request: NextRequest) {
       // Compute clock-out distance from shop only when we have both sets of coords
       let clockOutDistanceMeters: number | null = null;
       let clockOutDistanceFormatted: string | null = null;
+      let clockOutDriveFormatted: string | null = null;
       if (shopLat != null && shopLon != null && coLat != null && coLon != null) {
         clockOutDistanceMeters = calculateDistance(coLat, coLon, shopLat, shopLon);
         clockOutDistanceFormatted = formatDistanceUS(clockOutDistanceMeters);
+        // Rough drive-time estimate (free, no Routes API) so the office sees how
+        // far the clock-out was in TIME, not just distance.
+        clockOutDriveFormatted = formatDriveTimeUS(clockOutDistanceMeters);
       }
 
       return {
@@ -125,9 +134,10 @@ export async function GET(request: NextRequest) {
         clock_out_longitude: coLon,
         clock_out_outside_radius: tc?.clock_out_outside_radius ?? false,
         remote_photo_url: tc?.remote_photo_url ?? null,
-        // Computed distance
+        // Computed distance + rough drive-time estimate
         clock_out_distance_meters: clockOutDistanceMeters,
         clock_out_distance_formatted: clockOutDistanceFormatted,
+        clock_out_drive_formatted: clockOutDriveFormatted,
         // Requested times
         requested_clock_in: row.requested_clock_in,
         requested_clock_out: row.requested_clock_out,

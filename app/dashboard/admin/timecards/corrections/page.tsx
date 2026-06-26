@@ -41,6 +41,7 @@ interface CorrectionRequest {
   remote_photo_url: string | null;
   clock_out_distance_meters: number | null;
   clock_out_distance_formatted: string | null;
+  clock_out_drive_formatted: string | null;
   // Auto-flagged out-of-radius requests carry metadata.source = 'auto_out_of_radius'.
   metadata?: Record<string, unknown> | null;
   is_auto?: boolean;
@@ -650,8 +651,13 @@ export default function TimecardCorrectionsPage() {
               </p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {requests.map((req) => {
+            <div className="space-y-6">
+              {(() => {
+                // Founder's ask: keep auto-flagged out-of-geofence clock-outs in
+                // their OWN section — they aren't worker-submitted edit requests.
+                const geofenceRows = requests.filter((r) => r.is_auto);
+                const realRequests = requests.filter((r) => !r.is_auto);
+                const renderCard = (req: CorrectionRequest) => {
                 const requestedTotal = hoursBetween(
                   req.requested_clock_in || req.current_clock_in,
                   req.requested_clock_out || req.current_clock_out
@@ -663,8 +669,10 @@ export default function TimecardCorrectionsPage() {
                 const busy = submittingId === req.id;
                 const isPending = req.status === 'pending';
                 const adminAdjusted = !!req.reviewer_notes && req.reviewer_notes.includes('[admin adjusted times]');
-                // Show clock-out location when outside radius or distance data available
+                // Show clock-out location when outside radius or distance data available.
+                // Always show it for auto geofence flags — the distance IS the point.
                 const showClockOutLocation =
+                  req.is_auto ||
                   req.clock_out_outside_radius ||
                   (req.clock_out_distance_meters != null && req.clock_out_distance_formatted != null);
 
@@ -697,7 +705,10 @@ export default function TimecardCorrectionsPage() {
                       </div>
                     </div>
 
-                    {/* BEFORE → AFTER diff */}
+                    {/* BEFORE → AFTER diff — only for real worker edit requests.
+                        Auto geofence flags aren't a requested change, so the diff
+                        (and its misleading "+0.50" lunch artifact) is suppressed. */}
+                    {!req.is_auto && (
                     <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3 bg-gray-50 dark:bg-white/[0.03] rounded-xl p-3 sm:p-4 mb-3">
                       {/* Current */}
                       <div className="min-w-0">
@@ -751,6 +762,7 @@ export default function TimecardCorrectionsPage() {
                         </div>
                       </div>
                     </div>
+                    )}
 
                     {/* Clock-out location (Part A) */}
                     {showClockOutLocation && (
@@ -776,6 +788,15 @@ export default function TimecardCorrectionsPage() {
                                 ? `Clocked out ${req.clock_out_distance_formatted} from shop`
                                 : 'Clocked out outside geofence radius'}
                           </p>
+                          {req.clock_out_drive_formatted && (
+                            <p className={`text-xs mt-0.5 font-medium ${
+                              req.clock_out_outside_radius
+                                ? 'text-amber-700 dark:text-amber-300'
+                                : 'text-gray-500 dark:text-white/60'
+                            }`}>
+                              {req.clock_out_drive_formatted} drive from shop
+                            </p>
+                          )}
                           <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">
                             <span className="text-gray-500 dark:text-white/50">In </span>{fmtTime(req.current_clock_in)}
                             {' · '}
@@ -911,7 +932,7 @@ export default function TimecardCorrectionsPage() {
                               className="min-h-[44px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
                             >
                               {busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
-                              Approve
+                              {req.is_auto ? 'Acknowledge' : 'Approve'}
                             </button>
                             <button
                               onClick={() => { closeEditors(); openModify(req); }}
@@ -935,7 +956,35 @@ export default function TimecardCorrectionsPage() {
                     )}
                   </div>
                 );
-              })}
+                };
+                return (
+                  <>
+                    {geofenceRows.length > 0 && (
+                      <section>
+                        <div className="flex items-center gap-2 mb-1 px-1">
+                          <MapPin size={15} className="text-amber-500 dark:text-amber-400" />
+                          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Clock-outs Outside Geofence</h2>
+                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 text-[11px] font-bold">{geofenceRows.length}</span>
+                        </div>
+                        <p className="text-xs text-gray-400 dark:text-white/40 mb-3 px-1 leading-snug">
+                          No edit was requested — these crew clocked out beyond the shop radius. Review how far, then acknowledge.
+                        </p>
+                        <div className="space-y-3">{geofenceRows.map(renderCard)}</div>
+                      </section>
+                    )}
+                    {realRequests.length > 0 && (
+                      <section>
+                        <div className="flex items-center gap-2 mb-3 px-1">
+                          <ClipboardEdit size={15} className="text-violet-500 dark:text-violet-400" />
+                          <h2 className="text-sm font-bold text-gray-900 dark:text-white">Time Edit Requests</h2>
+                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 text-[11px] font-bold">{realRequests.length}</span>
+                        </div>
+                        <div className="space-y-3">{realRequests.map(renderCard)}</div>
+                      </section>
+                    )}
+                  </>
+                );
+              })()}
             </div>
           )
         )}

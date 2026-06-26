@@ -104,6 +104,29 @@ export function formatDistanceUS(distanceMeters: number): string {
   return `${miles.toFixed(miles < 10 ? 2 : 1)} mi`;
 }
 
+/**
+ * Rough drive-time estimate from a straight-line distance (meters), for the
+ * admin geofence-review screen. We deliberately do NOT call a paid Routes /
+ * Distance-Matrix API: a glance figure ("~12 min") is all the office needs to
+ * judge whether an out-of-radius clock-out is plausibly near the shop or came
+ * from a job site / home. Assumes ~30 mph local driving.
+ *
+ * Returns null for sub-0.2-mile readings — at that range the worker is
+ * effectively at the shop and a drive time is meaningless (would read "~1 min").
+ */
+export function estimateDriveMinutes(distanceMeters: number): number | null {
+  const miles = distanceMeters / 1609.344;
+  if (miles < 0.2) return null;
+  const ASSUMED_LOCAL_MPH = 30;
+  return Math.max(1, Math.round((miles / ASSUMED_LOCAL_MPH) * 60));
+}
+
+/** "~12 min" or null when the distance is too small to bother (see estimateDriveMinutes). */
+export function formatDriveTimeUS(distanceMeters: number): string | null {
+  const mins = estimateDriveMinutes(distanceMeters);
+  return mins == null ? null : `~${mins} min`;
+}
+
 export function isWithinShopRadius(
   userLocation: Coordinates,
   shopOverride?: ShopOverride,
