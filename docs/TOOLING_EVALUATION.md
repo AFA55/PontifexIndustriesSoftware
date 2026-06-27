@@ -28,7 +28,7 @@
 
 | Tool | Verdict |
 |---|---|
-| **ECC** | Agent-enhancement framework — overlaps the ruflo/claude-flow stack already installed (`.claude-flow/`, `agentdb.rvf`). A second agent framework = two sources of truth for workflows. If anything, we should *trim* the current one, not add another. |
+| **ECC** | Agent-enhancement framework — a second agent framework = two sources of truth for workflows. We use Claude Code's native orchestration (Workflow + worktree subagents + skills); no second framework. (Note: we *did* trim — the dormant ruflo/claude-flow stack was removed Jun 27, see Batch 3.) |
 | **Anthropic-Cybersecurity-Skills** | Third-party despite the name (author: mukul975). 754 skills is context bloat; our security posture = guardian checklist + `rls-policy-auditor` + Supabase advisors + periodic audits, which are targeted at OUR stack. |
 | **MoneyPrinterTurbo** | AI short-form video generator. Not a dev tool. Revisit *only* as a marketing experiment (TikTok/Reels for Pontifex) — and that's a founder/marketing decision, not engineering. |
 | **academic-research-skills** | Academic paper workflows — irrelevant to a SaaS operations platform. |
@@ -77,6 +77,38 @@ Founder flagged a post pushing 5 tools. **Context that drives every verdict:** w
 | **Manus** | Autonomous "type it, it builds the whole app" agent | ❌ **Not applicable** — we already build with Claude Code; a second autonomous builder is exactly the "no second framework for a solved problem" rule. |
 
 **Net for productivity + uniformity (founder's actual goal):** the highest-leverage move wasn't installing any of these — it was creating **[docs/reference/UI_CATALOG.md](reference/UI_CATALOG.md)** so every session reuses our shipped patterns. Pull from 21st.dev/Cult/Watermelon as *inspiration* for net-new **marketing** pages, rebrand, then record the result in the catalog.
+
+## Batch 3 — "10x dev velocity" research (Jun 27, 2026)
+
+Source: 5 Instagram posts the founder flagged (Hermes Agent, Boris Cherny on parallel sessions, the
+"agentic loop", Sakana Fugu) + a 109-agent deep-research pass (17 claims confirmed, 8 refuted) + a
+full local audit. Goal: stop fixing 2–3 bugs serially; run parallel agents + verify-loops. **Headline:
+the #1 unlock was native to Claude Code and already ours — not anything from the videos.**
+
+### ✅ Adopted (Jun 27)
+| Tool | What it is | Why adopted | How we use it |
+|---|---|---|---|
+| **Playwright MCP** (microsoft, official, free) | MCP server giving agents browser automation via accessibility-tree snapshots (not screenshots — token-lean) | Closes the known "frontend is hard to loop" gap: agents can self-verify UI/flows headlessly + in CI. One-line install, official, maintained. | Registered in `.mcp.json` (project scope). Subagents/verify-loops drive it; complements `Claude_Preview` (interactive) with headless/CI checks. NOT pixel-diffing — verifies elements/flows exist & work, not that a design *looks* right. |
+| **Native parallel worktrees + subagents + headless** (`claude --worktree`, `isolation: worktree`, `claude -p`) | First-party Claude Code parallelism. Boris Cherny (CC creator): 3–5 parallel worktree sessions = *"the single biggest productivity unlock."* | Free, already shipped in the tool, was underused. This is the actual 10x. | Codified as the **`parallel-burndown`** Workflow (`.claude/workflows/parallel-burndown.js`) + the [parallel-burndown playbook](playbooks/PARALLEL_BURNDOWN.md). |
+
+### 🟡 Staged (trial when triggered)
+| Tool | What it is | Trigger | Honest tradeoff |
+|---|---|---|---|
+| **Claude Context** (zilliztech, MIT MCP) | Semantic code-search index → claims ~40% token reduction | When agent token costs hurt on this repo | Real, but the 40% is vendor-self-reported (n=30, GPT-4o-mini, cherry-picked) and needs a Milvus/Zilliz vector store + embeddings provider. For a single repo the native subagent-summary pattern may already be enough — measure before committing. Overlaps the *staged* `codegraph`/Understand-Anything indexers: **pick ONE indexer, don't run two.** |
+| **Conductor** (conductor.build, Mac app) | GUI to run many parallel Claude Code/Codex agents in worktrees | If managing 5+ concurrent agents in terminals gets unwieldy | It's a GUI wrapper over `claude --worktree` we already have natively. Mac-only. Skippable unless visual session management becomes the bottleneck. |
+
+### ❌ Rejected (Jun 27 — don't re-litigate)
+| Tool | Verdict |
+|---|---|
+| **Hermes Agent** (NousResearch) | REAL (MIT, self-improving personal-assistant framework, Telegram/Discord/Slack), but the Instagram "180k★ in 4 months" claim was **refuted** by the research. It's a 24/7 personal agent, NOT a Claude Code orchestrator for this Next.js codebase. No fit. |
+| **Sakana Fugu / Fugu Ultra** | REAL & GA (multi-model "conductor" API), but "frontier parity with Fable 5" is **marketing** — Sakana's own numbers show Fable 5 beats it 3 of 4 (SWE-Bench 80.0 vs 73.7). It's a hosted model-router rival, not a Claude Code layer. Skip. |
+| **ruflo / claude-flow V3** (was already installed) | **REMOVED Jun 27.** Audit found it fully dormant — `.claude-flow/` (hierarchical-mesh "swarm," 149 stale sessions, "neural memory graph") + ~23 swarm agent-stub dirs (`swarm/`, `flow-nexus/`, `sparc/`, `v3/`, etc.) referencing `mcp__claude-flow__*` tools that were never connected/invoked. Pure dead weight. Deleted the dirs + `.claude-flow/` + the `claude-flow-*` command stubs. (The real router is `prompt-advisor.sh` + our own hooks, which stay.) Also prune the "ruflo init" block from `~/.claude/CLAUDE.md`. **This is the literal embodiment of house-rule #2 — a second orchestrator we never used.** |
+| **"Comment Jarvis" / waitlist-bait reels** | No content; engagement bait. Ignore. |
+
+### Dead npm deps removed (Jun 27)
+`use-places-autocomplete`, `@react-google-maps/api`, `@simplewebauthn/browser`, `@simplewebauthn/server`
+— zero imports (confirmed by grep), removed via `npm uninstall`. (Note: the `@simplewebauthn` row in
+the "Adopted" table above is now historical — web WebAuthn was removed Jun 14; the deps lingered until now.)
 
 ## House rules for future tool adoption
 
