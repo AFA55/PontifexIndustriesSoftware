@@ -6,10 +6,12 @@ import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { formatDay } from '@/lib/dates';
+import { useBranding } from '@/lib/branding-context';
+import { estimateDriveMinutes } from '@/lib/geolocation';
 import {
   ArrowLeft, ClipboardEdit, Loader2, CheckCircle, XCircle,
   ArrowRight, AlertTriangle, MessageSquare, Pencil, X, Check, Inbox,
-  MapPin, Camera, Wifi,
+  MapPin, Camera, Wifi, Navigation, Clock,
 } from 'lucide-react';
 
 // ── Types ──────────────────────────────────────────────────────
@@ -135,6 +137,19 @@ export default function TimecardCorrectionsPage() {
   const router = useRouter();
   const isRedirecting = useRef(false);
 
+  // ── Tenant brand palette (white-label) ───────────────────────
+  // Accents are driven by the tenant's brand colors so every company code gets
+  // its own look. Patriot resolves to navy (secondary) + red (primary). Fills
+  // use the brand color with white text (safe in light AND dark mode); text
+  // accents use the brand RED, which reads on both backgrounds.
+  const { branding } = useBranding();
+  const navy = branding?.secondary_color || '#1E3A5F';
+  const red = branding?.primary_color || '#DC2626';
+  const navySoft = `color-mix(in srgb, ${navy} 10%, transparent)`;
+  const navyBorder = `color-mix(in srgb, ${navy} 24%, transparent)`;
+  const redSoft = `color-mix(in srgb, ${red} 9%, transparent)`;
+  const redBorder = `color-mix(in srgb, ${red} 22%, transparent)`;
+
   const [user, setUser] = useState<User | null>(null);
   const [tab, setTab] = useState<TabKey>('pending');
   const [requests, setRequests] = useState<CorrectionRequest[]>([]);
@@ -156,6 +171,7 @@ export default function TimecardCorrectionsPage() {
   const [modifyingId, setModifyingId] = useState<string | null>(null);  // request with open modify editor
   const [modifyIn, setModifyIn] = useState('');
   const [modifyOut, setModifyOut] = useState('');
+  const [suggestHint, setSuggestHint] = useState<string | null>(null);  // auto-suggest explainer for the modify editor
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; kind: 'ok' | 'err' } | null>(null);
@@ -307,6 +323,23 @@ export default function TimecardCorrectionsPage() {
     }
   }, [user, refreshPendingCount, refreshRemoteCount]);
 
+  // ── Smart auto-acknowledge ───────────────────────────────────
+  // Opening this page clears the matching "Clock-out needs review" bell
+  // notifications for THIS admin — even ones they never clicked. The backend
+  // marks them read by type, scoped to the caller. Fire-and-forget.
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const token = await getToken();
+      if (!token) return;
+      fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ types: ['timecard_review'] }),
+      }).catch(() => {});
+    })();
+  }, [user, getToken]);
+
   // ── Close any open inline editors ────────────────────────────
   const closeEditors = () => {
     setDenyingId(null);
@@ -314,6 +347,7 @@ export default function TimecardCorrectionsPage() {
     setModifyingId(null);
     setModifyIn('');
     setModifyOut('');
+    setSuggestHint(null);
   };
 
   // ── Approve / Reject / Modify-and-approve ────────────────────
@@ -345,7 +379,9 @@ export default function TimecardCorrectionsPage() {
       }
 
       showToast(
-        action === 'approve' ? 'Correction approved' : 'Correction denied',
+        action === 'approve'
+          ? (req.is_auto ? 'Clock-out acknowledged' : 'Correction approved')
+          : 'Correction denied',
         'ok'
       );
       closeEditors();
@@ -365,8 +401,29 @@ export default function TimecardCorrectionsPage() {
   const openModify = (req: CorrectionRequest) => {
     setDenyingId(null);
     setModifyingId(req.id);
-    // Prefill from requested values, falling back to current.
+    setSuggestHint(null);
     setModifyIn(isoToLocalInput(req.requested_clock_in || req.current_clock_in));
+
+    // Auto-suggest a corrected clock-out for geofence flags: the worker drove
+    // away from the shop before clocking out, so their real on-site departure was
+    // ~the drive time earlier. Suggest (recorded clock-out − estimated drive),
+    // clamped to stay after clock-in. The admin can still override anything.
+    if (req.is_auto && req.current_clock_out && req.clock_out_distance_meters != null) {
+      const driveMin = estimateDriveMinutes(req.clock_out_distance_meters);
+      if (driveMin && driveMin > 0) {
+        const out = new Date(req.current_clock_out);
+        let suggested = new Date(out.getTime() - driveMin * 60000);
+        if (req.current_clock_in) {
+          const inT = new Date(req.current_clock_in);
+          if (suggested.getTime() <= inT.getTime()) suggested = new Date(inT.getTime() + 60000);
+        }
+        setModifyOut(isoToLocalInput(suggested.toISOString()));
+        setSuggestHint(
+          `Suggested: clocked out ${req.clock_out_distance_formatted ?? ''} away, so we trimmed ~${driveMin} min of drive time off the ${fmtTime(req.current_clock_out)} clock-out. Adjust if needed.`
+        );
+        return;
+      }
+    }
     setModifyOut(isoToLocalInput(req.requested_clock_out || req.current_clock_out));
   };
 
@@ -402,7 +459,7 @@ export default function TimecardCorrectionsPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+        <Loader2 className="w-8 h-8 animate-spin" style={{ color: navy }} />
       </div>
     );
   }
@@ -421,7 +478,10 @@ export default function TimecardCorrectionsPage() {
           </Link>
           <div className="h-6 w-px bg-gray-200 dark:bg-white/10" />
           <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-sm">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm"
+              style={{ background: `linear-gradient(135deg, ${navy}, ${red})` }}
+            >
               <ClipboardEdit size={16} className="text-white" />
             </div>
             <span>Time Edit Requests</span>
@@ -434,21 +494,26 @@ export default function TimecardCorrectionsPage() {
         <div className="mb-5 flex gap-1 bg-white dark:bg-white/5 rounded-xl p-1 border border-gray-200 dark:border-white/10 shadow-sm overflow-x-auto">
           {tabs.map(({ key, label }) => {
             const badgeCount = key === 'pending' ? pendingCount : key === 'remote' ? remoteCount : 0;
+            const active = tab === key;
             return (
               <button
                 key={key}
                 onClick={() => setTab(key)}
+                style={active ? { background: navy } : undefined}
                 className={`relative flex-1 min-w-[72px] px-3 py-2 rounded-lg text-sm font-semibold transition-all min-h-[40px] ${
-                  tab === key
-                    ? 'bg-violet-600 text-white shadow-sm'
+                  active
+                    ? 'text-white shadow-sm'
                     : 'text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80 hover:bg-gray-50 dark:hover:bg-white/8'
                 }`}
               >
                 {label}
                 {badgeCount > 0 && (
-                  <span className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
-                    tab === key ? 'bg-white text-violet-700' : 'bg-red-500 text-white'
-                  }`}>
+                  <span
+                    style={active ? { color: navy } : undefined}
+                    className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold ${
+                      active ? 'bg-white' : 'bg-red-500 text-white'
+                    }`}
+                  >
                     {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
@@ -487,8 +552,11 @@ export default function TimecardCorrectionsPage() {
             </div>
           ) : remoteClockIns.length === 0 ? (
             <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
-              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="text-emerald-500 dark:text-emerald-400" size={26} />
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: navy }}
+              >
+                <CheckCircle className="text-white" size={26} />
               </div>
               <p className="text-gray-700 dark:text-white/80 font-semibold">All clear</p>
               <p className="text-gray-400 dark:text-white/40 text-sm mt-1">No pending remote clock-ins to review.</p>
@@ -512,11 +580,14 @@ export default function TimecardCorrectionsPage() {
                           {dateLabel} · {timeLabel}
                         </p>
                       </div>
-                      <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide flex-shrink-0 ${
-                        entry.is_gps_remote
-                          ? 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'
-                          : 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
-                      }`}>
+                      <span
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold uppercase tracking-wide flex-shrink-0"
+                        style={
+                          entry.is_gps_remote
+                            ? { background: 'color-mix(in srgb, #2563eb 12%, transparent)', color: '#2563eb' }
+                            : { background: navySoft, color: navy }
+                        }
+                      >
                         <Wifi size={11} />
                         {entry.is_gps_remote ? 'GPS Remote' : 'Remote'}
                       </span>
@@ -559,7 +630,8 @@ export default function TimecardCorrectionsPage() {
                               href={entry.maps_url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-1 text-xs text-violet-600 dark:text-violet-400 hover:underline min-h-[44px] leading-tight"
+                              className="inline-flex items-center gap-1 mt-1 text-xs font-medium hover:underline min-h-[44px] leading-tight"
+                              style={{ color: red }}
                             >
                               <MapPin size={11} />
                               View on map
@@ -587,7 +659,8 @@ export default function TimecardCorrectionsPage() {
                       <button
                         onClick={() => verifyRemote(entry.id, true)}
                         disabled={busyVerify}
-                        className="min-h-[44px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        style={{ background: navy }}
+                        className="min-h-[44px] px-4 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
                       >
                         {busyVerify ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
                         Approve
@@ -595,7 +668,8 @@ export default function TimecardCorrectionsPage() {
                       <button
                         onClick={() => verifyRemote(entry.id, false)}
                         disabled={busyVerify}
-                        className="min-h-[44px] px-4 rounded-xl bg-white dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                        style={{ color: red, borderColor: redBorder }}
+                        className="min-h-[44px] px-4 rounded-xl bg-white dark:bg-white/5 border text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
                       >
                         <XCircle size={14} />
                         Reject
@@ -636,9 +710,12 @@ export default function TimecardCorrectionsPage() {
             </div>
           ) : requests.length === 0 ? (
             <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
-              <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-500/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={tab === 'pending' ? { background: navy } : undefined}
+              >
                 {tab === 'pending'
-                  ? <CheckCircle className="text-emerald-500 dark:text-emerald-400" size={26} />
+                  ? <CheckCircle className="text-white" size={26} />
                   : <Inbox className="text-gray-300 dark:text-white/30" size={26} />}
               </div>
               <p className="text-gray-700 dark:text-white/80 font-semibold">
@@ -669,12 +746,13 @@ export default function TimecardCorrectionsPage() {
                 const busy = submittingId === req.id;
                 const isPending = req.status === 'pending';
                 const adminAdjusted = !!req.reviewer_notes && req.reviewer_notes.includes('[admin adjusted times]');
-                // Show clock-out location when outside radius or distance data available.
-                // Always show it for auto geofence flags — the distance IS the point.
-                const showClockOutLocation =
-                  req.is_auto ||
-                  req.clock_out_outside_radius ||
-                  (req.clock_out_distance_meters != null && req.clock_out_distance_formatted != null);
+                // Show the clock-out location callout only for geofence flags /
+                // out-of-radius rows — the distance IS the point there. Normal
+                // in-radius edit requests don't need it.
+                const showClockOutLocation = req.is_auto || req.clock_out_outside_radius;
+                const diff = requestedTotal != null && req.current_total_hours != null
+                  ? requestedTotal - req.current_total_hours
+                  : null;
 
                 return (
                   <div
@@ -693,11 +771,10 @@ export default function TimecardCorrectionsPage() {
                       <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                         <span className="text-[11px] text-gray-400 dark:text-white/40 whitespace-nowrap">{relativeTime(req.created_at)}</span>
                         {!isPending && (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
-                            req.status === 'approved'
-                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
-                              : 'bg-rose-50 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
-                          }`}>
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide text-white"
+                            style={{ background: req.status === 'approved' ? navy : red }}
+                          >
                             {req.status === 'approved' ? <Check size={10} /> : <X size={10} />}
                             {req.status}
                           </span>
@@ -726,17 +803,17 @@ export default function TimecardCorrectionsPage() {
                         </div>
                       </div>
 
-                      <ArrowRight size={18} className="text-violet-400 dark:text-violet-500 flex-shrink-0" />
+                      <ArrowRight size={18} className="flex-shrink-0" style={{ color: red }} />
 
                       {/* Requested */}
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 dark:text-violet-400 mb-1.5">Requested</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: red }}>Requested</p>
                         <div className="space-y-1">
-                          <p className={`text-sm font-medium ${inChanged ? 'text-violet-700 dark:text-violet-300' : 'text-gray-700 dark:text-white/80'}`}>
+                          <p className="text-sm font-medium text-gray-700 dark:text-white/80" style={inChanged ? { color: red } : undefined}>
                             <span className="text-gray-400 dark:text-white/40 text-xs font-normal">In </span>
                             {fmtTime(req.requested_clock_in || req.current_clock_in)}
                           </p>
-                          <p className={`text-sm font-medium ${outChanged ? 'text-violet-700 dark:text-violet-300' : 'text-gray-700 dark:text-white/80'}`}>
+                          <p className="text-sm font-medium text-gray-700 dark:text-white/80" style={outChanged ? { color: red } : undefined}>
                             <span className="text-gray-400 dark:text-white/40 text-xs font-normal">Out </span>
                             {fmtTime(req.requested_clock_out || req.current_clock_out)}
                           </p>
@@ -744,16 +821,9 @@ export default function TimecardCorrectionsPage() {
                             {requestedTotal != null ? (
                               <>
                                 {requestedTotal.toFixed(2)} hrs
-                                {req.current_total_hours != null && (
-                                  <span className={`ml-1 font-semibold ${
-                                    requestedTotal - req.current_total_hours > 0
-                                      ? 'text-emerald-600 dark:text-emerald-400'
-                                      : requestedTotal - req.current_total_hours < 0
-                                        ? 'text-rose-600 dark:text-rose-400'
-                                        : ''
-                                  }`}>
-                                    ({requestedTotal - req.current_total_hours >= 0 ? '+' : ''}
-                                    {(requestedTotal - req.current_total_hours).toFixed(2)})
+                                {diff != null && (
+                                  <span className="ml-1 font-semibold" style={diff !== 0 ? { color: red } : undefined}>
+                                    ({diff >= 0 ? '+' : ''}{diff.toFixed(2)})
                                   </span>
                                 )}
                               </>
@@ -764,55 +834,55 @@ export default function TimecardCorrectionsPage() {
                     </div>
                     )}
 
-                    {/* Clock-out location (Part A) */}
+                    {/* Clock-out location — distance + drive-time pills */}
                     {showClockOutLocation && (
-                      <div className={`flex items-start gap-2 mb-3 px-3 py-2.5 rounded-xl ${
-                        req.clock_out_outside_radius
-                          ? 'bg-amber-50 dark:bg-amber-500/10 border border-amber-100 dark:border-amber-500/20'
-                          : 'bg-gray-50 dark:bg-white/[0.03] border border-gray-100 dark:border-white/10'
-                      }`}>
-                        <MapPin size={14} className={`mt-0.5 flex-shrink-0 ${
-                          req.clock_out_outside_radius
-                            ? 'text-amber-600 dark:text-amber-400'
-                            : 'text-gray-400 dark:text-white/40'
-                        }`} />
-                        <div className="min-w-0 flex-1">
-                          <p className={`text-sm leading-snug ${
-                            req.clock_out_outside_radius
-                              ? 'text-amber-800 dark:text-amber-200 font-medium'
-                              : 'text-gray-600 dark:text-white/70'
-                          }`}>
-                            {req.clock_out_outside_radius && req.clock_out_distance_formatted
-                              ? `Clocked out ${req.clock_out_distance_formatted} from shop (outside radius)`
-                              : req.clock_out_distance_formatted
-                                ? `Clocked out ${req.clock_out_distance_formatted} from shop`
-                                : 'Clocked out outside geofence radius'}
-                          </p>
-                          {req.clock_out_drive_formatted && (
-                            <p className={`text-xs mt-0.5 font-medium ${
-                              req.clock_out_outside_radius
-                                ? 'text-amber-700 dark:text-amber-300'
-                                : 'text-gray-500 dark:text-white/60'
-                            }`}>
-                              {req.clock_out_drive_formatted} drive from shop
+                      <div
+                        className="mb-3 px-3 py-3 rounded-xl border"
+                        style={{ background: redSoft, borderColor: redBorder }}
+                      >
+                        <div className="flex items-start gap-2">
+                          <MapPin size={15} className="mt-0.5 flex-shrink-0" style={{ color: red }} />
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm font-semibold text-gray-800 dark:text-white/90 leading-snug">
+                              {req.clock_out_outside_radius
+                                ? 'Clocked out beyond the shop radius'
+                                : 'Clock-out location'}
                             </p>
-                          )}
-                          <p className="text-xs text-gray-400 dark:text-white/40 mt-0.5">
-                            <span className="text-gray-500 dark:text-white/50">In </span>{fmtTime(req.current_clock_in)}
-                            {' · '}
-                            <span className="text-gray-500 dark:text-white/50">Out </span>{fmtTime(req.current_clock_out)}
-                          </p>
-                          {req.clock_out_latitude != null && req.clock_out_longitude != null && (
-                            <a
-                              href={`https://www.google.com/maps?q=${req.clock_out_latitude},${req.clock_out_longitude}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 mt-1 text-xs text-violet-600 dark:text-violet-400 hover:underline min-h-[44px] leading-tight"
-                            >
-                              <MapPin size={11} />
-                              View on map
-                            </a>
-                          )}
+                            <div className="flex flex-wrap gap-1.5 mt-2">
+                              {req.clock_out_distance_formatted && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold"
+                                  style={{ background: redSoft, color: red }}
+                                >
+                                  <Navigation size={10} />
+                                  {req.clock_out_distance_formatted} away
+                                </span>
+                              )}
+                              {req.clock_out_drive_formatted && (
+                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-bold text-gray-600 dark:text-white/70 bg-gray-100 dark:bg-white/10">
+                                  <Clock size={10} />
+                                  {req.clock_out_drive_formatted} drive
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-400 dark:text-white/40 mt-2">
+                              <span className="text-gray-500 dark:text-white/50">In </span>{fmtTime(req.current_clock_in)}
+                              {' · '}
+                              <span className="text-gray-500 dark:text-white/50">Out </span>{fmtTime(req.current_clock_out)}
+                            </p>
+                            {req.clock_out_latitude != null && req.clock_out_longitude != null && (
+                              <a
+                                href={`https://www.google.com/maps?q=${req.clock_out_latitude},${req.clock_out_longitude}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold hover:underline min-h-[44px] leading-tight"
+                                style={{ color: red }}
+                              >
+                                <MapPin size={11} />
+                                View on map
+                              </a>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
@@ -829,7 +899,7 @@ export default function TimecardCorrectionsPage() {
                         {req.reviewed_at && (
                           <p className="text-xs text-gray-400 dark:text-white/40">
                             Reviewed {relativeTime(req.reviewed_at)}
-                            {adminAdjusted && <span className="ml-1.5 text-amber-600 dark:text-amber-400 font-medium">· times adjusted by admin</span>}
+                            {adminAdjusted && <span className="ml-1.5 font-medium" style={{ color: red }}>· times adjusted by admin</span>}
                           </p>
                         )}
                         {req.reviewer_notes && (
@@ -846,8 +916,8 @@ export default function TimecardCorrectionsPage() {
                       <>
                         {/* Deny note editor */}
                         {denyingId === req.id && (
-                          <div className="mt-3 p-3 bg-rose-50/60 dark:bg-rose-500/10 rounded-xl border border-rose-100 dark:border-rose-500/20">
-                            <label className="block text-xs font-semibold text-rose-700 dark:text-rose-300 mb-1.5">
+                          <div className="mt-3 p-3 rounded-xl border" style={{ background: redSoft, borderColor: redBorder }}>
+                            <label className="block text-xs font-semibold mb-1.5" style={{ color: red }}>
                               Reason for denial (optional)
                             </label>
                             <textarea
@@ -855,7 +925,8 @@ export default function TimecardCorrectionsPage() {
                               onChange={(e) => setDenyNote(e.target.value)}
                               rows={2}
                               placeholder="Let them know why…"
-                              className="w-full px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border border-rose-200 dark:border-rose-500/30 rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:ring-2 focus:ring-rose-400/30 focus:border-rose-400 transition-all resize-none"
+                              style={{ borderColor: redBorder }}
+                              className="w-full px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border rounded-lg text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:outline-none transition-all resize-none"
                             />
                             <div className="flex gap-2 mt-2.5">
                               <button
@@ -868,7 +939,8 @@ export default function TimecardCorrectionsPage() {
                               <button
                                 onClick={() => submitReview(req, 'reject', { reviewerNotes: denyNote.trim() || undefined })}
                                 disabled={busy}
-                                className="flex-1 min-h-[44px] px-4 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                style={{ background: red }}
+                                className="flex-1 min-h-[44px] px-4 rounded-lg text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
                               >
                                 {busy ? <Loader2 size={15} className="animate-spin" /> : <XCircle size={15} />}
                                 Confirm Deny
@@ -879,10 +951,15 @@ export default function TimecardCorrectionsPage() {
 
                         {/* Modify & approve editor */}
                         {modifyingId === req.id && (
-                          <div className="mt-3 p-3 bg-violet-50/60 dark:bg-violet-500/10 rounded-xl border border-violet-100 dark:border-violet-500/20">
-                            <p className="text-xs font-semibold text-violet-700 dark:text-violet-300 mb-2.5">
-                              Adjust the times before approving
+                          <div className="mt-3 p-3 rounded-xl border" style={{ background: navySoft, borderColor: navyBorder }}>
+                            <p className="text-xs font-semibold text-gray-700 dark:text-white/80 mb-2.5">
+                              {req.is_auto ? 'Adjust the clock-out, then save' : 'Adjust the times before approving'}
                             </p>
+                            {suggestHint && (
+                              <p className="text-[11px] mb-2.5 leading-snug px-2.5 py-2 rounded-lg" style={{ background: redSoft, color: red }}>
+                                {suggestHint}
+                              </p>
+                            )}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                               <div>
                                 <label className="block text-[11px] font-medium text-gray-500 dark:text-white/50 mb-1">Clock In</label>
@@ -890,7 +967,8 @@ export default function TimecardCorrectionsPage() {
                                   type="datetime-local"
                                   value={modifyIn}
                                   onChange={(e) => setModifyIn(e.target.value)}
-                                  className="w-full px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border border-violet-200 dark:border-violet-500/30 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition-all min-h-[44px]"
+                                  style={{ borderColor: navyBorder }}
+                                  className="w-full px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border rounded-lg text-gray-900 dark:text-white focus:outline-none transition-all min-h-[44px]"
                                 />
                               </div>
                               <div>
@@ -899,7 +977,8 @@ export default function TimecardCorrectionsPage() {
                                   type="datetime-local"
                                   value={modifyOut}
                                   onChange={(e) => setModifyOut(e.target.value)}
-                                  className="w-full px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border border-violet-200 dark:border-violet-500/30 rounded-lg text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition-all min-h-[44px]"
+                                  style={{ borderColor: navyBorder }}
+                                  className="w-full px-3 py-2 text-base sm:text-sm bg-white dark:bg-white/5 border rounded-lg text-gray-900 dark:text-white focus:outline-none transition-all min-h-[44px]"
                                 />
                               </div>
                             </div>
@@ -914,10 +993,11 @@ export default function TimecardCorrectionsPage() {
                               <button
                                 onClick={() => confirmModify(req)}
                                 disabled={busy}
-                                className="flex-1 min-h-[44px] px-4 rounded-lg bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                                style={{ background: navy }}
+                                className="flex-1 min-h-[44px] px-4 rounded-lg text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
                               >
                                 {busy ? <Loader2 size={15} className="animate-spin" /> : <Check size={15} />}
-                                Approve Adjusted
+                                Save &amp; {req.is_auto ? 'Acknowledge' : 'Approve'}
                               </button>
                             </div>
                           </div>
@@ -929,7 +1009,8 @@ export default function TimecardCorrectionsPage() {
                             <button
                               onClick={() => submitReview(req, 'approve')}
                               disabled={busy}
-                              className="min-h-[44px] px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                              style={{ background: navy }}
+                              className="min-h-[44px] px-4 rounded-xl text-white text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
                             >
                               {busy ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle size={15} />}
                               {req.is_auto ? 'Acknowledge' : 'Approve'}
@@ -937,7 +1018,8 @@ export default function TimecardCorrectionsPage() {
                             <button
                               onClick={() => { closeEditors(); openModify(req); }}
                               disabled={busy}
-                              className="min-h-[44px] px-4 rounded-xl bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-violet-700 dark:text-violet-300 border border-violet-200 dark:border-violet-500/30 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                              style={{ color: navy, borderColor: navyBorder }}
+                              className="min-h-[44px] px-4 rounded-xl bg-white dark:bg-white/5 border text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5 dark:text-white/80"
                             >
                               <Pencil size={14} />
                               Modify
@@ -945,7 +1027,8 @@ export default function TimecardCorrectionsPage() {
                             <button
                               onClick={() => { closeEditors(); setDenyingId(req.id); }}
                               disabled={busy}
-                              className="min-h-[44px] px-4 rounded-xl bg-white dark:bg-white/5 hover:bg-rose-50 dark:hover:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-500/30 text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                              style={{ color: red, borderColor: redBorder }}
+                              className="min-h-[44px] px-4 rounded-xl bg-white dark:bg-white/5 border text-sm font-semibold transition-opacity hover:opacity-90 disabled:opacity-50 flex items-center justify-center gap-1.5"
                             >
                               <XCircle size={14} />
                               Deny
@@ -962,9 +1045,11 @@ export default function TimecardCorrectionsPage() {
                     {geofenceRows.length > 0 && (
                       <section>
                         <div className="flex items-center gap-2 mb-1 px-1">
-                          <MapPin size={15} className="text-amber-500 dark:text-amber-400" />
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-md" style={{ background: red }}>
+                            <MapPin size={13} className="text-white" />
+                          </span>
                           <h2 className="text-sm font-bold text-gray-900 dark:text-white">Clock-outs Outside Geofence</h2>
-                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300 text-[11px] font-bold">{geofenceRows.length}</span>
+                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold text-white" style={{ background: red }}>{geofenceRows.length}</span>
                         </div>
                         <p className="text-xs text-gray-400 dark:text-white/40 mb-3 px-1 leading-snug">
                           No edit was requested — these crew clocked out beyond the shop radius. Review how far, then acknowledge.
@@ -975,9 +1060,11 @@ export default function TimecardCorrectionsPage() {
                     {realRequests.length > 0 && (
                       <section>
                         <div className="flex items-center gap-2 mb-3 px-1">
-                          <ClipboardEdit size={15} className="text-violet-500 dark:text-violet-400" />
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-md" style={{ background: navy }}>
+                            <ClipboardEdit size={13} className="text-white" />
+                          </span>
                           <h2 className="text-sm font-bold text-gray-900 dark:text-white">Time Edit Requests</h2>
-                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 text-[11px] font-bold">{realRequests.length}</span>
+                          <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-bold text-white" style={{ background: navy }}>{realRequests.length}</span>
                         </div>
                         <div className="space-y-3">{realRequests.map(renderCard)}</div>
                       </section>
@@ -993,9 +1080,10 @@ export default function TimecardCorrectionsPage() {
       {/* ── Toast ──────────────────────────────────────────────── */}
       {toast && (
         <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 px-4">
-          <div className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white ${
-            toast.kind === 'ok' ? 'bg-emerald-600' : 'bg-rose-600'
-          }`}>
+          <div
+            className="flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white"
+            style={{ background: toast.kind === 'ok' ? navy : red }}
+          >
             {toast.kind === 'ok' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
             {toast.msg}
           </div>

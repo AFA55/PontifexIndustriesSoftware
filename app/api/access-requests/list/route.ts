@@ -23,7 +23,7 @@ export async function GET(request: NextRequest) {
     // filter hid every new request from admins — include unclaimed rows.
     let listQuery = supabaseAdmin
       .from('access_requests')
-      .select('id, full_name, email, phone_number, date_of_birth, position, status, reviewed_by, reviewed_at, assigned_role, denial_reason, created_at')
+      .select('id, full_name, email, phone_number, date_of_birth, position, status, reviewed_by, reviewed_at, assigned_role, denial_reason, created_at, invitation_id')
       .order('created_at', { ascending: false });
     if (tenantId) listQuery = listQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
     const { data, error } = await listQuery;

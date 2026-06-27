@@ -52,6 +52,9 @@ interface AccessRequest {
   assigned_role: string | null;
   denial_reason: string | null;
   created_at: string;
+  // Set when the request was approved → links to the user_invitations row, which
+  // is what we re-send the setup email for.
+  invitation_id?: string | null;
 }
 
 interface TenantOption {
@@ -624,10 +627,25 @@ export default function InviteUsersPage() {
                         <span className="text-xs text-slate-400 dark:text-white/40 ml-2">{req.email}</span>
                       </div>
                       {req.status === 'approved' ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
-                          <CheckCircle2 className="w-3 h-3" />
-                          Approved{req.assigned_role ? ` · ${getRoleLabel(req.assigned_role)}` : ''}
-                        </span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Approved{req.assigned_role ? ` · ${getRoleLabel(req.assigned_role)}` : ''}
+                          </span>
+                          {req.invitation_id && (
+                            <button
+                              onClick={() => handleResend(req.invitation_id!)}
+                              disabled={resendingId === req.invitation_id}
+                              title="Re-send the account setup email (rotates the link)"
+                              className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-white/70 dark:hover:bg-white/5 transition-colors disabled:opacity-50 min-h-[36px]"
+                            >
+                              {resendingId === req.invitation_id
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <RefreshCw className="w-3 h-3" />}
+                              Resend email
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <span
                           className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30"

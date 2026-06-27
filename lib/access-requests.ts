@@ -26,7 +26,7 @@ import { canInviteRole, getRoleLabel } from '@/lib/rbac';
 
 /** Safe columns — NEVER expose password_hash / password_reset_token to clients. */
 export const ACCESS_REQUEST_SELECT =
-  'id, full_name, email, phone_number, date_of_birth, position, status, assigned_role, denial_reason, reviewed_by, reviewed_at, created_at, tenant_id';
+  'id, full_name, email, phone_number, date_of_birth, position, status, assigned_role, denial_reason, reviewed_by, reviewed_at, created_at, tenant_id, invitation_id';
 
 /** `.or()` filter: rows claimed by this tenant OR still unclaimed (NULL). */
 export function tenantOrUnclaimedFilter(tenantId: string): string {

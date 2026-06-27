@@ -169,6 +169,23 @@ export async function PATCH(
       return NextResponse.json({ error: 'Failed to update correction request' }, { status: 500 });
     }
 
+    // Smart auto-acknowledge (resolve side): now that this flag is handled, clear
+    // the "Clock-out needs review" bell notifications tied to this timecard for
+    // EVERY admin in the tenant — so a second admin who never opened the page also
+    // sees their bell clear. Fire-and-forget; never blocks the response.
+    // (notifications.related_entity_id == the timecard id; see clock-out route.)
+    if (correction.timecard_id) {
+      Promise.resolve(
+        supabaseAdmin
+          .from('notifications')
+          .update({ is_read: true, read: true, updated_at: now })
+          .eq('tenant_id', tenantId)
+          .eq('type', 'timecard_review')
+          .eq('related_entity_id', correction.timecard_id)
+          .eq('is_read', false)
+      ).catch(() => {});
+    }
+
     if (action === 'approve' && timecard && !isAckOnly) {
       // Effective times: admin override wins, then operator request, then current value.
       const effClockIn = hasOverrideIn
