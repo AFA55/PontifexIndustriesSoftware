@@ -1,6 +1,8 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jun 27, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (latest `0e8c1506`) | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** ✅ in Google Play review — **org account, closed-testing NOT required**, auto-publishes on approval
+**Last updated:** Jun 27, 2026 (PT2) | **Branch:** `main` | **Prod:** ✅ LIVE (latest `96964571`) | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** ✅ in Google Play review — **org account, closed-testing NOT required**, auto-publishes on approval
+
+> **⚡ NEW — the dev-velocity engine (Jun 27 PT2):** we now run **parallel-burndown** — fan out N independent backlog items as concurrent reviewed builders instead of fixing 2–3 by hand. Engine: `.claude/workflows/parallel-burndown.js`; playbook: `docs/playbooks/PARALLEL_BURNDOWN.md`; tool verdicts: `docs/TOOLING_EVALUATION.md` Batch 3. Removed the dormant ruflo/claude-flow swarm (never invoked); added **Playwright MCP** (in-loop UI verification). Proven this session on a real 3-item batch incl. a P1 security fix. Default to this for multi-item work.
 
 > **New session? Read this top-to-bottom once, then work from [BACKLOG.md](BACKLOG.md).**
 > This file = where we are + how we work. BACKLOG.md = what to do next. [CLAUDE.md](CLAUDE.md) = the hard conventions (RLS, dates, auth, email, push-cost). [docs/SESSION_LOG.md](docs/SESSION_LOG.md) = older history.
@@ -18,6 +20,13 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 | **Android** | **v1.0.1 / versionCode 2 — IN REVIEW** (Submission 4, Jun 22), US-only, Managed publishing OFF → auto-publishes on approval. **Confirmed Jun 27: ORG account ("PontifexIndustriesLLC") → EXEMPT from the closed-testing mandate.** The dashboard "closed test track" card is optional — ignored/discarded the empty draft. Just waiting on Google. Procedure now lives in the **`android-release`** skill. |
 
 **The mobile apps are a remote-URL Capacitor webview that loads `pontifexindustries.com`.** This is the single most important architectural fact: **web/UI/API changes ship to BOTH apps instantly via a Vercel deploy — no App Store / Play build needed.** Only *native* changes (icon, splash, plugins, Info.plist/AndroidManifest, Capacitor config) require a store build.
+
+### Shipped + LIVE (Jun 27 PT2) — dev-velocity + security batch (pushed `96964571`)
+- **Dev-velocity engine** (`e25e8074`) — killed dormant ruflo/claude-flow (`.claude-flow/` + ~23 swarm agent-stub dirs, never invoked) + 4 dead npm deps + a stale duplicate component; added **Playwright MCP** + the **parallel-burndown Workflow** + playbook + TOOLING_EVALUATION Batch 3 (Hermes/Fugu/ruflo all rejected with reasons). Context: founder sent 5 IG videos → fact-checked by a 109-agent deep-research pass; the real "10x" was native Claude Code parallelism, not any IG tool.
+- **🔒 voice-checkouts RLS leak FIXED + APPLIED to prod** (`96964571`, migration `20260627_voice_checkouts_drop_broad_policies.sql`) — dropped 3 broad authenticated storage policies; verified zero remain; access stays server-side via `supabaseAdmin`. rls-policy-auditor PASS.
+- **grant-super-admin audit log FIXED** (`96964571`) — was silently never writing (wrong/missing columns); now correct `audit_logs` schema. guardian-review PASS.
+- **Jest ignores `.claude/`** (`96964571`) — no more stale worktree suite pickup.
+- ⚠️ **New follow-ups in BACKLOG (Jun 27 PT2):** 5 PUBLIC buckets allow listing (P1 security), `npm audit` 59 vulns (P2), Claude Context/Conductor trials staged (P2), grant-super-admin→logAuditEvent NIT (P3).
 
 ### Shipped + LIVE (Jun 24–27) — pushed, build-verified
 - **Time Edit Requests redesign (white-label brand palette)** (`0e8c1506`) — accents now come from the tenant brand via `useBranding()` (Patriot → navy chrome/fills + red accents) instead of hardcoded purple/yellow/green; every company code gets its own palette. Geofence callout redesigned with distance + drive-time pills. **Don't reintroduce hardcoded `violet`/`amber`/`emerald` accents on tenant-facing screens — drive them from `branding.primary_color`/`secondary_color`.**

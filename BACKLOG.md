@@ -12,11 +12,12 @@
 | **Prod** | ✅ LIVE — pontifexindustries.com (deployed `0e8c1506` — tenant-brand redesign of Time Edit Requests + drive-time auto-suggest + smart notif auto-ack + resend acceptance email) |
 | **iOS** | ✅ **APPROVED — v1.0.4 / Build 9 "Ready for Distribution"**, auto-releasing. Apple Developer Agreement re-accept = **DONE**. |
 | **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). **Org account → closed testing NOT required** (confirmed Jun 27); empty closed-test draft discarded. Auto-publishes on approval. See `android-release` skill. |
-| **Open** | P0: ~0 · P1: ~5 · P2: ~15 · P3: ~9 |
+| **Open** | P0: ~0 · P1: ~3 · P2: ~13 · P3: ~8 |
 | **In flight** | Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
+| **Dev engine** | ⚡ NEW (Jun 27): parallel-burndown Workflow + Playwright MCP live; ruflo/claude-flow dead weight removed. See `docs/playbooks/PARALLEL_BURNDOWN.md` + `TOOLING_EVALUATION.md` Batch 3. |
 | **Blocked on founder** | 🤖 Google Play review (auto-notifies) · Sentry DSN · (AI-Gateway greenlight for Jarvis) · (optional) expand Play beyond US |
-| **Unpushed commits** | ✅ none — all pushed through `0e8c1506` |
-| **Last groomed** | Jun 27, 2026 |
+| **Unpushed commits** | ✅ none — pushed through `96964571` (Jun 27 dev-velocity + security batch) |
+| **Last groomed** | Jun 27, 2026 (PT2) |
 
 ## 🔴 P0 — Verify / unblock now
 
@@ -49,10 +50,23 @@
 - [ ] **Sentry DSN** — code is fully wired & gated; founder sets `SENTRY_DSN` +
       `NEXT_PUBLIC_SENTRY_DSN` in Vercel → instant prod error visibility. (Phase A, docs/plans/PHASE_A_KICKOFF.md)
 - [ ] **Supabase Auth rate limits** — Dashboard → Auth → Settings (HIGH-2 from security audit).
-- [ ] **🔒 SECURITY: `voice-checkouts` storage bucket has the same cross-tenant leak** just fixed on `timecard-photos` — its `authenticated` storage policies are bucket-only (not tenant-scoped), so any authenticated user could read another tenant's voice notes directly via the Storage API. All access is server-side via `supabaseAdmin`, so drop the broad authenticated SELECT/INSERT/DELETE policies (mirror `20260622_timecard_photos_drop_broad_policies.sql`). Flagged by rls-policy-auditor Jun 22.
+- [x] ~~**🔒 SECURITY: `voice-checkouts` storage bucket cross-tenant leak**~~ — ✅ FIXED + APPLIED to prod Jun 27 (`96964571`, migration `20260627_voice_checkouts_drop_broad_policies.sql`). Dropped the 3 broad authenticated policies (`auth_upload/read/delete_voice_checkouts`); verified zero voice-checkouts policies remain. All access stays server-side via `supabaseAdmin`. rls-policy-auditor: PASS. (First proof-batch item of the new parallel-burndown engine.)
 - [x] ~~Clean up Vercel env vars~~ — ✅ Jun 12 via authed CLI: deleted unused `RESEND_FROM_EMAIL` +
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
+
+## 🟠 P1 (added Jun 27 — surfaced during dev-velocity sweep)
+
+- [ ] **🔒 SECURITY: 5 PUBLIC storage buckets allow listing** — `avatars`, `job-photos`, `jobsite-area-docs`, `scope-photos`, `site-compliance-docs` have broad SELECT policies flagged `public_bucket_allows_listing` by Supabase advisor (rls-policy-auditor, Jun 27). Public buckets are world-readable by design, but *listing* lets anyone enumerate all objects. Decide per-bucket: make private + serve via signed URLs (like timecard-photos/voice-checkouts) OR remove the LIST capability. Highest concern: `site-compliance-docs`, `scope-photos` (may contain customer/jobsite detail).
+
+## 🟡 P2 (added Jun 27)
+
+- [ ] **`npm audit`: 59 vulns** (1 critical, 11 high, 46 moderate, 1 low) surfaced after the dep cleanup. Run `npm audit` → triage; many are likely transitive/dev. Don't blind `audit fix --force` (breaking changes) on a live app.
+- [ ] **MCP/tooling trials (staged):** (a) **Claude Context** semantic-index MCP — trial only if agent token costs hurt on this repo; needs a Milvus/Zilliz store; measure vs native subagent-summaries (don't run two indexers — coordinate with the staged `codegraph`/Understand-Anything). (b) **Conductor** Mac app — optional GUI over `claude --worktree`; adopt only if managing 5+ parallel agents in terminals gets unwieldy. Verdicts in `TOOLING_EVALUATION.md` Batch 3.
+
+## 🟢 P3 (added Jun 27)
+
+- [ ] **`grant-super-admin` audit insert → use `logAuditEvent` helper** (guardian NIT): the inline fire-and-forget `.catch(()=>{})` doesn't inspect the resolved `{error}`, so a *future* schema drift would again be silent. Switch to `lib/audit.ts logAuditEvent(...)` for DRY + error logging (confirm it captures `tenant_id`).
 
 ## 🟠 P1 (added Jun 12 — schedule-form session)
 
@@ -72,7 +86,7 @@
       `*.vercel.app/*`, `localhost:3000/*`. Code fix `451b124a` already migrated to Places API (New);
       no code change needed.
   </details>
-- [ ] **Remove dead dep `use-places-autocomplete`** (`npm uninstall`) — zero imports after the Maps fix.
+- [x] ~~**Remove dead deps**~~ — ✅ Jun 27 (`e25e8074`): removed `use-places-autocomplete`, `@react-google-maps/api`, `@simplewebauthn/browser`, `@simplewebauthn/server` (zero imports). Added `@types/google.maps` as a direct devDep (the maps lib had been providing it transitively → tsc broke without it; types-only, no dead runtime). Also deleted stale legacy `components/GoogleAddressAutocomplete.tsx`.
 - [ ] **GoogleAddressAutocomplete dark-mode** — component is light-only (pre-existing, not a regression
       from the rewrite); add dark: variants when convenient.
 - [x] **🟠 Schedule-form EDIT MODE is lossy** ✅ Jun 16 — FIXED both sides (summary read + PATCH write):
@@ -109,8 +123,7 @@
       not overwriting non-empty existing values.
 - [ ] **Schedule-board avatar map keyed by display name** (two same-name operators share an avatar) —
       pre-existing pattern; fold into the schedule-board extraction refactor.
-- [ ] **Jest picks up ~70 stale `.claude/worktrees/` duplicate suites** — add `.claude/` to
-      `testPathIgnorePatterns` + clean the worktrees (disk re-inflating).
+- [x] ~~**Jest picks up ~70 stale `.claude/worktrees/` duplicate suites**~~ — ✅ Jun 27 (`96964571`): added `.claude/` + `.next/` to `testPathIgnorePatterns` in `jest.config.js` (13 real tests intact, 0 from `.claude`). Worktrees dir currently empty.
 
 ## 🟡 P2 (guardian nits from Jun 11 invite/access-request review — real but non-blocking)
 
@@ -146,7 +159,7 @@
       OG/JSON-LD, Patriot case study (docs/plans/SEO_HOMEPAGE_PLAN.md).
 - [ ] **Date-lib migration follow-ups** — `operator/[id]/page.tsx` getWeekStart/getWeekEnd still UTC.
 - [ ] **Consolidate timecard settings tables** — key/value `timecard_settings` is bypassed; converge on v2.
-- [ ] **`grant-super-admin` audit-log insert uses wrong columns** — silently failing (pre-existing).
+- [x] ~~**`grant-super-admin` audit-log insert uses wrong columns**~~ — ✅ Jun 27 (`96964571`): used nonexistent `actor_id`/`target_id` + omitted NOT NULL cols → silently never wrote. Now correct schema (`user_id/user_email/user_role/action/resource_type/resource_id/tenant_id/details`). guardian-review: PASS. (NIT logged below: could switch to `logAuditEvent` helper.)
 - [ ] **Patriot visual assets** — founder uploads logo → Settings → Company Branding.
 - [ ] **Verify address autocomplete on prod** — env audit (Jun 12) found `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` HAS been set in Production for ~25 days; the 'missing key' item was stale. Spot-check autocomplete on the schedule form; the local-dev console spam is just the key missing from `.env.local`.
 - [ ] **Twilio**: toll-free verification + rotate auth token.
@@ -158,7 +171,7 @@
 - [ ] **One un-migrated email remains:** `app/api/admin/notifications/send/route.ts` still builds inline HTML with hardcoded "Patriot" — migrate to the react-email system like the other 13 (email-guardian NIT).
 - [ ] **`timecard_settings_v2.late_grace_minutes` column default is 15** while code fallback is 7 — only affects brand-new tenants who never open Late settings. Consider changing the column default to 7 for consistency with the "more than 7 min" intent (Patriot is already 7).
 - [ ] **Dedupe the signed-URL helper** — identical `signTimecardPhoto`/`signPath` now in `remote-verify/route.ts` + `operator/[id]/route.ts`; extract to `lib/timecard-photos.ts` to prevent drift.
-- [ ] **Delete stale legacy `components/GoogleAddressAutocomplete.tsx`** (classic Autocomplete) — dead duplicate-name footgun; the active one is `components/ui/GoogleAddressAutocomplete.tsx`.
+- [x] ~~**Delete stale legacy `components/GoogleAddressAutocomplete.tsx`**~~ — ✅ Jun 27 (`e25e8074`): deleted (was unimported; active one is `components/ui/GoogleAddressAutocomplete.tsx`).
 
 
 
