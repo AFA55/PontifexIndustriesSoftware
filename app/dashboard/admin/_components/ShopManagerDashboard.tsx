@@ -46,10 +46,10 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
       if (!session) return;
       const headers = { Authorization: `Bearer ${session.access_token}` };
 
-      // Run in parallel: current timecard + equipment counts (status filtered).
-      const [curRes, oosRes, returnedRes, vehiclesOosRes] = await Promise.all([
+      // Run in parallel: current timecard + maintenance inbox + equipment counts (status filtered).
+      const [curRes, maintRes, returnedRes, vehiclesOosRes] = await Promise.all([
         fetch('/api/timecard/current', { headers }),
-        fetch('/api/admin/equipment?status=out_of_service&limit=200', { headers }),
+        fetch('/api/admin/maintenance-requests?status=open', { headers }),
         fetch('/api/admin/equipment?status=pending_putaway&limit=200', { headers }),
         fetch('/api/admin/equipment?kind=vehicle&status=out_of_service&limit=200', { headers }),
       ]);
@@ -65,8 +65,13 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
         }
       }
 
-      // Maintenance Inbox + Pending Pre-Use Checks populate in Phase 2/3.
-      setMaintenanceInbox(0);
+      // Maintenance Inbox — open requests from the live maintenance system.
+      if (maintRes.ok) {
+        const j = await maintRes.json();
+        setMaintenanceInbox(j.total ?? (j.data?.length ?? 0));
+      }
+
+      // Pending Pre-Use Checks populate in Phase 3.
       setPendingChecks(0);
 
       if (returnedRes.ok) {

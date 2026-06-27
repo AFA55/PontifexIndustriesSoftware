@@ -3,16 +3,29 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/cron/clock-in-reminders
  *
- * Runs every 5 minutes via Vercel Cron. Reminds operators to clock in around
- * their scheduled start time.
+ * Runs every 5 minutes via Vercel Cron (infra only — the cron itself decides
+ * WHETHER and WHEN to send based on each tenant's notification_settings).
+ * Reminds operators to clock in around their scheduled start time.
  *
- *   - "Pre" reminder fires ~5 min BEFORE their earliest scheduled job arrival
+ *   - "Pre" reminder fires ~5 min BEFORE the anchor time
  *   - "Post" reminder fires ~5 min AFTER, only if they still haven't clocked in
  *
- * "Start time" = the earliest arrival_time among the operator's jobs scheduled
- * for today (their schedule-board start time). Computed in each tenant's
- * timezone. Each reminder fires at most once per operator per day (reminder_log
- * dedup). Respects per-user notification_preferences.
+ * ANCHOR TIME — admin-controlled, honors the Settings tab:
+ *   1. If notification_settings.auto_clock_in_reminder = false for the tenant →
+ *      the tenant is SKIPPED entirely (no reminders).
+ *   2. If notification_settings.clock_in_reminder_time (HH:MM) is set → it is
+ *      used as the SINGLE tenant-wide anchor for ALL scheduled operators
+ *      (the admin "set the time" control is the source of truth).
+ *   3. If no settings row exists → defaults are applied (auto = ON,
+ *      time = '07:30') so behavior is sane out of the box for every tenant.
+ *   4. Legacy fallback: when no admin time is configured at all, the cron falls
+ *      back to per-operator earliest job arrival_time, then tenant
+ *      default_start_time (preserves the old per-job model for tenants that
+ *      never touch the setting).
+ *
+ * Computed in each tenant's timezone. Each reminder fires at most once per
+ * operator per day (reminder_log dedup). Respects per-user
+ * notification_preferences.
  *
  * Authorization: Bearer ${CRON_SECRET}  (fail-closed if env var unset)
  */
@@ -47,8 +60,29 @@ export async function GET(request: NextRequest) {
       const today = todayInTz(tz);
       const nowMin = nowMinutesInTz(tz);
 
+      // Honor the admin's Auto-Notification Settings for this tenant.
+      // No row → defaults (auto ON, time '07:30') so it works out of the box.
+      const { data: settingsRow } = await supabaseAdmin
+        .from('notification_settings')
+        .select('auto_clock_in_reminder, clock_in_reminder_time')
+        .eq('tenant_id', tenant.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const autoEnabled = (settingsRow as { auto_clock_in_reminder: boolean | null } | null)?.auto_clock_in_reminder ?? true;
+      // auto_clock_in_reminder = false → skip this tenant entirely.
+      if (!autoEnabled) continue;
+
+      // Admin-set anchor time (HH:MM). When present it is the SINGLE tenant-wide
+      // anchor for every scheduled operator. null → fall back to per-job model.
+      const adminAnchorMin = parseHHMM(
+        (settingsRow as { clock_in_reminder_time: string | null } | null)?.clock_in_reminder_time ?? null
+      );
+
       // Tenant-wide default start time fallback (for operators scheduled today
-      // but with no resolved arrival_time on any of their jobs).
+      // but with no resolved arrival_time on any of their jobs), used only when
+      // there is no admin anchor.
       const { data: tenantRow } = await supabaseAdmin
         .from('tenants')
         .select('default_start_time')
@@ -97,9 +131,16 @@ export async function GET(request: NextRequest) {
         consider(a.helper_id, arrival);
       }
 
-      // Operators scheduled today with no resolved start time → tenant default.
-      for (const opId of scheduledOps) {
-        if (!earliestStart.has(opId)) earliestStart.set(opId, defaultStartMin);
+      if (adminAnchorMin != null) {
+        // Admin set a tenant-wide reminder time → it overrides per-job arrival
+        // times. EVERY operator scheduled today is anchored to the admin time.
+        for (const opId of scheduledOps) earliestStart.set(opId, adminAnchorMin);
+      } else {
+        // Legacy per-job model: operators scheduled today with no resolved start
+        // time fall back to the tenant default start time.
+        for (const opId of scheduledOps) {
+          if (!earliestStart.has(opId)) earliestStart.set(opId, defaultStartMin);
+        }
       }
 
       if (earliestStart.size === 0) continue;

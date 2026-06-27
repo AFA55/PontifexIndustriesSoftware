@@ -138,11 +138,30 @@ export async function POST(
     );
 
     // ── Ensure completion-pdfs bucket exists ────────────────────────────────
-    // (If bucket doesn't exist, upload will create it as private; we try public first)
-    const { data: buckets } = await supabaseAdmin.storage.listBuckets();
+    // Failures here MUST be surfaced — a missing bucket means the PDF can never
+    // persist, so we cannot let the request return success (silent data loss).
+    const { data: buckets, error: listBucketsError } = await supabaseAdmin.storage.listBuckets();
+    if (listBucketsError) {
+      console.error('Failed to list storage buckets:', listBucketsError);
+      return NextResponse.json(
+        { error: 'Failed to verify completion PDF storage', details: listBucketsError.message },
+        { status: 500 }
+      );
+    }
     const bucketExists = buckets?.some((b) => b.name === 'completion-pdfs');
     if (!bucketExists) {
-      await supabaseAdmin.storage.createBucket('completion-pdfs', { public: true });
+      const { error: createBucketError } = await supabaseAdmin.storage.createBucket(
+        'completion-pdfs',
+        { public: true }
+      );
+      // Ignore a "already exists" race (another concurrent request created it).
+      if (createBucketError && !/already exists/i.test(createBucketError.message)) {
+        console.error('Failed to create completion-pdfs bucket:', createBucketError);
+        return NextResponse.json(
+          { error: 'Failed to create completion PDF storage', details: createBucketError.message },
+          { status: 500 }
+        );
+      }
     }
 
     // ── Upload PDF to Supabase Storage ───────────────────────────────────────
@@ -172,7 +191,19 @@ export async function POST(
 
     const pdfUrl = urlData?.publicUrl || '';
 
+    // The upload succeeded but we have no resolvable URL to archive — surface it
+    // rather than persisting an empty completion_pdf_url.
+    if (!pdfUrl) {
+      console.error('PDF uploaded but public URL could not be resolved for path:', storagePath);
+      return NextResponse.json(
+        { error: 'Completion PDF uploaded but its URL could not be resolved' },
+        { status: 500 }
+      );
+    }
+
     // ── Update job_orders row ────────────────────────────────────────────────
+    // The PDF URL is the customer-facing artifact. If this write fails the job
+    // would look completed with NO archived PDF (silent data loss), so fail loud.
     const { error: updateError } = await supabaseAdmin
       .from('job_orders')
       .update({
@@ -184,8 +215,11 @@ export async function POST(
       .eq('id', jobId);
 
     if (updateError) {
-      console.error('Failed to update job with PDF URL:', updateError);
-      // Don't fail the whole request — PDF was generated and uploaded
+      console.error('Failed to save completion PDF URL to job:', updateError);
+      return NextResponse.json(
+        { error: 'Completion PDF was generated but could not be saved to the job', details: updateError.message },
+        { status: 500 }
+      );
     }
 
     // ── Optional: email PDF receipt to customer (fire-and-forget) ──────────

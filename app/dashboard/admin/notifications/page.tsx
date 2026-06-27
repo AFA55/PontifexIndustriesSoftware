@@ -570,15 +570,19 @@ export default function AdminNotificationsPage() {
             </h3>
 
             <div className="space-y-6">
-              {/* Auto Clock-In Reminder */}
+              {/* Auto Clock-In Reminder — LIVE working control */}
               <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
                 <div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">Auto Clock-In Reminder</p>
-                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1">Send reminder to operators who haven't clocked in</p>
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1">
+                    Automatically remind scheduled operators who haven&apos;t clocked in. A nudge fires just
+                    before the time below, and again just after if they still haven&apos;t clocked in.
+                  </p>
                 </div>
                 <button
                   onClick={() => setSettings(s => ({ ...s, auto_clock_in_reminder: !s.auto_clock_in_reminder }))}
                   className={`p-1 rounded-lg transition-colors ${settings.auto_clock_in_reminder ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
+                  aria-pressed={settings.auto_clock_in_reminder}
                 >
                   {settings.auto_clock_in_reminder
                     ? <ToggleRight className="w-8 h-8" />
@@ -596,52 +600,47 @@ export default function AdminNotificationsPage() {
                     onChange={e => setSettings(s => ({ ...s, clock_in_reminder_time: e.target.value }))}
                     className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white"
                   />
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1.5">
+                    All scheduled operators get the reminder around this time (your company timezone).
+                  </p>
                 </div>
               )}
 
-              {/* Auto Overtime Alert */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
+              {/* Auto Overtime Alert — NOT YET WIRED. Disabled + "Coming soon". */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 opacity-60">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Auto Overtime Alert</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    Auto Overtime Alert
+                    <span className="text-[10px] uppercase tracking-wide font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-white/50">Coming soon</span>
+                  </p>
                   <p className="text-xs text-gray-400 dark:text-white/40 mt-1">Alert when operator approaches overtime threshold</p>
                 </div>
                 <button
-                  onClick={() => setSettings(s => ({ ...s, auto_overtime_alert: !s.auto_overtime_alert }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_overtime_alert ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
+                  disabled
+                  aria-disabled="true"
+                  title="Coming soon"
+                  className="p-1 rounded-lg text-gray-300 dark:text-white/20 cursor-not-allowed"
                 >
-                  {settings.auto_overtime_alert
-                    ? <ToggleRight className="w-8 h-8" />
-                    : <ToggleLeft className="w-8 h-8" />
-                  }
+                  <ToggleLeft className="w-8 h-8" />
                 </button>
               </div>
 
-              {settings.auto_overtime_alert && (
-                <div className="pl-4">
-                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">OT Threshold (hours)</label>
-                  <input
-                    type="number"
-                    value={settings.overtime_alert_threshold}
-                    onChange={e => setSettings(s => ({ ...s, overtime_alert_threshold: parseFloat(e.target.value) || 40 }))}
-                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 w-32 dark:bg-white/5 dark:border-white/10 dark:text-white"
-                  />
-                </div>
-              )}
-
-              {/* Auto Timecard Approval Reminder */}
-              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
+              {/* Auto Timecard Approval Reminder — NOT YET WIRED. Disabled + "Coming soon". */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10 opacity-60">
                 <div>
-                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Weekly Approval Reminder</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                    Weekly Approval Reminder
+                    <span className="text-[10px] uppercase tracking-wide font-bold px-2 py-0.5 rounded-full bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-white/50">Coming soon</span>
+                  </p>
                   <p className="text-xs text-gray-400 dark:text-white/40 mt-1">Send weekly reminder to approve pending timecards</p>
                 </div>
                 <button
-                  onClick={() => setSettings(s => ({ ...s, auto_timecard_approval_reminder: !s.auto_timecard_approval_reminder }))}
-                  className={`p-1 rounded-lg transition-colors ${settings.auto_timecard_approval_reminder ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
+                  disabled
+                  aria-disabled="true"
+                  title="Coming soon"
+                  className="p-1 rounded-lg text-gray-300 dark:text-white/20 cursor-not-allowed"
                 >
-                  {settings.auto_timecard_approval_reminder
-                    ? <ToggleRight className="w-8 h-8" />
-                    : <ToggleLeft className="w-8 h-8" />
-                  }
+                  <ToggleLeft className="w-8 h-8" />
                 </button>
               </div>
 

@@ -21,6 +21,12 @@ const EXCLUDED_FIELDS = new Set([
   'created_at',
   'updated_at',
   'status',
+  // Duplicate lands UNASSIGNED so the admin can assign a DIFFERENT operator —
+  // this is the "same job, multiple operators" workflow (duplicate, then reassign
+  // each copy). Without this the copy inherits the original's operator/helper and
+  // creates a same-day double-assignment the admin then has to undo.
+  'assigned_to',
+  'helper_assigned_to',
   'dispatched_at',
   'completed_at',
   'customer_signature',
