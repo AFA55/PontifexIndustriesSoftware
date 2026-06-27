@@ -4,6 +4,18 @@
 
 > **⚡ NEW — the dev-velocity engine (Jun 27 PT2):** we now run **parallel-burndown** — fan out N independent backlog items as concurrent reviewed builders instead of fixing 2–3 by hand. Engine: `.claude/workflows/parallel-burndown.js`; playbook: `docs/playbooks/PARALLEL_BURNDOWN.md`; tool verdicts: `docs/TOOLING_EVALUATION.md` Batch 3. Removed the dormant ruflo/claude-flow swarm (never invoked); added **Playwright MCP** (in-loop UI verification). Proven this session on a real 3-item batch incl. a P1 security fix. Default to this for multi-item work.
 >
+> **🚀 PATRIOT LAUNCH is the #1 priority now (revenue-first).** Founder needs revenue; fastest path =
+> finish Patriot → they pay → LinkedIn proof. Full strategy: `docs/plans/PONTIFEX_STRATEGY_AND_ROADMAP.md`
+> (resist scope creep; tenants≠apps; Hermes=personal-ops-only; Perplexity=research copilot). The launch
+> definition + tiered punch list = the **PATRIOT LAUNCH EPIC** at the top of BACKLOG.md. **Tier 1 (launch
+> fixes) ✅ DONE + LIVE (pushed `2f3143c3`):** clock-in reminder now admin-configurable (cron honors
+> notification_settings), job-completion PDF hardened, shop inbox count wired + dead route removed,
+> schedule-board duplicate bug fixed (was double-assigning operators). **NEXT = Tier 2** (the showcase
+> data UIs, design-sensitive, use `frontend-design` skill): (1) operator production-input form (linear
+> ft/holes per operator/job → existing `equipment_usage` table; add holes modeling), (2) cost input +
+> Project P&L/production dashboard (surface the existing `job_pnl_summary` view + per-operator production).
+> Then **Tier 3 = Artifex** (post-launch showcase; data already exists). Audit details: BACKLOG epic.
+>
 > **🎨 Tenant brand-token system (Jun 27 PT2, pushed `7c60735d`):** the recurring "UI ignores the tenant's color palette" bug had a ROOT CAUSE — `tailwind.config` never mapped a token to the `--color-*` vars BrandingProvider sets, so code hardcoded Pontifex purple across ~305 files. FIXED: added tenant-aware **`brand` / `brand-dark` / `brand-secondary` / `brand-accent`** Tailwind tokens (backed by `--color-*-rgb` channel vars for opacity; safelisted; `:root` defaults in globals.css; verified live = Patriot red/navy). **Use `bg-brand`/`text-brand`/`from-brand to-brand-accent`/`bg-brand/10` for ALL tenant-facing accents — never hardcoded purple/violet.** 16 highest-impact files swept (~213 swaps); ~290-file long tail tracked in BACKLOG P1 (run more parallel-burndown waves; preserve semantic status/category colors).
 
 > **New session? Read this top-to-bottom once, then work from [BACKLOG.md](BACKLOG.md).**
