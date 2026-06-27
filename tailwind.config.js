@@ -10,6 +10,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // TENANT BRAND tokens — driven by the per-tenant CSS vars that
+        // BrandingProvider sets (lib/branding-context.tsx), with :root defaults
+        // in globals.css. Use these for any tenant-facing accent so it follows
+        // the company's palette (NOT hardcoded purple/violet). Opacity modifiers
+        // work via the *-rgb channel vars: bg-brand, text-brand, bg-brand/10,
+        // ring-brand/30, from-brand to-brand-accent, etc.
+        brand: {
+          DEFAULT: 'rgb(var(--color-primary-rgb) / <alpha-value>)',
+          dark: 'rgb(var(--color-primary-dark-rgb) / <alpha-value>)',
+          secondary: 'rgb(var(--color-secondary-rgb) / <alpha-value>)',
+          accent: 'rgb(var(--color-accent-rgb) / <alpha-value>)',
+        },
         // New Modern Color Palette
         primary: {
           DEFAULT: '#1e40af',

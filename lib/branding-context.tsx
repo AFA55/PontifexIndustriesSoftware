@@ -90,6 +90,21 @@ const DEFAULT_BRANDING: TenantBranding = {
 const CACHE_KEY = 'patriot-branding';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+// Convert a hex color (#RRGGBB / #RGB) to a space-separated "R G B" channel string.
+// We expose these as `--color-*-rgb` so Tailwind's `brand` tokens can be defined as
+// `rgb(var(--color-primary-rgb) / <alpha-value>)` — which makes opacity modifiers
+// like `bg-brand/10` work against the tenant's palette. Returns null on bad input.
+function hexToRgbChannels(hex: string): string | null {
+  if (!hex) return null;
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) return null;
+  const r = parseInt(h.slice(0, 2), 16);
+  const g = parseInt(h.slice(2, 4), 16);
+  const b = parseInt(h.slice(4, 6), 16);
+  return `${r} ${g} ${b}`;
+}
+
 interface CachedBranding {
   data: TenantBranding;
   timestamp: number;
@@ -181,19 +196,20 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (loading) return;
 
-    // CSS custom properties for dynamic theming
-    if (branding.primary_color) {
-      document.documentElement.style.setProperty('--color-primary', branding.primary_color);
-    }
-    if (branding.primary_color_dark) {
-      document.documentElement.style.setProperty('--color-primary-dark', branding.primary_color_dark);
-    }
-    if (branding.secondary_color) {
-      document.documentElement.style.setProperty('--color-secondary', branding.secondary_color);
-    }
-    if (branding.accent_color) {
-      document.documentElement.style.setProperty('--color-accent', branding.accent_color);
-    }
+    // CSS custom properties for dynamic theming. We set BOTH the hex value
+    // (--color-*) and an "R G B" channel form (--color-*-rgb) so Tailwind's
+    // `brand` tokens (rgb(var(--color-primary-rgb) / <alpha-value>)) support
+    // opacity modifiers like bg-brand/10.
+    const setColorVar = (name: string, hex: string | null | undefined) => {
+      if (!hex) return;
+      document.documentElement.style.setProperty(`--color-${name}`, hex);
+      const rgb = hexToRgbChannels(hex);
+      if (rgb) document.documentElement.style.setProperty(`--color-${name}-rgb`, rgb);
+    };
+    setColorVar('primary', branding.primary_color);
+    setColorVar('primary-dark', branding.primary_color_dark);
+    setColorVar('secondary', branding.secondary_color);
+    setColorVar('accent', branding.accent_color);
     if (branding.header_bg_color) {
       document.documentElement.style.setProperty('--color-header-bg', branding.header_bg_color);
     }

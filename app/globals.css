@@ -18,6 +18,19 @@
   --brand-gradient: linear-gradient(135deg, #2563eb 0%, #dc2626 100%);
   --brand-gradient-hover: linear-gradient(135deg, #1d4ed8 0%, #b91c1c 100%);
 
+  /* Tenant theme tokens — overridden per-tenant at runtime by BrandingProvider
+     (lib/branding-context.tsx). Defaults match DEFAULT_BRANDING (Patriot red +
+     navy) so the Tailwind `brand` tokens resolve on first paint / SSR. The
+     *-rgb channel form powers opacity modifiers (e.g. bg-brand/10). */
+  --color-primary: #dc2626;
+  --color-primary-rgb: 220 38 38;
+  --color-primary-dark: #b91c1c;
+  --color-primary-dark-rgb: 185 28 28;
+  --color-secondary: #1e3a5f;
+  --color-secondary-rgb: 30 58 95;
+  --color-accent: #ef4444;
+  --color-accent-rgb: 239 68 68;
+
   /* Core Colors */
   --background: #ffffff;
   --background-secondary: #f8fafc;
