@@ -258,10 +258,10 @@ export default function RequestTimeOffPage() {
     t === 'pto' ? 'PTO' : t.charAt(0).toUpperCase() + t.slice(1).replace(/_/g, ' ');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#150b2e]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand/5 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#150b2e]">
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full opacity-10 blur-3xl animate-pulse" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-blue-300 rounded-full opacity-10 blur-3xl animate-pulse delay-1000" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-brand/30 rounded-full opacity-10 blur-3xl animate-pulse" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-brand-accent/30 rounded-full opacity-10 blur-3xl animate-pulse delay-1000" />
       </div>
 
       <div className="container mx-auto px-4 sm:px-6 py-8 relative">
@@ -274,7 +274,7 @@ export default function RequestTimeOffPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 bg-clip-text text-transparent">
+            <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent">
               Request Time Off
             </h1>
             <p className="text-gray-600 dark:text-white/50 font-medium mt-1">Submit your vacation and PTO requests</p>
@@ -398,7 +398,7 @@ export default function RequestTimeOffPage() {
                     onChange={handleInputChange}
                     min={toLocalYMD()}
                     required
-                    className="w-full px-4 py-4 bg-white dark:bg-white/[0.06] border-2 border-gray-300 dark:border-white/15 rounded-xl text-gray-800 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-sm min-h-[56px]"
+                    className="w-full px-4 py-4 bg-white dark:bg-white/[0.06] border-2 border-gray-300 dark:border-white/15 rounded-xl text-gray-800 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all shadow-sm min-h-[56px]"
                   />
                 </div>
                 <div>
@@ -410,13 +410,13 @@ export default function RequestTimeOffPage() {
                     onChange={handleInputChange}
                     min={formData.startDate || toLocalYMD()}
                     required
-                    className="w-full px-4 py-4 bg-white dark:bg-white/[0.06] border-2 border-gray-300 dark:border-white/15 rounded-xl text-gray-800 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-sm min-h-[56px]"
+                    className="w-full px-4 py-4 bg-white dark:bg-white/[0.06] border-2 border-gray-300 dark:border-white/15 rounded-xl text-gray-800 dark:text-white text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all shadow-sm min-h-[56px]"
                   />
                 </div>
               </div>
               {formData.startDate && formData.endDate && (
-                <div className="mt-4 bg-purple-50 dark:bg-purple-500/10 border-2 border-purple-300 dark:border-purple-500/30 rounded-xl p-4 text-center">
-                  <p className="text-purple-800 dark:text-purple-300 font-bold">
+                <div className="mt-4 bg-brand/10 dark:bg-brand/15 border-2 border-brand/40 dark:border-brand/30 rounded-xl p-4 text-center">
+                  <p className="text-brand dark:text-brand font-bold">
                     Total Days Requested: <span className="text-2xl">{countDays(formData.startDate, formData.endDate)}</span>
                   </p>
                 </div>
@@ -460,7 +460,7 @@ export default function RequestTimeOffPage() {
                 placeholder="Please provide a brief reason for your time off request..."
                 rows={5}
                 required
-                className="w-full px-4 py-4 bg-white dark:bg-white/[0.06] border-2 border-gray-300 dark:border-white/15 rounded-xl text-gray-800 dark:text-white text-base sm:text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all resize-none shadow-sm"
+                className="w-full px-4 py-4 bg-white dark:bg-white/[0.06] border-2 border-gray-300 dark:border-white/15 rounded-xl text-gray-800 dark:text-white text-base sm:text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent transition-all resize-none shadow-sm"
               />
               <p className="text-gray-500 dark:text-white/40 text-sm mt-2 font-medium">{formData.reason.length} characters</p>
             </div>
@@ -470,7 +470,7 @@ export default function RequestTimeOffPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || !formData.startDate || !formData.endDate || !formData.reason.trim()}
-                className="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl min-h-[56px] flex items-center justify-center gap-2"
+                className="flex-1 bg-gradient-to-r from-brand to-brand-accent hover:opacity-90 disabled:from-gray-400 disabled:to-gray-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-4 px-8 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl min-h-[56px] flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -496,13 +496,13 @@ export default function RequestTimeOffPage() {
           {/* My Requests */}
           <div className="bg-white/80 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl border border-gray-200 dark:border-white/10 p-5 sm:p-6 shadow-lg">
             <div className="flex items-center gap-2 mb-4">
-              <History className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <History className="w-5 h-5 text-brand dark:text-brand" />
               <h3 className="text-gray-800 dark:text-white font-bold text-lg">My Requests</h3>
             </div>
 
             {historyLoading ? (
               <div className="flex items-center justify-center py-10">
-                <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+                <Loader2 className="w-6 h-6 animate-spin text-brand" />
               </div>
             ) : requests.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-white/40 py-6 text-center">No time-off requests yet.</p>
@@ -561,7 +561,7 @@ export default function RequestTimeOffPage() {
                         <div className="mt-3 flex gap-2">
                           <button
                             onClick={() => startEdit(r)}
-                            className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:hover:bg-purple-500/25 dark:text-purple-300 text-xs font-semibold transition-colors"
+                            className="flex items-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-lg bg-brand/10 hover:bg-brand/20 text-brand dark:bg-brand/15 dark:hover:bg-brand/25 dark:text-brand text-xs font-semibold transition-colors"
                           >
                             <Pencil className="w-3.5 h-3.5" /> Edit
                           </button>

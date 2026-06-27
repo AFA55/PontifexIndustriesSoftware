@@ -256,7 +256,7 @@ function Badge({ count }: { count: number }) {
 // ---------------------------------------------------------------------------
 
 function UserAvatar({ name, avatarUrl }: { name: string; avatarUrl?: string | null }) {
-  return <SharedUserAvatar src={avatarUrl} name={name} size="sm" className="ring-1 ring-purple-500/40" />;
+  return <SharedUserAvatar src={avatarUrl} name={name} size="sm" className="ring-1 ring-brand/40" />;
 }
 
 // ---------------------------------------------------------------------------
@@ -378,7 +378,7 @@ function SidebarContent({
           collapsed ? 'justify-center' : ''
         }`}
       >
-        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0">
+        <div className="w-7 h-7 rounded-md bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center flex-shrink-0">
           <span className="text-white text-xs font-black">P</span>
         </div>
         {!collapsed && (
@@ -533,7 +533,7 @@ function SidebarContent({
                   <p className="text-slate-900 dark:text-white text-xs font-semibold truncate leading-tight">
                     {user.name}
                   </p>
-                  <p className="text-purple-600 dark:text-purple-400 text-[10px] leading-tight truncate">
+                  <p className="text-brand text-[10px] leading-tight truncate">
                     My Profile · {formatRole(user.role)}
                   </p>
                 </div>

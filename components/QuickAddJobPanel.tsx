@@ -120,11 +120,11 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
         style={{ animation: 'slideInRight 0.3s ease-out' }}
       >
         {/* Header */}
-        <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-500 p-5 text-white z-10">
+        <div className="sticky top-0 bg-gradient-to-r from-brand to-brand-accent p-5 text-white z-10">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold">Quick Add Job</h2>
-              <p className="text-purple-100 text-sm">Add a job to the schedule</p>
+              <p className="text-white/80 text-sm">Add a job to the schedule</p>
             </div>
             <button
               onClick={onClose}
@@ -153,7 +153,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
               value={customerName}
               onChange={(e) => setCustomerName(e.target.value)}
               placeholder="e.g. Patriot Concrete, ABC Construction"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900 text-base"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900 text-base"
             />
           </div>
 
@@ -185,7 +185,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                 <button
                   key={type}
                   onClick={() => setJobTypes([...jobTypes, type])}
-                  className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-all flex items-center gap-1.5"
+                  className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-medium text-gray-700 hover:border-brand hover:bg-brand/10 hover:text-brand transition-all flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   {type}
@@ -204,7 +204,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                 type="date"
                 value={scheduledDate}
                 onChange={(e) => setScheduledDate(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
                 style={{ colorScheme: 'light' }}
               />
             </div>
@@ -216,7 +216,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
                 style={{ colorScheme: 'light' }}
               />
             </div>
@@ -232,7 +232,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                 type="time"
                 value={shopArrivalTime}
                 onChange={(e) => setShopArrivalTime(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
               />
             </div>
             <div>
@@ -243,7 +243,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                 type="time"
                 value={arrivalTime}
                 onChange={(e) => setArrivalTime(e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
               />
             </div>
           </div>
@@ -256,7 +256,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
             <select
               value={selectedOperator}
               onChange={(e) => setSelectedOperator(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900 text-base bg-white"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900 text-base bg-white"
             >
               <option value="">Unassigned</option>
               {operators.map(op => (
@@ -279,13 +279,13 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                   return (
                     <span
                       key={item}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-purple-100 text-purple-700 rounded-lg text-sm font-medium"
+                      className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand/10 text-brand rounded-lg text-sm font-medium"
                       title={preset?.full}
                     >
                       {item}
                       <button
                         onClick={() => setEquipment(equipment.filter(e => e !== item))}
-                        className="hover:text-purple-900"
+                        className="hover:text-brand-dark"
                       >
                         <Minus className="w-3.5 h-3.5" />
                       </button>
@@ -302,7 +302,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                   key={preset.abbrev}
                   onClick={() => setEquipment([...equipment, preset.abbrev])}
                   title={preset.full}
-                  className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:border-purple-400 hover:bg-purple-50 hover:text-purple-700 transition-all flex items-center gap-1.5"
+                  className="px-3 py-2 border-2 border-gray-200 rounded-xl text-sm font-bold text-gray-700 hover:border-brand hover:bg-brand/10 hover:text-brand transition-all flex items-center gap-1.5"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   {preset.abbrev}
@@ -323,12 +323,12 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
                   }
                 }}
                 placeholder="Add other equipment..."
-                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+                className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
               />
               <button
                 type="button"
                 onClick={addCustomEquipment}
-                className="px-4 py-3 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-xl font-bold transition-colors"
+                className="px-4 py-3 bg-brand/10 hover:bg-brand/20 text-brand rounded-xl font-bold transition-colors"
               >
                 <Plus className="w-5 h-5" />
               </button>
@@ -345,7 +345,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               placeholder="e.g. Downtown Office Building"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
             />
           </div>
 
@@ -359,7 +359,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
               value={address}
               onChange={(e) => setAddress(e.target.value)}
               placeholder="e.g. 123 Main St, City, State"
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900"
             />
           </div>
 
@@ -373,7 +373,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Any initial notes about this job..."
               rows={3}
-              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none text-gray-900 resize-none"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none text-gray-900 resize-none"
             />
           </div>
         </div>
@@ -389,7 +389,7 @@ export default function QuickAddJobPanel({ operators, defaultDate, onSubmit, onC
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-4 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {submitting ? 'Adding...' : 'Add to Schedule'}
           </button>

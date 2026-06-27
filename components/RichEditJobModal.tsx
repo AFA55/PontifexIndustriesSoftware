@@ -58,11 +58,11 @@ export default function RichEditJobModal({
       <div className="fixed inset-0 bg-black/50 dark:bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div className="bg-white dark:bg-[#12082a] rounded-3xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
           {/* Modal Header */}
-          <div className="sticky top-0 bg-gradient-to-r from-purple-600 to-pink-500 text-white p-6 rounded-t-3xl z-10">
+          <div className="sticky top-0 bg-gradient-to-r from-brand to-brand-accent text-white p-6 rounded-t-3xl z-10">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-bold mb-1">Edit Job Details</h2>
-                <p className="text-purple-100">{job.job_number} - {job.title}</p>
+                <p className="text-white/80">{job.job_number} - {job.title}</p>
               </div>
               <button
                 onClick={onClose}
@@ -78,9 +78,9 @@ export default function RichEditJobModal({
           {/* Modal Content */}
           <div className="p-6 space-y-6">
             {/* Operator Assignment */}
-            <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-500/10 dark:to-pink-500/10 p-5 rounded-xl border-2 border-purple-200 dark:border-purple-500/30">
+            <div className="bg-gradient-to-br from-brand/5 to-brand-accent/5 dark:from-brand/10 dark:to-brand-accent/10 p-5 rounded-xl border-2 border-brand/30 dark:border-brand/30">
               <div className="flex items-start gap-3">
-                <Users className="w-6 h-6 text-purple-600 dark:text-purple-300 mt-1" />
+                <Users className="w-6 h-6 text-brand dark:text-brand mt-1" />
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-gray-900 dark:text-white mb-1">
                     Assigned Operator
@@ -92,11 +92,11 @@ export default function RichEditJobModal({
                   {/* Current Operator Display */}
                   {!showOperatorDropdown ? (
                     <div>
-                      <div className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-purple-300 dark:border-purple-500/40 rounded-xl mb-3">
+                      <div className="w-full px-4 py-3 bg-white dark:bg-slate-900 border-2 border-brand/40 dark:border-brand/40 rounded-xl mb-3">
                         <div className="flex items-center gap-2">
                           {job.assigned_to ? (
                             <>
-                              <div className="w-8 h-8 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm">
+                              <div className="w-8 h-8 rounded-full bg-brand flex items-center justify-center text-white font-bold text-sm">
                                 {job.operator_name?.charAt(0) || '?'}
                               </div>
                               <div>
@@ -127,7 +127,7 @@ export default function RichEditJobModal({
                         <button
                           type="button"
                           onClick={() => setShowOperatorDropdown(true)}
-                          className="flex-1 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
+                          className="flex-1 px-4 py-2 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent text-white rounded-lg font-semibold transition-all shadow-md hover:shadow-lg"
                         >
                           Change Operator
                         </button>
@@ -163,7 +163,7 @@ export default function RichEditJobModal({
                             operator_name: selectedOperator?.full_name || null,
                           });
                         }}
-                        className="w-full px-4 py-3 border-2 border-purple-300 dark:border-purple-500/40 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-slate-900 font-medium [&>option]:dark:bg-slate-800 [&>option]:dark:text-white"
+                        className="w-full px-4 py-3 border-2 border-brand/40 dark:border-brand/40 rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-slate-900 font-medium [&>option]:dark:bg-slate-800 [&>option]:dark:text-white"
                         autoFocus
                       >
                         <option value="">-- Select Operator --</option>
@@ -205,7 +205,7 @@ export default function RichEditJobModal({
 
               {/* End Date for multi-day jobs */}
               <div className="flex items-start gap-3 mt-4">
-                <Calendar className="w-6 h-6 text-purple-600 dark:text-purple-300 mt-1" />
+                <Calendar className="w-6 h-6 text-brand dark:text-brand mt-1" />
                 <div className="flex-1">
                   <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
                     End Date (multi-day jobs)
@@ -215,7 +215,7 @@ export default function RichEditJobModal({
                     value={job.end_date || ''}
                     onChange={(e) => onJobChange({ ...job, end_date: e.target.value || null })}
                     min={job.scheduled_date ? job.scheduled_date.split('T')[0] : ''}
-                    className="w-full px-4 py-3 border-2 border-purple-300 dark:border-purple-500/40 dark:bg-slate-900 dark:[color-scheme:dark] rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white text-lg font-semibold"
+                    className="w-full px-4 py-3 border-2 border-brand/40 dark:border-brand/40 dark:bg-slate-900 dark:[color-scheme:dark] rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white text-lg font-semibold"
                   />
                   <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Leave empty for single-day jobs</p>
                 </div>
@@ -232,7 +232,7 @@ export default function RichEditJobModal({
                   type="time"
                   value={job.shop_arrival_time ? job.shop_arrival_time.substring(0, 5) : ''}
                   onChange={(e) => onJobChange({ ...job, shop_arrival_time: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 dark:[color-scheme:dark] rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white text-lg font-semibold"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 dark:[color-scheme:dark] rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white text-lg font-semibold"
                 />
                 <div className="flex gap-2 mt-2">
                   {['06:00', '07:00', '08:00'].map(time => (
@@ -308,7 +308,7 @@ export default function RichEditJobModal({
                   type="text"
                   value={job.customer_name}
                   onChange={(e) => onJobChange({ ...job, customer_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white"
                 />
               </div>
               <div>
@@ -319,7 +319,7 @@ export default function RichEditJobModal({
                   type="text"
                   value={job.foreman_name || ''}
                   onChange={(e) => onJobChange({ ...job, foreman_name: e.target.value })}
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white"
                 />
               </div>
             </div>
@@ -332,7 +332,7 @@ export default function RichEditJobModal({
                 type="tel"
                 value={job.foreman_phone || ''}
                 onChange={(e) => onJobChange({ ...job, foreman_phone: e.target.value })}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white"
               />
             </div>
 
@@ -361,13 +361,13 @@ export default function RichEditJobModal({
                   {job.equipment_needed.map((item, idx) => (
                     <span
                       key={idx}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 rounded-lg text-sm font-medium"
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-lg text-sm font-medium"
                     >
                       {item}
                       <button
                         type="button"
                         onClick={() => removeEquipment(item)}
-                        className="hover:bg-purple-200 dark:hover:bg-purple-800/50 rounded-full p-0.5 transition-colors"
+                        className="hover:bg-brand/20 dark:hover:bg-brand/30 rounded-full p-0.5 transition-colors"
                       >
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -389,7 +389,7 @@ export default function RichEditJobModal({
                   }}
                   onFocus={() => setShowEquipmentDropdown(true)}
                   placeholder="Search equipment..."
-                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-purple-500 focus:outline-none transition-colors text-gray-900 dark:text-white"
+                  className="w-full px-4 py-3 border-2 border-gray-300 dark:border-slate-600 dark:bg-slate-900 rounded-xl focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white"
                   autoComplete="off"
                 />
 
@@ -402,7 +402,7 @@ export default function RichEditJobModal({
                         <div
                           key={idx}
                           onClick={() => addEquipment(item)}
-                          className="px-4 py-2 hover:bg-purple-50 dark:hover:bg-purple-500/10 cursor-pointer text-gray-800 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
+                          className="px-4 py-2 hover:bg-brand/5 dark:hover:bg-brand/10 cursor-pointer text-gray-800 dark:text-slate-200 border-b border-gray-100 dark:border-slate-700 last:border-b-0"
                         >
                           {item}
                         </div>
@@ -443,7 +443,7 @@ export default function RichEditJobModal({
               <button
                 onClick={onSave}
                 disabled={saving}
-                className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>

@@ -139,7 +139,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
       case 'system':
         return <Send className="w-4 h-4 text-blue-400" />;
       default:
-        return <MessageSquare className="w-4 h-4 text-purple-400" />;
+        return <MessageSquare className="w-4 h-4 text-brand" />;
     }
   };
 
@@ -160,7 +160,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
         onClick={() => setOpen(!open)}
         className={`relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200 ${
           unreadCount > 0
-            ? 'bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-white/20 dark:text-white dark:hover:bg-white/30'
+            ? 'bg-brand/10 text-brand hover:bg-brand/20 dark:bg-white/20 dark:text-white dark:hover:bg-white/30'
             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-white/10 dark:text-white/80 dark:hover:bg-white/20'
         }`}
       >
@@ -177,10 +177,10 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
           {/* Header */}
           <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-slate-800/50">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Bell className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              <Bell className="w-4 h-4 text-brand" />
               Notifications
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 bg-purple-600 text-white text-[10px] font-bold rounded-full">
+                <span className="px-2 py-0.5 bg-brand text-white text-[10px] font-bold rounded-full">
                   {unreadCount}
                 </span>
               )}
@@ -190,7 +190,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                 <button
                   onClick={markAllRead}
                   disabled={loading}
-                  className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold transition-colors"
+                  className="text-xs text-brand hover:opacity-80 font-semibold transition-colors"
                 >
                   Mark all read
                 </button>
@@ -213,7 +213,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                 <div
                   key={notif.id}
                   className={`px-4 py-3 border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-start gap-3 ${
-                    !notif.is_read ? 'bg-purple-50 dark:bg-purple-500/5' : ''
+                    !notif.is_read ? 'bg-brand/5 dark:bg-brand/10' : ''
                   }`}
                   onClick={() => handleNotificationClick(notif)}
                 >
@@ -228,7 +228,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                         {notif.title}
                       </p>
                       {!notif.is_read && (
-                        <span className="w-2 h-2 bg-purple-500 rounded-full flex-shrink-0" />
+                        <span className="w-2 h-2 bg-brand rounded-full flex-shrink-0" />
                       )}
                     </div>
                     {notif.message && (
@@ -237,7 +237,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                     <div className="flex items-center gap-2 mt-1">
                       <p className="text-[10px] text-gray-400 dark:text-gray-500">{timeAgo(notif.created_at)}</p>
                       {notif.action_url && (
-                        <span className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold">View</span>
+                        <span className="text-[10px] text-brand font-semibold">View</span>
                       )}
                     </div>
                   </div>
@@ -257,7 +257,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                   setOpen(false);
                   router.push('/dashboard/notifications');
                 }}
-                className="w-full text-center text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 font-semibold transition-colors"
+                className="w-full text-center text-xs text-brand hover:opacity-80 font-semibold transition-colors"
               >
                 View all notifications
               </button>

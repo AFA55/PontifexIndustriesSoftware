@@ -189,8 +189,8 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
     return (
       <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
         <div className="bg-[#13131a] rounded-2xl border border-white/[0.08] w-full max-w-md p-8 flex flex-col items-center gap-4 text-center">
-          <div className="w-16 h-16 rounded-full bg-violet-500/10 border border-violet-500/30 flex items-center justify-center">
-            <CheckCircle className="w-8 h-8 text-violet-400" />
+          <div className="w-16 h-16 rounded-full bg-brand/10 border border-brand/30 flex items-center justify-center">
+            <CheckCircle className="w-8 h-8 text-brand" />
           </div>
           <h2 className="text-xl font-semibold text-white">Invitation Sent</h2>
           <p className="text-sm text-white/50">
@@ -199,7 +199,7 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
           </p>
           <button
             onClick={onSuccess}
-            className="mt-2 w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl py-3 font-semibold transition-colors"
+            className="mt-2 w-full bg-brand hover:bg-brand-dark text-white rounded-xl py-3 font-semibold transition-colors"
           >
             Done
           </button>
@@ -225,24 +225,24 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
 
           {/* Full Name */}
           <div>
-            <label className="text-sm text-white/50 mb-1.5 block">Full Name <span className="text-violet-400">*</span></label>
+            <label className="text-sm text-white/50 mb-1.5 block">Full Name <span className="text-brand">*</span></label>
             <input
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Jane Smith"
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-colors"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-brand transition-colors"
             />
           </div>
 
           {/* Email */}
           <div>
-            <label className="text-sm text-white/50 mb-1.5 block">Email Address <span className="text-violet-400">*</span></label>
+            <label className="text-sm text-white/50 mb-1.5 block">Email Address <span className="text-brand">*</span></label>
             <input
               type="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
               placeholder="jane@company.com"
-              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-colors"
+              className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-brand transition-colors"
             />
           </div>
 
@@ -255,7 +255,7 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
                 value={phone}
                 onChange={e => setPhone(e.target.value)}
                 placeholder="(555) 000-0000"
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-violet-500/60 transition-colors"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder-white/20 focus:outline-none focus:border-brand transition-colors"
               />
             </div>
             <div>
@@ -264,14 +264,14 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
                 type="date"
                 value={dob}
                 onChange={e => setDob(e.target.value)}
-                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white/70 focus:outline-none focus:border-violet-500/60 transition-colors [color-scheme:dark]"
+                className="w-full bg-white/[0.04] border border-white/[0.08] rounded-xl px-4 py-3 text-white/70 focus:outline-none focus:border-brand transition-colors [color-scheme:dark]"
               />
             </div>
           </div>
 
           {/* Role */}
           <div>
-            <label className="text-sm text-white/50 mb-2 block">Role <span className="text-violet-400">*</span></label>
+            <label className="text-sm text-white/50 mb-2 block">Role <span className="text-brand">*</span></label>
             <div className="space-y-2">
               {ROLES.map(r => (
                 <button
@@ -279,14 +279,14 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
                   onClick={() => handleRoleChange(r.value)}
                   className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
                     role === r.value
-                      ? 'border-violet-500/60 bg-violet-500/10'
+                      ? 'border-brand bg-brand/10'
                       : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
                   }`}
                 >
                   <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                    role === r.value ? 'border-violet-400' : 'border-white/20'
+                    role === r.value ? 'border-brand' : 'border-white/20'
                   }`}>
-                    {role === r.value && <div className="w-2 h-2 rounded-full bg-violet-400" />}
+                    {role === r.value && <div className="w-2 h-2 rounded-full bg-brand" />}
                   </div>
                   <div>
                     <p className={`text-sm font-medium leading-none mb-0.5 ${role === r.value ? 'text-white' : 'text-white/70'}`}>
@@ -323,14 +323,14 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
                   onClick={() => setSelectedPreset('')}
                   className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
                     selectedPreset === ''
-                      ? 'border-violet-500/60 bg-violet-500/10'
+                      ? 'border-brand bg-brand/10'
                       : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
                   }`}
                 >
                   <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                    selectedPreset === '' ? 'border-violet-400' : 'border-white/20'
+                    selectedPreset === '' ? 'border-brand' : 'border-white/20'
                   }`}>
-                    {selectedPreset === '' && <div className="w-2 h-2 rounded-full bg-violet-400" />}
+                    {selectedPreset === '' && <div className="w-2 h-2 rounded-full bg-brand" />}
                   </div>
                   <div>
                     <p className={`text-sm font-medium leading-none mb-0.5 ${selectedPreset === '' ? 'text-white' : 'text-white/70'}`}>
@@ -346,14 +346,14 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
                     onClick={() => setSelectedPreset(preset.key)}
                     className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
                       selectedPreset === preset.key
-                        ? 'border-violet-500/60 bg-violet-500/10'
+                        ? 'border-brand bg-brand/10'
                         : 'border-white/[0.06] bg-white/[0.02] hover:border-white/[0.12]'
                     }`}
                   >
                     <div className={`mt-0.5 w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
-                      selectedPreset === preset.key ? 'border-violet-400' : 'border-white/20'
+                      selectedPreset === preset.key ? 'border-brand' : 'border-white/20'
                     }`}>
-                      {selectedPreset === preset.key && <div className="w-2 h-2 rounded-full bg-violet-400" />}
+                      {selectedPreset === preset.key && <div className="w-2 h-2 rounded-full bg-brand" />}
                     </div>
                     <div>
                       <p className={`text-sm font-medium leading-none mb-0.5 ${selectedPreset === preset.key ? 'text-white' : 'text-white/70'}`}>
@@ -396,7 +396,7 @@ export default function InviteMemberModal({ onClose, onSuccess }: Props) {
           <button
             onClick={handleSend}
             disabled={sending}
-            className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2"
+            className="flex-1 bg-brand hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2"
           >
             {sending
               ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>

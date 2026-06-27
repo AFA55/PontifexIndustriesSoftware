@@ -125,7 +125,7 @@ function PinDots({ length, filled }: { length: number; filled: number }) {
           key={i}
           className={`w-11 h-14 rounded-xl border-2 flex items-center justify-center text-2xl font-bold transition-all duration-150 ${
             i < filled
-              ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 scale-105'
+              ? 'border-brand bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand scale-105'
               : 'border-slate-300 dark:border-white/20 bg-white dark:bg-white/5 text-transparent'
           }`}
         >
@@ -160,7 +160,7 @@ function NumPad({ onDigit, onBack }: { onDigit: (d: string) => void; onBack: () 
           <button
             key={i}
             onClick={() => onDigit(k)}
-            className="h-14 rounded-2xl bg-slate-100 dark:bg-white/10 text-2xl font-semibold text-slate-800 dark:text-white hover:bg-purple-100 dark:hover:bg-purple-800/40 active:scale-95 active:bg-purple-200 dark:active:bg-purple-700/50 transition-all"
+            className="h-14 rounded-2xl bg-slate-100 dark:bg-white/10 text-2xl font-semibold text-slate-800 dark:text-white hover:bg-brand/10 dark:hover:bg-brand/30 active:scale-95 active:bg-brand/20 dark:active:bg-brand/40 transition-all"
           >
             {k}
           </button>
@@ -359,7 +359,7 @@ export default function NfcClockInModal({
   // ── Shared UI bits ──
   const headerGradient = isClockOut
     ? 'bg-gradient-to-r from-orange-500 to-red-600'
-    : 'bg-gradient-to-r from-purple-600 to-indigo-600';
+    : 'bg-gradient-to-r from-brand to-brand-accent';
 
   const headerTitle = isClockOut ? 'Clock Out' : 'Clock In';
   const headerSub = formatDateHeader(now);
@@ -458,16 +458,16 @@ export default function NfcClockInModal({
                     {/* Option A: Shop — GPS verifies you're at the shop (no code needed) */}
                     <button
                       onClick={() => { setGpsStatus('idle'); setFlow('shop_gps'); startShopGps(); }}
-                      className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-purple-200 dark:border-purple-700/40 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-800/30 transition-all text-left group"
+                      className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-brand/30 dark:border-brand/40 bg-brand/10 dark:bg-brand/20 hover:bg-brand/20 dark:hover:bg-brand/30 transition-all text-left group"
                     >
-                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                      <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
                         <Building2 className="w-6 h-6 text-white" />
                       </div>
                       <div className="flex-1">
                         <p className="font-bold text-slate-900 dark:text-white">Shop Clock-In</p>
                         <p className="text-xs text-slate-500 dark:text-white/50">GPS confirms you&apos;re at the shop — no code needed</p>
                       </div>
-                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-purple-200 dark:bg-purple-700/50 text-purple-800 dark:text-purple-200 whitespace-nowrap">
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/20 dark:bg-brand/40 text-brand dark:text-brand whitespace-nowrap">
                         STANDARD
                       </span>
                     </button>
@@ -500,7 +500,7 @@ export default function NfcClockInModal({
                     {expectedBypassCode && (
                       <button
                         onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
-                        className="w-full mt-1 py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
+                        className="w-full mt-1 py-2 text-xs text-slate-400 dark:text-white/40 hover:text-brand dark:hover:text-brand underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
                       >
                         <KeyRound className="w-3 h-3" /> Testing bypass
                       </button>
@@ -516,7 +516,7 @@ export default function NfcClockInModal({
               <div className="text-center py-2">
                 <button
                   onClick={() => { setFlow('choose'); setGpsStatus('idle'); }}
-                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 mb-4 transition-colors"
+                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-brand dark:hover:text-brand mb-4 transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" /> Back
                 </button>
@@ -524,8 +524,8 @@ export default function NfcClockInModal({
                 {gpsStatus === 'acquiring' && (
                   <div className="space-y-4 py-4">
                     <div className="relative w-20 h-20 mx-auto">
-                      <div className="absolute inset-0 rounded-full bg-purple-400/20 animate-ping" />
-                      <div className="relative w-full h-full rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+                      <div className="absolute inset-0 rounded-full bg-brand/20 animate-ping" />
+                      <div className="relative w-full h-full rounded-full bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center">
                         <MapPin className="w-9 h-9 text-white" />
                       </div>
                     </div>
@@ -589,7 +589,7 @@ export default function NfcClockInModal({
                       {expectedBypassCode && (
                         <button
                           onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
-                          className="w-full py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
+                          className="w-full py-2 text-xs text-slate-400 dark:text-white/40 hover:text-brand dark:hover:text-brand underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
                         >
                           <KeyRound className="w-3 h-3" /> Testing bypass
                         </button>
@@ -614,7 +614,7 @@ export default function NfcClockInModal({
                     {expectedBypassCode && (
                       <button
                         onClick={() => { setBypassCode(''); setBypassError(null); setFlow('bypass_code'); }}
-                        className="w-full py-2 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
+                        className="w-full py-2 text-xs text-slate-400 dark:text-white/40 hover:text-brand dark:hover:text-brand underline underline-offset-2 transition-colors flex items-center justify-center gap-1"
                       >
                         <KeyRound className="w-3 h-3" /> Testing bypass
                       </button>
@@ -629,7 +629,7 @@ export default function NfcClockInModal({
               <div>
                 <button
                   onClick={() => { setFlow('shop_gps'); setBypassCode(''); setBypassError(null); }}
-                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 mb-3 transition-colors"
+                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-brand dark:hover:text-brand mb-3 transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" /> Back
                 </button>
@@ -693,7 +693,7 @@ export default function NfcClockInModal({
               <div className="space-y-4">
                 <button
                   onClick={() => setFlow('choose')}
-                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                  className="flex items-center gap-1 text-xs text-slate-400 dark:text-white/40 hover:text-brand dark:hover:text-brand transition-colors"
                 >
                   <ChevronLeft className="w-3 h-3" /> Back
                 </button>
@@ -762,7 +762,7 @@ export default function NfcClockInModal({
                     {jobsiteGpsStatus === 'error' && 'GPS unavailable — location will be flagged for review'}
                   </span>
                   {jobsiteGpsStatus === 'acquiring' && (
-                    <Loader2 className="w-3 h-3 animate-spin text-purple-500" />
+                    <Loader2 className="w-3 h-3 animate-spin text-brand" />
                   )}
                   {jobsiteGpsStatus === 'ok' && (
                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500" />
@@ -773,7 +773,7 @@ export default function NfcClockInModal({
                         setJobsiteGpsStatus('idle');
                         setJobsiteCoords(null);
                       }}
-                      className="text-[10px] text-purple-500 hover:text-purple-700 dark:text-purple-400 font-semibold underline flex-shrink-0"
+                      className="text-[10px] text-brand hover:text-brand-dark dark:text-brand font-semibold underline flex-shrink-0"
                     >
                       Retry
                     </button>
@@ -792,8 +792,8 @@ export default function NfcClockInModal({
                 {!isClockOut && (
                   <div className="bg-white dark:bg-white/[0.05] rounded-xl border border-gray-200 dark:border-white/10 p-3">
                     <div className="flex items-center gap-2.5 mb-2.5">
-                      <div className="p-1.5 bg-violet-100 dark:bg-violet-900/40 rounded-lg">
-                        <MapPin className="w-4 h-4 text-violet-600 dark:text-violet-400" />
+                      <div className="p-1.5 bg-brand/10 dark:bg-brand/30 rounded-lg">
+                        <MapPin className="w-4 h-4 text-brand dark:text-brand" />
                       </div>
                       <p className="text-sm font-bold text-gray-700 dark:text-gray-200">Are you working out of town (overnight)?</p>
                     </div>
@@ -803,7 +803,7 @@ export default function NfcClockInModal({
                         onClick={() => setOutOfTown(true)}
                         className={`flex-1 min-h-[44px] flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
                           outOfTown === true
-                            ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-md shadow-violet-500/30 ring-1 ring-violet-400/30'
+                            ? 'bg-gradient-to-r from-brand to-brand-accent text-white shadow-md shadow-brand/30 ring-1 ring-brand/30'
                             : 'bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
                         }`}
                       >
@@ -845,7 +845,7 @@ export default function NfcClockInModal({
             {/* ════════════════════════════════ PROCESSING ════════════════════════════════ */}
             {flow === 'processing' && (
               <div className="text-center py-10">
-                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-purple-500" />
+                <Loader2 className="w-10 h-10 animate-spin mx-auto mb-3 text-brand" />
                 <p className="text-slate-700 dark:text-white font-semibold">
                   {isClockOut ? 'Clocking you out…' : 'Clocking you in…'}
                 </p>
@@ -863,7 +863,7 @@ export default function NfcClockInModal({
                   <p className="text-lg font-bold text-slate-900 dark:text-white">
                     {isClockOut ? 'Clocked Out Successfully!' : 'Clocked In Successfully!'}
                   </p>
-                  <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1">{successTime}</p>
+                  <p className="text-2xl font-bold text-brand dark:text-brand mt-1">{successTime}</p>
                   {requiresApproval && (
                     <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-semibold">
                       Pending supervisor approval
