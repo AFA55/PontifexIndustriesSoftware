@@ -274,7 +274,7 @@ export default function MyProfilePage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
-              <User className="w-6 h-6 text-purple-600" />
+              <User className="w-6 h-6 text-brand" />
               My Profile
             </h1>
             <p className="text-sm text-gray-500 dark:text-gray-400">View and edit your information</p>
@@ -283,7 +283,7 @@ export default function MyProfilePage() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-brand" />
           </div>
         ) : profile ? (
           <div className="space-y-6">
@@ -295,7 +295,7 @@ export default function MyProfilePage() {
                   type="button"
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="block rounded-full focus:outline-none focus:ring-2 focus:ring-purple-500/50 disabled:opacity-60"
+                  className="block rounded-full focus:outline-none focus:ring-2 focus:ring-brand/50 disabled:opacity-60"
                   title="Change profile photo"
                   aria-label="Change profile photo"
                 >
@@ -309,7 +309,7 @@ export default function MyProfilePage() {
                 <button
                   onClick={() => avatarInputRef.current?.click()}
                   disabled={uploadingAvatar}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-purple-600 hover:bg-purple-700 rounded-full flex items-center justify-center border-2 border-white dark:border-[#0b0618] transition-colors disabled:opacity-60"
+                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-brand hover:bg-brand-dark rounded-full flex items-center justify-center border-2 border-white dark:border-[#0b0618] transition-colors disabled:opacity-60"
                   title="Change profile photo"
                 >
                   {uploadingAvatar ? (
@@ -330,14 +330,14 @@ export default function MyProfilePage() {
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">{profile.full_name}</h2>
                 <span className={`inline-flex px-3 py-0.5 rounded-full text-xs font-bold mt-1 ${
                   profile.role === 'operator'
-                    ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300'
+                    ? 'bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand'
                     : 'bg-cyan-100 dark:bg-cyan-900/40 text-cyan-700 dark:text-cyan-300'
                 }`}>
                   {roleName}
                 </span>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{profile.email}</p>
                 {avatarError && <p className="text-xs text-red-500 dark:text-red-400 mt-1">{avatarError}</p>}
-                {uploadingAvatar && <p className="text-xs text-purple-600 dark:text-purple-400 mt-1">Uploading photo...</p>}
+                {uploadingAvatar && <p className="text-xs text-brand dark:text-brand mt-1">Uploading photo...</p>}
               </div>
             </div>
 
@@ -352,14 +352,14 @@ export default function MyProfilePage() {
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   placeholder="What do people call you?"
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                 />
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">
                   Phone Number
-                  <span className="ml-2 text-xs font-normal text-purple-600 dark:text-purple-400 bg-purple-50 dark:bg-purple-900/30 px-1.5 py-0.5 rounded-full">
+                  <span className="ml-2 text-xs font-normal text-brand dark:text-brand bg-brand/10 dark:bg-brand/20 px-1.5 py-0.5 rounded-full">
                     Used for SMS job notifications
                   </span>
                 </label>
@@ -370,7 +370,7 @@ export default function MyProfilePage() {
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="(555) 123-4567"
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   />
                 </div>
                 {!phone && (
@@ -388,7 +388,7 @@ export default function MyProfilePage() {
                     type="date"
                     value={dob}
                     onChange={(e) => setDob(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                   />
                 </div>
               </div>
@@ -397,7 +397,7 @@ export default function MyProfilePage() {
                 <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">Profile Photo</label>
                 <div className="flex items-center gap-3 flex-wrap">
                   <label className="flex items-center cursor-pointer w-fit">
-                    <div className="flex items-center gap-2 min-h-[44px] bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 hover:border-purple-400 dark:hover:border-purple-500 rounded-xl px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors">
+                    <div className="flex items-center gap-2 min-h-[44px] bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 hover:border-brand dark:hover:border-brand rounded-xl px-4 py-2.5 text-sm text-gray-700 dark:text-gray-300 transition-colors">
                       <Upload className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                       {uploadingAvatar ? 'Uploading...' : profilePicUrl ? 'Change Photo' : 'Upload Photo'}
                     </div>
@@ -441,7 +441,7 @@ export default function MyProfilePage() {
                   value={ecName}
                   onChange={(e) => setEcName(e.target.value)}
                   placeholder="Full name"
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                 />
               </div>
 
@@ -452,7 +452,7 @@ export default function MyProfilePage() {
                   value={ecPhone}
                   onChange={(e) => setEcPhone(e.target.value)}
                   placeholder="(555) 123-4567"
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                 />
               </div>
 
@@ -463,7 +463,7 @@ export default function MyProfilePage() {
                   value={ecRelationship}
                   onChange={(e) => setEcRelationship(e.target.value)}
                   placeholder="e.g. Spouse, Parent, Sibling"
-                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                 />
               </div>
             </div>
@@ -472,7 +472,7 @@ export default function MyProfilePage() {
             {bioShow && (
               <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm">
                 <h3 className="text-sm font-bold text-gray-600 dark:text-gray-200 uppercase tracking-wider flex items-center gap-2 mb-4">
-                  <Shield className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <Shield className="w-4 h-4 text-brand dark:text-brand" />
                   Security
                 </h3>
                 <div className="flex items-center justify-between gap-4">
@@ -515,8 +515,8 @@ export default function MyProfilePage() {
                 href="/dashboard/settings/notifications"
                 className="flex items-center gap-3 px-6 py-4 min-h-[44px] hover:bg-gray-50 dark:hover:bg-white/[0.04] transition-colors"
               >
-                <div className="w-9 h-9 rounded-xl bg-purple-100 dark:bg-purple-900/40 flex items-center justify-center flex-shrink-0">
-                  <Bell className="w-4.5 h-4.5 text-purple-600 dark:text-purple-300" />
+                <div className="w-9 h-9 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center flex-shrink-0">
+                  <Bell className="w-4.5 h-4.5 text-brand dark:text-brand" />
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">Notification Settings</p>
@@ -530,7 +530,7 @@ export default function MyProfilePage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="w-full py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {saving ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>

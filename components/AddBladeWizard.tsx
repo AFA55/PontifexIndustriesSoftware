@@ -337,8 +337,8 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                 onClick={() => handleEquipmentCategoryChange('blade')}
                 className={`p-8 border-2 rounded-lg transition-all ${
                   formData.equipmentCategory === 'blade'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-300 hover:border-indigo-300'
+                    ? 'border-brand bg-brand/10'
+                    : 'border-gray-300 hover:border-brand/50'
                 }`}
                 style={{ color: '#111827' }}
               >
@@ -351,8 +351,8 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                 onClick={() => handleEquipmentCategoryChange('bit')}
                 className={`p-8 border-2 rounded-lg transition-all ${
                   formData.equipmentCategory === 'bit'
-                    ? 'border-indigo-600 bg-indigo-50'
-                    : 'border-gray-300 hover:border-indigo-300'
+                    ? 'border-brand bg-brand/10'
+                    : 'border-gray-300 hover:border-brand/50'
                 }`}
                 style={{ color: '#111827' }}
               >
@@ -380,15 +380,15 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   onClick={() => updateFormData('manufacturer', mfg.value)}
                   className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
                     formData.manufacturer === mfg.value
-                      ? 'border-indigo-600 bg-indigo-50'
-                      : 'border-gray-300 hover:border-indigo-300'
+                      ? 'border-brand bg-brand/10'
+                      : 'border-gray-300 hover:border-brand/50'
                   }`}
                   style={{ color: '#111827' }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-gray-900">{mfg.label}</span>
                     {formData.manufacturer === mfg.value && (
-                      <Check className="w-5 h-5 text-indigo-600" />
+                      <Check className="w-5 h-5 text-brand" />
                     )}
                   </div>
                 </button>
@@ -404,7 +404,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   value={customManufacturer}
                   onChange={(e) => setCustomManufacturer(e.target.value)}
                   placeholder="e.g., Diamond Products"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900"
                   style={{ color: '#111827' }}
                 />
                 {errors.customManufacturer && (
@@ -428,7 +428,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
               value={formData.modelNumber}
               onChange={(e) => updateFormData('modelNumber', e.target.value)}
               placeholder="e.g., Elite-Cut 580"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900"
               style={{ color: '#111827' }}
             />
             {errors.modelNumber && (
@@ -448,7 +448,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                 value={formData.size}
                 onChange={(e) => updateFormData('size', e.target.value)}
                 placeholder="e.g., 20, 14, 3/4"
-                className="w-full px-4 py-3 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                className="w-full px-4 py-3 pr-16 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900"
                 style={{ color: '#111827' }}
               />
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
@@ -476,15 +476,15 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   onClick={() => updateFormData('equipmentFor', type.value)}
                   className={`w-full p-4 border-2 rounded-lg text-left transition-all ${
                     formData.equipmentFor === type.value
-                      ? 'border-indigo-600 bg-indigo-50'
-                      : 'border-gray-300 hover:border-indigo-300'
+                      ? 'border-brand bg-brand/10'
+                      : 'border-gray-300 hover:border-brand/50'
                   }`}
                   style={{ color: '#111827' }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-gray-900">{type.label}</span>
                     {formData.equipmentFor === type.value && (
-                      <Check className="w-5 h-5 text-indigo-600" />
+                      <Check className="w-5 h-5 text-brand" />
                     )}
                   </div>
                 </button>
@@ -511,7 +511,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   type="date"
                   value={formData.purchaseDate}
                   onChange={(e) => updateFormData('purchaseDate', e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900 bg-white"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900 bg-white"
                   style={{
                     color: '#111827',
                     colorScheme: 'light'
@@ -537,7 +537,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   value={formData.purchasePrice}
                   onChange={(e) => updateFormData('purchasePrice', e.target.value)}
                   placeholder="0.00"
-                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                  className="w-full pl-8 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900"
                   style={{ color: '#111827' }}
                 />
               </div>
@@ -562,13 +562,13 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
               >
                 -
               </button>
-              <div className="text-4xl font-bold text-indigo-600 w-20 text-center">
+              <div className="text-4xl font-bold text-brand w-20 text-center">
                 {formData.quantity}
               </div>
               <button
                 type="button"
                 onClick={() => handleQuantityChange(formData.quantity + 1)}
-                className="w-12 h-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center text-xl font-bold"
+                className="w-12 h-12 rounded-full bg-brand hover:opacity-90 text-white flex items-center justify-center text-xl font-bold"
               >
                 +
               </button>
@@ -601,7 +601,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   value={formData.location}
                   onChange={(e) => updateFormData('location', e.target.value)}
                   placeholder="e.g., Tool Shed A, Shelf 3, Warehouse B"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900"
                   style={{ color: '#111827' }}
                 />
               </div>
@@ -615,7 +615,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                   onChange={(e) => updateFormData('notes', e.target.value)}
                   placeholder="Any additional information about this inventory item..."
                   rows={3}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-gray-900"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand focus:border-transparent text-gray-900"
                   style={{ color: '#111827' }}
                 />
               </div>
@@ -642,7 +642,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
         <div className="border-b border-gray-200 p-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-3">
-              <Package className="w-6 h-6 text-indigo-600" />
+              <Package className="w-6 h-6 text-brand" />
               <h2 className="text-2xl font-bold text-gray-900">Add Equipment to Inventory</h2>
             </div>
             <button
@@ -662,7 +662,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
                 <div
                   key={index}
                   className={`h-2 flex-1 rounded-full transition-all ${
-                    displayStep <= currentStep ? 'bg-indigo-600' : 'bg-gray-200'
+                    displayStep <= currentStep ? 'bg-brand' : 'bg-gray-200'
                   }`}
                 />
               )
@@ -702,7 +702,7 @@ export default function AddBladeWizard({ isOpen, onClose, onSuccess }: AddBladeW
           {currentStep < totalSteps ? (
             <button
               onClick={handleNext}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center space-x-2"
+              className="px-6 py-2 bg-brand text-white rounded-lg hover:opacity-90 transition-colors flex items-center space-x-2"
             >
               <span>Next</span>
               <ChevronRight className="w-5 h-5" />

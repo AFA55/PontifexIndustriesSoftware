@@ -7,6 +7,15 @@ module.exports = {
     './app/**/*.{js,ts,jsx,tsx,mdx}',
     './contexts/**/*.{js,ts,jsx,tsx}',
   ],
+  // Guarantee the tenant `brand` utilities always compile during the palette
+  // sweep, even if a given variant is referenced sparsely. Opacity modifiers
+  // (e.g. bg-brand/10) still compile on demand from source usage.
+  safelist: [
+    {
+      pattern: /(bg|text|border|ring|from|via|to|fill|stroke|divide|outline|shadow)-brand(-(dark|secondary|accent))?/,
+      variants: ['hover', 'focus', 'active', 'group-hover', 'dark', 'dark:hover'],
+    },
+  ],
   theme: {
     extend: {
       colors: {

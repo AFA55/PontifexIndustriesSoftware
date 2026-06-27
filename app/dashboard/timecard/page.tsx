@@ -445,8 +445,8 @@ function TimecardPage() {
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
           <div className="w-14 h-14 mx-auto mb-4 relative">
-            <div className="absolute inset-0 rounded-full border-4 border-purple-100"></div>
-            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-purple-600 animate-spin"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-brand/20"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-brand animate-spin"></div>
           </div>
           <p className="text-gray-500 dark:text-white/60 text-sm font-medium">Loading timecards...</p>
         </div>
@@ -476,7 +476,7 @@ function TimecardPage() {
             </Link>
             <div className="h-6 w-px bg-gray-200 dark:bg-white/10" />
             <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-brand flex items-center justify-center shadow-sm">
                 <Clock size={16} className="text-white" />
               </div>
               My Timecard
@@ -492,7 +492,7 @@ function TimecardPage() {
               <span className="hidden sm:inline">Request Time Off</span>
             </Link>
             <div className="hidden sm:flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
+              <div className="w-8 h-8 bg-brand rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
                 {user?.name?.charAt(0) || 'U'}
               </div>
               <div className="text-right">
@@ -714,22 +714,22 @@ function TimecardPage() {
 
         {/* ── Weekly Summary Cards ─────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
-          <div className="col-span-2 sm:col-span-1 bg-purple-600 rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
+          <div className="col-span-2 sm:col-span-1 bg-brand rounded-xl p-5 text-white shadow-lg relative overflow-hidden">
             <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-6 translate-x-6" />
             <div className="flex items-center gap-2 mb-2">
-              <TrendingUp size={15} className="text-blue-200" />
-              <span className="text-xs font-semibold text-blue-200 uppercase tracking-wider">Total Hours</span>
+              <TrendingUp size={15} className="text-white/70" />
+              <span className="text-xs font-semibold text-white/70 uppercase tracking-wider">Total Hours</span>
             </div>
             <p className="text-3xl font-bold tracking-tight tabular-nums">{weekData?.totalHours.toFixed(1) || '0.0'}</p>
             <div className="mt-3 h-1.5 bg-white/15 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-700 ${
-                  (weekData?.weeklyOvertimeHours || 0) > 0 ? 'bg-gradient-to-r from-green-300 via-yellow-300 to-red-400' : 'bg-blue-300'
+                  (weekData?.weeklyOvertimeHours || 0) > 0 ? 'bg-gradient-to-r from-green-300 via-yellow-300 to-red-400' : 'bg-white/70'
                 }`}
                 style={{ width: `${Math.min(((weekData?.totalHours || 0) / 60) * 100, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-blue-300 mt-1">
+            <p className="text-xs text-white/60 mt-1">
               {(weekData?.weeklyOvertimeHours || 0) > 0
                 ? `${weekData?.weeklyOvertimeHours.toFixed(1)} hrs weekly OT`
                 : `${(40 - ((weekData?.totalHours || 0) - (weekData?.mandatoryOvertimeHours || 0))).toFixed(1)} hrs to OT`}
@@ -922,7 +922,7 @@ function TimecardPage() {
                     {/* Row 4: correct action (full-width, ≥44px tap target) */}
                     <button
                       onClick={() => openCorrectionModal(entry)}
-                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 transition-colors"
+                      className="w-full min-h-[44px] inline-flex items-center justify-center gap-1.5 px-3 rounded-lg text-sm font-semibold text-brand dark:text-brand hover:bg-brand/10 dark:hover:bg-brand/20 border border-brand/30 dark:border-brand/40 transition-colors"
                       title="Request a time correction"
                     >
                       <Edit2 size={14} /> Request Correction
@@ -1007,7 +1007,7 @@ function TimecardPage() {
                         <td className="px-3 py-3 whitespace-nowrap">
                           <button
                             onClick={() => openCorrectionModal(entry)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 border border-violet-200 dark:border-violet-700/40 transition-colors"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-semibold text-brand dark:text-brand hover:bg-brand/10 dark:hover:bg-brand/20 border border-brand/30 dark:border-brand/40 transition-colors"
                             title="Request a time correction"
                           >
                             <Edit2 size={10} />
@@ -1031,8 +1031,8 @@ function TimecardPage() {
               {/* Header */}
               <div className="p-5 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center">
-                    <Edit2 size={15} className="text-violet-600 dark:text-violet-400" />
+                  <div className="w-8 h-8 rounded-lg bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+                    <Edit2 size={15} className="text-brand dark:text-brand" />
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-gray-900 dark:text-white">Request Time Correction</h3>
@@ -1084,7 +1084,7 @@ function TimecardPage() {
                       type="datetime-local"
                       value={correctionClockIn}
                       onChange={(e) => setCorrectionClockIn(e.target.value)}
-                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                     />
                   </div>
 
@@ -1097,7 +1097,7 @@ function TimecardPage() {
                       type="datetime-local"
                       value={correctionClockOut}
                       onChange={(e) => setCorrectionClockOut(e.target.value)}
-                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                     />
                   </div>
 
@@ -1111,7 +1111,7 @@ function TimecardPage() {
                       placeholder="e.g. Forgot to clock out, clocked in 15 minutes late by mistake..."
                       value={correctionReason}
                       onChange={(e) => setCorrectionReason(e.target.value)}
-                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all resize-none"
+                      className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all resize-none"
                     />
                   </div>
 
@@ -1126,7 +1126,7 @@ function TimecardPage() {
                     <button
                       onClick={handleSubmitCorrection}
                       disabled={submittingCorrection || !correctionReason.trim()}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50 shadow-md shadow-violet-500/20"
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50 shadow-md shadow-brand/20"
                     >
                       {submittingCorrection ? (
                         <Loader2 size={14} className="animate-spin" />
@@ -1160,7 +1160,7 @@ function TimecardPage() {
                   setShowDailyReportGate(false);
                   router.push('/dashboard/daily-report?redirect=timecard');
                 }}
-                className="w-full py-3 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-sm shadow-md"
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-brand to-brand-accent text-white font-bold text-sm shadow-md"
               >
                 Complete Daily Report
               </button>

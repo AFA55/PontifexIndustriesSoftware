@@ -119,7 +119,7 @@ export default function CustomersPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900 dark:text-white">
-                <Building2 className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                <Building2 className="w-6 h-6 text-brand dark:text-brand" />
                 Customer Profiles
               </h1>
               <p className="text-sm text-gray-500 dark:text-white/40">Manage customers, contacts, and job history</p>
@@ -127,7 +127,7 @@ export default function CustomersPage() {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2"
+            className="px-4 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl font-bold text-sm transition-all shadow-sm flex items-center gap-2"
           >
             <Plus className="w-4 h-4" />
             Add Customer
@@ -142,7 +142,7 @@ export default function CustomersPage() {
             <p className="text-xs text-gray-500 dark:text-white/40">Customers</p>
           </div>
           <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200 dark:border-white/10 shadow-sm">
-            <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{totalJobs}</p>
+            <p className="text-2xl font-bold text-brand dark:text-brand">{totalJobs}</p>
             <p className="text-xs text-gray-500 dark:text-white/40">Total Jobs</p>
           </div>
           <div className="bg-white dark:bg-white/5 rounded-xl p-4 border border-gray-200 dark:border-white/10 shadow-sm">
@@ -162,7 +162,7 @@ export default function CustomersPage() {
               placeholder="Search customers..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-purple-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-violet-500/20 transition-all shadow-sm"
+              className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand dark:focus:border-brand focus:ring-2 focus:ring-brand/20 dark:focus:ring-brand/20 transition-all shadow-sm"
             />
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function CustomersPage() {
         {/* Customer Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+            <Loader2 className="w-8 h-8 animate-spin text-brand" />
           </div>
         ) : customers.length === 0 ? (
           <div className="text-center py-20">

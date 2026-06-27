@@ -165,14 +165,14 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-2xl border-2 border-gray-100 overflow-hidden">
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-8 py-6">
+      <div className="bg-gradient-to-r from-brand to-brand-accent px-8 py-6">
         <h2 className="text-2xl font-bold text-white drop-shadow-lg">Equipment Usage Tracking</h2>
-        <p className="text-blue-100 mt-1 font-medium">Track equipment performance & resource consumption</p>
+        <p className="text-white/80 mt-1 font-medium">Track equipment performance & resource consumption</p>
       </div>
 
       <div className="p-8 space-y-8">
         {/* Equipment Selection */}
-        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-200">
+        <div className="bg-brand/10 rounded-2xl p-6 border-2 border-brand/30">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Equipment & Task Info</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -180,7 +180,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
               <select
                 value={formData.equipment_type}
                 onChange={(e) => updateField('equipment_type', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none font-semibold"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold"
                 required
               >
                 <option value="">Select equipment...</option>
@@ -196,7 +196,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                 value={formData.equipment_id}
                 onChange={(e) => updateField('equipment_id', e.target.value)}
                 placeholder="e.g., BROKK-001"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none font-semibold"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold"
               />
             </div>
             <div>
@@ -204,7 +204,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
               <select
                 value={formData.task_type}
                 onChange={(e) => updateField('task_type', e.target.value)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none font-semibold"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold"
                 required
               >
                 <option value="">Select task...</option>
@@ -217,14 +217,14 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
 
           {/* Smart Equipment Selector - Shows after task type is selected */}
           {formData.task_type && filteredEquipment.length > 0 && (
-            <div className="mt-4 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-300 rounded-xl p-5">
+            <div className="mt-4 bg-brand/10 border-2 border-brand/30 rounded-xl p-5">
               <div className="flex items-center gap-2 mb-3">
                 {formData.task_type.includes('drilling') ? (
-                  <Disc className="w-5 h-5 text-purple-600" />
+                  <Disc className="w-5 h-5 text-brand" />
                 ) : (
-                  <Wrench className="w-5 h-5 text-purple-600" />
+                  <Wrench className="w-5 h-5 text-brand" />
                 )}
-                <h4 className="text-sm font-bold text-purple-900">
+                <h4 className="text-sm font-bold text-brand">
                   Select Specific {formData.task_type.includes('drilling') ? 'Bit' : 'Blade'} Used
                 </h4>
               </div>
@@ -239,7 +239,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                     }
                   }
                 }}
-                className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-purple-200 hover:border-purple-300 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
+                className="w-full px-4 py-3 rounded-xl font-medium bg-white border-2 border-brand/30 hover:border-brand/50 focus:border-brand focus:ring-4 focus:ring-brand/10 transition-all duration-200 shadow-sm hover:shadow-md text-gray-900 cursor-pointer"
               >
                 <option value="">Select equipment...</option>
                 {filteredEquipment.map((eq) => (
@@ -253,7 +253,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-purple-700 mt-2 flex items-center gap-1">
+              <p className="text-xs text-brand mt-2 flex items-center gap-1">
                 <span>💡</span>
                 <span>Usage will be tracked on the selected {formData.task_type.includes('drilling') ? 'bit' : 'blade'} for analytics</span>
               </p>
@@ -277,7 +277,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                 step="0.01"
                 value={formData.linear_feet_cut}
                 onChange={(e) => updateField('linear_feet_cut', parseFloat(e.target.value) || 0)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none font-semibold text-lg"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold text-lg"
               />
             </div>
           </div>
@@ -315,7 +315,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
         </div>
 
         {/* Blade Tracking */}
-        <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200">
+        <div className="bg-brand/10 rounded-2xl p-6 border-2 border-brand/30">
           <h3 className="text-lg font-bold text-gray-900 mb-4">Blade Usage</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -325,7 +325,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                 value={formData.blade_type}
                 onChange={(e) => updateField('blade_type', e.target.value)}
                 placeholder="e.g., 14-inch diamond"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none font-semibold"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold"
               />
             </div>
             <div>
@@ -334,7 +334,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                 type="number"
                 value={formData.blades_used}
                 onChange={(e) => updateField('blades_used', parseInt(e.target.value) || 0)}
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none font-semibold text-lg"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold text-lg"
               />
             </div>
             <div className="md:col-span-2">
@@ -344,7 +344,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
                 value={formData.blade_wear_notes}
                 onChange={(e) => updateField('blade_wear_notes', e.target.value)}
                 placeholder="e.g., 1 blade 50% worn, 1 blade fully worn"
-                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-purple-500 focus:outline-none"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none"
               />
             </div>
           </div>
@@ -421,7 +421,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
             value={formData.notes}
             onChange={(e) => updateField('notes', e.target.value)}
             placeholder="Any additional information about equipment usage..."
-            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-blue-500 focus:outline-none"
+            className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none"
             rows={4}
           />
         </div>
@@ -438,7 +438,7 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
         </button>
         <button
           type="submit"
-          className="flex-1 px-6 py-4 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl"
+          className="flex-1 px-6 py-4 bg-gradient-to-r from-brand to-brand-accent hover:opacity-90 text-white rounded-xl font-bold transition-all shadow-lg hover:shadow-xl"
         >
           Save Equipment Usage
         </button>

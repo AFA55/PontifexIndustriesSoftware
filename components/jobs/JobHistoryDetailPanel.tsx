@@ -213,13 +213,13 @@ function StatChip({
   const colorMap = {
     emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
     blue:    'bg-blue-50 border-blue-200 text-blue-700',
-    purple:  'bg-purple-50 border-purple-200 text-purple-700',
+    purple:  'bg-brand/10 border-brand/30 text-brand',
     gray:    'bg-gray-50 border-gray-200 text-gray-700',
   };
   const iconMap = {
     emerald: 'text-emerald-500',
     blue:    'text-blue-500',
-    purple:  'text-purple-500',
+    purple:  'text-brand',
     gray:    'text-gray-400',
   };
   return (
@@ -234,12 +234,12 @@ function StatChip({
 function PersonCard({ person, role }: { person: OperatorRef; role: string }) {
   return (
     <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-      <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
-        <span className="text-sm font-bold text-indigo-700">{getInitials(person.full_name)}</span>
+      <div className="w-10 h-10 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
+        <span className="text-sm font-bold text-brand">{getInitials(person.full_name)}</span>
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-semibold text-gray-900 truncate">{person.full_name}</p>
-        <span className="inline-block text-xs font-medium text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2 py-0.5">
+        <span className="inline-block text-xs font-medium text-brand bg-brand/10 border border-brand/30 rounded-full px-2 py-0.5">
           {role}
         </span>
       </div>
@@ -284,11 +284,11 @@ function OverviewTab({ data }: { data: JobDetailPayload }) {
 
       {/* Multi-day badge */}
       {job.is_multi_day && (
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-indigo-50 border border-indigo-200 rounded-full text-sm font-semibold text-indigo-700">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand/10 border border-brand/30 rounded-full text-sm font-semibold text-brand">
           <Calendar className="w-4 h-4" />
           Multi-day job
           {job.total_days_worked != null && (
-            <span className="text-indigo-500"> · {job.total_days_worked} day{job.total_days_worked !== 1 ? 's' : ''} worked</span>
+            <span className="text-brand/70"> · {job.total_days_worked} day{job.total_days_worked !== 1 ? 's' : ''} worked</span>
           )}
         </div>
       )}
@@ -518,7 +518,7 @@ function HoursTab({
                 className="flex items-center justify-between gap-3 bg-gray-50 rounded-xl border border-gray-100 px-4 py-3"
               >
                 <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 rounded-full px-2.5 py-1">
+                  <span className="text-xs font-bold text-brand bg-brand/10 border border-brand/30 rounded-full px-2.5 py-1">
                     Day {log.day_number}
                   </span>
                   {log.date_worked && (
@@ -566,11 +566,11 @@ function NotesTab({ notes }: { notes: NoteEntry[] }) {
           <div key={note.id} className="bg-gray-50 rounded-xl border border-gray-100 p-4 space-y-2">
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <div className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center flex-shrink-0">
                   {isSystem ? (
-                    <CheckCircle2 className="w-3.5 h-3.5 text-indigo-500" />
+                    <CheckCircle2 className="w-3.5 h-3.5 text-brand" />
                   ) : (
-                    <User className="w-3.5 h-3.5 text-indigo-500" />
+                    <User className="w-3.5 h-3.5 text-brand" />
                   )}
                 </div>
                 <span className="text-sm font-semibold text-gray-900">
@@ -581,7 +581,7 @@ function NotesTab({ notes }: { notes: NoteEntry[] }) {
                     className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
                       isSystem
                         ? 'bg-gray-100 text-gray-500 border-gray-200'
-                        : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+                        : 'bg-brand/10 text-brand border-brand/30'
                     }`}
                   >
                     {note.note_type.replace(/_/g, ' ')}
@@ -676,7 +676,7 @@ export default function JobHistoryDetailPanel({
         <div className="flex-shrink-0 border-b border-gray-100 px-5 pt-4 pb-3">
           {loading ? (
             <div className="flex items-center gap-3 h-10">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
+              <Loader2 className="w-5 h-5 animate-spin text-brand" />
               <span className="text-sm text-gray-500">Loading job details…</span>
             </div>
           ) : error ? (
@@ -699,7 +699,7 @@ export default function JobHistoryDetailPanel({
                 <div className="flex-1 min-w-0">
                   {/* Job number + status row */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono text-base font-bold text-indigo-600 tracking-tight">
+                    <span className="font-mono text-base font-bold text-brand tracking-tight">
                       {job.job_number}
                     </span>
                     <StatusBadge status={job.status} />
@@ -721,7 +721,7 @@ export default function JobHistoryDetailPanel({
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <a
                     href={`/dashboard/admin/jobs/${jobId}`}
-                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors border border-indigo-200"
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-brand hover:bg-brand/10 rounded-lg transition-colors border border-brand/30"
                     title="Open full detail page"
                   >
                     <ExternalLink className="w-3.5 h-3.5" />
@@ -780,7 +780,7 @@ export default function JobHistoryDetailPanel({
                   onClick={() => setActiveTab(tab)}
                   className={`flex-shrink-0 px-3 py-1.5 rounded-full text-sm font-semibold transition-colors ${
                     activeTab === tab
-                      ? 'bg-indigo-600 text-white shadow-sm'
+                      ? 'bg-brand text-white shadow-sm'
                       : 'text-gray-500 hover:bg-gray-100 hover:text-gray-800'
                   }`}
                 >
@@ -795,7 +795,7 @@ export default function JobHistoryDetailPanel({
         <div className="flex-1 overflow-y-auto">
           {loading && (
             <div className="flex flex-col items-center justify-center h-full gap-3">
-              <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand" />
               <p className="text-sm text-gray-500">Loading job details…</p>
             </div>
           )}
@@ -811,7 +811,7 @@ export default function JobHistoryDetailPanel({
               </div>
               <button
                 onClick={fetchDetail}
-                className="text-sm text-indigo-600 font-semibold hover:underline"
+                className="text-sm text-brand font-semibold hover:underline"
               >
                 Try again
               </button>

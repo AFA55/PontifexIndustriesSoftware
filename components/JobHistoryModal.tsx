@@ -71,11 +71,11 @@ export default function JobHistoryModal({ jobId, jobNumber, isOpen, onClose }: J
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6">
+        <div className="bg-gradient-to-r from-brand to-brand-accent text-white p-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold mb-1">📜 Change History</h2>
-              <p className="text-indigo-100">Job #{jobNumber}</p>
+              <p className="text-white/80">Job #{jobNumber}</p>
             </div>
             <button
               onClick={onClose}
@@ -92,7 +92,7 @@ export default function JobHistoryModal({ jobId, jobNumber, isOpen, onClose }: J
         <div className="flex-1 overflow-y-auto p-6">
           {loading ? (
             <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-brand mx-auto"></div>
               <p className="mt-4 text-gray-600">Loading history...</p>
             </div>
           ) : history.length === 0 ? (
@@ -111,12 +111,12 @@ export default function JobHistoryModal({ jobId, jobNumber, isOpen, onClose }: J
                   <div key={entry.id} className="relative pb-8 last:pb-0">
                     {/* Timeline line */}
                     {index !== history.length - 1 && (
-                      <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gradient-to-b from-indigo-200 to-transparent" />
+                      <div className="absolute left-4 top-10 bottom-0 w-0.5 bg-gradient-to-b from-brand/30 to-transparent" />
                     )}
 
                     {/* Timeline dot */}
                     <div className="absolute left-0 top-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center shadow-lg">
                         <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                         </svg>
@@ -124,11 +124,11 @@ export default function JobHistoryModal({ jobId, jobNumber, isOpen, onClose }: J
                     </div>
 
                     {/* Content card */}
-                    <div className="ml-14 bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-5 hover:border-indigo-300 transition-all shadow-sm">
+                    <div className="ml-14 bg-gradient-to-br from-white to-gray-50 rounded-xl border-2 border-gray-200 p-5 hover:border-brand/40 transition-all shadow-sm">
                       {/* Header */}
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          <span className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-xs font-semibold uppercase">
+                          <span className="px-3 py-1 bg-brand/10 text-brand rounded-full text-xs font-semibold uppercase">
                             {entry.changeType}
                           </span>
                           <span className="text-sm font-medium text-gray-900">
@@ -147,7 +147,7 @@ export default function JobHistoryModal({ jobId, jobNumber, isOpen, onClose }: J
                       <div className="space-y-2">
                         {entry.changeSummary.map((change, idx) => (
                           <div key={idx} className="flex items-start gap-2 text-sm">
-                            <svg className="w-4 h-4 text-indigo-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-4 h-4 text-brand mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>
                             <span className="text-gray-700">{change}</span>

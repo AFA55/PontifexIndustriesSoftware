@@ -677,7 +677,7 @@ export default function AdminDashboard() {
           </div>
           <Link
             href="/dashboard/admin/schedule-form"
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white text-sm font-semibold rounded-lg transition-colors"
           >
             <Plus className="w-4 h-4" />
             New Quote
@@ -692,10 +692,10 @@ export default function AdminDashboard() {
             className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-violet-100 dark:bg-violet-900/40 rounded-full flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              <div className="w-10 h-10 bg-brand/10 dark:bg-brand/20 rounded-full flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-brand dark:text-brand" />
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-violet-500 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-brand transition-colors" />
             </div>
             {salesLoading ? (
               <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-12 mb-2" />
@@ -803,7 +803,7 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <Link
               href="/dashboard/admin/schedule-form"
-              className="flex flex-col items-center gap-2 p-4 bg-violet-50 dark:bg-violet-900/20 hover:bg-violet-100 dark:hover:bg-violet-900/40 rounded-xl border border-violet-200 dark:border-violet-800/50 text-violet-700 dark:text-violet-400 transition-colors"
+              className="flex flex-col items-center gap-2 p-4 bg-brand/10 dark:bg-brand/20 hover:bg-brand/20 dark:hover:bg-brand/30 rounded-xl border border-brand/30 dark:border-brand/40 text-brand dark:text-brand transition-colors"
             >
               <Plus className="w-5 h-5" />
               <span className="text-xs font-semibold">New Quote</span>
@@ -996,10 +996,10 @@ export default function AdminDashboard() {
             className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
           >
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
-                <Clock className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div className="w-10 h-10 bg-brand/10 dark:bg-brand/20 rounded-full flex items-center justify-center">
+                <Clock className="w-5 h-5 text-brand dark:text-brand" />
               </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-purple-500 transition-colors" />
+              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-brand transition-colors" />
             </div>
             {dashLoading ? (
               <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-16 mb-2" />
@@ -1013,8 +1013,8 @@ export default function AdminDashboard() {
         ) : (
           <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
             <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/40 rounded-full flex items-center justify-center">
-                <Users className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+              <div className="w-10 h-10 bg-brand/10 dark:bg-brand/20 rounded-full flex items-center justify-center">
+                <Users className="w-5 h-5 text-brand dark:text-brand" />
               </div>
             </div>
             {dashLoading ? (
@@ -1334,7 +1334,7 @@ export default function AdminDashboard() {
               </Link>
               <Link
                 href="/dashboard/admin/timecards"
-                className="flex flex-col items-center gap-2 p-4 bg-purple-50 dark:bg-purple-900/20 hover:bg-purple-100 dark:hover:bg-purple-900/40 rounded-xl border border-purple-200 dark:border-purple-800/50 text-purple-700 dark:text-purple-400 transition-colors cursor-pointer"
+                className="flex flex-col items-center gap-2 p-4 bg-brand/10 dark:bg-brand/20 hover:bg-brand/20 dark:hover:bg-brand/30 rounded-xl border border-brand/30 dark:border-brand/40 text-brand dark:text-brand transition-colors cursor-pointer"
               >
                 <Clock className="w-5 h-5" />
                 <span className="text-xs font-semibold">Timecards</span>
@@ -1355,8 +1355,8 @@ export default function AdminDashboard() {
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-200 dark:border-slate-700 shadow-sm">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-purple-100 dark:bg-purple-900/40 rounded-lg flex items-center justify-center">
-              <Activity className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <div className="w-8 h-8 bg-brand/10 dark:bg-brand/20 rounded-lg flex items-center justify-center">
+              <Activity className="w-4 h-4 text-brand dark:text-brand" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-gray-900 dark:text-white">View Active Jobs</h2>
@@ -1365,7 +1365,7 @@ export default function AdminDashboard() {
           </div>
           <Link
             href="/dashboard/admin/active-jobs"
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-semibold rounded-lg transition-colors"
           >
             View All
             <ChevronRight className="w-3.5 h-3.5" />
@@ -1390,7 +1390,7 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-400 dark:text-slate-500">Jobs with status &ldquo;assigned&rdquo; or &ldquo;in progress&rdquo; will appear here</p>
               <Link
                 href="/dashboard/admin/schedule-form"
-                className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 bg-brand hover:bg-brand-dark text-white text-xs font-semibold rounded-lg transition-colors"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Schedule a Job
@@ -1402,10 +1402,10 @@ export default function AdminDashboard() {
                 <Link
                   key={job.id}
                   href={`/dashboard/admin/active-jobs`}
-                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 hover:border-purple-300 dark:hover:border-purple-700 transition-all group"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/50 hover:bg-gray-100 dark:hover:bg-slate-700 border border-gray-200 dark:border-slate-600 hover:border-brand dark:hover:border-brand transition-all group"
                 >
                   {/* Job number */}
-                  <span className="text-xs font-mono bg-purple-100 dark:bg-purple-900/40 px-2 py-1 rounded text-purple-700 dark:text-purple-400 flex-shrink-0 min-w-[72px] text-center">
+                  <span className="text-xs font-mono bg-brand/10 dark:bg-brand/20 px-2 py-1 rounded text-brand dark:text-brand flex-shrink-0 min-w-[72px] text-center">
                     {job.job_number}
                   </span>
 
@@ -1444,14 +1444,14 @@ export default function AdminDashboard() {
                       : 'Assigned'}
                   </span>
 
-                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-slate-500 group-hover:text-purple-500 transition-colors flex-shrink-0" />
+                  <ChevronRight className="w-4 h-4 text-gray-400 dark:text-slate-500 group-hover:text-brand transition-colors flex-shrink-0" />
                 </Link>
               ))}
 
               {activeJobs.length > 6 && (
                 <Link
                   href="/dashboard/admin/active-jobs"
-                  className="block text-center py-2 text-xs text-purple-500 dark:text-purple-400 hover:text-purple-600 dark:hover:text-purple-300 font-medium transition-colors"
+                  className="block text-center py-2 text-xs text-brand dark:text-brand hover:text-brand-dark dark:hover:text-brand-dark font-medium transition-colors"
                 >
                   +{activeJobs.length - 6} more active jobs &rarr;
                 </Link>
