@@ -19,6 +19,26 @@
 | **Unpushed commits** | ✅ none — pushed through `96964571` (Jun 27 dev-velocity + security batch) |
 | **Last groomed** | Jun 27, 2026 (PT2) |
 
+## 🚀 PATRIOT LAUNCH EPIC (the path to first revenue — Jun 27 founder-defined "done")
+
+> Founder's definition of "Patriot is launchable + they'll pay." Audited Jun 27 (5 parallel scouts) —
+> most is built; gaps below are real. Strategy: [docs/plans/PONTIFEX_STRATEGY_AND_ROADMAP.md]. Tiers:
+> T1 = launch fixes (small/safe), T2 = smart-data UIs (new builds), T3 = Artifex showcase (post-launch).
+
+**Tier 1 — launch fixes (start here; mostly small + safe):**
+- [ ] **Clock-in reminder frequency not wired** — admin notifications Settings has `clock_in_reminder_time` but the cron (`/api/cron/clock-in-reminders`, hardcoded `*/5`) ignores it. Wire the cron to read the tenant setting (active-hours/time window) so the founder can actually "set the frequency." Also hide/implement the dead settings fields (overtime alert, approval reminder have no cron). Admin Send/Settings/History UI already exists (`app/dashboard/admin/notifications/page.tsx`).
+- [ ] **Job completion robustness** — `generate-completion-pdf` swallows `completion-pdfs` bucket-creation failure → completion looks successful but PDF is missing. Return an error instead. (Optional) add a "signature captured" guard before marking complete. (Creation/assignment/step-through/signature→PDF→save all verified working.)
+- [ ] **Shop cleanup** — deprecate the unused legacy `equipment_maintenance_requests` table + `/api/operator/maintenance-requests` (active system is `maintenance_requests` + admin inbox, which works end-to-end incl. notify). Wire `ShopManagerDashboard` maintenance inbox count (stubbed to 0 at line ~69) to `/api/admin/maintenance-requests?status=open`. Verify breakdown→notify fires on prod.
+- [ ] **Schedule board multi-operator** — the "duplicate job → assign different operator" workflow ALREADY exists (`/api/admin/job-orders/[id]/duplicate` + EditJobPanel copy button; jobs are single-operator-by-design + `parent_job_id` links copies). Confirm it's discoverable + smooth; light UX polish if needed. (Production rolls up by `parent_job_id`.)
+
+**Tier 2 — smart-data UIs (new builds; founder wants "clean UI to input + see analysis"):**
+- [ ] **Operator production-input form** — linear ft / holes per operator per job → writes the EXISTING `equipment_usage` table (linear_feet_cut, operator_id, feet_per_hour auto-calc). Add explicit "holes" modeling (currently only `num_cuts` in scope JSON). No real-time input UI exists today.
+- [ ] **Cost input + Project P&L / production dashboard** — surface the EXISTING `job_pnl_summary` view (revenue/labor cost/gross profit/margin) + per-operator production from `equipment_usage`. Operator rates already in `profiles.hourly_rate`; per-job `labor_cost` auto-calcs on clock-out. Build the read dashboard + a clean rate-input screen. OPTIONAL per tenant (works without rates). This is the data foundation Artifex reads.
+
+**Tier 3 — Artifex (post-launch showcase; data already exists to query):** see `docs/plans/ARTIFEX_PLAN.md`. Answers "check Zack's OT + job value", "who had most production at project X", "total cost at project X", "any bad client ratings" (surveys). Build on the Claude/Vercel-AI-Gateway path (founder greenlight + budget pending).
+
+**Non-blocking nits found in the audit (P2/P3):** PTO balance adjust + weekend-pay-mismatch are fire-and-forget (already logged below); correction-rejection doesn't notify operator; signature-request orphan rows; lunch column duplication (`break_minutes` vs `lunch_duration_minutes`); maintenance equipment-status sync is fire-and-forget; mobile audit of maintenance wizard/inbox.
+
 ## 🔴 P0 — Verify / unblock now
 
 ### ✅ LAUNCH — DONE (Jun 21–22) — both apps submitted, web live
