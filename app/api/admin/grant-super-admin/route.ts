@@ -37,12 +37,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to update user role' }, { status: 500 });
   }
 
-  // Fire-and-forget audit log
+  // Fire-and-forget audit log — REAL audit_logs columns
+  // (user_id / user_email / user_role / action / resource_* / details / tenant_id).
+  // user_email, user_role, resource_type are NOT NULL; omitting them silently failed the insert.
   Promise.resolve(
     supabaseAdmin.from('audit_logs').insert({
+      user_id: auth.userId,
+      user_email: auth.userEmail,
+      user_role: auth.role,
       action: 'grant_super_admin',
-      actor_id: auth.userId,
-      target_id: userId,
+      resource_type: 'profile',
+      resource_id: userId,
       tenant_id: auth.tenantId,
       details: { granted_by: auth.userId, granted_to: userId },
     })
