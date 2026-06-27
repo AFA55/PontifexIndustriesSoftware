@@ -9,14 +9,14 @@
 | | |
 |---|---|
 | **Phase** | 🚀 **LAUNCHING** — web live; both mobile apps in store review |
-| **Prod** | ✅ LIVE — pontifexindustries.com (deployed `0aaf111d` — timecards batch + react-email white-label + email UI polish + remote-photo storage + late-recompute) |
-| **iOS** | ✅ **APPROVED — v1.0.4 / Build 9 "Ready for Distribution"** (Apple review passed Jun 23). Apple Developer Agreement re-accept = **DONE** (founder signed). |
-| **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). Auto-publishes on approval. |
+| **Prod** | ✅ LIVE — pontifexindustries.com (deployed `0e8c1506` — tenant-brand redesign of Time Edit Requests + drive-time auto-suggest + smart notif auto-ack + resend acceptance email) |
+| **iOS** | ✅ **APPROVED — v1.0.4 / Build 9 "Ready for Distribution"**, auto-releasing. Apple Developer Agreement re-accept = **DONE**. |
+| **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). **Org account → closed testing NOT required** (confirmed Jun 27); empty closed-test draft discarded. Auto-publishes on approval. See `android-release` skill. |
 | **Open** | P0: ~0 · P1: ~5 · P2: ~15 · P3: ~9 |
 | **In flight** | Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
-| **Blocked on founder** | 🗺️ **Maps incognito/phone test** (503 traced to browser/network block, not config — verify it works for real users) · Approve Bryan's request · Sentry DSN · (AI-Gateway greenlight for Jarvis) |
-| **Unpushed commits** | 🟡 **5 staged (Jun 23, web-affecting — one push deploys all):** `b77ca30e`+`4d120ecd` time-off (all-profiles selector, rank approval, callout-immediate+notify-all-mgmt, schedule-board Out Today) · `e67d39f2` email header logo/centering · `c736406b` Remember-Me default-OFF · `dca49afd` secure biometric Face ID (refresh-token in Keychain). All guardian-PASS. |
-| **Last groomed** | Jun 23, 2026 |
+| **Blocked on founder** | 🤖 Google Play review (auto-notifies) · Sentry DSN · (AI-Gateway greenlight for Jarvis) · (optional) expand Play beyond US |
+| **Unpushed commits** | ✅ none — all pushed through `0e8c1506` |
+| **Last groomed** | Jun 27, 2026 |
 
 ## 🔴 P0 — Verify / unblock now
 

@@ -1,25 +1,34 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jun 23, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (web deployed at `113cd77a`; only 1 docs commit unpushed) | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** in Google Play review
+**Last updated:** Jun 27, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (latest `0e8c1506`) | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** ✅ in Google Play review — **org account, closed-testing NOT required**, auto-publishes on approval
 
 > **New session? Read this top-to-bottom once, then work from [BACKLOG.md](BACKLOG.md).**
 > This file = where we are + how we work. BACKLOG.md = what to do next. [CLAUDE.md](CLAUDE.md) = the hard conventions (RLS, dates, auth, email, push-cost). [docs/SESSION_LOG.md](docs/SESSION_LOG.md) = older history.
 
 ---
 
-## ⚡ WHERE WE ARE (Jun 22, 2026) — LAUNCH IN PROGRESS
+## ⚡ WHERE WE ARE (Jun 27, 2026) — LAUNCH IN PROGRESS
 
 The platform is **live on the web** with a paying trial customer (Patriot Concrete Cutting) and **both mobile apps are in store review**.
 
 | Surface | Status |
 |---|---|
-| **Web** | ✅ LIVE — `pontifexindustries.com` (deployed `113cd77a`, Jun 23). This is the product; the mobile apps are thin wrappers around it. |
-| **iOS** | ✅ **v1.0.4 APPROVED — "Ready for Distribution"** + set to **Automatically release** (the Jun-24-11am date in ASC is the *unselected* third option, ignore it). Developer Agreement re-accept = DONE. Releasing v1.0.4 delivers the native Face ID plugin to users. |
-| **Android** | **v1.0.1 / versionCode 2 — IN REVIEW** on Google Play. Auto-publishes when Google approves. |
+| **Web** | ✅ LIVE — `pontifexindustries.com` (latest `0e8c1506`, Jun 27). This is the product; the mobile apps are thin wrappers around it. |
+| **iOS** | ✅ **v1.0.4 APPROVED — "Ready for Distribution"** + set to **Automatically release**. Developer Agreement re-accept = DONE. Releasing v1.0.4 delivers the native Face ID plugin to users. |
+| **Android** | **v1.0.1 / versionCode 2 — IN REVIEW** (Submission 4, Jun 22), US-only, Managed publishing OFF → auto-publishes on approval. **Confirmed Jun 27: ORG account ("PontifexIndustriesLLC") → EXEMPT from the closed-testing mandate.** The dashboard "closed test track" card is optional — ignored/discarded the empty draft. Just waiting on Google. Procedure now lives in the **`android-release`** skill. |
 
 **The mobile apps are a remote-URL Capacitor webview that loads `pontifexindustries.com`.** This is the single most important architectural fact: **web/UI/API changes ship to BOTH apps instantly via a Vercel deploy — no App Store / Play build needed.** Only *native* changes (icon, splash, plugins, Info.plist/AndroidManifest, Capacitor config) require a store build.
 
-### Shipped + LIVE (Jun 22–23) — all pushed, verified
+### Shipped + LIVE (Jun 24–27) — pushed, build-verified
+- **Time Edit Requests redesign (white-label brand palette)** (`0e8c1506`) — accents now come from the tenant brand via `useBranding()` (Patriot → navy chrome/fills + red accents) instead of hardcoded purple/yellow/green; every company code gets its own palette. Geofence callout redesigned with distance + drive-time pills. **Don't reintroduce hardcoded `violet`/`amber`/`emerald` accents on tenant-facing screens — drive them from `branding.primary_color`/`secondary_color`.**
+- **Drive-time auto-suggest** (`0e8c1506`) — Modify on a geofence flag pre-fills clock-out = recorded − estimated drive time from the shop (free distance-based estimate via `estimateDriveMinutes`, tenant-correct, works on localhost). Optional future upgrade: live Google driving time.
+- **Smart notification auto-ack** (`0e8c1506`) — `mark-read` gained a `{ types }` mode (caller-scoped); opening the corrections page clears the admin's `timecard_review` bell items; resolving a flag clears the matching notifications tenant-wide. Fixes the "bell still shows N after I caught up" mismatch.
+- **Resend acceptance email** (`0e8c1506`) — approved access requests expose `invitation_id` and show a "Resend email" button reusing `PUT /api/admin/invite` (rotates token, refreshes 7-day TTL).
+- **Geofence clock-outs split into their own section + drive-time estimate + access-request bell alerts** (`e742d403`) — and fixed two worker notifications that were silently dropped by the `notification_type` CHECK (now use the allowed `'general'` value; keep the event key in `type`).
+- **Permanently Delete user** (`61a809b0`) — `close_account()` scrub + frees the email (auth/profile renamed to a sentinel + permanent ban) + purges pending invitations/access_requests.
+- **Subsistence out-of-town** (`3806f3f4`) — remote clock-in asks "working out of town?"; per-day "Subs." surfacing; night_date aligned to tenant timezone.
+
+### Prior batches (Jun 22–23) — pushed, verified
 **Jun 23 batch (deployed `113cd77a`):**
 - **Maps address autocomplete FIXED** (`113cd77a`) — TRUE root cause was our **CSP in `middleware.ts`** (`script-src` lacked `maps.googleapis.com` → browser blocked the Maps script client-side; zero traffic reached Google). Added the Google origins to `script-src`/`connect-src`. **Verified live: `fetchAutocompleteSuggestions` returns 5 suggestions.** (Also done: dedicated website-restricted key "Pontifex Web Maps Key" in GCP project `quantum-conduit-482219-a1` w/ www referrer + Maps JS + Places New + billing; `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` swapped in Vercel. The old key `AIzaSyB4kg…` was orphaned/unmanageable — retired.)
 - **Time-off** (`b77ca30e`+`4d120ecd`) — Log modal lists ALL company profiles; rank approval (admin→below-admin incl. PM/salesman+supervisor, super_admin→all, no auto/self-approve); **callouts/no-shows immediate + notify ALL management**, planned requests pending + notify approvers; schedule-board **"Out Today"** card for non-operators.
@@ -29,8 +38,8 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 
 **Jun 22 batch (deployed `0aaf111d`):** email white-label migration · notif-bell deep-link · remote-photo storage + out-of-radius auto-edit-request + storage RLS fix · late-recompute-on-edit · email UI polish (invoice clipping).
 
-> **Only 1 unpushed commit:** `9faf1194` (BACKLOG.md doc note) — held to avoid a billed build for a doc-only change; rides the next real change.
-> **DB migrations applied to prod** (additive/idempotent): `timecard_photos_bucket`, `timecard_photos_drop_broad_policies`, `timecard_corrections_metadata`, `notifications_action_url` (Jun 22). No new migrations Jun 23.
+> **All commits through `0e8c1506` are pushed** (Jun 27 batch shipped with the docs cleanup).
+> **No new DB migrations in the Jun 24–27 work** — all of it was code-only (the brand redesign, drive-time, smart-ack, and resend reuse existing tables/columns; the `notification_type` CHECK was worked *around* with the allowed `'general'` value, not altered). Prior additive/idempotent migrations: `timecard_photos_bucket`, `timecard_photos_drop_broad_policies`, `timecard_corrections_metadata`, `notifications_action_url`, `timecards_out_of_town` (subsistence).
 
 ### What shipped recently (the launch arc, Jun 20–22)
 - **Timecards batch** (live `a0bf8bcb`): correction-request 404 fix, km→**miles** distance everywhere, **configurable start-time + late-entries** system (`lib/timecard-start.ts` resolution chain: job ticket > per-day override > tenant standard; new `/dashboard/admin/timecards/late` page + `timecard_day_overrides` table), geofence detail + remote-clock-in review tab.
@@ -41,10 +50,9 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 - **Play Developer API upload automated** (`scripts/play-upload.mjs`): no more manual `.aab` file-pick. One-time setup done — Android Publisher API enabled on GCP project `pontifex-ind-1dc89`; SA `firebase-adminsdk-fbsvc@pontifex-ind-1dc89.iam.gserviceaccount.com` granted Admin in Play. Future Android ships = one command.
 
 ### Blocked on the founder (only the founder can do these)
-- 🍎 **Apple Developer Agreement** — Account Holder must re-accept it in App Store Connect or iOS updates can't submit.
-- 🤖 **Apple/Google review** — out of our hands; both auto-notify by email.
-- 🗺️ **Enable Places API (New)** in Google Cloud (address autocomplete; degrades to manual entry until then).
-- 👤 **Approve Bryan's access request** · **Sentry DSN** · (optional) **AI Gateway greenlight + $ ceiling** for Jarvis Phase 2.
+- 🤖 **Google Play review** — out of our hands; auto-notifies by email; auto-publishes on approval (~day 5 of up-to-7). Nothing else to do on Play. (iOS v1.0.4 already approved/auto-releasing.)
+- 👤 **Sentry DSN** · (optional) **AI Gateway greenlight + $ ceiling** for Jarvis Phase 2 · (optional) expand Play beyond US.
+- ✅ Resolved since last handoff: Apple Developer Agreement re-accepted; Maps autocomplete fixed (was our CSP, not the API); Android closed-testing question settled (org-exempt).
 
 ---
 
@@ -68,6 +76,7 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 - `prod-deploy` — the verification gate + cost confirm + push + deploy-watch.
 - `guardian-review` — architecture-guardian PASS/BLOCKING checklist. **Run after every builder/subagent**, before committing significant changes.
 - `ios-release` — full App Store/TestFlight ship procedure (manual signing, Transporter, screenshot gotchas).
+- `android-release` — full Google Play ship procedure (version bump, `cap sync`, signed AAB, `scripts/play-upload.mjs` API upload, declarations checklist) + how to read Play review status. Org account = no closed testing required.
 - `design-taste` / `frontend-design` / `pontifex-brand` — anti-generic UI + brand application (bridge-P mark, purple→red gradient).
 
 **Specialist subagents** (spawn via the Agent tool for the right job):
