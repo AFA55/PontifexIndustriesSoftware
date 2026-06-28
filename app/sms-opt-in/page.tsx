@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { MessageSquare, CheckCircle2, Loader2, ShieldCheck } from 'lucide-react';
 
@@ -22,6 +22,17 @@ export default function SmsOptInPage() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [error, setError] = useState('');
+
+  // Pre-fill phone + name from the emailed/texted opt-in-request link
+  // (?phone=…&name=…) so the contact only has to check the box and confirm.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const p = params.get('phone');
+    const n = params.get('name');
+    if (p) setPhone(p);
+    if (n) setName(n);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

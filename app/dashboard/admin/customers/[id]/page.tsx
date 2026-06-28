@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import SendOptInRequestButton from '@/components/SendOptInRequestButton';
 import CustomerForm from '../_components/CustomerForm';
 import ContactForm from '../_components/ContactForm';
 
@@ -480,6 +481,15 @@ export default function CustomerDetailPage() {
                         </div>
                         {contact.notes && (
                           <p className="text-xs text-gray-400 mt-1">{contact.notes}</p>
+                        )}
+                        {contact.phone && (
+                          <div className="mt-2">
+                            <SendOptInRequestButton
+                              name={contact.name}
+                              phone={contact.phone}
+                              email={contact.email}
+                            />
+                          </div>
                         )}
                       </div>
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-2">

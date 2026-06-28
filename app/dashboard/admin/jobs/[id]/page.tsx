@@ -41,6 +41,7 @@ import {
   Printer,
 } from 'lucide-react';
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
+import SendOptInRequestButton from '@/components/SendOptInRequestButton';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
@@ -1878,6 +1879,14 @@ export default function AdminJobDetailPage({
                     <dd className="mt-0.5 text-slate-700 dark:text-white/80 flex items-center gap-1.5">
                       <Phone className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
                       {job.customer_phone}
+                    </dd>
+                    <dd className="mt-2">
+                      <SendOptInRequestButton
+                        name={job.contact_name || job.customer_name}
+                        phone={job.customer_phone}
+                        email={job.customer_email}
+                        jobId={job.id}
+                      />
                     </dd>
                   </div>
                 )}
