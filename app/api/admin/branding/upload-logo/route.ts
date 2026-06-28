@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/x-icon'];
@@ -10,10 +10,10 @@ const VALID_LOGO_TYPES = ['main', 'dark', 'favicon', 'icon'];
 
 /**
  * POST /api/admin/branding/upload-logo?type=main|dark|favicon|icon
- * Super admin only — upload a logo file to Supabase Storage.
+ * Admin + super admin — upload a logo file to Supabase Storage.
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
 
   try {

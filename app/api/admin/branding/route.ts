@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const ALLOWED_FIELDS = [
@@ -114,10 +114,10 @@ export async function GET(request: NextRequest) {
 
 /**
  * PATCH /api/admin/branding
- * Super admin only -- update the active branding row.
+ * Admin + super admin -- update the active branding row (tenant-scoped to the caller).
  */
 export async function PATCH(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
 
   try {

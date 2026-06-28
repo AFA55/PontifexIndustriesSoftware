@@ -91,6 +91,9 @@ export default function SiteVisitsListPage() {
   });
 
   const isSupervisor = user?.role === 'supervisor';
+  // Admins are view-only for visit reports (the /new page blocks them server-side).
+  // Only show the "New Visit Report" button to roles that can actually create one.
+  const canCreate = ['supervisor', 'operations_manager', 'super_admin'].includes(user?.role ?? '');
 
   if (authLoading) {
     return (
@@ -127,13 +130,15 @@ export default function SiteVisitsListPage() {
               </p>
             </div>
           </div>
-          <Link
-            href="/dashboard/admin/site-visits/new"
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 transition"
-          >
-            <Plus className="w-4 h-4" />
-            New Visit Report
-          </Link>
+          {canCreate && (
+            <Link
+              href="/dashboard/admin/site-visits/new"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 transition"
+            >
+              <Plus className="w-4 h-4" />
+              New Visit Report
+            </Link>
+          )}
         </div>
 
         {/* Filters */}
@@ -172,7 +177,7 @@ export default function SiteVisitsListPage() {
             <p className="text-gray-500 dark:text-slate-400 text-sm">
               {search || followUpOnly ? 'No visits match your filters.' : 'No site visit reports yet.'}
             </p>
-            {!search && !followUpOnly && (
+            {!search && !followUpOnly && canCreate && (
               <Link
                 href="/dashboard/admin/site-visits/new"
                 className="inline-flex items-center gap-1.5 mt-4 text-sm font-semibold text-violet-600 dark:text-violet-400 hover:underline"

@@ -24,7 +24,6 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  ArrowLeft,
   Menu,
   X,
   ClipboardCheck,
@@ -163,7 +162,8 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'ADMIN',
     accent: 'text-red-400',
     items: [
-      { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings, flagKey: 'can_manage_settings' },
+      // Settings is visible to admin + super_admin (super_admin/ops_manager bypass roles via SUPER_ADMIN_FLAGS).
+      { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'operations_manager'] },
       { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
       { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics', moduleKey: 'analytics' },
       { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard, superAdminOnly: true },
@@ -490,21 +490,6 @@ function SidebarContent({
           );
         })}
       </nav>
-
-      {/* ------------------------------------------------------------------ */}
-      {/* Bottom: Operator View link */}
-      {/* ------------------------------------------------------------------ */}
-      <div className="px-2 pb-1 flex-shrink-0">
-        <Link
-          href="/dashboard"
-          onClick={onNavClick}
-          title={collapsed ? 'Operator View' : undefined}
-          className="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-500 dark:hover:text-slate-200 dark:hover:bg-slate-800 text-xs font-medium transition-colors border-l-2 border-transparent"
-        >
-          <ArrowLeft className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && <span>Operator View</span>}
-        </Link>
-      </div>
 
       {/* ------------------------------------------------------------------ */}
       {/* Bottom: User profile + sign out */}

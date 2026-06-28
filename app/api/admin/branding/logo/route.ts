@@ -1,6 +1,6 @@
 export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const ALLOWED_TYPES = ['image/png', 'image/jpeg', 'image/svg+xml', 'image/x-icon'];
@@ -8,7 +8,7 @@ const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
 /**
  * POST /api/admin/branding/logo
- * Super admin only — upload logo or favicon to Supabase Storage.
+ * Admin + super admin — upload logo or favicon to Supabase Storage (tenant-scoped to the caller).
  * FormData fields:
  *   file: File
  *   type: 'logo' | 'favicon'
@@ -16,7 +16,7 @@ const MAX_SIZE = 2 * 1024 * 1024; // 2MB
  * On success: updates tenant_branding.logo_url or favicon_url and returns { url }.
  */
 export async function POST(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
 
   try {
