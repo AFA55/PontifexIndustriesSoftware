@@ -87,6 +87,17 @@
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
 
+## 🟠 P1 (added Jun 28 — UNIFICATION campaign: change/edit/duplicate across companies)
+
+> Founder: unify the software so parts can be changed/edited/duplicated into other companies. Audit verdict:
+> backend already unified (api-auth/rbac/branding/dates/email/module-registry); the gap was the UI (every page
+> hand-rolled buttons/cards/modals inline → brand sweep took ~170 files). Path chosen: build the component
+> library now + adopt incrementally; defer the bigger reuse work to when company #2 is real.
+- [x] **Core UI component library** ✅ (`be958658`-era) — `components/ui/` (Button, Card, Modal, StatusBadge, EmptyState, StatCard, Tabs, Alert, PageHeader, Spinner) + `lib/cn.ts` + barrel; brand-aware, dark-mode, 44px taps. UI_CATALOG references real components now. Proof migration: admin/fleet.
+- [x] **DRY helpers** ✅ — `lib/signed-urls.ts` (5 sites) + `lib/status-colors.ts` (5 sites).
+- [ ] **Incremental adoption (ongoing):** migrate hand-rolled pages to the `components/ui` primitives as they're edited/built — every new screen uses the kit. Highest-traffic first (schedule board, customers, jobs, timecards). NOT a big-bang retrofit.
+- [ ] **Deferred to company #2 / post-Patriot** (the "implement into other companies" layer): activate feature-gating (`requireModule` is built but unused → enforce on non-core routes); make PDF/invoice generation branding-agnostic (currently hardcoded Patriot); extract the reusable `pontifex-starter` template; document module dependencies. Full audit in this session's history.
+
 ## 🟠 P1 (added Jun 28 — founder testing findings, admin + super_admin)
 
 - [x] ~~Remove broken "Operator View" button~~ ✅ (`3d80ec2f`) — gone from sidebar.
