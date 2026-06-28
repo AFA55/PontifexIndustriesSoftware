@@ -6,11 +6,12 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  Truck, Plus, Loader2, ArrowLeft, ChevronRight, AlertTriangle,
+  Truck, Plus, ChevronRight, AlertTriangle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { useModuleGate } from '@/components/ModuleGuard';
+import { PageHeader, Button, EmptyState, Spinner, StatusBadge } from '@/components/ui';
 
 interface VehicleRow {
   id: string;
@@ -90,7 +91,7 @@ export default function FleetListPage() {
   }
 
   if (authLoading) {
-    return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>;
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900"><Spinner size="lg" brand /></div>;
   }
 
   if (moduleGate.blocked) return moduleGate.fallback;
@@ -98,37 +99,32 @@ export default function FleetListPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
-        <Link href="/dashboard/admin" className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-blue-600">
-          <ArrowLeft className="w-4 h-4" /> Dashboard
-        </Link>
-
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30">
-              <Truck className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Fleet</h1>
-              <p className="text-sm text-gray-500 dark:text-slate-400">{items.length} vehicle{items.length === 1 ? '' : 's'}</p>
-            </div>
-          </div>
-          <Link
-            href="/dashboard/admin/fleet/new"
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white text-sm font-semibold shadow-lg shadow-blue-500/30 transition-all hover:-translate-y-0.5"
-          >
-            <Plus className="w-4 h-4" /> New Vehicle
-          </Link>
-        </div>
+        <PageHeader
+          backHref="/dashboard/admin"
+          backLabel="Dashboard"
+          title="Fleet"
+          subtitle={`${items.length} vehicle${items.length === 1 ? '' : 's'}`}
+          action={
+            <Button href="/dashboard/admin/fleet/new" leftIcon={<Plus className="w-4 h-4" />}>
+              New Vehicle
+            </Button>
+          }
+        />
 
         {loading ? (
-          <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-blue-600" /></div>
+          <div className="flex items-center justify-center py-16"><Spinner size="lg" brand /></div>
         ) : items.length === 0 ? (
-          <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">
-            <Truck className="w-10 h-10 text-gray-300 dark:text-slate-600 mx-auto mb-3" />
-            <p className="text-gray-500 dark:text-slate-400 text-sm">No vehicles yet.</p>
-            <Link href="/dashboard/admin/fleet/new" className="inline-flex items-center gap-1.5 mt-4 text-sm font-semibold text-blue-600 hover:underline">
-              <Plus className="w-4 h-4" /> Add your first vehicle
-            </Link>
+          <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-white/10">
+            <EmptyState
+              icon={Truck}
+              title="No vehicles yet"
+              description="Add your fleet to track registration, insurance, and status."
+              action={
+                <Button href="/dashboard/admin/fleet/new" variant="secondary" leftIcon={<Plus className="w-4 h-4" />}>
+                  Add your first vehicle
+                </Button>
+              }
+            />
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -164,10 +160,10 @@ export default function FleetListPage() {
                           {(it.status || 'available').replace(/_/g, ' ')}
                         </span>
                         {(regSoon || insSoon) && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 inline-flex items-center gap-1">
+                          <StatusBadge variant="warning" className="text-[10px] px-1.5 py-0.5">
                             <AlertTriangle className="w-2.5 h-2.5" />
                             {regSoon && insSoon ? 'reg + ins exp' : regSoon ? 'reg soon' : 'ins soon'}
-                          </span>
+                          </StatusBadge>
                         )}
                       </div>
                     </div>
