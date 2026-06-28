@@ -678,7 +678,7 @@ export default function AdminNotificationsPage() {
               <div className="divide-y divide-gray-100 dark:divide-white/5">
                 {sentNotifications.map(notif => (
                   <div key={notif.id} className={`px-6 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors ${
-                    !notif.is_read ? 'dark:bg-violet-500/10 dark:border-l-2 dark:border-l-violet-400/40' : ''
+                    !notif.is_read ? 'dark:bg-brand/10 dark:border-l-2 dark:border-l-brand/40' : ''
                   }`}>
                     <div className="flex items-center justify-between">
                       <div className="flex-1">

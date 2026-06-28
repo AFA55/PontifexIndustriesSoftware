@@ -351,7 +351,7 @@ export default function MaintenanceInboxPage() {
   if (!authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-[#0b0618]">
-        <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -364,7 +364,7 @@ export default function MaintenanceInboxPage() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+          <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-brand to-brand-secondary bg-clip-text text-transparent">
             Maintenance Inbox
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
@@ -381,7 +381,7 @@ export default function MaintenanceInboxPage() {
           </button>
           <Link
             href="/dashboard/maintenance/new"
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors min-h-[44px]"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold transition-colors min-h-[44px]"
           >
             <Plus className="w-4 h-4" />
             Submit Request
@@ -397,7 +397,7 @@ export default function MaintenanceInboxPage() {
             onClick={() => { setActiveTab(tab.key); setPage(0); }}
             className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-all min-h-[44px] ${
               activeTab === tab.key
-                ? 'bg-white dark:bg-slate-700 text-violet-700 dark:text-violet-300 shadow-sm'
+                ? 'bg-white dark:bg-slate-700 text-brand dark:text-brand shadow-sm'
                 : 'text-gray-600 dark:text-slate-400 hover:text-gray-900 dark:hover:text-slate-200'
             }`}
           >
@@ -415,7 +415,7 @@ export default function MaintenanceInboxPage() {
       {/* List */}
       {loading && requests.length === 0 ? (
         <div className="flex items-center justify-center py-16">
-          <Loader2 className="w-8 h-8 animate-spin text-violet-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand" />
         </div>
       ) : requests.length === 0 ? (
         <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">

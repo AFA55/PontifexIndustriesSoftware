@@ -322,9 +322,9 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
       <DailyEquipmentNeeds />
 
       {/* Phase 1A footer note */}
-      <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 rounded-2xl p-4 text-sm text-violet-700 dark:text-violet-300">
+      <div className="bg-brand/10 dark:bg-brand/20 border border-brand/30 dark:border-brand/30 rounded-2xl p-4 text-sm text-brand dark:text-brand">
         <p className="font-semibold mb-1">Phase 1A — foundation only</p>
-        <p className="text-violet-600 dark:text-violet-400 text-xs">
+        <p className="text-brand dark:text-brand text-xs">
           Equipment inventory CRUD ships in Phase 1B. Maintenance + checkout flows in Phase 2-3. Until then these cards are placeholders so you can see the shape of the dashboard.
         </p>
       </div>

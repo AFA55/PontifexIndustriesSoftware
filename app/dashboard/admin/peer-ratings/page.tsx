@@ -226,7 +226,7 @@ export default function PeerRatingsPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-purple-600" />
+        <Loader2 className="w-10 h-10 animate-spin text-brand" />
       </div>
     );
   }
@@ -378,12 +378,12 @@ export default function PeerRatingsPage() {
           <div>
             {teamLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-brand" />
               </div>
             ) : teamRatings.length === 0 ? (
               <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center shadow-sm">
-                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Users className="w-8 h-8 text-purple-500" />
+                <div className="w-16 h-16 bg-brand/10 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-8 h-8 text-brand" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-800 mb-2">No ratings submitted yet</h3>
                 <p className="text-gray-500 text-sm">Once operators rate each other after jobs, scores will appear here.</p>
@@ -406,7 +406,7 @@ export default function PeerRatingsPage() {
                         <tr key={member.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                              <div className="w-8 h-8 bg-gradient-to-br from-brand to-brand-secondary rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                                 {member.full_name?.charAt(0)?.toUpperCase() || '?'}
                               </div>
                               <span className="text-sm font-semibold text-gray-800">{member.full_name}</span>
@@ -436,7 +436,7 @@ export default function PeerRatingsPage() {
                           <td className="px-4 py-3 text-right">
                             <button
                               onClick={() => setSlideOverUser(member)}
-                              className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-semibold px-3 py-2 rounded-lg hover:bg-purple-50 transition-colors min-h-[36px]"
+                              className="inline-flex items-center gap-1.5 text-xs text-brand hover:text-brand-dark font-semibold px-3 py-2 rounded-lg hover:bg-brand/10 transition-colors min-h-[36px]"
                             >
                               <Eye className="w-3.5 h-3.5" />
                               Details

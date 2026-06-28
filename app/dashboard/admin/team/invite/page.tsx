@@ -353,7 +353,7 @@ export default function InviteUsersPage() {
   if (!authChecked) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
-        <Loader2 className="w-8 h-8 text-violet-500 dark:text-violet-400 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand dark:text-brand animate-spin" />
       </div>
     );
   }
@@ -390,8 +390,8 @@ export default function InviteUsersPage() {
         </Link>
 
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-11 h-11 rounded-xl bg-violet-50 border border-violet-200 dark:bg-violet-500/15 dark:border-violet-500/30 flex items-center justify-center flex-shrink-0">
-            <UserPlus className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+          <div className="w-11 h-11 rounded-xl bg-brand/10 border border-brand/30 dark:bg-brand/15 dark:border-brand/30 flex items-center justify-center flex-shrink-0">
+            <UserPlus className="w-5 h-5 text-brand dark:text-brand" />
           </div>
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-white">Invite Team Members</h1>
@@ -403,10 +403,10 @@ export default function InviteUsersPage() {
             A real onboarding once landed in the wrong tenant because the
             super_admin's own org was silently used as the default. */}
         {isSuperAdmin && (
-          <div className="bg-white/90 ring-1 ring-violet-200 shadow-sm rounded-2xl p-4 sm:p-5 mb-6 dark:bg-white/[0.04] dark:ring-violet-500/30">
+          <div className="bg-white/90 ring-1 ring-brand/30 shadow-sm rounded-2xl p-4 sm:p-5 mb-6 dark:bg-white/[0.04] dark:ring-brand/30">
             <label htmlFor="invite-tenant" className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5" /> Company
-              <span className="text-violet-600 dark:text-violet-300 font-medium">(required)</span>
+              <span className="text-brand dark:text-brand font-medium">(required)</span>
             </label>
             <select
               id="invite-tenant"
@@ -420,9 +420,9 @@ export default function InviteUsersPage() {
               }}
               className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
                 bg-white border border-slate-200 text-slate-900
-                focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                 dark:bg-white/5 dark:border-white/10 dark:text-white
-                dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                dark:focus:border-brand dark:focus:ring-brand/20"
             >
               <option value="" disabled>
                 {loadingTenants ? 'Loading companies…' : 'Select a company…'}
@@ -448,7 +448,7 @@ export default function InviteUsersPage() {
             onClick={() => setActiveTab('invite')}
             className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors min-h-[44px] ${
               activeTab === 'invite'
-                ? 'bg-violet-600 text-white'
+                ? 'bg-brand text-white'
                 : 'bg-white/90 ring-1 ring-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60 dark:hover:text-white'
             }`}
           >
@@ -460,7 +460,7 @@ export default function InviteUsersPage() {
             onClick={() => setActiveTab('requests')}
             className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors min-h-[44px] ${
               activeTab === 'requests'
-                ? 'bg-violet-600 text-white'
+                ? 'bg-brand text-white'
                 : 'bg-white/90 ring-1 ring-slate-200 text-slate-600 hover:text-slate-900 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60 dark:hover:text-white'
             }`}
           >
@@ -504,7 +504,7 @@ export default function InviteUsersPage() {
 
             {loadingRequests ? (
               <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-6 h-6 text-violet-500 dark:text-violet-400 animate-spin" />
+                <Loader2 className="w-6 h-6 text-brand dark:text-brand animate-spin" />
               </div>
             ) : tenantPending ? (
               <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">
@@ -542,9 +542,9 @@ export default function InviteUsersPage() {
                           aria-label={`Role for ${req.full_name}`}
                           className="rounded-xl px-3 py-2.5 text-sm transition-colors min-h-[44px]
                             bg-white border border-slate-200 text-slate-900
-                            focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                            focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                             dark:bg-white/5 dark:border-white/10 dark:text-white
-                            dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                            dark:focus:border-brand dark:focus:ring-brand/20"
                         >
                           {invitableRoles.map((r) => (
                             <option key={r.value} value={r.value}>
@@ -682,9 +682,9 @@ export default function InviteUsersPage() {
                 autoComplete="off"
                 className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
                   bg-white border border-slate-200 text-slate-900 placeholder-slate-400
-                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                   dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
-                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  dark:focus:border-brand dark:focus:ring-brand/20"
               />
             </div>
             <div>
@@ -698,9 +698,9 @@ export default function InviteUsersPage() {
                 placeholder="Jordan Smith"
                 className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
                   bg-white border border-slate-200 text-slate-900 placeholder-slate-400
-                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                   dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
-                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  dark:focus:border-brand dark:focus:ring-brand/20"
               />
             </div>
             <div>
@@ -712,9 +712,9 @@ export default function InviteUsersPage() {
                 onChange={(e) => setRole(e.target.value)}
                 className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
                   bg-white border border-slate-200 text-slate-900
-                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                   dark:bg-white/5 dark:border-white/10 dark:text-white
-                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  dark:focus:border-brand dark:focus:ring-brand/20"
               >
                 {invitableRoles.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -740,9 +740,9 @@ export default function InviteUsersPage() {
                 autoComplete="off"
                 className="w-full rounded-xl px-4 py-3 text-sm transition-colors min-h-[44px]
                   bg-white border border-slate-200 text-slate-900 placeholder-slate-400
-                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                   dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
-                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  dark:focus:border-brand dark:focus:ring-brand/20"
               />
             </div>
           </div>
@@ -767,7 +767,7 @@ export default function InviteUsersPage() {
           <button
             type="submit"
             disabled={submitting || tenantPending}
-            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-700 disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 font-semibold transition-colors min-h-[44px]"
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-brand hover:bg-brand-dark disabled:opacity-60 disabled:cursor-not-allowed text-white rounded-xl px-6 py-3 font-semibold transition-colors min-h-[44px]"
           >
             {submitting ? (
               <>
@@ -794,7 +794,7 @@ export default function InviteUsersPage() {
 
         {loadingList ? (
           <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 text-violet-500 dark:text-violet-400 animate-spin" />
+            <Loader2 className="w-6 h-6 text-brand dark:text-brand animate-spin" />
           </div>
         ) : tenantPending ? (
           <div className="bg-white/90 ring-1 ring-slate-200 shadow-sm rounded-2xl p-8 text-center text-slate-500 dark:bg-white/[0.04] dark:ring-white/10 dark:text-white/60">

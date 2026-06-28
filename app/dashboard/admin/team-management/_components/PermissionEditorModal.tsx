@@ -170,13 +170,13 @@ export default function PermissionEditorModal({
                       disabled
                         ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
                         : selectedRole === role.value
-                        ? 'border-purple-500 bg-purple-50'
+                        ? 'border-brand bg-brand/10'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
                     <p className={`font-semibold text-sm ${
                       disabled ? 'text-gray-400'
-                        : selectedRole === role.value ? 'text-purple-700' : 'text-gray-800'
+                        : selectedRole === role.value ? 'text-brand' : 'text-gray-800'
                     }`}>
                       {role.label}
                     </p>
@@ -191,11 +191,11 @@ export default function PermissionEditorModal({
 
           {/* Permission Grid */}
           {isBypassRole ? (
-            <div className="bg-purple-50 border-2 border-purple-200 rounded-xl p-4">
-              <p className="text-purple-800 font-semibold">
+            <div className="bg-brand/10 border-2 border-brand/30 rounded-xl p-4">
+              <p className="text-brand-dark font-semibold">
                 {getRoleLabel(selectedRole)} has full access to all dashboard cards.
               </p>
-              <p className="text-purple-600 text-sm mt-1">
+              <p className="text-brand text-sm mt-1">
                 No per-card permissions needed — this role bypasses all permission checks.
               </p>
             </div>

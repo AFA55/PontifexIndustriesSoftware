@@ -244,7 +244,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                       setSelectedType(t);
                       setStep(2);
                     }}
-                    className="flex items-start gap-4 text-left p-4 rounded-2xl border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-violet-400 hover:shadow-lg transition group"
+                    className="flex items-start gap-4 text-left p-4 rounded-2xl border-2 border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-brand hover:shadow-lg transition group"
                   >
                     <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${t.gradient} flex items-center justify-center flex-shrink-0 shadow-md`}>
                       <Icon className="w-5 h-5 text-white" />
@@ -257,7 +257,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     {t.redirectToFleet ? (
                       <span className="text-[10px] font-semibold bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 px-2 py-1 rounded-full self-center flex-shrink-0">→ Fleet</span>
                     ) : (
-                      <ArrowRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-violet-500 transition self-center flex-shrink-0" />
+                      <ArrowRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-brand transition self-center flex-shrink-0" />
                     )}
                   </button>
                 );
@@ -280,7 +280,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder={isPowered ? 'Husqvarna FS5000' : isHandTool ? 'Torque Wrench' : isAccessory ? 'Diamond Blade 14"' : 'Equipment Trailer'}
-                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
                 <div>
@@ -292,7 +292,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     value={shortName}
                     onChange={(e) => setShortName(e.target.value)}
                     placeholder={isPowered ? 'FS5000' : isAccessory ? 'Blade' : 'Short name'}
-                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">Used for voice check-out recognition</p>
                 </div>
@@ -309,7 +309,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     value={unitNumber}
                     onChange={(e) => setUnitNumber(e.target.value)}
                     placeholder="e.g. 5, 12, T-01"
-                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
                 <div>
@@ -321,7 +321,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="shop (default)"
-                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
               </div>
@@ -336,7 +336,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                       value={make}
                       onChange={(e) => setMake(e.target.value)}
                       placeholder={isPowered ? 'Husqvarna' : 'Brand'}
-                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
                   <div>
@@ -346,7 +346,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
                       placeholder={isPowered ? 'FS5000' : 'Model #'}
-                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
                   <div>
@@ -356,7 +356,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                       value={serial}
                       onChange={(e) => setSerial(e.target.value)}
                       placeholder="Serial / VIN"
-                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
                 </div>
@@ -412,7 +412,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     <select
                       value={category}
                       onChange={(e) => setCategory(e.target.value)}
-                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                     >
                       <option value="">Select category…</option>
                       <option value="blade">Diamond Blade</option>
@@ -432,7 +432,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                       value={compatibleWith}
                       onChange={(e) => setCompatibleWith(e.target.value)}
                       placeholder="e.g. FS5000, HS61"
-                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                      className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                     />
                   </div>
                 </div>
@@ -446,7 +446,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     type="date"
                     value={purchaseDate}
                     onChange={(e) => setPurchaseDate(e.target.value)}
-                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
                 <div>
@@ -458,7 +458,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                     placeholder="0.00"
                     min="0"
                     step="0.01"
-                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                    className="w-full px-3 py-2.5 min-h-[44px] rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                   />
                 </div>
               </div>
@@ -471,7 +471,7 @@ export default function NewInventoryModal({ onClose, onCreated }: Props) {
                   onChange={(e) => setNotes(e.target.value)}
                   rows={2}
                   placeholder="Any additional details…"
-                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full px-3 py-2.5 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                 />
               </div>
 

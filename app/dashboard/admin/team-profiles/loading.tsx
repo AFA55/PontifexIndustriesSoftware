@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand/5 p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="h-8 w-56 bg-slate-200 rounded animate-pulse" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

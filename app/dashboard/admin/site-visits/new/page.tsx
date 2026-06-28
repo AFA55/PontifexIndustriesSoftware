@@ -43,9 +43,9 @@ interface EquipmentIssue {
 const ALLOWED_ROLES = ['supervisor', 'super_admin', 'operations_manager'];
 
 const STEPS = [
-  { num: 1, title: 'Visit Details', icon: UserIcon, gradient: 'from-violet-500 to-indigo-600' },
-  { num: 2, title: 'What You Saw', icon: MessageSquare, gradient: 'from-indigo-500 to-purple-600' },
-  { num: 3, title: 'Equipment Issues', icon: Wrench, gradient: 'from-purple-500 to-fuchsia-600' },
+  { num: 1, title: 'Visit Details', icon: UserIcon, gradient: 'from-brand to-brand-secondary' },
+  { num: 2, title: 'What You Saw', icon: MessageSquare, gradient: 'from-brand-secondary to-brand' },
+  { num: 3, title: 'Equipment Issues', icon: Wrench, gradient: 'from-brand to-brand-accent' },
 ] as const;
 
 function todayStr() {
@@ -301,7 +301,7 @@ export default function NewSiteVisitPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand" />
       </div>
     );
   }
@@ -330,7 +330,7 @@ export default function NewSiteVisitPage() {
         {/* Back link */}
         <Link
           href="/dashboard/admin/site-visits"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-brand dark:hover:text-brand"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Visit Reports
@@ -338,7 +338,7 @@ export default function NewSiteVisitPage() {
 
         {/* Vibrant gradient hero header (matches current step's accent) */}
         <div
-          className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${currentStepMeta.gradient} p-5 sm:p-7 shadow-xl shadow-violet-500/30 text-white transition-all`}
+          className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${currentStepMeta.gradient} p-5 sm:p-7 shadow-xl shadow-brand/30 text-white transition-all`}
         >
           <div className="flex items-center gap-3 sm:gap-4">
             <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center ring-1 ring-white/30 flex-shrink-0">
@@ -370,7 +370,7 @@ export default function NewSiteVisitPage() {
                   isCurrent
                     ? `bg-gradient-to-r ${s.gradient}`
                     : isCompleted
-                    ? 'bg-violet-300 dark:bg-violet-700 hover:bg-violet-400'
+                    ? 'bg-brand/40 dark:bg-brand/60 hover:bg-brand/50'
                     : 'bg-gray-200 dark:bg-slate-700'
                 }`}
                 aria-label={`${isCompleted ? 'Go back to' : 'Step'}: ${s.title}`}
@@ -385,13 +385,13 @@ export default function NewSiteVisitPage() {
             <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
               <div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1.5">
-                  <UserIcon className="w-4 h-4 text-violet-500" /> Operator visited <span className="text-rose-500">*</span>
+                  <UserIcon className="w-4 h-4 text-brand" /> Operator visited <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={operatorId}
                   onChange={(e) => setOperatorId(e.target.value)}
                   required
-                  className="w-full min-w-0 max-w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full min-w-0 max-w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                 >
                   <option value="">Select operator…</option>
                   {peopleOptions.map((p) => (
@@ -404,7 +404,7 @@ export default function NewSiteVisitPage() {
 
               <div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1.5">
-                  <Calendar className="w-4 h-4 text-violet-500" /> Date of visit
+                  <Calendar className="w-4 h-4 text-brand" /> Date of visit
                 </label>
                 <CalendarPicker
                   value={visitDate}
@@ -417,7 +417,7 @@ export default function NewSiteVisitPage() {
             {operatorId && (
               <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3">
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200">
-                  <Briefcase className="w-4 h-4 text-violet-500" /> Active job on that day
+                  <Briefcase className="w-4 h-4 text-brand" /> Active job on that day
                 </label>
 
                 {jobsLoading ? (
@@ -438,15 +438,15 @@ export default function NewSiteVisitPage() {
                         onClick={() => setJobOrderId(j.id === jobOrderId ? '' : j.id)}
                         className={`w-full text-left p-3 rounded-lg border-2 transition ${
                           j.id === jobOrderId
-                            ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
-                            : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-violet-300'
+                            ? 'border-brand bg-brand/10 dark:bg-brand/20'
+                            : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-brand/30'
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3 mb-0.5">
                           <span className="text-sm font-semibold text-gray-900 dark:text-white truncate min-w-0">
                             {j.job_number || 'Job'} — {j.customer_name || 'Customer'}
                           </span>
-                          <span className="text-[10px] uppercase font-semibold tracking-wide text-violet-600 dark:text-violet-400 flex-shrink-0">
+                          <span className="text-[10px] uppercase font-semibold tracking-wide text-brand dark:text-brand flex-shrink-0">
                             {j.status}
                           </span>
                         </div>
@@ -462,7 +462,7 @@ export default function NewSiteVisitPage() {
                 )}
 
                 {selectedJob && (
-                  <p className="text-xs text-violet-700 dark:text-violet-300">
+                  <p className="text-xs text-brand dark:text-brand">
                     Linked to <strong>{selectedJob.job_number}</strong>
                   </p>
                 )}
@@ -478,14 +478,14 @@ export default function NewSiteVisitPage() {
             <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
               <div>
                 <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200 mb-1.5">
-                  <MessageSquare className="w-4 h-4 text-violet-500" /> Observations
+                  <MessageSquare className="w-4 h-4 text-brand" /> Observations
                 </label>
                 <textarea
                   value={observations}
                   onChange={(e) => setObservations(e.target.value)}
                   rows={4}
                   placeholder="What did you see? Crew working well, equipment status, customer interaction, etc."
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                 />
               </div>
 
@@ -498,7 +498,7 @@ export default function NewSiteVisitPage() {
                   onChange={(e) => setIssues(e.target.value)}
                   rows={3}
                   placeholder="Safety issues, performance concerns, customer complaints…"
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                 />
               </div>
             </section>
@@ -516,7 +516,7 @@ export default function NewSiteVisitPage() {
                   type="checkbox"
                   checked={followUp}
                   onChange={(e) => setFollowUp(e.target.checked)}
-                  className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  className="w-5 h-5 rounded border-gray-300 text-brand focus:ring-brand"
                 />
                 Follow-up required
               </label>
@@ -526,7 +526,7 @@ export default function NewSiteVisitPage() {
                   onChange={(e) => setFollowUpNotes(e.target.value)}
                   rows={2}
                   placeholder="What needs to happen next?"
-                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                 />
               )}
             </section>
@@ -534,7 +534,7 @@ export default function NewSiteVisitPage() {
             {/* Jobsite Photos */}
             <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3">
               <p className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200">
-                <ImageIcon className="w-4 h-4 text-violet-500" /> Jobsite Photos (optional)
+                <ImageIcon className="w-4 h-4 text-brand" /> Jobsite Photos (optional)
               </p>
               {sitePhotoUrls.length > 0 && (
                 <div className="grid grid-cols-3 gap-2">
@@ -566,7 +566,7 @@ export default function NewSiteVisitPage() {
                 type="button"
                 onClick={() => siteFileRef.current?.click()}
                 disabled={sitePhotoUploading}
-                className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border-2 border-dashed border-violet-300 dark:border-violet-700 text-violet-600 dark:text-violet-400 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-sm font-semibold disabled:opacity-50"
+                className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border-2 border-dashed border-brand/30 dark:border-brand/40 text-brand dark:text-brand hover:border-brand hover:bg-brand/10 dark:hover:bg-brand/20 transition text-sm font-semibold disabled:opacity-50"
               >
                 {sitePhotoUploading ? (
                   <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
@@ -591,7 +591,7 @@ export default function NewSiteVisitPage() {
                     if (e.target.checked && equipmentIssues.length === 0) addEquipmentIssue();
                     if (!e.target.checked) setEquipmentIssues([]);
                   }}
-                  className="w-5 h-5 rounded border-gray-300 text-violet-600 focus:ring-violet-500 mt-0.5"
+                  className="w-5 h-5 rounded border-gray-300 text-brand focus:ring-brand mt-0.5"
                 />
                 <div>
                   <p className="text-sm font-semibold text-gray-900 dark:text-white">
@@ -612,7 +612,7 @@ export default function NewSiteVisitPage() {
                     className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3"
                   >
                     <div className="flex items-start justify-between">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-violet-600 dark:text-violet-400">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-brand dark:text-brand">
                         Issue #{idx + 1}
                       </p>
                       <button
@@ -634,7 +634,7 @@ export default function NewSiteVisitPage() {
                         value={it.equipment_name}
                         onChange={(e) => updateEquipmentIssue(idx, { equipment_name: e.target.value })}
                         placeholder="e.g. Husqvarna FS5000 #2 or DFS-5"
-                        className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                       />
                     </div>
 
@@ -647,7 +647,7 @@ export default function NewSiteVisitPage() {
                         onChange={(e) => updateEquipmentIssue(idx, { whats_wrong: e.target.value })}
                         rows={2}
                         placeholder="Brief description of the problem"
-                        className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                        className="w-full px-3 py-3 rounded-lg border border-gray-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-gray-900 dark:text-white text-base sm:text-sm focus:ring-2 focus:ring-brand focus:border-brand"
                       />
                     </div>
 
@@ -726,7 +726,7 @@ export default function NewSiteVisitPage() {
                         type="button"
                         onClick={() => issueFileRefs.current[idx]?.click()}
                         disabled={!!it.photoUploading}
-                        className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 transition text-sm font-medium disabled:opacity-50"
+                        className="w-full inline-flex items-center justify-center gap-2 min-h-[44px] rounded-xl border border-dashed border-gray-300 dark:border-slate-600 text-gray-600 dark:text-slate-300 hover:border-brand hover:text-brand transition text-sm font-medium disabled:opacity-50"
                       >
                         {it.photoUploading ? (
                           <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
@@ -741,7 +741,7 @@ export default function NewSiteVisitPage() {
                 <button
                   type="button"
                   onClick={addEquipmentIssue}
-                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-violet-300 dark:border-violet-700 text-violet-600 dark:text-violet-400 hover:border-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/20 transition text-sm font-semibold"
+                  className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl border-2 border-dashed border-brand/30 dark:border-brand/40 text-brand dark:text-brand hover:border-brand hover:bg-brand/10 dark:hover:bg-brand/20 transition text-sm font-semibold"
                 >
                   <Plus className="w-4 h-4" />
                   Add another issue
@@ -795,7 +795,7 @@ export default function NewSiteVisitPage() {
                 }
                 setStep((step + 1) as 1 | 2 | 3);
               }}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 min-h-[44px] px-6 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 transition"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 min-h-[44px] px-6 rounded-xl bg-gradient-to-br from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white text-sm font-semibold shadow-lg shadow-brand/30 transition"
             >
               Continue
               <ArrowRight className="w-4 h-4" />

@@ -149,7 +149,7 @@ export default function LogTimeOffModal({
         <div className="bg-white dark:bg-[#13082a] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-5 rounded-t-2xl text-white">
+          <div className="bg-gradient-to-r from-brand to-brand-secondary p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold flex items-center gap-2">
@@ -189,7 +189,7 @@ export default function LogTimeOffModal({
                 <select
                   value={operatorId}
                   onChange={e => setOperatorId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-900/50 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
+                  className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
                 >
                   <option value="">Select person...</option>
                   {operators.map(op => (
@@ -248,7 +248,7 @@ export default function LogTimeOffModal({
                     setStartDate(e.target.value);
                     if (endDate < e.target.value) setEndDate(e.target.value);
                   }}
-                  className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-900/50 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
+                  className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
                 />
               </div>
               <div>
@@ -260,12 +260,12 @@ export default function LogTimeOffModal({
                   value={endDate}
                   min={startDate}
                   onChange={e => setEndDate(e.target.value)}
-                  className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-900/50 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
+                  className="w-full px-3 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white transition-all"
                 />
               </div>
             </div>
             {dayCount > 1 && (
-              <p className="text-xs text-purple-600 dark:text-purple-400 font-medium -mt-2">
+              <p className="text-xs text-brand dark:text-brand font-medium -mt-2">
                 {dayCount} days will be blocked
               </p>
             )}
@@ -304,7 +304,7 @@ export default function LogTimeOffModal({
                 onChange={e => setNotes(e.target.value)}
                 placeholder="Additional details about this absence..."
                 rows={2}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-900/50 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 transition-all resize-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.06] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 transition-all resize-none"
               />
             </div>
 
@@ -319,7 +319,7 @@ export default function LogTimeOffModal({
               <button
                 onClick={handleSubmit}
                 disabled={saving || !operatorId || !startDate}
-                className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {saving ? 'Saving...' : selectedType?.isCallout ? 'Log & Notify' : 'Save Entry'}

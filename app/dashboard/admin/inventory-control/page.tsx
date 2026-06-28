@@ -993,12 +993,12 @@ function VoiceNotePlayer({ checkoutId, initialUrl }: { checkoutId: string; initi
   return (
     <div className="mt-2 flex flex-col gap-1">
       <div className="flex items-center gap-2">
-        <Volume2 className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+        <Volume2 className="w-3.5 h-3.5 text-brand flex-shrink-0" />
         <span className="text-[11px] text-gray-500 dark:text-slate-400 font-medium">Voice note</span>
         <button
           onClick={resign}
           disabled={status === 'refreshing'}
-          className="ml-auto inline-flex items-center gap-1 text-[10px] text-violet-600 dark:text-violet-400 hover:underline disabled:opacity-50"
+          className="ml-auto inline-flex items-center gap-1 text-[10px] text-brand dark:text-brand hover:underline disabled:opacity-50"
           title="Reload audio if it fails to play"
         >
           <RefreshCw className={`w-3 h-3 ${status === 'refreshing' ? 'animate-spin' : ''}`} />

@@ -164,7 +164,7 @@ export default function RatingFormBuilderModal({ editForm, onClose, onSaved }: P
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPreviewMode((p) => !p)}
-              className={`p-2.5 rounded-xl transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${previewMode ? 'bg-purple-100 text-purple-600' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+              className={`p-2.5 rounded-xl transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${previewMode ? 'bg-brand/10 text-brand' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
               title="Preview"
             >
               <Eye className="w-4 h-4" />
@@ -246,8 +246,8 @@ export default function RatingFormBuilderModal({ editForm, onClose, onSaved }: P
                       onClick={() => toggleRole(raterRoles, setRaterRoles, r.value)}
                       className={`px-3 py-2 rounded-xl text-xs font-semibold border transition-all min-h-[36px] ${
                         raterRoles.includes(r.value)
-                          ? 'bg-purple-600 text-white border-purple-600'
-                          : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300'
+                          ? 'bg-brand text-white border-brand'
+                          : 'bg-white text-gray-600 border-gray-200 hover:border-brand/30'
                       }`}
                     >
                       {r.label}

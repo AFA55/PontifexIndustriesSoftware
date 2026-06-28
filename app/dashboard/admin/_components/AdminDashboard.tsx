@@ -118,14 +118,14 @@ export default function AdminDashboard({ user, dashData, dashLoading, activeJobs
 
       {/* Identity banner */}
       <div className="flex items-center gap-3 rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4">
-        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center font-bold">
+        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-brand to-brand-accent text-white flex items-center justify-center font-bold">
           {initials}
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 dark:text-white truncate">{user?.name || 'Admin'}</p>
           <p className="text-xs text-gray-500 dark:text-slate-400">Admin · Operations &amp; back-office</p>
         </div>
-        <span className="text-[11px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300">
+        <span className="text-[11px] font-semibold uppercase tracking-wide px-2.5 py-1 rounded-full bg-brand/10 text-brand dark:bg-brand/40 dark:text-brand">
           Admin
         </span>
       </div>
@@ -266,7 +266,7 @@ export default function AdminDashboard({ user, dashData, dashLoading, activeJobs
           {/* Quick Actions */}
           <section className="rounded-2xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5">
             <div className="flex items-center gap-2 mb-3">
-              <ListChecks className="w-5 h-5 text-violet-500" />
+              <ListChecks className="w-5 h-5 text-brand" />
               <h2 className="font-semibold text-gray-900 dark:text-white">Quick Actions</h2>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
@@ -296,7 +296,7 @@ export default function AdminDashboard({ user, dashData, dashLoading, activeJobs
             {dashData.recent_activity.slice(0, 8).map((a) => {
               const Row = (
                 <>
-                  <span className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0" />
                   <span className="flex-1 text-sm text-gray-700 dark:text-slate-200 truncate">{a.description}</span>
                   <span className="text-xs text-gray-400 dark:text-slate-500 flex-shrink-0">{relativeTime(a.created_at)}</span>
                 </>

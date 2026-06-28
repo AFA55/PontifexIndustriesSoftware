@@ -48,7 +48,7 @@ function HeaderAvatar({ user }: { user: User | null }) {
       aria-label="My Profile"
       className="flex items-center gap-2.5 min-h-[44px] px-1.5 -mx-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 transition-colors select-none"
     >
-      <UserAvatar src={avatarUrl} name={user.name} size="sm" className="ring-2 ring-purple-500/30" />
+      <UserAvatar src={avatarUrl} name={user.name} size="sm" className="ring-2 ring-brand/30" />
       <span className="hidden sm:block text-sm font-medium text-gray-700 dark:text-white/80 truncate max-w-[120px]">
         {user.name}
       </span>
@@ -131,7 +131,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 href="/dashboard/admin/site-visits/new"
                 prefetch
-                className="flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 transition-all shadow-sm shadow-violet-500/30"
+                className="flex items-center justify-center gap-1.5 min-w-[44px] min-h-[44px] px-3 sm:px-3.5 rounded-lg text-sm font-semibold text-white bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent transition-all shadow-sm shadow-brand/30"
                 aria-label="New Visit Report"
               >
                 <ClipboardCheck className="w-5 h-5" />

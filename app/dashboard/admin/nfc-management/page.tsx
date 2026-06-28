@@ -313,7 +313,7 @@ export default function NfcManagementPage() {
             </Link>
             <div className="h-6 w-px bg-gray-200 dark:bg-white/10" />
             <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center shadow-sm">
                 <Smartphone size={16} className="text-white" />
               </div>
               NFC Management
@@ -322,7 +322,7 @@ export default function NfcManagementPage() {
 
           <button
             onClick={() => { setError(''); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Register Tag</span>
@@ -360,7 +360,7 @@ export default function NfcManagementPage() {
               placeholder="Search by label, UID, or truck number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+              className="w-full pl-9 pr-4 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
             />
           </div>
 
@@ -371,7 +371,7 @@ export default function NfcManagementPage() {
                 onClick={() => setFilterType(type)}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all capitalize ${
                   filterType === type
-                    ? 'bg-violet-600 text-white shadow-sm'
+                    ? 'bg-brand text-white shadow-sm'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/10'
                 }`}
               >
@@ -387,7 +387,7 @@ export default function NfcManagementPage() {
                 onClick={() => setFilterActive(status)}
                 className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all capitalize ${
                   filterActive === status
-                    ? 'bg-violet-600 text-white shadow-sm'
+                    ? 'bg-brand text-white shadow-sm'
                     : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50 dark:text-white/60 dark:hover:text-white dark:hover:bg-white/10'
                 }`}
               >
@@ -456,7 +456,7 @@ export default function NfcManagementPage() {
                     const typeConfig = TAG_TYPE_CONFIG[tag.tag_type];
                     const TypeIcon = typeConfig.icon;
                     return (
-                      <tr key={tag.id} className="group hover:bg-violet-50 dark:hover:bg-white/5 transition-colors">
+                      <tr key={tag.id} className="group hover:bg-brand/5 dark:hover:bg-white/5 transition-colors">
                         <td className="px-4 py-3">
                           <button
                             onClick={() => handleToggleActive(tag)}
@@ -503,7 +503,7 @@ export default function NfcManagementPage() {
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button
                               onClick={() => openEditModal(tag)}
-                              className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 dark:text-white/40 dark:hover:text-violet-300 dark:hover:bg-violet-500/15 rounded-md transition-all"
+                              className="p-1.5 text-gray-400 hover:text-brand hover:bg-brand/5 dark:text-white/40 dark:hover:text-brand dark:hover:bg-brand/15 rounded-md transition-all"
                               title="Edit tag"
                             >
                               <Edit size={14} />
@@ -531,12 +531,12 @@ export default function NfcManagementPage() {
       {showCreateModal && (
         <div className="fixed inset-0 z-[999] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-white dark:bg-[#1a1035] rounded-2xl w-full max-w-lg shadow-xl overflow-hidden border border-transparent dark:border-white/10">
-            <div className="px-6 py-4 bg-gradient-to-r from-violet-600 to-purple-700 text-white">
+            <div className="px-6 py-4 bg-gradient-to-r from-brand to-brand-secondary text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Plus size={18} />
                 Register New NFC Tag
               </h2>
-              <p className="text-sm text-violet-200 mt-1">Add a new NFC tag for clock-in verification</p>
+              <p className="text-sm text-white/80 mt-1">Add a new NFC tag for clock-in verification</p>
             </div>
 
             <div className="p-6 space-y-4">
@@ -554,7 +554,7 @@ export default function NfcManagementPage() {
                   placeholder="e.g., 04:A3:2B:1C:5D:6E:7F"
                   value={createForm.tag_uid}
                   onChange={(e) => setCreateForm({ ...createForm, tag_uid: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none font-mono dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                  className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none font-mono dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                 />
                 <p className="text-[10px] text-gray-400 dark:text-white/40 mt-1">The hardware UID printed on the NFC tag or read from a scanner</p>
               </div>
@@ -566,7 +566,7 @@ export default function NfcManagementPage() {
                   placeholder="e.g., Shop Front Door, Truck 42, 123 Main St Jobsite"
                   value={createForm.label}
                   onChange={(e) => setCreateForm({ ...createForm, label: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                  className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                 />
               </div>
 
@@ -583,7 +583,7 @@ export default function NfcManagementPage() {
                         onClick={() => setCreateForm({ ...createForm, tag_type: type })}
                         className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
                           createForm.tag_type === type
-                            ? 'border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'
+                            ? 'border-brand bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand'
                             : 'border-gray-200 text-gray-500 hover:border-gray-300 dark:border-white/10 dark:text-white/60 dark:hover:border-white/20'
                         }`}
                       >
@@ -603,7 +603,7 @@ export default function NfcManagementPage() {
                     placeholder="e.g., 42"
                     value={createForm.truck_number}
                     onChange={(e) => setCreateForm({ ...createForm, truck_number: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                   />
                 </div>
               )}
@@ -616,7 +616,7 @@ export default function NfcManagementPage() {
                     placeholder="e.g., 123 Main St, Greenville SC"
                     value={createForm.jobsite_address}
                     onChange={(e) => setCreateForm({ ...createForm, jobsite_address: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                   />
                 </div>
               )}
@@ -632,7 +632,7 @@ export default function NfcManagementPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
               >
                 {saving ? (
                   <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
@@ -674,7 +674,7 @@ export default function NfcManagementPage() {
                   type="text"
                   value={editForm.label}
                   onChange={(e) => setEditForm({ ...editForm, label: e.target.value })}
-                  className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                  className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                 />
               </div>
 
@@ -691,7 +691,7 @@ export default function NfcManagementPage() {
                         onClick={() => setEditForm({ ...editForm, tag_type: type })}
                         className={`flex items-center justify-center gap-2 px-3 py-3 rounded-lg border-2 text-sm font-semibold transition-all ${
                           editForm.tag_type === type
-                            ? 'border-violet-500 bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300'
+                            ? 'border-brand bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand'
                             : 'border-gray-200 text-gray-500 hover:border-gray-300 dark:border-white/10 dark:text-white/60 dark:hover:border-white/20'
                         }`}
                       >
@@ -710,7 +710,7 @@ export default function NfcManagementPage() {
                     type="text"
                     value={editForm.truck_number}
                     onChange={(e) => setEditForm({ ...editForm, truck_number: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                   />
                 </div>
               )}
@@ -722,7 +722,7 @@ export default function NfcManagementPage() {
                     type="text"
                     value={editForm.jobsite_address}
                     onChange={(e) => setEditForm({ ...editForm, jobsite_address: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-violet-500 focus:border-violet-500 outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
+                    className="w-full px-3 py-2.5 bg-white text-gray-900 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-brand focus:border-brand outline-none dark:bg-white/5 dark:text-white dark:border-white/10 dark:placeholder-white/30"
                   />
                 </div>
               )}
@@ -756,7 +756,7 @@ export default function NfcManagementPage() {
               <button
                 onClick={handleUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
               >
                 {saving ? (
                   <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />

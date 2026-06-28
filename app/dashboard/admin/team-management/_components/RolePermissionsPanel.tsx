@@ -262,8 +262,8 @@ export default function RolePermissionsPanel({ getAuthHeaders, editorRole }: Rol
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 sm:p-5">
         <div className="flex items-start justify-between gap-4 mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center flex-shrink-0">
-              <Shield className="w-4 h-4 text-purple-600" />
+            <div className="w-9 h-9 bg-brand/10 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Shield className="w-4 h-4 text-brand" />
             </div>
             <div>
               <h2 className="text-sm sm:text-base font-bold text-gray-900">Role Permissions</h2>
@@ -287,8 +287,8 @@ export default function RolePermissionsPanel({ getAuthHeaders, editorRole }: Rol
               onClick={() => setSelectedRole(r.value)}
               className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all border ${
                 selectedRole === r.value
-                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
-                  : 'bg-white text-gray-600 border-gray-200 hover:border-purple-300 hover:text-purple-600'
+                  ? 'bg-brand text-white border-brand shadow-sm'
+                  : 'bg-white text-gray-600 border-gray-200 hover:border-brand/30 hover:text-brand'
               }`}
             >
               {r.label}
@@ -306,9 +306,9 @@ export default function RolePermissionsPanel({ getAuthHeaders, editorRole }: Rol
         </div>
 
         {/* Bypass role note */}
-        <div className="mt-3 flex items-center gap-2 p-2.5 bg-indigo-50 border border-indigo-100 rounded-lg">
-          <Zap className="w-3.5 h-3.5 text-indigo-500 flex-shrink-0" />
-          <p className="text-xs text-indigo-700">
+        <div className="mt-3 flex items-center gap-2 p-2.5 bg-brand/10 border border-brand/20 rounded-lg">
+          <Zap className="w-3.5 h-3.5 text-brand flex-shrink-0" />
+          <p className="text-xs text-brand">
             <span className="font-semibold">Super Admin</span> and <span className="font-semibold">Operations Manager</span> bypass all permission checks and always have full access to every feature.
           </p>
         </div>
@@ -331,7 +331,7 @@ export default function RolePermissionsPanel({ getAuthHeaders, editorRole }: Rol
       {/* Permission grid */}
       {loading ? (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8 text-center">
-          <div className="animate-spin w-7 h-7 border-2 border-purple-600 border-t-transparent rounded-full mx-auto mb-3"></div>
+          <div className="animate-spin w-7 h-7 border-2 border-brand border-t-transparent rounded-full mx-auto mb-3"></div>
           <p className="text-gray-500 text-sm">Loading permissions...</p>
         </div>
       ) : (
@@ -349,7 +349,7 @@ export default function RolePermissionsPanel({ getAuthHeaders, editorRole }: Rol
               );
             })}
             {!isDefault && (
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-purple-200 bg-purple-50 text-xs font-semibold text-purple-700 ml-auto">
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-brand/30 bg-brand/10 text-xs font-semibold text-brand ml-auto">
                 <Shield className="w-3 h-3" />
                 Custom permissions active
               </div>
@@ -422,7 +422,7 @@ export default function RolePermissionsPanel({ getAuthHeaders, editorRole }: Rol
               <button
                 onClick={handleSave}
                 disabled={saving || resetting}
-                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold transition-all shadow-sm hover:shadow disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save className={`w-4 h-4 ${saving ? 'animate-pulse' : ''}`} />
                 {saving ? 'Saving...' : 'Save Permissions'}

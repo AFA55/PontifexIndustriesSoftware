@@ -19,7 +19,7 @@ export default function TenantManagementRedirect() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
-      <RefreshCw className="w-8 h-8 text-violet-600 animate-spin" />
+      <RefreshCw className="w-8 h-8 text-brand animate-spin" />
     </div>
   );
 }

@@ -1,6 +1,6 @@
 export default function Loading() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-violet-50/30 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand/5 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="h-5 w-24 bg-slate-200 rounded animate-pulse" />
         {/* Vehicle header */}

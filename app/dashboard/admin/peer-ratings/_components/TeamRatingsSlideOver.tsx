@@ -152,7 +152,7 @@ export default function TeamRatingsSlideOver({ member, onClose }: Props) {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-5 pt-5 pb-4 z-10">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
+            <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-secondary rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
               {member.full_name?.charAt(0)?.toUpperCase() || '?'}
             </div>
             <div className="flex-1 min-w-0">
@@ -191,7 +191,7 @@ export default function TeamRatingsSlideOver({ member, onClose }: Props) {
         <div className="px-5 py-4">
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-brand" />
             </div>
           ) : ratings.length === 0 ? (
             <div className="text-center py-16">

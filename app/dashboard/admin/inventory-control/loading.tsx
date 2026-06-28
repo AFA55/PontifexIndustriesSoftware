@@ -10,7 +10,7 @@ export default function Loading() {
           </div>
           <div className="flex gap-2">
             <div className="h-10 w-28 bg-white ring-1 ring-slate-200 rounded-lg animate-pulse" />
-            <div className="h-10 w-32 bg-violet-200 rounded-lg animate-pulse" />
+            <div className="h-10 w-32 bg-brand/20 rounded-lg animate-pulse" />
           </div>
         </div>
         {/* Tab bar */}
@@ -28,7 +28,7 @@ export default function Loading() {
         <div className="space-y-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="bg-white ring-1 ring-slate-200 rounded-2xl p-5 flex items-center gap-4 animate-pulse">
-              <div className="h-10 w-10 bg-violet-100 rounded-xl shrink-0" />
+              <div className="h-10 w-10 bg-brand/10 rounded-xl shrink-0" />
               <div className="flex-1 space-y-2">
                 <div className="h-5 w-2/5 bg-slate-200 rounded" />
                 <div className="flex gap-4">

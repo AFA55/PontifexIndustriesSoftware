@@ -885,8 +885,8 @@ export default function BillingPage() {
                 onClick={() => setShowCreateForm(true)}
                 className="
                   flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-lg text-sm font-semibold transition-all whitespace-nowrap
-                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white
-                  shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30
+                  bg-gradient-to-r from-brand via-brand-secondary to-brand-accent text-white
+                  shadow-md shadow-brand/20 hover:shadow-lg hover:shadow-brand/30
                 "
               >
                 <Plus className="w-4 h-4" />
@@ -1050,7 +1050,7 @@ export default function BillingPage() {
             onClick={() => setActiveTab('invoices')}
             className={`px-4 py-2.5 text-sm font-semibold transition-colors border-b-2 -mb-px ${
               activeTab === 'invoices'
-                ? 'border-violet-600 text-violet-600 dark:border-violet-400 dark:text-violet-300'
+                ? 'border-brand text-brand dark:border-brand dark:text-brand'
                 : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300 dark:text-white/60 dark:hover:text-white dark:hover:border-white/20'
             }`}
           >
@@ -1081,7 +1081,7 @@ export default function BillingPage() {
         <RevealSection index={3}>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 text-violet-500 animate-spin mb-3" />
+            <Loader2 className="w-8 h-8 text-brand animate-spin mb-3" />
             <p className="text-slate-500 dark:text-white/60 text-sm">Loading billing data...</p>
           </div>
         ) : loadError && invoices.length === 0 ? (
@@ -1117,9 +1117,9 @@ export default function BillingPage() {
                   className="
                     w-full pl-9 pr-4 py-2 rounded-lg text-sm transition-all
                     bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
-                    focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                    focus:border-brand focus:ring-1 focus:ring-brand/30
                     dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
-                    dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                    dark:focus:border-brand dark:focus:ring-brand/30
                   "
                 />
               </div>
@@ -1129,9 +1129,9 @@ export default function BillingPage() {
                 className="
                   px-3 py-2 rounded-lg text-sm cursor-pointer transition-all
                   bg-white border border-slate-200 text-slate-900
-                  focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                  focus:border-brand focus:ring-1 focus:ring-brand/30
                   dark:bg-white/5 dark:border-white/10 dark:text-white
-                  dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                  dark:focus:border-brand dark:focus:ring-brand/30
                 "
               >
                 <option value="all">All Status</option>
@@ -1160,8 +1160,8 @@ export default function BillingPage() {
                   onClick={() => setShowCreateForm(true)}
                   className="
                     inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
-                    bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white
-                    shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30
+                    bg-gradient-to-r from-brand via-brand-secondary to-brand-accent text-white
+                    shadow-md shadow-brand/20 hover:shadow-lg hover:shadow-brand/30
                   "
                 >
                   <Plus className="w-4 h-4" />
@@ -1187,7 +1187,7 @@ export default function BillingPage() {
                       className="
                         group relative block w-full overflow-hidden rounded-2xl p-4 pt-5 text-left transition-all cursor-pointer
                         bg-white/90 ring-1 ring-slate-200 hover:ring-slate-300 shadow-sm hover:shadow-md
-                        focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500
+                        focus:outline-none focus-visible:ring-2 focus-visible:ring-brand
                         dark:bg-white/[0.04] dark:ring-white/10 dark:hover:ring-white/20
                       "
                     >
@@ -1301,8 +1301,8 @@ export default function BillingPage() {
                               onClick={() => viewInvoice(inv.id)}
                               className="
                                 p-1.5 rounded-lg transition-colors
-                                text-slate-400 hover:text-violet-600 hover:bg-violet-50
-                                dark:text-white/40 dark:hover:text-violet-300 dark:hover:bg-violet-500/15
+                                text-slate-400 hover:text-brand hover:bg-brand/10
+                                dark:text-white/40 dark:hover:text-brand dark:hover:bg-brand/15
                               "
                               title="View Details"
                             >
@@ -1393,7 +1393,7 @@ export default function BillingPage() {
                         <div className="flex items-center gap-3 mb-2 flex-wrap">
                           <Link
                             href={`/dashboard/admin/completed-job-tickets/${job.id}`}
-                            className="text-sm font-mono font-semibold text-violet-600 hover:text-violet-700 dark:text-violet-300 dark:hover:text-violet-200 hover:underline"
+                            className="text-sm font-mono font-semibold text-brand hover:text-brand-dark dark:text-brand dark:hover:text-brand-dark hover:underline"
                           >
                             {job.job_number}
                           </Link>
@@ -1489,8 +1489,8 @@ export default function BillingPage() {
                       disabled={sendingEmail === selectedInvoice.id}
                       className="
                         flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all border
-                        bg-violet-50 border-violet-200 text-violet-700 hover:bg-violet-100
-                        dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-300 dark:hover:bg-violet-500/25
+                        bg-brand/10 border-brand/20 text-brand hover:bg-brand/20
+                        dark:bg-brand/15 dark:border-brand/30 dark:text-brand dark:hover:bg-brand/25
                         disabled:opacity-60 disabled:cursor-not-allowed
                       "
                       title={`Email invoice to ${selectedInvoice.customer_email}`}

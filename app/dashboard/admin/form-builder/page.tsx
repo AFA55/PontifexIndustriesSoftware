@@ -265,7 +265,7 @@ export default function FormBuilderPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -304,7 +304,7 @@ export default function FormBuilderPage() {
           <div className="lg:col-span-3 space-y-4">
             <button
               onClick={resetForm}
-              className="w-full flex items-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-all"
+              className="w-full flex items-center gap-2 px-4 py-3 bg-brand hover:bg-brand-dark text-white rounded-xl font-semibold text-sm transition-all"
             >
               <Plus className="w-4 h-4" />
               New Template
@@ -325,7 +325,7 @@ export default function FormBuilderPage() {
                       onClick={() => loadTemplate(t)}
                       className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ${
                         selectedTemplate?.id === t.id
-                          ? 'bg-purple-50 border-purple-300 text-purple-900 dark:bg-purple-500/15 dark:border-purple-400/30 dark:text-purple-300'
+                          ? 'bg-brand/10 border-brand/30 text-brand-dark dark:bg-brand/15 dark:border-brand/30 dark:text-brand'
                           : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/8'
                       }`}
                     >
@@ -352,7 +352,7 @@ export default function FormBuilderPage() {
             <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6 space-y-4 dark:bg-white/5 dark:border-white/10">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Settings2 className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                  <Settings2 className="w-5 h-5 text-brand dark:text-brand" />
                   {isEditing ? 'Edit Template' : 'New Template'}
                 </h2>
                 {isEditing && selectedTemplate && (
@@ -374,7 +374,7 @@ export default function FormBuilderPage() {
                     value={formName}
                     onChange={e => setFormName(e.target.value)}
                     placeholder="e.g. Utility Waiver Form"
-                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
+                    className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                   />
                 </div>
                 <div>
@@ -404,7 +404,7 @@ export default function FormBuilderPage() {
                   onChange={e => setFormDescription(e.target.value)}
                   placeholder="What is this form for?"
                   rows={2}
-                  className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 transition-all resize-none dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
+                  className="w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand/50 focus:border-brand transition-all resize-none dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                 />
               </div>
 
@@ -412,7 +412,7 @@ export default function FormBuilderPage() {
                 <div
                   onClick={() => setRequiresSignature(!requiresSignature)}
                   className={`w-10 h-6 rounded-full relative transition-colors ${
-                    requiresSignature ? 'bg-purple-600' : 'bg-gray-300 dark:bg-white/20'
+                    requiresSignature ? 'bg-brand' : 'bg-gray-300 dark:bg-white/20'
                   }`}
                 >
                   <div className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${
@@ -437,7 +437,7 @@ export default function FormBuilderPage() {
                   </button>
                   <button
                     onClick={addField}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-brand hover:bg-brand-dark rounded-lg transition-all"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Add Field
@@ -476,7 +476,7 @@ export default function FormBuilderPage() {
                             <select
                               value={field.type}
                               onChange={e => updateField(index, { type: e.target.value as FormField['type'] })}
-                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:bg-white/5 dark:border-white/10 dark:text-white"
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 focus:ring-2 focus:ring-brand/50 focus:border-brand dark:bg-white/5 dark:border-white/10 dark:text-white"
                             >
                               {FIELD_TYPE_OPTIONS.map(opt => (
                                 <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -492,7 +492,7 @@ export default function FormBuilderPage() {
                               value={field.label}
                               onChange={e => updateField(index, { label: e.target.value })}
                               placeholder="Field label"
-                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand/50 focus:border-brand dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                             />
                           </div>
 
@@ -504,7 +504,7 @@ export default function FormBuilderPage() {
                               value={field.placeholder || ''}
                               onChange={e => updateField(index, { placeholder: e.target.value })}
                               placeholder="Placeholder text"
-                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
+                              className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand/50 focus:border-brand dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                             />
                           </div>
 
@@ -515,7 +515,7 @@ export default function FormBuilderPage() {
                                 type="checkbox"
                                 checked={field.required}
                                 onChange={e => updateField(index, { required: e.target.checked })}
-                                className="w-4 h-4 rounded border-gray-300 bg-white text-purple-600 focus:ring-purple-500"
+                                className="w-4 h-4 rounded border-gray-300 bg-white text-brand focus:ring-brand"
                               />
                               <span className="text-xs text-gray-600 dark:text-white/60">Required</span>
                             </label>
@@ -539,7 +539,7 @@ export default function FormBuilderPage() {
                             onChange={e => updateField(index, { options: e.target.value.split('\n').filter(Boolean) })}
                             placeholder={"Option 1\nOption 2\nOption 3"}
                             rows={3}
-                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500 resize-none dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
+                            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 focus:ring-2 focus:ring-brand/50 focus:border-brand resize-none dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/30"
                           />
                         </div>
                       )}
@@ -621,7 +621,7 @@ export default function FormBuilderPage() {
               <button
                 onClick={handleSave}
                 disabled={saving || !formName.trim()}
-                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-3 bg-brand hover:bg-brand-dark text-white rounded-xl font-semibold text-sm transition-all disabled:opacity-50"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? 'Saving...' : isEditing ? 'Update Template' : 'Save Template'}

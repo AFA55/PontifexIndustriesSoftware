@@ -643,8 +643,8 @@ export default function TeamManagementPage() {
                   {Object.values(roleBreakdown).filter(v => v > 0).length}
                 </p>
               </div>
-              <div className="w-9 h-9 bg-purple-50 rounded-lg flex items-center justify-center">
-                <Shield className="w-4 h-4 text-purple-600" />
+              <div className="w-9 h-9 bg-brand/10 rounded-lg flex items-center justify-center">
+                <Shield className="w-4 h-4 text-brand" />
               </div>
             </div>
           </div>
@@ -672,7 +672,7 @@ export default function TeamManagementPage() {
             onClick={() => setActiveTab('permissions')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all flex-1 sm:flex-none justify-center sm:justify-start ${
               activeTab === 'permissions'
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-brand text-white shadow-sm'
                 : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
@@ -880,7 +880,7 @@ export default function TeamManagementPage() {
                   onClick={() => setRoleFilter('all')}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     roleFilter === 'all'
-                      ? 'bg-purple-600 text-white'
+                      ? 'bg-brand text-white'
                       : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
                   }`}
                 >
@@ -1224,7 +1224,7 @@ export default function TeamManagementPage() {
                 </div>
               )}
               {BYPASS_ROLES.includes(newUser.role) && (
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-2.5 text-xs text-purple-700 flex items-center gap-2">
+                <div className="bg-brand/10 border border-brand/30 rounded-lg p-2.5 text-xs text-brand flex items-center gap-2">
                   <Crown className="w-3.5 h-3.5 flex-shrink-0" />
                   This role has full access to all modules automatically.
                 </div>

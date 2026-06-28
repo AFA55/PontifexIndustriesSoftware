@@ -98,7 +98,7 @@ export default function SiteVisitsListPage() {
   if (authLoading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand" />
       </div>
     );
   }
@@ -111,7 +111,7 @@ export default function SiteVisitsListPage() {
         {/* Breadcrumb back */}
         <Link
           href="/dashboard/admin"
-          className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400"
+          className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-brand dark:hover:text-brand"
         >
           <ArrowLeft className="w-4 h-4" />
           Dashboard
@@ -120,7 +120,7 @@ export default function SiteVisitsListPage() {
         {/* Header */}
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center shadow-lg shadow-brand/30">
               <ClipboardCheck className="w-6 h-6 text-white" />
             </div>
             <div>
@@ -133,7 +133,7 @@ export default function SiteVisitsListPage() {
           {canCreate && (
             <Link
               href="/dashboard/admin/site-visits/new"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 text-white text-sm font-semibold shadow-lg shadow-violet-500/30 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white text-sm font-semibold shadow-lg shadow-brand/30 transition"
             >
               <Plus className="w-4 h-4" />
               New Visit Report
@@ -150,7 +150,7 @@ export default function SiteVisitsListPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search operator, supervisor, job, customer…"
-              className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+              className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-brand focus:border-brand"
             />
           </div>
           <button
@@ -169,7 +169,7 @@ export default function SiteVisitsListPage() {
         {/* List */}
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-violet-600" />
+            <Loader2 className="w-6 h-6 animate-spin text-brand" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16 bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700">
@@ -180,7 +180,7 @@ export default function SiteVisitsListPage() {
             {!search && !followUpOnly && canCreate && (
               <Link
                 href="/dashboard/admin/site-visits/new"
-                className="inline-flex items-center gap-1.5 mt-4 text-sm font-semibold text-violet-600 dark:text-violet-400 hover:underline"
+                className="inline-flex items-center gap-1.5 mt-4 text-sm font-semibold text-brand dark:text-brand hover:underline"
               >
                 <Plus className="w-4 h-4" />
                 File your first report
@@ -193,12 +193,12 @@ export default function SiteVisitsListPage() {
               <Link
                 key={v.id}
                 href={`/dashboard/admin/site-visits/${v.id}`}
-                className="block bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 hover:border-violet-300 dark:hover:border-violet-700 hover:shadow-lg hover:shadow-violet-500/10 transition cursor-pointer"
+                className="block bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 hover:border-brand/30 dark:hover:border-brand/40 hover:shadow-lg hover:shadow-brand/10 transition cursor-pointer"
               >
                 {/* Top row */}
                 <div className="flex items-start justify-between gap-3 mb-3 flex-wrap">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 dark:text-violet-300 bg-violet-50 dark:bg-violet-900/20 px-2 py-1 rounded-full">
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-brand dark:text-brand bg-brand/10 dark:bg-brand/20 px-2 py-1 rounded-full">
                       <Calendar className="w-3 h-3" />
                       {formatVisitDate(v.visit_date)}
                     </span>

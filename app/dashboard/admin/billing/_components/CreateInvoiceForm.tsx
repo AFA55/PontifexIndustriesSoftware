@@ -42,9 +42,9 @@ interface CreateInvoiceFormProps {
 const inputClass =
   'w-full px-3 py-2 rounded-lg text-sm transition-all ' +
   'bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400 ' +
-  'focus:border-violet-500 focus:ring-1 focus:ring-violet-200 ' +
+  'focus:border-brand focus:ring-1 focus:ring-brand/30 ' +
   'dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 ' +
-  'dark:focus:border-violet-400 dark:focus:ring-violet-500/30';
+  'dark:focus:border-brand dark:focus:ring-brand/30';
 const labelClass = 'block text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider mb-1';
 
 export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceFormProps) {
@@ -314,7 +314,7 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/10">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
               <FileText size={16} />
             </div>
             <div>
@@ -513,7 +513,7 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
           <div>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-xs font-semibold text-slate-500 dark:text-white/60 uppercase tracking-wider flex items-center gap-2">
-                <Calculator size={14} className="text-violet-600 dark:text-violet-300" />
+                <Calculator size={14} className="text-brand dark:text-brand" />
                 Line Items
               </h3>
               <button
@@ -521,8 +521,8 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                 onClick={addLineItem}
                 className="
                   flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ring-1
-                  bg-violet-50 text-violet-700 ring-violet-200 hover:bg-violet-100
-                  dark:bg-violet-500/15 dark:text-violet-200 dark:ring-violet-400/30 dark:hover:bg-violet-500/25
+                  bg-brand/10 text-brand ring-brand/20 hover:bg-brand/20
+                  dark:bg-brand/15 dark:text-brand dark:ring-brand/30 dark:hover:bg-brand/25
                 "
               >
                 <Plus size={14} />
@@ -563,9 +563,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       className="
                         w-full px-2 py-1.5 rounded-lg text-sm transition-all
                         bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
-                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        focus:border-brand focus:ring-1 focus:ring-brand/30
                         dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
-                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                        dark:focus:border-brand dark:focus:ring-brand/30
                       "
                       placeholder="Description of work"
                     />
@@ -578,9 +578,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       className="
                         w-full px-2 py-1.5 rounded-lg text-sm text-right transition-all tabular-nums
                         bg-white border border-slate-200 text-slate-900
-                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        focus:border-brand focus:ring-1 focus:ring-brand/30
                         dark:bg-white/5 dark:border-white/10 dark:text-white
-                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                        dark:focus:border-brand dark:focus:ring-brand/30
                       "
                       min="0"
                       step="any"
@@ -594,9 +594,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       className="
                         w-full px-2 py-1.5 rounded-lg text-sm text-right transition-all tabular-nums
                         bg-white border border-slate-200 text-slate-900
-                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        focus:border-brand focus:ring-1 focus:ring-brand/30
                         dark:bg-white/5 dark:border-white/10 dark:text-white
-                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                        dark:focus:border-brand dark:focus:ring-brand/30
                       "
                       min="0"
                       step="0.01"
@@ -642,9 +642,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       className="
                         w-16 px-2 py-1 rounded text-xs text-right transition-all tabular-nums
                         bg-white border border-slate-200 text-slate-900
-                        focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                        focus:border-brand focus:ring-1 focus:ring-brand/30
                         dark:bg-white/5 dark:border-white/10 dark:text-white
-                        dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                        dark:focus:border-brand dark:focus:ring-brand/30
                       "
                       placeholder="0"
                       min="0"
@@ -654,9 +654,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                   </div>
                   <span className="font-semibold text-slate-900 dark:text-white tabular-nums">${taxAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-base font-bold px-3 pt-2 border-t-2 border-violet-600 dark:border-violet-400">
+                <div className="flex justify-between text-base font-bold px-3 pt-2 border-t-2 border-brand dark:border-brand">
                   <span className="text-slate-900 dark:text-white">Total</span>
-                  <span className="tabular-nums bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent">${total.toFixed(2)}</span>
+                  <span className="tabular-nums bg-gradient-to-r from-brand via-brand-secondary to-brand-accent bg-clip-text text-transparent">${total.toFixed(2)}</span>
                 </div>
               </div>
             </div>
@@ -674,9 +674,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
               className="
                 w-full px-3 py-2 rounded-lg text-sm transition-all resize-none
                 bg-white border border-slate-200 text-slate-900 placeholder:text-slate-400
-                focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                focus:border-brand focus:ring-1 focus:ring-brand/30
                 dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder:text-white/40
-                dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                dark:focus:border-brand dark:focus:ring-brand/30
               "
               placeholder="Payment terms, notes, or special instructions..."
             />
@@ -701,8 +701,8 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
             disabled={saving}
             className="
               flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-semibold transition-all disabled:opacity-50
-              bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white
-              shadow-md shadow-violet-500/20 hover:shadow-lg hover:shadow-violet-500/30
+              bg-gradient-to-r from-brand via-brand-secondary to-brand-accent text-white
+              shadow-md shadow-brand/20 hover:shadow-lg hover:shadow-brand/30
             "
           >
             {saving ? (

@@ -264,7 +264,7 @@ function RequestsTab({ token, currentRole, onRefresh }: { token: string; current
               onClick={() => setStatusFilter(s)}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all capitalize ${
                 statusFilter === s
-                  ? 'bg-purple-600 text-white shadow-sm'
+                  ? 'bg-brand text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-white/50 dark:hover:bg-white/10'
               }`}
             >
@@ -288,13 +288,13 @@ function RequestsTab({ token, currentRole, onRefresh }: { token: string; current
             placeholder="Search operator..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.05] text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 w-48"
+            className="pl-9 pr-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.05] text-sm focus:outline-none focus:ring-2 focus:ring-brand/40 w-48"
           />
         </div>
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
         >
           <Plus className="w-4 h-4" />
           Log Time Off
@@ -315,7 +315,7 @@ function RequestsTab({ token, currentRole, onRefresh }: { token: string; current
       <div className="bg-white dark:bg-white/[0.05] border border-gray-100 dark:border-white/10 rounded-2xl overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+            <Loader2 className="w-6 h-6 animate-spin text-brand" />
           </div>
         ) : loadError && requests.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
@@ -570,7 +570,7 @@ function ScorecardsTab({ token }: { token: string }) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
-        <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand" />
       </div>
     );
   }
@@ -609,7 +609,7 @@ function ScorecardsTab({ token }: { token: string }) {
           placeholder="Search operators..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40"
+          className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.05] text-sm focus:outline-none focus:ring-2 focus:ring-brand/40"
         />
       </div>
 
@@ -629,12 +629,12 @@ function ScorecardsTab({ token }: { token: string }) {
                 key={card.operatorId}
                 className="bg-white dark:bg-white/[0.05] border border-gray-100 dark:border-white/10 rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
-                <div className="h-1 bg-gradient-to-r from-purple-400 to-indigo-500" />
+                <div className="h-1 bg-gradient-to-r from-brand to-brand-secondary" />
 
                 <div className="p-5">
                   {/* Header */}
                   <div className="flex items-start gap-3 mb-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold text-white bg-gradient-to-br from-purple-500 to-indigo-600 flex-shrink-0`}>
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold text-white bg-gradient-to-br from-brand to-brand-secondary flex-shrink-0`}>
                       {getInitials(card.name)}
                     </div>
                     <div className="min-w-0 flex-1">
@@ -656,7 +656,7 @@ function ScorecardsTab({ token }: { token: string }) {
                       </p>
                       <div className="mt-1.5 h-1.5 bg-gray-200 dark:bg-white/10 rounded-full overflow-hidden">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-purple-400 to-purple-600 transition-all"
+                          className="h-full rounded-full bg-gradient-to-r from-brand to-brand-dark transition-all"
                           style={{ width: `${ptoPct}%` }}
                         />
                       </div>
@@ -784,7 +784,7 @@ export default function TimeOffPage() {
   if (!authReady) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-6 h-6 animate-spin text-purple-500" />
+        <Loader2 className="w-6 h-6 animate-spin text-brand" />
       </div>
     );
   }
@@ -803,7 +803,7 @@ export default function TimeOffPage() {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center shadow-lg">
               <TrendingUp className="w-5 h-5 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Attendance & Performance</h1>
@@ -815,7 +815,7 @@ export default function TimeOffPage() {
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-semibold rounded-xl shadow-lg transition-all"
+          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white font-semibold rounded-xl shadow-lg transition-all"
         >
           <Plus className="w-4 h-4" />
           Log Time Off
@@ -830,7 +830,7 @@ export default function TimeOffPage() {
             onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
               tab === id
-                ? 'bg-purple-600 text-white shadow-sm'
+                ? 'bg-brand text-white shadow-sm'
                 : 'text-gray-500 hover:text-gray-700 dark:text-white/50 dark:hover:text-white/70 hover:bg-white/50 dark:hover:bg-white/10'
             }`}
           >
