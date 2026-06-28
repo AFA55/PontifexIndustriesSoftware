@@ -1,6 +1,18 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jun 27, 2026 (PT2) | **Branch:** `main` | **Prod:** ✅ LIVE (latest `96964571`) | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** ✅ in Google Play review — **org account, closed-testing NOT required**, auto-publishes on approval
+**Last updated:** Jun 28, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (customer-portal gaps batch)
+
+> **🛎️ Customer Portal completed (Jun 28):** the portal was ~70% pre-built (magic-link `/portal/[token]`,
+> doc signing `/sign/[token]`, liability waiver, survey). Built the 3 gaps this session, all guardian +
+> rls-auditor PASS: **(1) customer notifications** (en-route + job-complete emails w/ portal link; SMS
+> dormant till Twilio toll-free verified), **(2) customer comments → management** (2-way channel: portal
+> thread + admin panel, notifies admin/PM/super_admin; new `customer_comments` table), **(3) live "In Route"
+> tracker** (operator broadcasts GPS while in_route → customer sees "on the way" + last-updated; new
+> `operator_location_pings` table; strict privacy cutoff outside in_route). Also live-caught + fixed the
+> **office-documents 500** on the job-detail page. Spec/follow-ups: `docs/plans/CUSTOMER_PORTAL_GAPS_PLAN.md`.
+> **Still TODO:** Twilio toll-free verification (founder+Twilio — unblocks ALL customer SMS); v2 location
+> (geocode jobsite → real ETA + map); auto-trigger liability waiver on completion; the branding admin-gate
+> fix + Settings design pass (founder ask, specced). | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** ✅ in Google Play review — **org account, closed-testing NOT required**, auto-publishes on approval
 
 > **⚡ NEW — the dev-velocity engine (Jun 27 PT2):** we now run **parallel-burndown** — fan out N independent backlog items as concurrent reviewed builders instead of fixing 2–3 by hand. Engine: `.claude/workflows/parallel-burndown.js`; playbook: `docs/playbooks/PARALLEL_BURNDOWN.md`; tool verdicts: `docs/TOOLING_EVALUATION.md` Batch 3. Removed the dormant ruflo/claude-flow swarm (never invoked); added **Playwright MCP** (in-loop UI verification). Proven this session on a real 3-item batch incl. a P1 security fix. Default to this for multi-item work.
 >
