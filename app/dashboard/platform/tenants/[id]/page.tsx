@@ -64,7 +64,7 @@ export default function TenantDetailPage() {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-12 text-center">
         <Building2 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
         <h3 className="font-bold text-gray-900 dark:text-white mb-2">Tenant not found</h3>
-        <Link href="/dashboard/platform/tenants" className="text-violet-600 text-sm font-medium">Back to tenants</Link>
+        <Link href="/dashboard/platform/tenants" className="text-brand text-sm font-medium">Back to tenants</Link>
       </div>
     );
   }
@@ -106,7 +106,7 @@ export default function TenantDetailPage() {
               onClick={() => setTab(t.key)}
               className={`px-4 py-2.5 min-h-[44px] text-sm font-medium flex items-center gap-1.5 border-b-2 -mb-px whitespace-nowrap transition-colors ${
                 active
-                  ? 'border-violet-600 text-violet-700 dark:text-violet-400'
+                  ? 'border-brand text-brand dark:text-brand'
                   : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
@@ -179,7 +179,7 @@ function OverviewTab({ tenant, protectedTenant, onUpdated, success, showError }:
       <div className="flex flex-wrap items-center gap-2">
         <button
           onClick={() => setEditing(true)}
-          className="px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
+          className="px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
         >
           <Pencil className="w-4 h-4" /> Edit
         </button>
@@ -314,7 +314,7 @@ function EditTenantModal({ tenant, onClose, onSaved, success, showError }: {
     }
   };
 
-  const inputCls = 'w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300';
+  const inputCls = 'w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/50';
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
@@ -368,7 +368,7 @@ function EditTenantModal({ tenant, onClose, onSaved, success, showError }: {
           </div>
           <div className="flex gap-3 pt-4 border-t border-gray-100 dark:border-slate-800">
             <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 min-h-[44px] bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 rounded-xl text-sm font-semibold">Cancel</button>
-            <button type="submit" disabled={busy} className="flex-1 px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold">{busy ? 'Saving…' : 'Save Changes'}</button>
+            <button type="submit" disabled={busy} className="flex-1 px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl text-sm font-semibold">{busy ? 'Saving…' : 'Save Changes'}</button>
           </div>
         </form>
       </div>
@@ -383,8 +383,8 @@ function EditTenantModal({ tenant, onClose, onSaved, success, showError }: {
 function BillingTab({ tenant }: { tenant: Tenant }) {
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-8 text-center">
-      <div className="w-12 h-12 rounded-xl bg-violet-100 dark:bg-violet-950/40 flex items-center justify-center mx-auto mb-4">
-        <CreditCard className="w-6 h-6 text-violet-600" />
+      <div className="w-12 h-12 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center mx-auto mb-4">
+        <CreditCard className="w-6 h-6 text-brand" />
       </div>
       <h3 className="font-bold text-gray-900 dark:text-white mb-1">Subscription &amp; Billing</h3>
       <p className="text-sm text-gray-500 dark:text-slate-400 mb-5 max-w-sm mx-auto">
@@ -392,7 +392,7 @@ function BillingTab({ tenant }: { tenant: Tenant }) {
       </p>
       <Link
         href={`/dashboard/admin/subscription?tenantId=${tenant.id}`}
-        className="inline-flex items-center gap-1.5 px-5 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold transition-colors"
+        className="inline-flex items-center gap-1.5 px-5 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold transition-colors"
       >
         Open Billing <ExternalLink className="w-4 h-4" />
       </Link>

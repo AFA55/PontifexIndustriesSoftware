@@ -159,7 +159,7 @@ function FeedbackRow({
         <select
           value={status}
           onChange={e => setStatus(e.target.value)}
-          className="px-3 py-2.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium text-gray-900 dark:text-white capitalize focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="px-3 py-2.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm font-medium text-gray-900 dark:text-white capitalize focus:outline-none focus:ring-2 focus:ring-brand/40"
         >
           {STATUSES.map(s => (
             <option key={s} value={s}>
@@ -173,14 +173,14 @@ function FeedbackRow({
           value={response}
           onChange={e => setResponse(e.target.value)}
           placeholder="Response to the reporter (optional)…"
-          className="px-3 py-2.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500"
+          className="px-3 py-2.5 min-h-[44px] rounded-xl border border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand/40"
         />
 
         <div className="flex gap-2">
           <button
             onClick={save}
             disabled={saving || !dirty}
-            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 min-h-[44px] rounded-xl bg-brand hover:bg-brand-dark disabled:opacity-40 text-white text-sm font-semibold transition-colors"
           >
             {saving ? (
               <RefreshCw className="w-4 h-4 animate-spin" />
@@ -280,8 +280,8 @@ export default function PlatformFeedbackPage() {
               onClick={() => setFilter(s)}
               className={`px-3 py-2 min-h-[40px] rounded-xl text-sm font-semibold capitalize transition-colors border ${
                 active
-                  ? 'bg-violet-600 text-white border-violet-600'
-                  : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-violet-300'
+                  ? 'bg-brand text-white border-brand'
+                  : 'bg-white dark:bg-slate-900 text-gray-600 dark:text-slate-300 border-gray-200 dark:border-slate-700 hover:border-brand/40'
               }`}
             >
               {s === 'all' ? 'All' : s.replace('_', ' ')}

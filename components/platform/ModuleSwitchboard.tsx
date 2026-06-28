@@ -101,7 +101,7 @@ export default function ModuleSwitchboard({
                 aria-label={`Toggle ${m.label}`}
                 onClick={() => toggle(m.key)}
                 className={`relative flex-shrink-0 w-12 h-7 min-h-[28px] rounded-full transition-colors ${
-                  on ? 'bg-violet-600' : 'bg-gray-300 dark:bg-slate-700'
+                  on ? 'bg-brand' : 'bg-gray-300 dark:bg-slate-700'
                 }`}
               >
                 <span
@@ -141,7 +141,7 @@ export default function ModuleSwitchboard({
           type="button"
           onClick={handleSave}
           disabled={!dirty || saving}
-          className="px-5 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors"
+          className="px-5 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark disabled:bg-gray-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold flex items-center gap-2 transition-colors"
         >
           {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           {saving ? 'Saving…' : dirty ? 'Save Configuration' : 'No Changes'}

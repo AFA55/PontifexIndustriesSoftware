@@ -122,7 +122,7 @@ export default function TenantUsersTab({ tenantId }: { tenantId: string }) {
         </p>
         <button
           onClick={() => setShowAdd(true)}
-          className="px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
+          className="px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
         >
           <UserPlus className="w-4 h-4" /> Add User
         </button>
@@ -142,7 +142,7 @@ export default function TenantUsersTab({ tenantId }: { tenantId: string }) {
               <div key={user.id} className="flex flex-col sm:flex-row sm:items-center gap-3 p-4">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-white text-sm font-bold flex-shrink-0 ${
-                    user.active ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gray-300 dark:bg-slate-700'
+                    user.active ? 'bg-gradient-to-br from-brand to-brand-accent' : 'bg-gray-300 dark:bg-slate-700'
                   }`}>
                     {(user.full_name || user.email)[0]?.toUpperCase()}
                   </div>
@@ -167,7 +167,7 @@ export default function TenantUsersTab({ tenantId }: { tenantId: string }) {
                     disabled={busy || isSelf}
                     onChange={e => changeRole(user, e.target.value)}
                     title={isSelf ? 'You cannot change your own role here' : 'Change role'}
-                    className="px-2.5 py-2 min-h-[44px] bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-violet-500/20 disabled:opacity-50"
+                    className="px-2.5 py-2 min-h-[44px] bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs font-medium text-gray-700 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-brand/20 disabled:opacity-50"
                   >
                     {/* keep the user's current role visible even if it's super_admin or unknown */}
                     {!ROLES.includes(user.role as any) && (
@@ -272,8 +272,8 @@ function AddUserModal({ base, onClose, onAdded }: {
       <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-gray-100 dark:border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-violet-100 dark:bg-violet-950/40 rounded-xl flex items-center justify-center">
-              <UserPlus className="w-5 h-5 text-violet-600" />
+            <div className="w-10 h-10 bg-brand/10 dark:bg-brand/20 rounded-xl flex items-center justify-center">
+              <UserPlus className="w-5 h-5 text-brand" />
             </div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white">Add User to Tenant</h2>
           </div>
@@ -288,7 +288,7 @@ function AddUserModal({ base, onClose, onAdded }: {
             <input
               type="email" required value={email} onChange={e => setEmail(e.target.value)}
               placeholder="user@company.com"
-              className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300"
+              className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/50"
             />
           </div>
           <div>
@@ -296,21 +296,21 @@ function AddUserModal({ base, onClose, onAdded }: {
             <input
               type="text" value={name} onChange={e => setName(e.target.value)}
               placeholder="Jane Doe"
-              className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300"
+              className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/50"
             />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-slate-300 mb-1">Role</label>
             <select
               value={role} onChange={e => setRole(e.target.value)}
-              className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20"
             >
               {ROLES.map(r => <option key={r} value={r}>{roleLabel(r)}</option>)}
             </select>
           </div>
 
           <label className="flex items-center gap-2.5 text-sm text-gray-700 dark:text-slate-300 cursor-pointer">
-            <input type="checkbox" checked={invite} onChange={e => setInvite(e.target.checked)} className="w-4 h-4 accent-violet-600" />
+            <input type="checkbox" checked={invite} onChange={e => setInvite(e.target.checked)} className="w-4 h-4 accent-brand" />
             <Mail className="w-4 h-4 text-gray-400" />
             Send an email invitation (user sets their own password)
           </label>
@@ -321,7 +321,7 @@ function AddUserModal({ base, onClose, onAdded }: {
               <input
                 type="text" value={tempPassword} onChange={e => setTempPassword(e.target.value)}
                 placeholder="Set an initial password"
-                className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                className="w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20"
               />
             </div>
           )}
@@ -332,7 +332,7 @@ function AddUserModal({ base, onClose, onAdded }: {
               Cancel
             </button>
             <button type="submit" disabled={busy}
-              className="flex-1 px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors">
+              className="flex-1 px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl text-sm font-semibold transition-colors">
               {busy ? 'Adding…' : invite ? 'Send Invite' : 'Create User'}
             </button>
           </div>

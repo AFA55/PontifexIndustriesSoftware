@@ -118,7 +118,7 @@ export function ConfirmModal({
             onClick={onConfirm}
             disabled={busy}
             className={`flex-1 px-4 py-2.5 min-h-[44px] text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 ${
-              destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-violet-600 hover:bg-violet-700'
+              destructive ? 'bg-red-600 hover:bg-red-700' : 'bg-brand hover:bg-brand-dark'
             }`}
           >
             {busy ? 'Working…' : confirmLabel}

@@ -108,8 +108,8 @@ export default function DemoRequestsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3">
-          <span className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/40 flex items-center justify-center">
-            <Inbox className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+          <span className="w-10 h-10 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+            <Inbox className="w-5 h-5 text-brand dark:text-brand" />
           </span>
           <div>
             <h1 className="text-xl font-bold text-gray-900 dark:text-white">Demo requests</h1>
@@ -144,7 +144,7 @@ export default function DemoRequestsPage() {
       {/* Body */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <RefreshCw className="w-7 h-7 text-violet-400 animate-spin" />
+          <RefreshCw className="w-7 h-7 text-brand animate-spin" />
         </div>
       ) : loadError ? (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-rose-200 dark:border-rose-900 p-8 text-center">
@@ -196,11 +196,11 @@ export default function DemoRequestsPage() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
                       <p className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
                         <Mail className="w-4 h-4 text-gray-400" />
-                        {r.email ? <a className="text-violet-600 hover:underline break-all" href={`mailto:${r.email}`}>{r.email}</a> : '—'}
+                        {r.email ? <a className="text-brand hover:underline break-all" href={`mailto:${r.email}`}>{r.email}</a> : '—'}
                       </p>
                       <p className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
                         <Phone className="w-4 h-4 text-gray-400" />
-                        {r.phone ? <a className="text-violet-600 hover:underline" href={`tel:${r.phone}`}>{r.phone}</a> : '—'}
+                        {r.phone ? <a className="text-brand hover:underline" href={`tel:${r.phone}`}>{r.phone}</a> : '—'}
                       </p>
                       <p className="flex items-center gap-2 text-gray-700 dark:text-slate-300">
                         <Building2 className="w-4 h-4 text-gray-400" /> {r.trade_type || '—'}
@@ -242,7 +242,7 @@ export default function DemoRequestsPage() {
                         onChange={e => setNoteDraft(e.target.value)}
                         placeholder="Internal notes (call outcome, follow-up date...)"
                         rows={2}
-                        className="flex-1 text-base sm:text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        className="flex-1 text-base sm:text-sm rounded-xl border border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-gray-800 dark:text-slate-200 p-3 focus:outline-none focus:ring-2 focus:ring-brand/40"
                       />
                       <button
                         disabled={savingId === r.id}
@@ -257,7 +257,7 @@ export default function DemoRequestsPage() {
                     <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800">
                       <Link
                         href="/dashboard/platform/tenants/new"
-                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-violet-600 hover:text-violet-800"
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-dark"
                       >
                         Convert to tenant — create company code <ArrowRight className="w-4 h-4" />
                       </Link>

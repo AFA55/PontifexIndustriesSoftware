@@ -60,7 +60,7 @@ export default function PlatformTenantsPage() {
         </div>
         <Link
           href="/dashboard/platform/tenants/new"
-          className="px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
+          className="px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold flex items-center gap-1.5 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Tenant
@@ -75,7 +75,7 @@ export default function PlatformTenantsPage() {
           placeholder="Search by name, slug, or company code…"
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300"
+          className="w-full pl-10 pr-4 py-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/50"
         />
       </div>
 
@@ -88,7 +88,7 @@ export default function PlatformTenantsPage() {
           </p>
           <Link
             href="/dashboard/platform/tenants/new"
-            className="inline-block px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700"
+            className="inline-block px-4 py-2 bg-brand text-white rounded-xl text-sm font-semibold hover:bg-brand-dark"
           >
             Create First Tenant
           </Link>
@@ -103,11 +103,11 @@ export default function PlatformTenantsPage() {
               <Link
                 key={tenant.id}
                 href={`/dashboard/platform/tenants/${tenant.id}`}
-                className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 hover:shadow-md hover:border-violet-200 dark:hover:border-violet-700 transition-all"
+                className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 hover:shadow-md hover:border-brand/40 dark:hover:border-brand/40 transition-all"
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 bg-gradient-to-br from-violet-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
+                    <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-accent rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
                       {tenant.name[0]?.toUpperCase() || '?'}
                     </div>
                     <div className="min-w-0">
@@ -158,7 +158,7 @@ export default function PlatformTenantsPage() {
                   <span className="text-[10px] text-gray-400">
                     Created {new Date(tenant.created_at).toLocaleDateString()}
                   </span>
-                  <span className="text-xs text-violet-600 dark:text-violet-400 font-medium flex items-center gap-0.5 group-hover:gap-1.5 transition-all">
+                  <span className="text-xs text-brand dark:text-brand font-medium flex items-center gap-0.5 group-hover:gap-1.5 transition-all">
                     Manage <ChevronRight className="w-3.5 h-3.5" />
                   </span>
                 </div>

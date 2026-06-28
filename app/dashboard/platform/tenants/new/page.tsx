@@ -94,7 +94,7 @@ export default function NewTenantPage() {
     }
   };
 
-  const inputCls = 'w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-300';
+  const inputCls = 'w-full px-3 py-2.5 min-h-[44px] bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/50';
 
   return (
     <div className="max-w-2xl mx-auto">
@@ -103,8 +103,8 @@ export default function NewTenantPage() {
       </Link>
 
       <div className="flex items-center gap-3 mb-6">
-        <div className="w-11 h-11 bg-violet-100 dark:bg-violet-950/40 rounded-xl flex items-center justify-center">
-          <Building2 className="w-5 h-5 text-violet-600" />
+        <div className="w-11 h-11 bg-brand/10 dark:bg-brand/20 rounded-xl flex items-center justify-center">
+          <Building2 className="w-5 h-5 text-brand" />
         </div>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">Create New Tenant</h1>
       </div>
@@ -179,7 +179,7 @@ export default function NewTenantPage() {
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-bold text-gray-900 dark:text-white">Modules</h2>
             <div className="flex gap-3 text-xs">
-              <button type="button" onClick={() => setModules(Object.fromEntries(TOGGLEABLE_MODULES.map(m => [m.key, true])))} className="text-violet-600 font-medium">All on</button>
+              <button type="button" onClick={() => setModules(Object.fromEntries(TOGGLEABLE_MODULES.map(m => [m.key, true])))} className="text-brand font-medium">All on</button>
               <button type="button" onClick={() => setModules(Object.fromEntries(TOGGLEABLE_MODULES.map(m => [m.key, false])))} className="text-gray-400 font-medium">All off</button>
             </div>
           </div>
@@ -191,10 +191,10 @@ export default function NewTenantPage() {
                   key={m.key} type="button"
                   onClick={() => setModules(s => ({ ...s, [m.key]: !s[m.key] }))}
                   className={`flex items-center gap-2 p-2.5 min-h-[44px] rounded-xl border text-left transition-colors ${
-                    on ? 'bg-violet-50 dark:bg-violet-950/30 border-violet-200 dark:border-violet-800' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
+                    on ? 'bg-brand/10 dark:bg-brand/15 border-brand/40 dark:border-brand/40' : 'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700'
                   }`}
                 >
-                  <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${on ? 'bg-violet-600' : 'bg-gray-300 dark:bg-slate-600'}`}>
+                  <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 ${on ? 'bg-brand' : 'bg-gray-300 dark:bg-slate-600'}`}>
                     {on && <Check className="w-3 h-3 text-white" />}
                   </span>
                   <span className="text-xs font-medium text-gray-700 dark:text-slate-200 truncate">{m.label}</span>
@@ -208,7 +208,7 @@ export default function NewTenantPage() {
         {/* First admin */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
           <label className="flex items-center gap-2.5 text-sm font-bold text-gray-900 dark:text-white cursor-pointer">
-            <input type="checkbox" checked={createAdmin} onChange={e => setCreateAdmin(e.target.checked)} className="w-4 h-4 accent-violet-600" />
+            <input type="checkbox" checked={createAdmin} onChange={e => setCreateAdmin(e.target.checked)} className="w-4 h-4 accent-brand" />
             Create &amp; invite a first admin
           </label>
           {createAdmin && (
@@ -234,7 +234,7 @@ export default function NewTenantPage() {
 
         <div className="flex gap-3">
           <Link href="/dashboard/platform/tenants" className="flex-1 px-4 py-2.5 min-h-[44px] flex items-center justify-center bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-slate-200 rounded-xl text-sm font-semibold transition-colors">Cancel</Link>
-          <button type="submit" disabled={busy || !codeValid} className="flex-1 px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors">{busy ? 'Creating…' : 'Create Tenant'}</button>
+          <button type="submit" disabled={busy || !codeValid} className="flex-1 px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl text-sm font-semibold transition-colors">{busy ? 'Creating…' : 'Create Tenant'}</button>
         </div>
       </form>
     </div>

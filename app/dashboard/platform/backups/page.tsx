@@ -104,14 +104,14 @@ export default function PlatformBackupsPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
             <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Download className="w-4 h-4 text-violet-600" /> Manual Data Snapshot
+              <Download className="w-4 h-4 text-brand" /> Manual Data Snapshot
             </h3>
             <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">Export a JSON snapshot of all critical tables to Supabase Storage</p>
           </div>
           <button
             onClick={handleTriggerBackup}
             disabled={backupLoading}
-            className="px-4 py-2.5 min-h-[44px] bg-violet-600 hover:bg-violet-700 disabled:bg-gray-300 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
+            className="px-4 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark disabled:bg-gray-300 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition-colors"
           >
             {backupLoading ? <><RefreshCw className="w-4 h-4 animate-spin" />Backing up…</> : <><Database className="w-4 h-4" />Create Backup Now</>}
           </button>
