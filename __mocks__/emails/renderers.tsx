@@ -48,6 +48,12 @@ import SalespersonNotificationEmail, {
 import DemoRequestNotificationEmail, {
   DemoRequestNotificationEmailProps,
 } from '../../emails/DemoRequestNotificationEmail';
+import CustomerEnRouteEmail, {
+  CustomerEnRouteEmailProps,
+} from '../../emails/CustomerEnRouteEmail';
+import CustomerJobCompleteEmail, {
+  CustomerJobCompleteEmailProps,
+} from '../../emails/CustomerJobCompleteEmail';
 
 const DOCTYPE =
   '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">';
@@ -133,4 +139,16 @@ export async function renderDemoRequestNotificationEmail(
   props: DemoRequestNotificationEmailProps
 ): Promise<string> {
   return renderEmailToHtml(<DemoRequestNotificationEmail {...props} />);
+}
+
+export async function renderCustomerEnRouteEmail(
+  props: CustomerEnRouteEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<CustomerEnRouteEmail {...props} />);
+}
+
+export async function renderCustomerJobCompleteEmail(
+  props: CustomerJobCompleteEmailProps
+): Promise<string> {
+  return renderEmailToHtml(<CustomerJobCompleteEmail {...props} />);
 }

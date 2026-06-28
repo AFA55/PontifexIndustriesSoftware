@@ -11,9 +11,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { sendEmail, getTenantEmailBranding, generatePortalAccessEmail } from '@/lib/email';
 import { sendSMSAny } from '@/lib/sms';
-import { resolveAppOrigin } from '@/lib/app-url';
-
-const APP_URL = resolveAppOrigin(); // hardened: trim + validate + origin-only
+import { createPortalToken, buildPortalUrl } from '@/lib/portal-tokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,26 +43,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create the portal token row (DB generates the token via DEFAULT)
-    const { data: portalToken, error: insertError } = await supabaseAdmin
-      .from('customer_portal_tokens')
-      .insert({
-        tenant_id: tenantId,
-        customer_name: customer_name.trim(),
-        customer_email: customer_email?.trim() || null,
-        customer_phone: customer_phone?.trim() || null,
-        job_order_id: job_order_id || null,
-        created_by: auth.userId,
-      })
-      .select('id, token, expires_at')
-      .single();
+    // Create the portal token row (DB generates the token via DEFAULT).
+    // Shared helper — same model the automated customer notifications reuse.
+    const portalToken = await createPortalToken({
+      tenantId,
+      customerName: customer_name,
+      customerEmail: customer_email,
+      customerPhone: customer_phone,
+      jobOrderId: job_order_id || null,
+      createdBy: auth.userId,
+    });
 
-    if (insertError || !portalToken) {
-      console.error('Error creating portal token:', insertError);
+    if (!portalToken) {
       return NextResponse.json({ error: 'Failed to create portal link' }, { status: 500 });
     }
 
-    const portalUrl = `${APP_URL}/portal/${portalToken.token}`;
+    const portalUrl = buildPortalUrl(portalToken.token);
 
     // Fetch tenant company name for the SMS line (email uses getTenantEmailBranding).
     let companyName = 'Your Service Provider';

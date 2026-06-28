@@ -40,6 +40,10 @@ import SalespersonNotificationEmail, {
 import DemoRequestNotificationEmail, {
   DemoRequestNotificationEmailProps,
 } from './DemoRequestNotificationEmail';
+import CustomerEnRouteEmail, { CustomerEnRouteEmailProps } from './CustomerEnRouteEmail';
+import CustomerJobCompleteEmail, {
+  CustomerJobCompleteEmailProps,
+} from './CustomerJobCompleteEmail';
 
 export async function renderInviteEmail(props: InviteEmailProps): Promise<string> {
   return render(<InviteEmail {...props} />);
@@ -117,4 +121,16 @@ export async function renderDemoRequestNotificationEmail(
   props: DemoRequestNotificationEmailProps
 ): Promise<string> {
   return render(<DemoRequestNotificationEmail {...props} />);
+}
+
+export async function renderCustomerEnRouteEmail(
+  props: CustomerEnRouteEmailProps
+): Promise<string> {
+  return render(<CustomerEnRouteEmail {...props} />);
+}
+
+export async function renderCustomerJobCompleteEmail(
+  props: CustomerJobCompleteEmailProps
+): Promise<string> {
+  return render(<CustomerJobCompleteEmail {...props} />);
 }

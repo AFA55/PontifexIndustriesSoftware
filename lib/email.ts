@@ -22,6 +22,8 @@ import {
   renderClockInReminderEmail,
   renderSalespersonNotificationEmail,
   renderDemoRequestNotificationEmail,
+  renderCustomerEnRouteEmail,
+  renderCustomerJobCompleteEmail,
 } from '@/emails/renderers';
 import type { InvoiceVariant, InvoiceLineItem } from '@/emails/InvoiceEmail';
 import type { CompletionVariant } from '@/emails/CompletionThankYouEmail';
@@ -547,6 +549,42 @@ export async function generateSalespersonNotificationEmail(opts: {
 }): Promise<string> {
   const { branding, ...rest } = opts;
   return renderSalespersonNotificationEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a customer "crew is on the way" email (sent when the operator taps
+ * "In Route"). White-label: pass the recipient tenant's branding.
+ */
+export async function generateCustomerEnRouteEmail(opts: {
+  branding?: EmailBranding;
+  customerName: string;
+  jobAddress?: string | null;
+  jobNumber?: string | null;
+  portalUrl: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderCustomerEnRouteEmail({
+    branding: branding ?? DEFAULT_EMAIL_BRANDING,
+    ...rest,
+  });
+}
+
+/**
+ * Generate a customer "your job is complete" email (sent when the job is marked
+ * completed). White-label: pass the recipient tenant's branding.
+ */
+export async function generateCustomerJobCompleteEmail(opts: {
+  branding?: EmailBranding;
+  customerName: string;
+  jobAddress?: string | null;
+  jobNumber?: string | null;
+  portalUrl: string;
+}): Promise<string> {
+  const { branding, ...rest } = opts;
+  return renderCustomerJobCompleteEmail({
     branding: branding ?? DEFAULT_EMAIL_BRANDING,
     ...rest,
   });

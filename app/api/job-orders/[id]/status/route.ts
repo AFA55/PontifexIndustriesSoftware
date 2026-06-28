@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { notifySalesperson } from '@/lib/notify-salesperson';
+import { notifyCustomer } from '@/lib/notify-customer';
 import { isValidTransition, validateTransitionTimestamp } from '@/lib/job-status';
 
 async function updateJobStatus(
@@ -383,6 +384,37 @@ async function updateJobStatus(
       }
     } catch {
       // never block on notification dispatch
+    }
+
+    // Fire-and-forget CUSTOMER notifications (email always if present + best-effort
+    // SMS). Dedup: only fire on the FIRST real transition into the state — we key
+    // off the SAME timestamp guards the update used above (in_route_at /
+    // work_completed_at were unset before this update), so repeated POSTs that
+    // re-send the same status never re-notify the customer. No-ops when there's
+    // no customer email/phone. Reuses the customer_portal_tokens magic-link.
+    try {
+      const firstInRoute = status === 'in_route' && !existingJob.in_route_at;
+      const firstCompleted = status === 'completed' && !existingJob.work_completed_at;
+      if (firstInRoute || firstCompleted) {
+        notifyCustomer({
+          event: firstInRoute ? 'en_route' : 'completed',
+          job: {
+            id: jobId,
+            tenant_id: existingJob.tenant_id || null,
+            customer_name: existingJob.customer_name,
+            customer_email: existingJob.customer_email,
+            site_contact_phone: existingJob.site_contact_phone,
+            foreman_phone: existingJob.foreman_phone,
+            customer_contact: existingJob.customer_contact,
+            job_number: existingJob.job_number,
+            address: existingJob.address,
+            location: existingJob.location,
+          },
+          triggeredBy: user.id,
+        }).catch(() => {});
+      }
+    } catch {
+      // never block on customer-notification dispatch
     }
 
     return NextResponse.json(
