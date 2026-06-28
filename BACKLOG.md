@@ -87,6 +87,20 @@
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
 
+## 🟡 P2/P3 (added Jun 28 — launch workflow validation nits; core flow verified ✅ + fixed)
+
+> Full create→assign→schedule→operator→board→maintenance flow traced (4 validators) + the launch-relevant
+> bugs fixed (`4b2dc2fd`: notify-race, active-jobs polling, bell badge, work_type miscategorization, helper-on-edit).
+> Remaining lower-severity items:
+- [ ] **Schedule board doesn't live-poll** (P2) — board reflects status on reload/drag, not real-time. Likely by-design (planning/dispatch tool; the job-detail live-status panel DOES poll 60s). Add `useVisiblePoll` only if founder wants the board itself as a live field-ops monitor.
+- [ ] **`on_site` status label has no DB enum** (P3, cosmetic) — UI derives "On Site" from `arrived_at_jobsite_at` timestamp; the CHECK constraint only has `in_progress`. Works; semantically loose.
+- [ ] **active-jobs progress % lazy-loads** (P3) — per-job summary fetch (concurrency 3) shows "Loading progress…" ~5-10s on mount. Consider batching into the list query.
+- [ ] **Maintenance: no EMAIL for new requests** (P2) — shop_manager gets in-app + push but not email; wire through sendNotification email channel if wanted.
+- [ ] **Maintenance Inbox nav badge not wired** (P3) — open count shown in-page but no sidebar badge (only timecards/notifications have badges); add `badgeKey: 'maintenance'`.
+- [ ] **Maintenance resolve redirect** (P3) — submitter notification links to `/dashboard/maintenance/new` instead of the request/inbox.
+- [ ] **Quick-add no customer auto-link** (P3) — CRM link only on full schedule form; fine (deferred to full-form).
+- [ ] **status-route claim-error not logged** (P3 nit) — a DB error on the claim update silently suppresses the customer email rather than logging; add a console.warn for observability.
+
 ## 🟠 P1 (added Jun 28 — UNIFICATION campaign: change/edit/duplicate across companies)
 
 > Founder: unify the software so parts can be changed/edited/duplicated into other companies. Audit verdict:
