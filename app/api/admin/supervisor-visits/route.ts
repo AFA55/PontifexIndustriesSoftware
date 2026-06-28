@@ -9,13 +9,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 
-const WRITE_ROLES = new Set(['supervisor', 'admin', 'super_admin', 'operations_manager']);
+// Read = anyone in management can VIEW visit reports (incl. plain admin + salesman).
+const READ_ROLES = new Set(['supervisor', 'admin', 'super_admin', 'operations_manager', 'salesman']);
+// Create = filing a visit report is for supervisors / ops managers / super_admin only.
+// Plain admins are VIEW-ONLY by design (founder intent), enforced server-side here, not just in the UI.
+const CREATE_ROLES = new Set(['supervisor', 'super_admin', 'operations_manager']);
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
 
-  if (!WRITE_ROLES.has(auth.role) && auth.role !== 'salesman') {
+  if (!READ_ROLES.has(auth.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
@@ -59,8 +63,8 @@ export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
 
-  if (!WRITE_ROLES.has(auth.role)) {
-    return NextResponse.json({ error: 'Forbidden. Supervisor or admin access required.' }, { status: 403 });
+  if (!CREATE_ROLES.has(auth.role)) {
+    return NextResponse.json({ error: 'Forbidden. Filing visit reports requires supervisor, operations manager, or super admin access.' }, { status: 403 });
   }
 
   let body: any;
