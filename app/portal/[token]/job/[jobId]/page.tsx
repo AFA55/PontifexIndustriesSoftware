@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { parseYMDLocal, formatTime } from '@/lib/dates';
 import CommentThread from '@/components/portal/CommentThread';
+import LiveRouteTracker from '@/components/portal/LiveRouteTracker';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -343,7 +344,14 @@ export default function PortalJobDetailPage() {
       {/* ── Body ────────────────────────────────────────────────────────────── */}
       <div className="container mx-auto px-4 py-6 max-w-lg space-y-6 pb-12">
 
-        {/* LiveRouteTracker mounts here (Feature B) */}
+        {/* LiveRouteTracker mounts here (Feature B) — self-hides when active:false */}
+        <LiveRouteTracker
+          token={token}
+          jobId={job.id}
+          primaryColor={tenant.primary_color}
+          destinationAddress={job.address || job.location}
+        />
+
 
         {/* ── Job summary card ──────────────────────────────────────────────── */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5">

@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { MapPin, Phone, User, PlayCircle, ArrowLeft, AlertTriangle, FileText, Briefcase, RefreshCw } from 'lucide-react';
 import Notification from '@/components/Notification';
+import { useLocationBroadcast } from '@/hooks/useLocationBroadcast';
 
 interface JobOrder {
   id: string;
@@ -43,6 +44,14 @@ export default function InRoutePage() {
   const [displayTime, setDisplayTime] = useState('');
   const [hasStartedProcess, setHasStartedProcess] = useState(false);
   const [showWorkDiffersModal, setShowWorkDiffersModal] = useState(false);
+
+  // Feature B — live "In Route" location broadcast. While this operator's job is
+  // in_route, periodically POST GPS to /api/operator/location so the customer can
+  // watch them approach. Stops automatically when status leaves in_route (the
+  // endpoint replies active:false) or on unmount. No-ops if geolocation/permission
+  // is unavailable. (v1 = foreground only; native background tracking is out of scope.)
+  const isInRoute = job?.status === 'in_route';
+  useLocationBroadcast(jobId, isInRoute);
 
   useEffect(() => {
     checkEquipmentChecklist();
