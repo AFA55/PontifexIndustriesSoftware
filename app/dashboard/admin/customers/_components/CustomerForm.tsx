@@ -185,7 +185,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
     }
   };
 
-  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all placeholder-gray-400';
+  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all placeholder-gray-400';
   const labelClass = 'block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider';
   const sectionClass = 'border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50';
 
@@ -198,7 +198,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
+            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />
             </div>
             {isEdit ? 'Edit Customer' : 'New Customer'}
@@ -218,7 +218,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           {/* Company Info Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <Building2 className="w-4 h-4 text-purple-600" />
+              <Building2 className="w-4 h-4 text-brand" />
               <h3 className="text-sm font-bold text-gray-900">Company Information</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -295,7 +295,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           {/* Payment & Billing Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <CreditCard className="w-4 h-4 text-purple-600" />
+              <CreditCard className="w-4 h-4 text-brand" />
               <h3 className="text-sm font-bold text-gray-900">Payment &amp; Billing</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -490,7 +490,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-sm text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+              className="px-8 py-2.5 bg-brand hover:bg-brand-dark rounded-xl font-bold text-sm text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Create Customer'}

@@ -112,7 +112,7 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <User className="w-5 h-5 text-purple-600" />
+                <User className="w-5 h-5 text-brand" />
                 {profile?.full_name || 'Loading...'}
               </h2>
               {profile && (
@@ -128,7 +128,7 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
         <div className="flex-1 overflow-y-auto p-5 space-y-6">
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-4 border-purple-200 border-t-purple-600 rounded-full animate-spin" />
+              <div className="w-8 h-8 border-4 border-brand/30 border-t-brand rounded-full animate-spin" />
             </div>
           ) : profile ? (
             <>
@@ -183,17 +183,17 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
               {/* Facility Badges */}
               <div className="space-y-3">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <BadgeCheck className="w-4 h-4 text-purple-500" />
+                  <BadgeCheck className="w-4 h-4 text-brand" />
                   Facility Badges
                   {!badgesLoading && (
-                    <span className="px-2 py-0.5 bg-purple-100 rounded-full text-xs text-purple-700 font-bold">
+                    <span className="px-2 py-0.5 bg-brand/10 rounded-full text-xs text-brand font-bold">
                       {badges.length}
                     </span>
                   )}
                 </h3>
                 {badgesLoading ? (
                   <div className="flex justify-center py-4">
-                    <Loader2 className="w-5 h-5 text-purple-400 animate-spin" />
+                    <Loader2 className="w-5 h-5 text-brand animate-spin" />
                   </div>
                 ) : badges.length > 0 ? (
                   <div className="space-y-2">
@@ -245,7 +245,7 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
                 )}
                 <a
                   href="/dashboard/admin/facilities"
-                  className="inline-flex items-center gap-1 text-xs text-purple-600 hover:text-purple-800 font-medium"
+                  className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark font-medium"
                 >
                   <ExternalLink className="w-3 h-3" />
                   Manage badges in Facilities
@@ -255,9 +255,9 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
               {/* Project History */}
               <div className="space-y-3">
                 <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-purple-500" />
+                  <Briefcase className="w-4 h-4 text-brand" />
                   Project History
-                  <span className="px-2 py-0.5 bg-purple-100 rounded-full text-xs text-purple-700 font-bold">
+                  <span className="px-2 py-0.5 bg-brand/10 rounded-full text-xs text-brand font-bold">
                     {profile.project_history.length}
                   </span>
                 </h3>

@@ -381,7 +381,7 @@ export default function CompletedJobsArchivePage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-slate-600 dark:text-white/60 font-medium">
             Loading completed jobs...
           </p>
@@ -414,7 +414,7 @@ export default function CompletedJobsArchivePage() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent tabular-nums">
+            <span className="text-4xl font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent tabular-nums">
               {jobs.length}
             </span>
             <span className="text-sm text-slate-500 dark:text-white/60">completed</span>
@@ -511,9 +511,9 @@ export default function CompletedJobsArchivePage() {
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm transition-colors
                     bg-white border border-slate-200 text-slate-900 placeholder-slate-400
-                    focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                    focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                     dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
-                    dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                    dark:focus:border-brand/60 dark:focus:ring-brand/20"
                 />
               </div>
               <select
@@ -523,9 +523,9 @@ export default function CompletedJobsArchivePage() {
                 }
                 className="px-4 py-3 rounded-xl text-sm transition-colors
                   bg-white border border-slate-200 text-slate-900
-                  focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                   dark:bg-white/5 dark:border-white/10 dark:text-white
-                  dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                  dark:focus:border-brand/60 dark:focus:ring-brand/20"
               >
                 <option value="">All Ratings</option>
                 <option value="9">9+ Stars</option>
@@ -551,7 +551,7 @@ export default function CompletedJobsArchivePage() {
                           onClick={() => loadJobDetails(job)}
                           className={`relative w-full text-left p-3 rounded-xl overflow-hidden transition-all
                             ${active
-                              ? 'bg-violet-50 ring-2 ring-violet-400 dark:bg-violet-500/15 dark:ring-violet-400/60'
+                              ? 'bg-brand/10 ring-2 ring-brand dark:bg-brand/15 dark:ring-brand/60'
                               : 'bg-white ring-1 ring-slate-200 hover:ring-slate-300 dark:bg-white/[0.03] dark:ring-white/10 dark:hover:ring-white/20'
                             }`}
                         >
@@ -599,7 +599,7 @@ export default function CompletedJobsArchivePage() {
               <div className="lg:col-span-2">
                 {loadingDetails ? (
                   <div className="rounded-2xl p-12 text-center shadow-sm bg-white border border-slate-200 dark:bg-white/5 dark:border-white/10">
-                    <div className="w-8 h-8 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto" />
+                    <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto" />
                   </div>
                 ) : selectedJobDetails ? (
                   <div className="space-y-6">
@@ -767,10 +767,10 @@ export default function CompletedJobsArchivePage() {
 
                       {/* Date range for multi-day jobs */}
                       {selectedJobDetails.job.is_multi_day && selectedJobDetails.firstLogDate && (
-                        <div className="mb-6 flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30 text-sm text-violet-700 dark:text-violet-300">
+                        <div className="mb-6 flex items-center gap-2 px-3 py-2 rounded-lg bg-brand/10 ring-1 ring-brand/30 dark:bg-brand/10 dark:ring-brand/30 text-sm text-brand dark:text-brand">
                           <Calendar className="w-4 h-4 flex-shrink-0" />
                           <span className="font-semibold">Multi-day job</span>
-                          <span className="text-violet-500 dark:text-violet-400">•</span>
+                          <span className="text-brand dark:text-brand">•</span>
                           <span>
                             {new Date(selectedJobDetails.firstLogDate).toLocaleDateString()}
                             {selectedJobDetails.lastLogDate && selectedJobDetails.lastLogDate !== selectedJobDetails.firstLogDate
@@ -894,11 +894,11 @@ export default function CompletedJobsArchivePage() {
                     {/* Documents */}
                     <div className="relative overflow-hidden rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
                       <span
-                        className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+                        className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand to-brand-accent"
                         aria-hidden
                       />
                       <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-violet-50 text-violet-600 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30">
+                        <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-brand/10 text-brand ring-1 ring-brand/20 dark:bg-brand/15 dark:text-brand dark:ring-brand/30">
                           <FileText className="w-4 h-4" />
                         </span>
                         Job Documents &amp; Attachments
@@ -1092,15 +1092,15 @@ export default function CompletedJobsArchivePage() {
                             {selectedJobDetails.documents.map((doc) => (
                               <div
                                 key={doc.id}
-                                className="rounded-xl p-4 bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30 flex items-start justify-between gap-3"
+                                className="rounded-xl p-4 bg-brand/10 ring-1 ring-brand/20 dark:bg-brand/10 dark:ring-brand/30 flex items-start justify-between gap-3"
                               >
                                 <div className="flex items-start gap-3">
-                                  <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300 mt-0.5" />
+                                  <FileText className="w-5 h-5 text-brand dark:text-brand mt-0.5" />
                                   <div>
-                                    <p className="font-semibold text-violet-900 dark:text-violet-200">
+                                    <p className="font-semibold text-brand dark:text-brand">
                                       {doc.document_name}
                                     </p>
-                                    <p className="text-xs text-violet-600 dark:text-violet-300/70">
+                                    <p className="text-xs text-brand dark:text-brand/70">
                                       Generated:{' '}
                                       {new Date(doc.generated_at).toLocaleString()}
                                     </p>
@@ -1110,7 +1110,7 @@ export default function CompletedJobsArchivePage() {
                                   href={doc.file_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-700 text-white transition-colors flex-shrink-0"
+                                  className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-brand hover:bg-brand-dark text-white transition-colors flex-shrink-0"
                                 >
                                   View
                                 </a>
@@ -1129,16 +1129,16 @@ export default function CompletedJobsArchivePage() {
                       return (
                         <div className="relative overflow-hidden rounded-2xl p-6 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
                           <span
-                            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+                            className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand to-brand-accent"
                             aria-hidden
                           />
                           <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-violet-50 text-violet-600 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30">
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-brand/10 text-brand ring-1 ring-brand/20 dark:bg-brand/15 dark:text-brand dark:ring-brand/30">
                               <Camera className="w-4 h-4" />
                             </span>
                             Completion Photos
                             {photos.length > 0 && (
-                              <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700 dark:bg-violet-500/25 dark:text-violet-200">
+                              <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-brand/20 text-brand dark:bg-brand/25 dark:text-brand">
                                 {photos.length}
                               </span>
                             )}
@@ -1161,7 +1161,7 @@ export default function CompletedJobsArchivePage() {
                                   href={url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="group relative aspect-square rounded-xl overflow-hidden ring-1 ring-slate-200 hover:ring-2 hover:ring-violet-400 dark:ring-white/10 dark:hover:ring-violet-400/70 transition-all bg-slate-100 dark:bg-white/[0.05]"
+                                  className="group relative aspect-square rounded-xl overflow-hidden ring-1 ring-slate-200 hover:ring-2 hover:ring-brand dark:ring-white/10 dark:hover:ring-brand/70 transition-all bg-slate-100 dark:bg-white/[0.05]"
                                 >
                                   <img
                                     src={url}

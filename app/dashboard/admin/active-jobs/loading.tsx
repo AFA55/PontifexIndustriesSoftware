@@ -23,7 +23,7 @@ export default function Loading() {
               key={i}
               className="bg-white ring-1 ring-slate-200 rounded-2xl p-5 flex items-center gap-4 animate-pulse"
             >
-              <div className="w-1 h-16 bg-violet-200 rounded-full" />
+              <div className="w-1 h-16 bg-brand/20 rounded-full" />
               <div className="flex-1 space-y-2">
                 <div className="h-5 w-1/3 bg-slate-200 rounded" />
                 <div className="h-4 w-1/2 bg-slate-200/70 rounded" />

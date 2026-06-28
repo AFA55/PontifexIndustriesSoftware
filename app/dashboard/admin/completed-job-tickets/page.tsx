@@ -120,7 +120,7 @@ export default function CompletedJobTicketsPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
         <div className="text-center">
-          <div className="w-10 h-10 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-10 h-10 border-2 border-brand border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-slate-600 dark:text-white/60 font-medium">
             Loading completed jobs...
           </p>
@@ -151,7 +151,7 @@ export default function CompletedJobTicketsPage() {
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-bold bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 bg-clip-text text-transparent tabular-nums">
+            <span className="text-4xl font-bold bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent tabular-nums">
               {jobs.length}
             </span>
             <span className="text-sm text-slate-500 dark:text-white/60">completed</span>
@@ -217,9 +217,9 @@ export default function CompletedJobTicketsPage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-10 pr-4 py-3 rounded-xl text-sm transition-colors
               bg-white border border-slate-200 text-slate-900 placeholder-slate-400
-              focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
+              focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
               dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
-              dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+              dark:focus:border-brand/60 dark:focus:ring-brand/20"
           />
         </div>
 
@@ -295,8 +295,8 @@ export default function CompletedJobTicketsPage() {
                       </span>
                     </div>
                     {job.customer_feedback_comments && (
-                      <div className="mt-3 text-xs rounded-lg p-2.5 bg-violet-50 text-slate-700 ring-1 ring-violet-100 dark:bg-violet-500/10 dark:text-white/80 dark:ring-violet-400/20">
-                        <span className="font-semibold text-violet-700 dark:text-violet-300">
+                      <div className="mt-3 text-xs rounded-lg p-2.5 bg-brand/10 text-slate-700 ring-1 ring-brand/20 dark:bg-brand/10 dark:text-white/80 dark:ring-brand/20">
+                        <span className="font-semibold text-brand dark:text-brand">
                           Feedback:{' '}
                         </span>
                         {job.customer_feedback_comments}

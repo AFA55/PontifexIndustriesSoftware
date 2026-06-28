@@ -541,11 +541,11 @@ export default function OperatorProfilesPage() {
                             {skillSummary.map(s => (
                               <span
                                 key={s.name}
-                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-purple-50 border border-purple-200 rounded-full text-[10px] font-semibold text-purple-700"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-brand/10 border border-brand/20 rounded-full text-[10px] font-semibold text-brand"
                               >
                                 <Zap className="w-2.5 h-2.5" />
                                 {s.name.length > 12 ? s.name.slice(0, 12) + '\u2026' : s.name}
-                                <span className="font-bold text-purple-900">{s.rating}</span>
+                                <span className="font-bold text-brand-dark">{s.rating}</span>
                               </span>
                             ))}
                           </div>
@@ -1017,7 +1017,7 @@ export default function OperatorProfilesPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                        <Zap className="w-4 h-4 text-purple-500" />
+                        <Zap className="w-4 h-4 text-brand" />
                         Skill Rankings
                       </h3>
                       <p className="text-xs text-gray-400">Rate on a 1–10 scale</p>

@@ -87,7 +87,7 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
     }
   };
 
-  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none transition-all placeholder-gray-400';
+  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all placeholder-gray-400';
   const labelClass = 'block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider';
 
   return (
@@ -95,7 +95,7 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
       <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl">
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <User className="w-5 h-5 text-purple-600" />
+            <User className="w-5 h-5 text-brand" />
             {isEdit ? 'Edit Contact' : 'Add Contact'}
           </h2>
           <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
@@ -158,11 +158,11 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
 
           <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.is_primary} onChange={e => update('is_primary', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
+              <input type="checkbox" checked={form.is_primary} onChange={e => update('is_primary', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
               <span className="text-sm text-gray-700">Primary Contact</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.is_billing_contact} onChange={e => update('is_billing_contact', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500" />
+              <input type="checkbox" checked={form.is_billing_contact} onChange={e => update('is_billing_contact', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
               <span className="text-sm text-gray-700">Billing Contact</span>
             </label>
           </div>
@@ -179,7 +179,7 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
             <button
               type="submit"
               disabled={loading}
-              className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 rounded-xl font-bold text-sm text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2.5 bg-brand hover:bg-brand-dark rounded-xl font-bold text-sm text-white transition-all shadow-sm disabled:opacity-50 flex items-center gap-2"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Add Contact'}

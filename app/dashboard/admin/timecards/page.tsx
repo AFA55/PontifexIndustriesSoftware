@@ -653,7 +653,7 @@ export default function AdminTimecardsPage() {
             </Link>
             <div className="h-6 w-px bg-gray-200 dark:bg-white/10" />
             <h1 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-purple-700 flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-dark flex items-center justify-center shadow-sm">
                 <DollarSign size={16} className="text-white" />
               </div>
               <span className="hidden sm:inline">Team Payroll</span>
@@ -692,7 +692,7 @@ export default function AdminTimecardsPage() {
               onClick={() => router.push('/dashboard/admin/timecards/corrections')}
               className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${
                 pendingCorrectionCount > 0
-                  ? 'bg-violet-600 hover:bg-violet-700 text-white border-violet-600 shadow-md shadow-violet-500/30'
+                  ? 'bg-brand hover:bg-brand-dark text-white border-brand shadow-md shadow-brand/30'
                   : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border-gray-200 dark:border-white/10'
               }`}
               title="Time Edit Requests"
@@ -835,7 +835,7 @@ export default function AdminTimecardsPage() {
         {/* ── Summary Cards ──────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
           {/* Total Payroll Hours */}
-          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-xl p-4 relative overflow-hidden shadow-lg">
+          <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-brand to-brand-accent rounded-xl p-4 relative overflow-hidden shadow-lg">
             <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-full -translate-y-4 translate-x-4" />
             <div className="flex items-center gap-1.5 mb-1.5">
               <TrendingUp size={13} className="text-purple-200" />
@@ -991,7 +991,7 @@ export default function AdminTimecardsPage() {
                         ? 'bg-emerald-600 text-white shadow-sm'
                         : key === 'no_entries'
                           ? 'bg-red-600 text-white shadow-sm'
-                          : 'bg-purple-600 text-white shadow-sm'
+                          : 'bg-brand text-white shadow-sm'
                     : 'text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 hover:bg-gray-50 dark:hover:bg-white/8'
                 }`}
               >
@@ -1297,14 +1297,14 @@ export default function AdminTimecardsPage() {
                       const dayTotal = filteredMembers.reduce((sum, m) => sum + (m.dailyHours[day]?.hours || 0), 0);
                       return (
                         <td key={day} className="px-2 py-3 text-center">
-                          <span className={`text-xs font-bold tabular-nums ${dayTotal > 0 ? 'text-purple-600 dark:text-violet-400' : 'text-gray-300 dark:text-white/20'}`}>
+                          <span className={`text-xs font-bold tabular-nums ${dayTotal > 0 ? 'text-brand dark:text-brand' : 'text-gray-300 dark:text-white/20'}`}>
                             {dayTotal > 0 ? dayTotal.toFixed(1) : '-'}
                           </span>
                         </td>
                       );
                     })}
                     <td className="px-3 py-3 text-center">
-                      <span className="text-sm font-bold text-purple-600 dark:text-violet-400 tabular-nums">
+                      <span className="text-sm font-bold text-brand dark:text-brand tabular-nums">
                         {filteredMembers.reduce((s, m) => s + m.weeklyTotal, 0).toFixed(1)}
                       </span>
                     </td>
@@ -1488,8 +1488,8 @@ export default function AdminTimecardsPage() {
             {/* Panel Header */}
             <div className="px-5 py-4 border-b border-gray-200 dark:border-white/10 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-violet-500/10 dark:bg-violet-500/20 flex items-center justify-center">
-                  <ClipboardEdit size={15} className="text-violet-600 dark:text-violet-400" />
+                <div className="w-8 h-8 rounded-lg bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+                  <ClipboardEdit size={15} className="text-brand dark:text-brand" />
                 </div>
                 <div>
                   <h2 className="text-sm font-bold text-gray-900 dark:text-white">Time Correction Requests</h2>
@@ -1510,7 +1510,7 @@ export default function AdminTimecardsPage() {
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {correctionsLoading ? (
                 <div className="py-16 text-center">
-                  <Loader2 className="w-8 h-8 mx-auto animate-spin text-violet-600 mb-3" />
+                  <Loader2 className="w-8 h-8 mx-auto animate-spin text-brand mb-3" />
                   <p className="text-sm text-gray-500 dark:text-white/40">Loading requests...</p>
                 </div>
               ) : corrections.length === 0 ? (
@@ -1592,7 +1592,7 @@ export default function AdminTimecardsPage() {
                       <input
                         type="text"
                         placeholder="e.g. Approved — matched supervisor report"
-                        className="w-full px-3 py-1.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                        className="w-full px-3 py-1.5 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                         onFocus={() => setCorrectionReviewerNotes('')}
                         onChange={(e) => setCorrectionReviewerNotes(e.target.value)}
                       />

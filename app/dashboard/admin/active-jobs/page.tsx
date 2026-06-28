@@ -692,7 +692,7 @@ export default function ActiveJobsPage() {
                   bg-white border shadow-sm hover:shadow-md
                   dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80 dark:backdrop-blur
                   ${active
-                    ? 'border-violet-400 ring-2 ring-violet-200 dark:border-violet-400/60 dark:ring-violet-500/30'
+                    ? 'border-brand ring-2 ring-brand/30 dark:border-brand/60 dark:ring-brand/30'
                     : 'border-slate-200 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'
                   }
                 `}
@@ -734,7 +734,7 @@ export default function ActiveJobsPage() {
                 className={`
                   px-4 py-2.5 min-h-[44px] rounded-full text-sm font-medium transition-all relative
                   ${active
-                    ? 'bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white shadow-md shadow-violet-500/20'
+                    ? 'bg-gradient-to-r from-brand to-brand-accent text-white shadow-md shadow-brand/20'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10'
                   }
                 `}
@@ -896,7 +896,7 @@ export default function ActiveJobsPage() {
                             <span
                               className="
                                 inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white
-                                bg-gradient-to-br from-violet-500 to-fuchsia-500
+                                bg-gradient-to-br from-brand to-brand-accent
                               "
                               aria-hidden
                             >

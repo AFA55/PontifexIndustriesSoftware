@@ -8,7 +8,7 @@ export default function Loading() {
           <div className="h-9 w-72 bg-slate-200 rounded animate-pulse" />
         </div>
         {/* Gradient hero */}
-        <div className="h-40 bg-gradient-to-r from-violet-100 via-white to-violet-50 ring-1 ring-violet-200 rounded-2xl animate-pulse" />
+        <div className="h-40 bg-gradient-to-r from-brand/10 via-white to-brand/5 ring-1 ring-brand/20 rounded-2xl animate-pulse" />
         {/* 5 metric tiles */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {[1, 2, 3, 4, 5].map((i) => (

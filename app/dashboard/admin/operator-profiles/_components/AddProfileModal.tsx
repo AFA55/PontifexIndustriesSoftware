@@ -42,7 +42,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <UserPlus className="w-5 h-5 text-purple-600" />
+                  <UserPlus className="w-5 h-5 text-brand" />
                   Add Team Member
                 </h2>
                 <p className="text-gray-500 text-sm">Create a new operator or helper account</p>
@@ -65,7 +65,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="e.g. John Smith"
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white text-gray-900 transition-all"
               />
             </div>
 
@@ -76,7 +76,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="john@patriotconcretecutting.com"
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white text-gray-900 transition-all"
               />
             </div>
 
@@ -85,7 +85,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white text-gray-900 transition-all"
               >
                 <option value="operator">Operator</option>
                 <option value="apprentice">Helper / Apprentice</option>
@@ -98,7 +98,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white text-gray-900 transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white text-gray-900 transition-all"
               />
             </div>
 
@@ -112,7 +112,7 @@ export default function AddProfileModal({ onSubmit, onClose }: AddProfileModalPr
               <button
                 onClick={handleSubmit}
                 disabled={submitting || !fullName.trim() || !email.trim()}
-                className="flex-1 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl font-bold text-sm transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
                 {submitting ? 'Creating...' : 'Create Account'}

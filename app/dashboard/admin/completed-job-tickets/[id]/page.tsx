@@ -379,7 +379,7 @@ export default function CompletedJobSummaryPage() {
           <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">Job Not Found</h2>
           <Link
             href="/dashboard/admin/completed-job-tickets"
-            className="text-violet-600 dark:text-violet-300 hover:underline text-sm"
+            className="text-brand dark:text-brand hover:underline text-sm"
           >
             Back to Completed Jobs
           </Link>
@@ -438,8 +438,8 @@ export default function CompletedJobSummaryPage() {
               <button
                 onClick={() => openSigModal()}
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
-                  bg-violet-50 border border-violet-200 text-violet-700 hover:bg-violet-100
-                  dark:bg-violet-500/15 dark:border-violet-400/30 dark:text-violet-200 dark:hover:bg-violet-500/25"
+                  bg-brand/10 border border-brand/20 text-brand hover:bg-brand/20
+                  dark:bg-brand/15 dark:border-brand/30 dark:text-brand dark:hover:bg-brand/25"
               >
                 <Send className="w-4 h-4" />
                 Send for Signature
@@ -456,7 +456,7 @@ export default function CompletedJobSummaryPage() {
               <Link
                 href={`/dashboard/admin/billing/create?job=${jobId}`}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all
-                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 text-white shadow-md shadow-violet-500/20 hover:shadow-lg"
+                  bg-gradient-to-r from-brand to-brand-accent text-white shadow-md shadow-brand/20 hover:shadow-lg"
               >
                 <Receipt className="w-4 h-4" />
                 Create Invoice
@@ -496,7 +496,7 @@ export default function CompletedJobSummaryPage() {
         <div className={`relative overflow-hidden ${SECTION_CARD}`}>
           <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500" aria-hidden />
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+            <FileText className="w-5 h-5 text-brand dark:text-brand" />
             Job Overview
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -691,20 +691,20 @@ export default function CompletedJobSummaryPage() {
           <div className={SECTION_CARD}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                <Target className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                <Target className="w-5 h-5 text-brand dark:text-brand" />
                 Cycle Billing Milestones
               </h2>
               <button
                 onClick={() => setShowMilestoneForm((prev) => !prev)}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-all
-                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 hover:shadow-md shadow-violet-500/20"
+                  bg-gradient-to-r from-brand to-brand-accent hover:shadow-md shadow-brand/20"
               >
                 <Plus className="w-4 h-4" />
                 Add Milestone
               </button>
             </div>
             {showMilestoneForm && (
-              <div className="mb-4 p-4 rounded-xl bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30 flex flex-wrap gap-3 items-end">
+              <div className="mb-4 p-4 rounded-xl bg-brand/10 ring-1 ring-brand/20 dark:bg-brand/10 dark:ring-brand/30 flex flex-wrap gap-3 items-end">
                 <div className="flex-1 min-w-40">
                   <label className="text-xs font-semibold text-slate-600 dark:text-white/70 uppercase mb-1 block">Label</label>
                   <input
@@ -712,8 +712,8 @@ export default function CompletedJobSummaryPage() {
                     value={milestoneLabel}
                     onChange={(e) => setMilestoneLabel(e.target.value)}
                     placeholder="e.g. Foundation Complete"
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-white border border-slate-300 text-slate-900 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
-                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-white border border-slate-300 text-slate-900 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-brand/60 dark:focus:ring-brand/20"
                   />
                 </div>
                 <div className="w-32">
@@ -725,8 +725,8 @@ export default function CompletedJobSummaryPage() {
                     placeholder="25"
                     min={1}
                     max={100}
-                    className="w-full px-3 py-2 rounded-lg text-sm bg-white border border-slate-300 text-slate-900 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
-                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                    className="w-full px-3 py-2 rounded-lg text-sm bg-white border border-slate-300 text-slate-900 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                      dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-brand/60 dark:focus:ring-brand/20"
                   />
                 </div>
                 <div className="flex gap-2">
@@ -734,7 +734,7 @@ export default function CompletedJobSummaryPage() {
                     onClick={handleAddMilestone}
                     disabled={savingMilestone || !milestoneLabel.trim() || !milestonePercent}
                     className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all disabled:opacity-50 flex items-center gap-1.5
-                      bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:shadow-md"
+                      bg-gradient-to-r from-brand to-brand-accent hover:shadow-md"
                   >
                     {savingMilestone ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                     Save
@@ -797,7 +797,7 @@ export default function CompletedJobSummaryPage() {
                             onClick={() => handleTriggerMilestone(ms.id)}
                             disabled={triggeringId === ms.id}
                             className="px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-50 flex items-center gap-1
-                              bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:shadow-md"
+                              bg-gradient-to-r from-brand to-brand-accent hover:shadow-md"
                           >
                             {triggeringId === ms.id ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
                             Trigger Now
@@ -871,7 +871,7 @@ export default function CompletedJobSummaryPage() {
         <RevealSection index={5}>
         <div className={SECTION_CARD}>
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+            <FileText className="w-5 h-5 text-brand dark:text-brand" />
             Documents &amp; Photos
           </h2>
 
@@ -927,8 +927,8 @@ export default function CompletedJobSummaryPage() {
                 <button
                   onClick={() => openSigModal()}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium transition-colors
-                    bg-white border border-violet-300 text-violet-700 hover:bg-violet-50
-                    dark:bg-white/5 dark:border-violet-400/30 dark:text-violet-300 dark:hover:bg-violet-500/15"
+                    bg-white border border-brand/40 text-brand hover:bg-brand/10
+                    dark:bg-white/5 dark:border-brand/30 dark:text-brand dark:hover:bg-brand/15"
                 >
                   <Send className="w-3 h-3" />
                   Send for Signature
@@ -1042,8 +1042,8 @@ export default function CompletedJobSummaryPage() {
                     href={ph.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group relative aspect-square rounded-xl overflow-hidden ring-1 ring-slate-200 bg-slate-100 hover:ring-violet-400 transition-colors
-                      dark:ring-white/10 dark:bg-white/5 dark:hover:ring-violet-400/60"
+                    className="group relative aspect-square rounded-xl overflow-hidden ring-1 ring-slate-200 bg-slate-100 hover:ring-brand transition-colors
+                      dark:ring-white/10 dark:bg-white/5 dark:hover:ring-brand/60"
                   >
                     <img
                       src={ph.url}
@@ -1087,7 +1087,7 @@ export default function CompletedJobSummaryPage() {
                   href={currentPdfUrl}
                   download
                   className="px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-all flex items-center gap-1.5
-                    bg-gradient-to-r from-violet-600 to-fuchsia-500 hover:shadow-md"
+                    bg-gradient-to-r from-brand to-brand-accent hover:shadow-md"
                 >
                   <Download className="w-4 h-4" />
                   Download
@@ -1113,7 +1113,7 @@ export default function CompletedJobSummaryPage() {
           <div className="bg-white dark:bg-[#120a24] rounded-2xl shadow-2xl w-full max-w-md ring-1 ring-slate-200 dark:ring-white/10">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-white/10">
               <div className="flex items-center gap-2">
-                <PenTool className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                <PenTool className="w-5 h-5 text-brand dark:text-brand" />
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">Send Signature Request</h3>
               </div>
               <button
@@ -1138,8 +1138,8 @@ export default function CompletedJobSummaryPage() {
                   onChange={(e) => setSigEmail(e.target.value)}
                   placeholder="customer@example.com"
                   className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
-                    bg-white border border-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
-                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                    bg-white border border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-brand/60 dark:focus:ring-brand/20"
                 />
               </div>
               <div>
@@ -1152,8 +1152,8 @@ export default function CompletedJobSummaryPage() {
                   onChange={(e) => setSigName(e.target.value)}
                   placeholder={summary?.customer_name || 'Customer name'}
                   className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
-                    bg-white border border-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
-                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                    bg-white border border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-brand/60 dark:focus:ring-brand/20"
                 />
               </div>
               <div>
@@ -1166,8 +1166,8 @@ export default function CompletedJobSummaryPage() {
                   onChange={(e) => setSigPhone(e.target.value)}
                   placeholder="(555) 000-0000"
                   className="w-full px-4 py-3 rounded-xl text-slate-900 transition-colors
-                    bg-white border border-slate-300 focus:border-violet-400 focus:ring-2 focus:ring-violet-100 focus:outline-none
-                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-violet-400/60 dark:focus:ring-violet-500/20"
+                    bg-white border border-slate-300 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                    dark:bg-white/5 dark:border-white/10 dark:text-white dark:focus:border-brand/60 dark:focus:ring-brand/20"
                 />
               </div>
               <div className="flex gap-3 pt-2">
@@ -1175,7 +1175,7 @@ export default function CompletedJobSummaryPage() {
                   onClick={handleSendSignatureRequest}
                   disabled={!sigEmail.trim() || sendingSig}
                   className="flex-1 rounded-xl py-3 font-semibold text-sm text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2
-                    bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500 hover:shadow-md shadow-violet-500/20"
+                    bg-gradient-to-r from-brand to-brand-accent hover:shadow-md shadow-brand/20"
                 >
                   {sendingSig ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                   {sendingSig ? 'Sending...' : 'Send Signature Request'}

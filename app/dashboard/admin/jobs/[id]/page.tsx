@@ -756,12 +756,12 @@ export default function AdminJobDetailPage({
         dark:border-white/10 dark:backdrop-blur
       ">
         {/* Purple accent stripe */}
-        <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500" aria-hidden />
+        <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-brand-secondary to-brand-accent" aria-hidden />
 
         <div className="p-5 pt-6">
           {/* Header */}
           <div className="flex items-center gap-2 mb-4">
-            <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+            <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
               <Radio className="w-4 h-4" />
             </span>
             <h2 className="text-base font-semibold text-slate-900 dark:text-white">Live Status</h2>
@@ -865,7 +865,7 @@ export default function AdminJobDetailPage({
             </div>
             <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10">
               <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-1">Time On Site</p>
-              <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">
+              <p className="text-sm font-semibold text-brand dark:text-brand">
                 {formatMinutes(liveStatus.time_on_site_minutes)}
               </p>
             </div>
@@ -876,22 +876,22 @@ export default function AdminJobDetailPage({
             <div
               className="
                 mb-3 w-full px-3 py-2 rounded-xl text-xs
-                bg-violet-50 text-violet-800 border border-violet-200
-                dark:bg-violet-500/10 dark:text-violet-200 dark:border-violet-400/30
+                bg-brand/10 text-brand border border-brand/20
+                dark:bg-brand/10 dark:text-brand dark:border-brand/30
               "
             >
               <div className="flex items-center gap-2">
                 <span className="relative flex h-2 w-2 flex-shrink-0">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-violet-500" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-brand" />
                 </span>
                 <span className="font-semibold">Draft in progress</span>
-                <span className="text-violet-700/80 dark:text-violet-300/80">
+                <span className="text-brand/80 dark:text-brand/80">
                   · {liveStatus.draft_work_performed.items.length}{' '}
                   {liveStatus.draft_work_performed.items.length === 1 ? 'item' : 'items'} typed
                 </span>
                 {liveStatus.draft_work_performed.updated_at && (
-                  <span className="ml-auto text-[10px] text-violet-700/70 dark:text-violet-300/60">
+                  <span className="ml-auto text-[10px] text-brand/70 dark:text-brand/60">
                     edited {formatTimeFromISO(liveStatus.draft_work_performed.updated_at)}
                   </span>
                 )}
@@ -902,17 +902,17 @@ export default function AdminJobDetailPage({
                   return (
                     <span
                       key={i}
-                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/70 dark:bg-violet-400/10 text-[10px] font-medium ring-1 ring-violet-200/60 dark:ring-violet-400/30"
+                      className="inline-flex items-center px-2 py-0.5 rounded-md bg-white/70 dark:bg-brand/10 text-[10px] font-medium ring-1 ring-brand/20 dark:ring-brand/30"
                     >
                       {item.name ?? '—'}
                       {typeof item.quantity === 'number' && (
-                        <span className="ml-1 text-violet-500 dark:text-violet-300">×{item.quantity}</span>
+                        <span className="ml-1 text-brand dark:text-brand">×{item.quantity}</span>
                       )}
                     </span>
                   );
                 })}
                 {liveStatus.draft_work_performed.items.length > 8 && (
-                  <span className="text-[10px] text-violet-600/80 dark:text-violet-300/70 self-center">
+                  <span className="text-[10px] text-brand/80 dark:text-brand/70 self-center">
                     +{liveStatus.draft_work_performed.items.length - 8} more
                   </span>
                 )}
@@ -972,7 +972,7 @@ export default function AdminJobDetailPage({
                   currentValue: liveStatus.in_route_at,
                 })}
                 title="Edit in-route timestamp"
-                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
@@ -991,14 +991,14 @@ export default function AdminJobDetailPage({
                   currentValue: liveStatus.arrived_at,
                 })}
                 title="Edit arrival timestamp"
-                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
             </div>
             {/* Work Started — editable */}
             <div className="flex items-center gap-2 text-xs">
-              <Wrench className="w-3.5 h-3.5 text-violet-500 flex-shrink-0" />
+              <Wrench className="w-3.5 h-3.5 text-brand flex-shrink-0" />
               <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Work Started</span>
               <span className="font-medium text-slate-800 dark:text-white">
                 {liveStatus.work_started_at ? formatTimeFromISO(liveStatus.work_started_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
@@ -1010,7 +1010,7 @@ export default function AdminJobDetailPage({
                   currentValue: liveStatus.work_started_at,
                 })}
                 title="Edit work-started timestamp"
-                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>
@@ -1030,7 +1030,7 @@ export default function AdminJobDetailPage({
                     currentValue: liveStatus.work_completed_at ?? null,
                   })}
                   title="Edit work-completed timestamp"
-                  className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-violet-600 dark:text-white/35 dark:hover:text-violet-300"
+                  className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
@@ -1055,12 +1055,12 @@ export default function AdminJobDetailPage({
               <ul className="space-y-1.5">
                 {liveStatus.work_performed_today.map((item) => (
                   <li key={item.id} className="flex items-start gap-2 text-xs">
-                    <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-fuchsia-400 flex-shrink-0" />
+                    <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-brand-accent flex-shrink-0" />
                     <div className="min-w-0">
                       <span className="font-medium text-slate-800 dark:text-white/85">
                         {item.scope_item_description || item.work_type || 'Work item'}
                       </span>
-                      <span className="ml-1.5 font-mono text-violet-600 dark:text-violet-300">
+                      <span className="ml-1.5 font-mono text-brand dark:text-brand">
                         ×{item.quantity_completed}
                       </span>
                       {item.notes && (
@@ -1174,7 +1174,7 @@ export default function AdminJobDetailPage({
   }
 
   const isPendingCompletion = completionRequest?.status === 'pending';
-  const heroAccent = statusConfig?.accent ?? 'from-violet-500 to-fuchsia-500';
+  const heroAccent = statusConfig?.accent ?? 'from-brand to-brand-accent';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720]">
@@ -1210,8 +1210,8 @@ export default function AdminJobDetailPage({
                 <h1 className="
                   text-2xl font-extrabold font-mono tracking-tight
                   bg-clip-text text-transparent
-                  bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
-                  dark:from-violet-300 dark:via-fuchsia-300 dark:to-pink-300
+                  bg-gradient-to-r from-brand via-brand-secondary to-brand-accent
+                  dark:from-brand dark:via-brand-secondary dark:to-brand-accent
                 ">
                   {job.job_number}
                 </h1>
@@ -1242,7 +1242,7 @@ export default function AdminJobDetailPage({
                 {job.operator_name && (
                   <span className="inline-flex items-center gap-1.5">
                     <span
-                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white bg-gradient-to-br from-violet-500 to-fuchsia-500"
+                      className="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-white bg-gradient-to-br from-brand to-brand-accent"
                       aria-hidden
                     >
                       {job.operator_name.trim().charAt(0).toUpperCase()}
@@ -1347,12 +1347,12 @@ export default function AdminJobDetailPage({
               dark:border-white/10 dark:backdrop-blur
             ">
               <div className="flex items-center gap-2 mb-5">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
                   <Activity className="w-4 h-4" />
                 </span>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Daily Progress</h2>
                 {dailyLogs.length > 0 && (
-                  <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                  <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand">
                     {dailyLogs.length} {dailyLogs.length === 1 ? 'day' : 'days'} logged
                   </span>
                 )}
@@ -1372,7 +1372,7 @@ export default function AdminJobDetailPage({
                   {dailyLogs.length > 1 && (
                     <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10 flex items-center gap-4 flex-wrap">
                       <div className="flex items-center gap-1.5 text-sm">
-                        <Timer className="w-4 h-4 text-violet-500 dark:text-violet-400" />
+                        <Timer className="w-4 h-4 text-brand dark:text-brand" />
                         <span className="font-semibold text-slate-800 dark:text-white">
                           {dailyLogs.reduce((sum, l) => sum + (l.hours_worked || 0), 0).toFixed(1)}h
                         </span>
@@ -1382,7 +1382,7 @@ export default function AdminJobDetailPage({
                         {dailyLogs.map((_, i) => (
                           <div
                             key={i}
-                            className="w-6 h-2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500"
+                            className="w-6 h-2 rounded-full bg-gradient-to-r from-brand to-brand-accent"
                             title={`Day ${i + 1}`}
                           />
                         ))}
@@ -1410,10 +1410,10 @@ export default function AdminJobDetailPage({
                         className="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden"
                       >
                         {/* Day header */}
-                        <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-violet-50 to-fuchsia-50 dark:from-violet-500/10 dark:to-fuchsia-500/10 border-b border-slate-200 dark:border-white/10">
+                        <div className="flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-brand/10 to-brand-accent/10 dark:from-brand/10 dark:to-brand-accent/10 border-b border-slate-200 dark:border-white/10">
                           <span className="
                             inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold
-                            bg-gradient-to-br from-violet-600 to-fuchsia-600 text-white flex-shrink-0
+                            bg-gradient-to-br from-brand to-brand-accent text-white flex-shrink-0
                           ">
                             {dayNum}
                           </span>
@@ -1427,7 +1427,7 @@ export default function AdminJobDetailPage({
                             </p>
                           </div>
                           {log.hours_worked != null && (
-                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300 flex-shrink-0">
+                            <span className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand flex-shrink-0">
                               <Clock className="w-3 h-3" />
                               {log.hours_worked.toFixed(1)}h
                             </span>
@@ -1447,7 +1447,7 @@ export default function AdminJobDetailPage({
                               )}
                               {log.work_started_at && (
                                 <span className="inline-flex items-center gap-1">
-                                  <Wrench className="w-3 h-3 text-violet-500" />
+                                  <Wrench className="w-3 h-3 text-brand" />
                                   Work started: {formatDateTime(log.work_started_at)}
                                 </span>
                               )}
@@ -1478,13 +1478,13 @@ export default function AdminJobDetailPage({
                                   const detail = item.details || item.notes;
                                   return (
                                     <li key={itemIdx} className="flex items-start gap-2 text-sm">
-                                      <span className="w-1.5 h-1.5 mt-2 rounded-full bg-fuchsia-400 flex-shrink-0" />
+                                      <span className="w-1.5 h-1.5 mt-2 rounded-full bg-brand-accent flex-shrink-0" />
                                       <div>
                                         <span className="font-medium text-slate-800 dark:text-white/85">
                                           {label}
                                         </span>
                                         {qty && (
-                                          <span className="ml-1.5 text-xs font-mono text-violet-600 dark:text-violet-300">
+                                          <span className="ml-1.5 text-xs font-mono text-brand dark:text-brand">
                                             {qty}
                                           </span>
                                         )}
@@ -1541,11 +1541,11 @@ export default function AdminJobDetailPage({
               dark:border-white/10 dark:backdrop-blur
             ">
               <span
-                className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-pink-500"
+                className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-brand-secondary to-brand-accent"
                 aria-hidden
               />
               <div className="flex items-center gap-2 mb-5">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
                   <Camera className="w-4 h-4" />
                 </span>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">
@@ -1572,7 +1572,7 @@ export default function AdminJobDetailPage({
                       href={url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group relative block aspect-square overflow-hidden rounded-xl ring-1 ring-slate-200 dark:ring-white/10 bg-slate-100 dark:bg-white/5 hover:ring-violet-400 dark:hover:ring-violet-400/60 transition-all"
+                      className="group relative block aspect-square overflow-hidden rounded-xl ring-1 ring-slate-200 dark:ring-white/10 bg-slate-100 dark:bg-white/5 hover:ring-brand dark:hover:ring-brand/60 transition-all"
                       title={`Open photo ${idx + 1} in new tab`}
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1641,7 +1641,7 @@ export default function AdminJobDetailPage({
               dark:border-white/10 dark:backdrop-blur
             ">
               <div className="flex items-center gap-2 mb-4">
-                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
                   <ClipboardList className="w-4 h-4" />
                 </span>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Activity &amp; Progress Log</h2>
@@ -1700,12 +1700,12 @@ export default function AdminJobDetailPage({
 
                   {activityLog.map((entry) => (
                     <div key={entry.id} className="flex items-start gap-3 text-sm">
-                      <div className="w-2 h-2 mt-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                      <div className="w-2 h-2 mt-1.5 rounded-full bg-brand flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <span className="text-slate-400 dark:text-white/40 text-xs">
                           {formatDateTime(entry.timestamp)}
                           {entry.day_number && (
-                            <span className="ml-1 text-violet-500 dark:text-violet-300">Day {entry.day_number}</span>
+                            <span className="ml-1 text-brand dark:text-brand">Day {entry.day_number}</span>
                           )}
                         </span>
                         <p className="text-slate-700 dark:text-white/80">
@@ -1854,7 +1854,7 @@ export default function AdminJobDetailPage({
               dark:border-white/10 dark:backdrop-blur
             ">
               <h2 className="text-base font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
                   <FileText className="w-4 h-4" />
                 </span>
                 Job Details
@@ -1965,9 +1965,9 @@ export default function AdminJobDetailPage({
                             className="
                               w-20 px-2 py-1 rounded-md text-sm tabular-nums
                               bg-white border border-slate-300 text-slate-900
-                              focus:border-violet-500 focus:ring-1 focus:ring-violet-200
+                              focus:border-brand focus:ring-1 focus:ring-brand/20
                               dark:bg-white/5 dark:border-white/15 dark:text-white
-                              dark:focus:border-violet-400 dark:focus:ring-violet-500/30
+                              dark:focus:border-brand dark:focus:ring-brand/30
                             "
                             autoFocus
                           />
@@ -2008,7 +2008,7 @@ export default function AdminJobDetailPage({
                       <div className="flex items-center gap-1.5">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                           job.commission_rate !== null && job.commission_rate !== undefined
-                            ? 'bg-violet-50 text-violet-700 ring-1 ring-violet-200 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30'
+                            ? 'bg-brand/10 text-brand ring-1 ring-brand/20 dark:bg-brand/15 dark:text-brand dark:ring-brand/30'
                             : 'bg-slate-100 text-slate-600 ring-1 ring-slate-200 dark:bg-white/10 dark:text-white/70 dark:ring-white/10'
                         }`}>
                           {job.commission_rate !== null && job.commission_rate !== undefined
@@ -2021,8 +2021,8 @@ export default function AdminJobDetailPage({
                           title="Edit commission rate"
                           className="
                             p-1 rounded-md transition-colors
-                            text-slate-400 hover:text-violet-600 hover:bg-violet-50
-                            dark:text-white/45 dark:hover:text-violet-300 dark:hover:bg-violet-500/15
+                            text-slate-400 hover:text-brand hover:bg-brand/10
+                            dark:text-white/45 dark:hover:text-brand dark:hover:bg-brand/15
                           "
                         >
                           <Edit3 className="w-3.5 h-3.5" />

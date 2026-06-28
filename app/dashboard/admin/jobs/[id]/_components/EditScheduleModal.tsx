@@ -84,7 +84,7 @@ export default function EditScheduleModal({ job, onClose, onSaved }: EditSchedul
               value={scheduledDate}
               onChange={(e) => setScheduledDate(e.target.value)}
               className="
-                w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500
+                w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand
                 bg-white border border-slate-300 text-slate-900
                 dark:bg-white/5 dark:border-white/10 dark:text-white dark:[color-scheme:dark]
               "
@@ -98,7 +98,7 @@ export default function EditScheduleModal({ job, onClose, onSaved }: EditSchedul
               onChange={(e) => setEndDate(e.target.value)}
               min={scheduledDate}
               className="
-                w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500
+                w-full rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand
                 bg-white border border-slate-300 text-slate-900
                 dark:bg-white/5 dark:border-white/10 dark:text-white dark:[color-scheme:dark]
               "
@@ -114,9 +114,9 @@ export default function EditScheduleModal({ job, onClose, onSaved }: EditSchedul
             disabled={saving || !scheduledDate}
             className="
               flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
-              text-white bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
-              hover:from-violet-700 hover:via-fuchsia-600 hover:to-pink-600
-              disabled:opacity-50 transition-all shadow-sm shadow-violet-500/20
+              text-white bg-gradient-to-r from-brand via-brand-secondary to-brand-accent
+              hover:from-brand-dark hover:via-brand-secondary hover:to-brand-accent
+              disabled:opacity-50 transition-all shadow-sm shadow-brand/20
             "
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}

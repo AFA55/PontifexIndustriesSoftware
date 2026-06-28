@@ -286,7 +286,7 @@ function SplitDateTimePicker({
   allowEmpty?: boolean;
 }) {
   const ring = accent === 'emerald' ? 'focus:ring-emerald-500/20 focus:border-emerald-500 dark:focus:border-emerald-400' :
-               accent === 'violet'  ? 'focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400' :
+               accent === 'violet'  ? 'focus:ring-brand/20 focus:border-brand dark:focus:border-brand' :
                                       'focus:ring-blue-500/20 focus:border-blue-500 dark:focus:border-blue-400';
 
   // Parse local-date + local-time from the ISO string (in browser-local TZ).
@@ -1111,7 +1111,7 @@ function OperatorTimecardDetailPageInner() {
           <div className="flex items-center justify-center gap-3 flex-wrap">
             <button
               onClick={() => fetchData()}
-              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-sm font-semibold transition-colors"
+              className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 bg-brand hover:bg-brand-dark text-white rounded-lg text-sm font-semibold transition-colors"
             >
               <RefreshCw size={16} />
               Try Again
@@ -1269,7 +1269,7 @@ function OperatorTimecardDetailPageInner() {
         {stats && (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-5">
             {/* Total Hours — hero card */}
-            <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-purple-600 via-purple-700 to-indigo-800 rounded-xl p-4 text-white shadow-lg shadow-purple-500/10 relative overflow-hidden">
+            <div className="col-span-2 sm:col-span-1 bg-gradient-to-br from-brand via-brand-dark to-brand-accent rounded-xl p-4 text-white shadow-lg shadow-brand/10 relative overflow-hidden">
               <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -translate-y-6 translate-x-6" />
               <div className="flex items-center gap-1.5 mb-1.5">
                 <TrendingUp size={13} className="text-purple-200" />
@@ -2211,7 +2211,7 @@ function OperatorTimecardDetailPageInner() {
                 <button
                   onClick={handleSaveNotes}
                   disabled={savingNotes}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50"
                 >
                   {savingNotes ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
                   Save Notes
@@ -2265,7 +2265,7 @@ function OperatorTimecardDetailPageInner() {
       {showEditModal && selectedEntry && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl max-w-lg w-full border border-slate-200 dark:border-white/10 max-h-[90vh] overflow-y-auto">
-            <div className="p-5 flex items-center justify-between sticky top-0 z-10 bg-gradient-to-r from-violet-600 to-indigo-600 text-white">
+            <div className="p-5 flex items-center justify-between sticky top-0 z-10 bg-gradient-to-r from-brand to-brand-accent text-white">
               <div>
                 <h3 className="text-base font-bold flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-xl bg-white/20 flex items-center justify-center">
@@ -2290,8 +2290,8 @@ function OperatorTimecardDetailPageInner() {
                   datetime-local wheel bug where tapping "6" registers as "10") */}
               <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center flex-shrink-0">
-                    <Clock size={14} className="text-violet-600 dark:text-violet-300" />
+                  <div className="w-7 h-7 rounded-lg bg-brand/10 dark:bg-brand/15 flex items-center justify-center flex-shrink-0">
+                    <Clock size={14} className="text-brand dark:text-brand" />
                   </div>
                   <p className="text-sm font-bold text-slate-800 dark:text-white">Clock In / Out</p>
                 </div>
@@ -2321,8 +2321,8 @@ function OperatorTimecardDetailPageInner() {
                 return (
                   <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 space-y-4">
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center flex-shrink-0">
-                        <Coffee size={14} className="text-violet-600 dark:text-violet-300" />
+                      <div className="w-7 h-7 rounded-lg bg-brand/10 dark:bg-brand/15 flex items-center justify-center flex-shrink-0">
+                        <Coffee size={14} className="text-brand dark:text-brand" />
                       </div>
                       <div>
                         <p className="text-sm font-bold text-slate-800 dark:text-white">Lunch Deduction</p>
@@ -2339,7 +2339,7 @@ function OperatorTimecardDetailPageInner() {
                         step="5"
                         value={editFormData.lunch_duration_minutes}
                         onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
-                        className="w-20 px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 text-sm text-slate-800 dark:text-white tabular-nums transition-all"
+                        className="w-20 px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-brand text-sm text-slate-800 dark:text-white tabular-nums transition-all"
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">min</span>
                       <div className="flex gap-2 ml-auto">
@@ -2352,8 +2352,8 @@ function OperatorTimecardDetailPageInner() {
                               onClick={() => setEditFormData({ ...editFormData, lunch_duration_minutes: m })}
                               className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
                                 active
-                                  ? 'bg-violet-600 border-violet-600 text-white shadow-sm shadow-violet-500/30'
-                                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-violet-300 dark:hover:border-violet-500/50'
+                                  ? 'bg-brand border-brand text-white shadow-sm shadow-brand/30'
+                                  : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:border-brand dark:hover:border-brand'
                               }`}
                             >
                               {m === 0 ? 'None' : `${m}m`}
@@ -2367,7 +2367,7 @@ function OperatorTimecardDetailPageInner() {
                       placeholder="Reason for override (optional, e.g. 'doctor appt')"
                       value={editFormData.lunch_override_reason}
                       onChange={(e) => setEditFormData({ ...editFormData, lunch_override_reason: e.target.value })}
-                      className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 transition-all"
+                      className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-brand text-sm text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 transition-all"
                     />
                   </div>
                 );
@@ -2376,8 +2376,8 @@ function OperatorTimecardDetailPageInner() {
               {/* Pay overrides */}
               <div className="bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 space-y-4">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 flex items-center justify-center flex-shrink-0">
-                    <DollarSign size={14} className="text-violet-600 dark:text-violet-300" />
+                  <div className="w-7 h-7 rounded-lg bg-brand/10 dark:bg-brand/15 flex items-center justify-center flex-shrink-0">
+                    <DollarSign size={14} className="text-brand dark:text-brand" />
                   </div>
                   <p className="text-sm font-bold text-slate-800 dark:text-white">Pay Overrides</p>
                 </div>
@@ -2389,7 +2389,7 @@ function OperatorTimecardDetailPageInner() {
                     <select
                       value={editFormData.pay_type_override}
                       onChange={(e) => setEditFormData({ ...editFormData, pay_type_override: e.target.value })}
-                      className="w-full px-4 py-3.5 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 transition-all appearance-none cursor-pointer"
+                      className="w-full px-4 py-3.5 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-brand transition-all appearance-none cursor-pointer"
                     >
                       {PAY_TYPE_OPTIONS.map(opt => (
                         <option key={opt.value} value={opt.value} className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">{opt.label}</option>
@@ -2423,7 +2423,7 @@ function OperatorTimecardDetailPageInner() {
                           is_shop_time: cat === 'shop' ? true : editFormData.is_shop_time,
                         });
                       }}
-                      className="w-full px-4 py-3.5 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 transition-all appearance-none cursor-pointer"
+                      className="w-full px-4 py-3.5 pr-10 bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-xl text-base text-slate-800 dark:text-white focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-brand transition-all appearance-none cursor-pointer"
                     >
                       <option value="regular" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">Regular — standard rate</option>
                       <option value="night_shift" className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white">Night Shift — premium rate (field only)</option>
@@ -2530,7 +2530,7 @@ function OperatorTimecardDetailPageInner() {
                   onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
                   rows={3}
                   placeholder="Add notes for this entry..."
-                  className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 dark:focus:border-violet-400 hover:border-slate-300 dark:hover:border-white/20 text-base text-slate-800 dark:text-white resize-none placeholder-slate-400 dark:placeholder-white/30 transition-all duration-200"
+                  className="w-full px-4 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-brand hover:border-slate-300 dark:hover:border-white/20 text-base text-slate-800 dark:text-white resize-none placeholder-slate-400 dark:placeholder-white/30 transition-all duration-200"
                 />
               </div>
 
@@ -2544,7 +2544,7 @@ function OperatorTimecardDetailPageInner() {
                 <button
                   onClick={handleUpdateEntry}
                   disabled={editSaving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-violet-500/20 min-h-[44px]"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition-all shadow-lg shadow-brand/20 min-h-[44px]"
                 >
                   {editSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                   {editSaving ? 'Saving…' : 'Save Changes'}

@@ -287,7 +287,7 @@ export default function CustomerDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -349,7 +349,7 @@ export default function CustomerDetailPage() {
             <Link href="/dashboard/admin/customers" className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
               <ChevronLeft className="w-5 h-5 text-gray-600" />
             </Link>
-            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center shadow-lg">
               <span className="text-white font-bold text-lg">
                 {customer.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
               </span>
@@ -404,7 +404,7 @@ export default function CustomerDetailPage() {
         {/* Stats Bar — 5 cards */}
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-            <p className="text-2xl font-bold text-purple-600">{customer.stats.total_jobs}</p>
+            <p className="text-2xl font-bold text-brand">{customer.stats.total_jobs}</p>
             <p className="text-xs text-gray-500">Total Jobs</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
@@ -433,9 +433,9 @@ export default function CustomerDetailPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                  <User className="w-4 h-4 text-purple-600" /> Contacts ({customer.contacts.length})
+                  <User className="w-4 h-4 text-brand" /> Contacts ({customer.contacts.length})
                 </h2>
-                <button onClick={() => { setEditingContact(null); setShowContactForm(true); }} className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-purple-200">
+                <button onClick={() => { setEditingContact(null); setShowContactForm(true); }} className="px-3 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-brand/20">
                   <Plus className="w-3 h-3" /> Add Contact
                 </button>
               </div>
@@ -452,7 +452,7 @@ export default function CustomerDetailPage() {
                         <div className="flex items-center gap-2 flex-wrap">
                           <p className="font-bold text-sm text-gray-900">{contact.name}</p>
                           {contact.is_primary && (
-                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-100 text-purple-700 flex items-center gap-0.5">
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand/10 text-brand flex items-center gap-0.5">
                               <Star className="w-2.5 h-2.5" /> Primary
                             </span>
                           )}
@@ -469,12 +469,12 @@ export default function CustomerDetailPage() {
                         </div>
                         <div className="flex items-center gap-4 mt-1.5">
                           {contact.email && (
-                            <a href={`mailto:${contact.email}`} className="text-xs text-gray-500 hover:text-purple-600 flex items-center gap-1 transition-colors">
+                            <a href={`mailto:${contact.email}`} className="text-xs text-gray-500 hover:text-brand flex items-center gap-1 transition-colors">
                               <Mail className="w-3 h-3" /> {contact.email}
                             </a>
                           )}
                           {contact.phone && (
-                            <a href={`tel:${contact.phone}`} className="text-xs text-gray-500 hover:text-purple-600 flex items-center gap-1 transition-colors">
+                            <a href={`tel:${contact.phone}`} className="text-xs text-gray-500 hover:text-brand flex items-center gap-1 transition-colors">
                               <Phone className="w-3 h-3" /> {contact.phone}
                             </a>
                           )}
@@ -510,13 +510,13 @@ export default function CustomerDetailPage() {
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-purple-600" />
+                  <Briefcase className="w-4 h-4 text-brand" />
                   Project History
                   <span className="text-sm font-normal text-gray-400">({customer.jobs.length} jobs · {projectNames.length} projects)</span>
                 </h2>
                 <button
                   onClick={() => handleAddJobForProject('', undefined)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-bold rounded-lg transition-colors"
                 >
                   <Plus className="w-3.5 h-3.5" /> New Job
                 </button>
@@ -528,7 +528,7 @@ export default function CustomerDetailPage() {
                   <p className="text-sm">No projects yet</p>
                   <button
                     onClick={() => handleAddJobForProject('', undefined)}
-                    className="mt-3 px-4 py-2 bg-purple-600 text-white text-sm font-semibold rounded-lg hover:bg-purple-700 transition-colors"
+                    className="mt-3 px-4 py-2 bg-brand text-white text-sm font-semibold rounded-lg hover:bg-brand-dark transition-colors"
                   >
                     + Create First Job
                   </button>
@@ -567,7 +567,7 @@ export default function CustomerDetailPage() {
                             <span className="text-sm font-bold text-emerald-600">${totalValue.toLocaleString()}</span>
                             <button
                               onClick={(e) => { e.stopPropagation(); handleAddJobForProject(projectName, representativeJob); }}
-                              className="flex items-center gap-1 px-2.5 py-1.5 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
+                              className="flex items-center gap-1 px-2.5 py-1.5 bg-brand hover:bg-brand-dark text-white text-xs font-bold rounded-lg transition-colors whitespace-nowrap"
                             >
                               <Plus className="w-3 h-3" /> Add Job
                             </button>
@@ -591,10 +591,10 @@ export default function CustomerDetailPage() {
                                 {projectJobs.map((job, jIdx) => (
                                   <tr
                                     key={job.id}
-                                    className={`border-b border-gray-50 hover:bg-purple-50 cursor-pointer transition-colors ${jIdx === projectJobs.length - 1 ? 'border-0' : ''}`}
+                                    className={`border-b border-gray-50 hover:bg-brand/5 cursor-pointer transition-colors ${jIdx === projectJobs.length - 1 ? 'border-0' : ''}`}
                                     onClick={() => router.push(`/dashboard/admin/active-jobs/${job.id}`)}
                                   >
-                                    <td className="px-4 py-2.5 font-mono text-xs text-purple-600 font-semibold">{job.job_number}</td>
+                                    <td className="px-4 py-2.5 font-mono text-xs text-brand font-semibold">{job.job_number}</td>
                                     <td className="px-4 py-2.5 text-gray-700 text-xs">{job.job_type || '--'}</td>
                                     <td className="px-4 py-2.5 text-gray-500 text-xs">{formatDate(job.scheduled_date)}</td>
                                     <td className="px-4 py-2.5">
@@ -690,7 +690,7 @@ export default function CustomerDetailPage() {
             {/* Customer Details Card */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h2 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                <Building2 className="w-4 h-4 text-purple-600" /> Company Details
+                <Building2 className="w-4 h-4 text-brand" /> Company Details
               </h2>
               <div className="space-y-3 text-sm">
                 {customer.address && (
@@ -713,19 +713,19 @@ export default function CustomerDetailPage() {
                 {customer.primary_contact_phone && (
                   <div className="flex items-center gap-2">
                     <Phone className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <a href={`tel:${customer.primary_contact_phone}`} className="text-gray-700 hover:text-purple-600 transition-colors">{customer.primary_contact_phone}</a>
+                    <a href={`tel:${customer.primary_contact_phone}`} className="text-gray-700 hover:text-brand transition-colors">{customer.primary_contact_phone}</a>
                   </div>
                 )}
                 {customer.primary_contact_email && (
                   <div className="flex items-center gap-2">
                     <Mail className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <a href={`mailto:${customer.primary_contact_email}`} className="text-gray-700 hover:text-purple-600 transition-colors truncate">{customer.primary_contact_email}</a>
+                    <a href={`mailto:${customer.primary_contact_email}`} className="text-gray-700 hover:text-brand transition-colors truncate">{customer.primary_contact_email}</a>
                   </div>
                 )}
                 {customer.website && (
                   <div className="flex items-center gap-2">
                     <Globe className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <a href={customer.website} target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-purple-600 transition-colors truncate flex items-center gap-1">
+                    <a href={customer.website} target="_blank" rel="noopener noreferrer" className="text-gray-700 hover:text-brand transition-colors truncate flex items-center gap-1">
                       {customer.website.replace(/^https?:\/\//, '')} <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
@@ -742,10 +742,10 @@ export default function CustomerDetailPage() {
             {/* Notes */}
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
               <h2 className="font-bold text-gray-900 flex items-center gap-2 mb-3">
-                <FileText className="w-4 h-4 text-purple-600" /> Internal Notes
+                <FileText className="w-4 h-4 text-brand" /> Internal Notes
               </h2>
               <textarea
-                className="w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-xl text-sm focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 transition-all placeholder-gray-400 min-h-[100px] resize-y"
+                className="w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-xl text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all placeholder-gray-400 min-h-[100px] resize-y"
                 placeholder="Internal notes about this customer..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -753,7 +753,7 @@ export default function CustomerDetailPage() {
               <button
                 onClick={handleSaveNotes}
                 disabled={savingNotes}
-                className="mt-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50"
+                className="mt-2 px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50"
               >
                 {savingNotes ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
                 Save Notes

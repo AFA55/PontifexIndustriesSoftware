@@ -425,14 +425,14 @@ export default function ModernEstimateBuilder() {
                 </div>
 
                 {/* Grand Total */}
-                <div className="bg-purple-600 rounded-2xl p-6 text-white mb-6 shadow-lg">
+                <div className="bg-brand rounded-2xl p-6 text-white mb-6 shadow-lg">
                   <p className="text-sm font-bold opacity-90 mb-1 tracking-wide">GRAND TOTAL</p>
                   <p className="text-5xl font-bold tracking-tight">${grandTotal.toFixed(2)}</p>
                 </div>
 
                 {/* Action Buttons */}
                 <div className="space-y-3">
-                  <button className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
+                  <button className="w-full flex items-center justify-center gap-2 px-5 py-3.5 bg-brand hover:bg-brand-dark text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5">
                     <FileText className="w-5 h-5" />
                     Generate PDF
                   </button>

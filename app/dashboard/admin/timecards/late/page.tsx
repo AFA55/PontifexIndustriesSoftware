@@ -436,7 +436,7 @@ export default function LateEntriesPage() {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand animate-spin" />
       </div>
     );
   }
@@ -498,7 +498,7 @@ export default function LateEntriesPage() {
                 {!isThisWeek && (
                   <button
                     onClick={goToThisWeek}
-                    className="text-[11px] font-medium text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 mt-0.5 transition-colors"
+                    className="text-[11px] font-medium text-brand hover:text-brand-dark dark:hover:text-brand mt-0.5 transition-colors"
                   >
                     This week
                   </button>
@@ -608,7 +608,7 @@ export default function LateEntriesPage() {
             ════════════════════════════════════════════════════ */}
         <section>
           <h2 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2 mb-4">
-            <Clock size={16} className="text-violet-500" />
+            <Clock size={16} className="text-brand" />
             Standard Start Time &amp; Late Grace
           </h2>
 
@@ -640,7 +640,7 @@ export default function LateEntriesPage() {
                       onChange={(e) =>
                         setSettings((prev) => ({ ...prev, default_start_time: e.target.value }))
                       }
-                      className="w-full px-3 py-2.5 text-base bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition-all min-h-[44px]"
+                      className="w-full px-3 py-2.5 text-base bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all min-h-[44px]"
                     />
                   </div>
                   <div>
@@ -658,7 +658,7 @@ export default function LateEntriesPage() {
                           late_grace_minutes: Math.max(0, parseInt(e.target.value, 10) || 0),
                         }))
                       }
-                      className="w-full px-3 py-2.5 text-base bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-violet-400/30 focus:border-violet-400 transition-all min-h-[44px]"
+                      className="w-full px-3 py-2.5 text-base bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl text-gray-900 dark:text-white focus:ring-2 focus:ring-brand/30 focus:border-brand transition-all min-h-[44px]"
                     />
                   </div>
                 </div>
@@ -666,7 +666,7 @@ export default function LateEntriesPage() {
                 <button
                   onClick={saveSettings}
                   disabled={settingsSaving}
-                  className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                  className="flex items-center gap-2 min-h-[44px] px-5 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold transition-colors disabled:opacity-50"
                 >
                   {settingsSaving ? (
                     <Loader2 size={15} className="animate-spin" />

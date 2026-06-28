@@ -55,9 +55,9 @@ function RatingInput({
           onClick={() => onChange(n)}
           className={`w-7 h-7 rounded-md text-xs font-bold transition-all ${
             value === n
-              ? 'bg-purple-600 text-white shadow-md scale-110'
+              ? 'bg-brand text-white shadow-md scale-110'
               : value !== null && n <= value
-              ? 'bg-purple-100 text-purple-700 hover:bg-purple-200'
+              ? 'bg-brand/10 text-brand hover:bg-brand/20'
               : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
           }`}
         >
@@ -169,7 +169,7 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
-        <Loader2 className="w-6 h-6 text-purple-400 animate-spin" />
+        <Loader2 className="w-6 h-6 text-brand animate-spin" />
       </div>
     );
   }
@@ -183,14 +183,14 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
             {ratedCount} / {skills.length} rated
           </span>
           {avgRating && (
-            <span className="px-2.5 py-1 bg-purple-50 rounded-full text-xs font-bold text-purple-700">
+            <span className="px-2.5 py-1 bg-brand/10 rounded-full text-xs font-bold text-brand">
               Avg: {avgRating} / 10
             </span>
           )}
         </div>
         <button
           onClick={() => setShowAddCategory(v => !v)}
-          className="flex items-center gap-1.5 text-xs font-semibold text-purple-600 hover:text-purple-800 transition-colors"
+          className="flex items-center gap-1.5 text-xs font-semibold text-brand hover:text-brand-dark transition-colors"
         >
           <Plus className="w-3.5 h-3.5" />
           Add Category
@@ -200,21 +200,21 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
 
       {/* Add category form */}
       {showAddCategory && (
-        <div className="bg-purple-50 rounded-xl border border-purple-200 p-3 space-y-2">
-          <p className="text-xs font-semibold text-purple-700 uppercase tracking-wider">New Skill Category</p>
+        <div className="bg-brand/10 rounded-xl border border-brand/20 p-3 space-y-2">
+          <p className="text-xs font-semibold text-brand uppercase tracking-wider">New Skill Category</p>
           <div className="flex gap-2">
             <input
               type="text"
               value={newCategoryName}
               onChange={e => { setNewCategoryName(e.target.value); setAddCategoryError(''); }}
               placeholder="e.g. Flat Sawing"
-              className="flex-1 px-3 py-1.5 border border-purple-300 rounded-lg text-sm text-gray-900 focus:border-purple-500 focus:ring-1 focus:ring-purple-200 bg-white transition-all"
+              className="flex-1 px-3 py-1.5 border border-brand/30 rounded-lg text-sm text-gray-900 focus:border-brand focus:ring-1 focus:ring-brand/30 bg-white transition-all"
               onKeyDown={e => { if (e.key === 'Enter') handleAddCategory(); }}
             />
             <button
               onClick={handleAddCategory}
               disabled={addingCategory || !newCategoryName.trim()}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+              className="px-3 py-1.5 bg-brand hover:bg-brand-dark text-white rounded-lg text-xs font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5"
             >
               {addingCategory ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
               Add
@@ -237,7 +237,7 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
               key={skill.category_id}
               className={`bg-white rounded-xl border transition-all ${
                 isEditing
-                  ? 'border-purple-300 shadow-md'
+                  ? 'border-brand/30 shadow-md'
                   : 'border-gray-200 hover:border-gray-300'
               }`}
             >
@@ -247,7 +247,7 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-gray-800">{skill.category_name}</span>
                     {!skill.is_default && (
-                      <span className="px-1.5 py-0.5 bg-purple-50 rounded-full text-[10px] font-semibold text-purple-600">custom</span>
+                      <span className="px-1.5 py-0.5 bg-brand/10 rounded-full text-[10px] font-semibold text-brand">custom</span>
                     )}
                   </div>
                   <div className="flex items-center gap-2">
@@ -267,7 +267,7 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all ${
                         isEditing
                           ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                          : 'bg-purple-50 text-purple-600 hover:bg-purple-100'
+                          : 'bg-brand/10 text-brand hover:bg-brand/20'
                       }`}
                     >
                       {isEditing ? 'Cancel' : skill.rating !== null ? 'Edit' : 'Rate'}
@@ -293,7 +293,7 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
 
               {/* Editing form */}
               {isEditing && (
-                <div className="px-3.5 pb-3.5 border-t border-purple-100 pt-3 space-y-3">
+                <div className="px-3.5 pb-3.5 border-t border-brand/20 pt-3 space-y-3">
                   <div>
                     <p className="text-xs font-semibold text-gray-500 mb-2 uppercase tracking-wider">Rating (1–10)</p>
                     <RatingInput value={pendingRating} onChange={setPendingRating} />
@@ -310,13 +310,13 @@ export default function SkillsTab({ operatorId, apiFetch }: SkillsTabProps) {
                       onChange={e => setPendingNotes(e.target.value)}
                       rows={2}
                       placeholder="Any observations about this skill..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 resize-none transition-all"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:border-brand focus:ring-1 focus:ring-brand/30 resize-none transition-all"
                     />
                   </div>
                   <button
                     onClick={() => saveRating(skill.category_id)}
                     disabled={saving || pendingRating === null}
-                    className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                    className="w-full px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg font-semibold text-sm transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
                   >
                     {saving ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
