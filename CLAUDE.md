@@ -82,6 +82,7 @@ npm run build      # Production build check (must pass with 0 errors)
 - `DEPLOYMENT_COST.md` — Vercel cost discipline. **86% of the bill was build minutes — every push to main costs money.**
 - `APP_CHANGES.md` — native iOS-only change log
 - `docs/DEVELOPMENT_PLAYBOOK.md` — how we build (executive engineer + builders + guardian)
+- `docs/playbooks/HOW_WE_BUILD.md` — **the founder+Claude operating model** (director mindset, the loop = build→guardian→verify→fix, browser-eyes/Playwright, prompt patterns + magic phrases, white-label-by-default). Read to understand how work happens here.
 - `docs/TOOLING_EVALUATION.md` — third-party tool verdicts; consult + update BEFORE installing anything
 - `docs/SESSION_LOG.md` — historical sprint log (was in this file)
 - `docs/plans/` (future work) · `docs/playbooks/` (how-tos) · `docs/reference/` (deep context: CLAUDE_CONTEXT, CLAUDE_SESSION_CONTEXT, FEATURE_CATALOG, SCALING, DEV_TOOLING_RECOMMENDATIONS, **UI_CATALOG** = reusable Tailwind component patterns — check BEFORE building a card/button/modal, add to it AFTER shipping a new reusable pattern) · `docs/archive/` (history — don't update)
