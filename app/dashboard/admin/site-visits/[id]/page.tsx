@@ -68,7 +68,7 @@ function StarRow({ label, value, color }: { label: string; value: number; color:
         {[1, 2, 3, 4, 5].map((n) => (
           <Star
             key={n}
-            className={`w-5 h-5 ${n <= value ? color : 'text-gray-200 dark:text-slate-700'}`}
+            className={`w-5 h-5 ${n <= value ? color : 'text-gray-200 dark:text-white/15'}`}
             fill={n <= value ? 'currentColor' : 'none'}
           />
         ))}
@@ -121,17 +121,17 @@ export default function SiteVisitDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex items-center justify-center">
-        <Loader2 className="w-7 h-7 animate-spin text-violet-600" />
+      <div className="min-h-screen bg-gray-50 dark:bg-[#1e1b4b] flex items-center justify-center">
+        <Loader2 className="w-7 h-7 animate-spin text-brand" />
       </div>
     );
   }
 
   if (error || !visit) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900 flex flex-col items-center justify-center gap-4">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#1e1b4b] flex flex-col items-center justify-center gap-4">
         <p className="text-gray-500 dark:text-slate-400">{error || 'Visit not found'}</p>
-        <Link href="/dashboard/admin/site-visits" className="text-sm text-violet-600 hover:underline">
+        <Link href="/dashboard/admin/site-visits" className="text-sm font-semibold text-brand hover:underline">
           Back to visits
         </Link>
       </div>
@@ -179,23 +179,24 @@ export default function SiteVisitDetailPage() {
         </div>
       )}
 
-      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+      <div className="min-h-screen bg-gray-50 dark:bg-[#1e1b4b]">
         <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-5 pb-12">
 
           {/* Back */}
           <Link
             href="/dashboard/admin/site-visits"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400"
+            className="inline-flex items-center gap-1.5 min-h-[44px] -ml-1 pl-1 pr-2 text-sm font-medium text-gray-600 dark:text-slate-300 hover:text-brand dark:hover:text-brand transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             All Visits
           </Link>
 
           {/* Hero header */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 via-indigo-600 to-purple-700 p-6 sm:p-8 shadow-2xl shadow-violet-500/30 text-white">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand to-brand-accent p-6 sm:p-8 shadow-xl shadow-brand/25 text-white">
             <div className="absolute inset-0 opacity-10"
               style={{ backgroundImage: 'radial-gradient(circle at 80% 20%, white 0%, transparent 60%)' }}
             />
+            <div className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-white/5 blur-2xl" />
             <div className="relative">
               <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
                 <div>
@@ -267,17 +268,26 @@ export default function SiteVisitDetailPage() {
 
           {/* Ratings */}
           {hasRatings && (
-            <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-4">
-              <h2 className="text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">Ratings</h2>
-              <div className="space-y-3">
+            <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6 space-y-4">
+              <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">
+                <Star className="w-4 h-4 text-brand" fill="currentColor" />
+                Ratings
+              </h2>
+              <div className="divide-y divide-gray-100 dark:divide-white/10">
                 {visit.performance_rating && (
-                  <StarRow label="Performance" value={visit.performance_rating} color="text-violet-500" />
+                  <div className="py-2.5 first:pt-0 last:pb-0">
+                    <StarRow label="Performance" value={visit.performance_rating} color="text-brand" />
+                  </div>
                 )}
                 {visit.safety_rating && (
-                  <StarRow label="Safety" value={visit.safety_rating} color="text-emerald-500" />
+                  <div className="py-2.5 first:pt-0 last:pb-0">
+                    <StarRow label="Safety" value={visit.safety_rating} color="text-emerald-500" />
+                  </div>
                 )}
                 {visit.cleanliness_rating && (
-                  <StarRow label="Cleanliness" value={visit.cleanliness_rating} color="text-sky-500" />
+                  <div className="py-2.5 first:pt-0 last:pb-0">
+                    <StarRow label="Cleanliness" value={visit.cleanliness_rating} color="text-sky-500" />
+                  </div>
                 )}
               </div>
             </section>
@@ -285,9 +295,9 @@ export default function SiteVisitDetailPage() {
 
           {/* Observations */}
           {visit.observations && (
-            <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3">
+            <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6 space-y-3">
               <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">
-                <MessageSquare className="w-4 h-4 text-violet-500" />
+                <MessageSquare className="w-4 h-4 text-brand" />
                 Observations
               </h2>
               <p className="text-sm text-gray-700 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
@@ -298,7 +308,7 @@ export default function SiteVisitDetailPage() {
 
           {/* Issues */}
           {visit.issues_flagged && (
-            <section className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800/40 p-5 space-y-3">
+            <section className="bg-amber-50 dark:bg-amber-900/10 rounded-2xl border border-amber-200 dark:border-amber-800/40 p-5 sm:p-6 space-y-3">
               <h2 className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300 uppercase tracking-widest">
                 <AlertTriangle className="w-4 h-4" />
                 Issues / Concerns
@@ -311,7 +321,7 @@ export default function SiteVisitDetailPage() {
 
           {/* Follow-up */}
           {visit.follow_up_required && (
-            <section className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-amber-300 dark:border-amber-700 p-5 space-y-2">
+            <section className="bg-amber-50/40 dark:bg-amber-900/10 rounded-2xl border-2 border-amber-300 dark:border-amber-700/60 p-5 sm:p-6 space-y-2">
               <h2 className="flex items-center gap-2 text-sm font-bold text-amber-700 dark:text-amber-300 uppercase tracking-widest">
                 <Flag className="w-4 h-4" />
                 Follow-up Required
@@ -328,21 +338,21 @@ export default function SiteVisitDetailPage() {
 
           {/* Jobsite Photos */}
           {sitePhotos.length > 0 && (
-            <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3">
+            <section className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6 space-y-3">
               <h2 className="flex items-center gap-2 text-sm font-bold text-gray-900 dark:text-white uppercase tracking-widest">
-                <ImageIcon className="w-4 h-4 text-violet-500" />
+                <ImageIcon className="w-4 h-4 text-brand" />
                 Jobsite Photos
                 <span className="text-xs font-normal text-gray-400 normal-case tracking-normal ml-1">
                   {sitePhotos.length} photo{sitePhotos.length !== 1 ? 's' : ''}
                 </span>
               </h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
                 {sitePhotos.map((url, i) => (
                   <button
                     key={i}
                     type="button"
                     onClick={() => setLightboxUrl(url)}
-                    className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-slate-600 hover:opacity-90 hover:ring-2 hover:ring-violet-500 transition group"
+                    className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 hover:opacity-95 hover:ring-2 hover:ring-brand transition group"
                     aria-label={`View jobsite photo ${i + 1}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -372,7 +382,7 @@ export default function SiteVisitDetailPage() {
                 return (
                   <div
                     key={i}
-                    className={`bg-white dark:bg-slate-800 rounded-2xl border p-5 space-y-3 ${
+                    className={`rounded-2xl border bg-white dark:bg-white/[0.03] p-5 sm:p-6 space-y-3 ${
                       isMaint
                         ? 'border-amber-200 dark:border-amber-800/40'
                         : 'border-rose-200 dark:border-rose-800/40'
@@ -417,7 +427,7 @@ export default function SiteVisitDetailPage() {
                             key={pi}
                             type="button"
                             onClick={() => setLightboxUrl(url)}
-                            className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600 hover:ring-2 hover:ring-violet-500 transition group"
+                            className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-white/10 hover:ring-2 hover:ring-brand transition group"
                             aria-label={`View issue photo ${pi + 1}`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
