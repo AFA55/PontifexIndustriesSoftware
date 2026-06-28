@@ -166,7 +166,7 @@ export default function CapacitySettingsPage() {
           max={max}
           value={settings[settingKey] as number}
           onChange={e => updateSetting(settingKey, parseInt(e.target.value, 10) || 0)}
-          className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-purple-500"
+          className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-brand"
         />
         <button
           onClick={() => updateSetting(settingKey, (settings[settingKey] as number) + 1)}
@@ -182,7 +182,7 @@ export default function CapacitySettingsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -217,7 +217,7 @@ export default function CapacitySettingsPage() {
           </button>
           <div>
             <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              <Settings className="w-6 h-6 text-purple-600" />
+              <Settings className="w-6 h-6 text-brand" />
               Capacity Settings
             </h1>
             <p className="text-gray-600 mt-1 text-sm">
@@ -230,8 +230,8 @@ export default function CapacitySettingsPage() {
           {/* Section 1: Skill-Based Capacity */}
           <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-6">
             <div className="flex items-center gap-3 mb-5">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <Wrench className="w-5 h-5 text-purple-400" />
+              <div className="p-2 bg-brand/20 rounded-lg">
+                <Wrench className="w-5 h-5 text-brand" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-gray-900">Skill-Based Capacity</h2>
@@ -263,7 +263,7 @@ export default function CapacitySettingsPage() {
                           max={20}
                           value={settings[skill.key] as number}
                           onChange={e => updateSetting(skill.key, parseInt(e.target.value, 10) || 0)}
-                          className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-purple-500"
+                          className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-brand"
                         />
                         <button
                           onClick={() => updateSetting(skill.key, (settings[skill.key] as number) + 1)}
@@ -380,7 +380,7 @@ export default function CapacitySettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl font-medium transition-colors"
+              className="flex items-center gap-2 px-6 py-3 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl font-medium transition-colors"
             >
               {saving ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />

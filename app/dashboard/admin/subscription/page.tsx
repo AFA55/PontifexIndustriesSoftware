@@ -343,8 +343,8 @@ function SubscriptionPageInner() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
         <div className="max-w-md w-full bg-white rounded-2xl border border-gray-200 shadow-sm p-8 text-center">
-          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-purple-100 flex items-center justify-center">
-            <CreditCard className="w-6 h-6 text-purple-600" />
+          <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-brand/10 flex items-center justify-center">
+            <CreditCard className="w-6 h-6 text-brand" />
           </div>
           <h1 className="text-xl font-bold text-gray-900 mb-2">Manage billing on the web</h1>
           <p className="text-sm text-gray-500 mb-6">
@@ -418,7 +418,7 @@ function SubscriptionPageInner() {
 
         {loading ? (
           <div className="flex items-center justify-center py-32">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-brand" />
           </div>
         ) : sub ? (
           <div className="space-y-6">
@@ -493,7 +493,7 @@ function SubscriptionPageInner() {
                   <button
                     onClick={handlePortal}
                     disabled={portalLoading || !sub.hasStripeCustomer}
-                    className="text-sm font-semibold text-purple-600 hover:text-purple-700 disabled:opacity-40 flex items-center gap-1 transition-colors"
+                    className="text-sm font-semibold text-brand hover:text-brand-dark disabled:opacity-40 flex items-center gap-1 transition-colors"
                   >
                     {portalLoading ? (
                       <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -546,7 +546,7 @@ function SubscriptionPageInner() {
               <div className="flex flex-wrap gap-3">
                 <Link
                   href="/pricing"
-                  className="inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
+                  className="inline-flex items-center gap-2 bg-brand hover:bg-brand-dark text-white font-medium px-5 py-2.5 rounded-xl transition-colors text-sm"
                 >
                   <ExternalLink className="w-4 h-4" />
                   View Plans
@@ -577,7 +577,7 @@ export default function SubscriptionPage() {
     <Suspense
       fallback={
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand" />
         </div>
       }
     >

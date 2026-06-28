@@ -125,12 +125,12 @@ function BillingSection({ userRole }: { userRole: string }) {
 
   return (
     <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-      <div className="bg-gradient-to-r from-violet-600 to-indigo-700 px-6 py-4 text-white">
+      <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white">
         <h2 className="text-lg font-bold flex items-center gap-2">
           <CreditCard className="w-5 h-5" />
           Billing &amp; Subscription
         </h2>
-        <p className="text-violet-100 text-sm mt-0.5">Manage your Pontifex Industries subscription</p>
+        <p className="text-white/80 text-sm mt-0.5">Manage your Pontifex Industries subscription</p>
       </div>
 
       <div className="p-6 space-y-5">
@@ -173,7 +173,7 @@ function BillingSection({ userRole }: { userRole: string }) {
             </div>
             <Link
               href="/patriot#pricing"
-              className="flex items-center justify-center gap-2 min-h-[44px] w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-bold text-sm transition-all shadow-lg"
+              className="flex items-center justify-center gap-2 min-h-[44px] w-full rounded-xl bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white font-bold text-sm transition-all shadow-lg"
             >
               View Plans &amp; Pricing
               <ArrowUpRight className="w-4 h-4" />
@@ -183,7 +183,7 @@ function BillingSection({ userRole }: { userRole: string }) {
           <button
             onClick={handleManage}
             disabled={portalLoading}
-            className="flex items-center justify-center gap-2 min-h-[44px] w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all shadow-lg"
+            className="flex items-center justify-center gap-2 min-h-[44px] w-full rounded-xl bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold text-sm transition-all shadow-lg"
           >
             {portalLoading ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Opening portal…</>
@@ -340,7 +340,7 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto mb-3" />
           <p className="text-gray-600 dark:text-white/60 font-medium">Loading settings...</p>
         </div>
       </div>
@@ -369,7 +369,7 @@ export default function SettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving}
-              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Saving...' : 'Save Changes'}
@@ -402,7 +402,7 @@ export default function SettingsPage() {
               href="/dashboard/admin/settings/branding"
               className="block bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.01]"
             >
-              <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white flex items-center justify-between gap-4">
+              <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 min-w-0">
                   {branding.logo_url ? (
                     <img
@@ -422,7 +422,7 @@ export default function SettingsPage() {
                         Super Admin Only
                       </span>
                     </h2>
-                    <p className="text-purple-200 text-sm mt-0.5">Logo, colors, company name and tagline</p>
+                    <p className="text-white/80 text-sm mt-0.5">Logo, colors, company name and tagline</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-white/70 flex-shrink-0" />
@@ -434,12 +434,12 @@ export default function SettingsPage() {
               SCHEDULE BOARD CONFIGURATION
              ══════════════════════════════════════════════ */}
           <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+            <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
                 Schedule Board Configuration
               </h2>
-              <p className="text-purple-200 text-sm mt-0.5">Control how many job slots appear on the daily schedule</p>
+              <p className="text-white/80 text-sm mt-0.5">Control how many job slots appear on the daily schedule</p>
             </div>
 
             <div className="p-6 space-y-6">
@@ -447,7 +447,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <LayoutGrid className="w-4 h-4 text-purple-600" />
+                    <LayoutGrid className="w-4 h-4 text-brand" />
                     <label className="text-sm font-bold text-gray-900 dark:text-white">Available Schedule Spots</label>
                   </div>
                   <p className="text-xs text-gray-500 dark:text-white/60">
@@ -462,8 +462,8 @@ export default function SettingsPage() {
                   >
                     <Minus className="w-4 h-4 text-gray-700 dark:text-white/80" />
                   </button>
-                  <div className="w-16 h-12 flex items-center justify-center bg-purple-50 border-2 border-purple-200 dark:bg-purple-500/15 dark:border-purple-400/30 rounded-xl">
-                    <span className="text-xl font-bold text-purple-700 dark:text-purple-300">{settings.max_slots}</span>
+                  <div className="w-16 h-12 flex items-center justify-center bg-brand/10 border-2 border-brand/20 dark:bg-brand/15 dark:border-brand/30 rounded-xl">
+                    <span className="text-xl font-bold text-brand dark:text-brand">{settings.max_slots}</span>
                   </div>
                   <button
                     onClick={() => adjustSlots(1)}
@@ -483,14 +483,14 @@ export default function SettingsPage() {
                     <div key={i} className="flex items-center gap-2">
                       <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-bold ${
                         i < settings.warning_threshold
-                          ? 'bg-purple-100 text-purple-700 dark:bg-purple-500/15 dark:text-purple-300'
+                          ? 'bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand'
                           : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
                       }`}>
                         {i + 1}
                       </div>
                       <div className={`flex-1 h-6 rounded-lg ${
                         i < settings.warning_threshold
-                          ? 'bg-purple-50 border border-purple-200 dark:bg-purple-500/10 dark:border-purple-400/20'
+                          ? 'bg-brand/5 border border-brand/20 dark:bg-brand/10 dark:border-brand/20'
                           : 'bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/20'
                       }`}>
                         <div className="px-2 py-0.5 text-[10px] text-gray-400 dark:text-white/40">
@@ -684,12 +684,12 @@ export default function SettingsPage() {
               COMPANY HOLIDAYS
              ══════════════════════════════════════════════ */}
           <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4 text-white">
+            <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
                 Company Holidays
               </h2>
-              <p className="text-purple-200 text-sm mt-1">Mark paid holidays and auto-apply holiday pay to eligible staff</p>
+              <p className="text-white/80 text-sm mt-1">Mark paid holidays and auto-apply holiday pay to eligible staff</p>
             </div>
             <div className="p-6">
               <p className="text-sm text-gray-600 dark:text-white/60 mb-4">
@@ -698,7 +698,7 @@ export default function SettingsPage() {
               </p>
               <Link
                 href="/dashboard/admin/settings/holidays"
-                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
+                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
               >
                 Manage Holidays →
               </Link>
@@ -709,12 +709,12 @@ export default function SettingsPage() {
               DATA BACKUPS
              ══════════════════════════════════════════════ */}
           <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
-            <div className="bg-gradient-to-r from-violet-600 to-purple-700 px-6 py-4 text-white">
+            <div className="bg-gradient-to-r from-brand-secondary to-brand px-6 py-4 text-white">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" /></svg>
                 Data Backups
               </h2>
-              <p className="text-violet-100 text-sm mt-1">Export and protect your customer and contact data</p>
+              <p className="text-white/80 text-sm mt-1">Export and protect your customer and contact data</p>
             </div>
             <div className="p-6">
               <p className="text-sm text-gray-600 dark:text-white/60 mb-4">
@@ -723,7 +723,7 @@ export default function SettingsPage() {
               </p>
               <Link
                 href="/dashboard/admin/settings/backups"
-                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-700 hover:from-violet-700 hover:to-purple-800 text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
+                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-brand-secondary to-brand hover:from-brand hover:to-brand-dark text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
               >
                 Manage Backups →
               </Link>

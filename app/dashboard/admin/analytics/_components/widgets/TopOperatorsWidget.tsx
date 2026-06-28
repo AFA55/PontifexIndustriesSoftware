@@ -46,7 +46,7 @@ export default function TopOperatorsWidget({ data, timeRange, isLoading }: Widge
                 <div className="flex items-center gap-2">
                   <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-gradient-to-r from-purple-500 to-blue-500"
+                      className="h-full rounded-full bg-gradient-to-r from-brand to-brand-accent"
                       style={{ width: `${(op.revenue / maxRevenue) * 100}%` }}
                     />
                   </div>

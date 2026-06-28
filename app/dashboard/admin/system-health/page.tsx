@@ -159,7 +159,7 @@ export default function SystemHealthPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <RefreshCw className="w-8 h-8 text-violet-600 animate-spin mx-auto mb-3" />
+          <RefreshCw className="w-8 h-8 text-brand animate-spin mx-auto mb-3" />
           <p className="text-gray-500 text-sm">Loading system health...</p>
         </div>
       </div>
@@ -173,7 +173,7 @@ export default function SystemHealthPage() {
           <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-gray-900 mb-2">Access Denied</h2>
           <p className="text-sm text-gray-500 mb-4">{error}</p>
-          <button onClick={() => router.push('/dashboard/admin')} className="px-4 py-2 bg-violet-600 text-white rounded-xl text-sm font-semibold hover:bg-violet-700">
+          <button onClick={() => router.push('/dashboard/admin')} className="px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold">
             Back to Dashboard
           </button>
         </div>

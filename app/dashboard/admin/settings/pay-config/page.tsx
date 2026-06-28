@@ -107,7 +107,7 @@ export default function PayConfigPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
       </div>
     );
   }
@@ -126,7 +126,7 @@ export default function PayConfigPage() {
           </Link>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2">
-              <DollarSign className="w-6 h-6 text-purple-600" />
+              <DollarSign className="w-6 h-6 text-brand" />
               Pay Category Configuration
             </h1>
             <p className="text-slate-500 text-sm mt-0.5">
@@ -163,7 +163,7 @@ export default function PayConfigPage() {
                     step={0.5}
                     value={config.overtime_threshold_hours}
                     onChange={(e) => setConfig(c => ({ ...c, overtime_threshold_hours: Number(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">hrs</span>
                 </div>
@@ -182,7 +182,7 @@ export default function PayConfigPage() {
                     step={0.05}
                     value={config.overtime_rate}
                     onChange={(e) => setConfig(c => ({ ...c, overtime_rate: Number(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">×</span>
                 </div>
@@ -217,7 +217,7 @@ export default function PayConfigPage() {
                 <select
                   value={config.night_shift_start_hour}
                   onChange={(e) => setConfig(c => ({ ...c, night_shift_start_hour: Number(e.target.value) }))}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand bg-white"
                 >
                   {Array.from({ length: 24 }, (_, i) => (
                     <option key={i} value={i}>{hourToLabel(i)}</option>
@@ -238,7 +238,7 @@ export default function PayConfigPage() {
                     step={0.05}
                     value={config.night_shift_premium_rate}
                     onChange={(e) => setConfig(c => ({ ...c, night_shift_premium_rate: Number(e.target.value) }))}
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">×</span>
                 </div>
@@ -275,7 +275,7 @@ export default function PayConfigPage() {
           {/* Priority Summary */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
             <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-              <Zap className="w-4 h-4 text-purple-600" />
+              <Zap className="w-4 h-4 text-brand" />
               Classification Priority
             </h2>
             <ol className="space-y-2">
@@ -316,7 +316,7 @@ export default function PayConfigPage() {
           <button
             onClick={handleSave}
             disabled={saving}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-700 disabled:opacity-60 text-white font-semibold rounded-2xl transition-colors shadow-sm"
+            className="w-full flex items-center justify-center gap-2 py-3 bg-brand hover:bg-brand-dark disabled:opacity-60 text-white font-semibold rounded-2xl transition-colors shadow-sm"
           >
             {saving ? (
               <Loader2 className="w-4 h-4 animate-spin" />

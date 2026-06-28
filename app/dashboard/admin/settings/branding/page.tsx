@@ -72,7 +72,7 @@ function TextInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+        className="w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent"
       />
     </div>
   );
@@ -103,7 +103,7 @@ function ColorInput({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="#000000"
-          className="flex-1 px-3 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          className="flex-1 px-3 py-2.5 text-gray-900 bg-white border border-gray-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-brand focus:border-transparent"
         />
       </div>
     </div>
@@ -135,7 +135,7 @@ function Toggle({
           onChange={(e) => onChange(e.target.checked)}
           className="sr-only peer"
         />
-        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600" />
+        <div className="w-11 h-6 bg-gray-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand" />
       </label>
     </div>
   );
@@ -218,13 +218,13 @@ function LogoUpload({
         onClick={() => inputRef.current?.click()}
         className={`relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
           dragOver
-            ? 'border-purple-400 bg-purple-50'
+            ? 'border-brand bg-brand/10'
             : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
         }`}
       >
         {uploading ? (
           <div className="flex items-center justify-center gap-2 py-2">
-            <Loader2 className="w-5 h-5 animate-spin text-purple-600" />
+            <Loader2 className="w-5 h-5 animate-spin text-brand" />
             <span className="text-sm text-gray-500">Uploading...</span>
           </div>
         ) : currentUrl ? (
@@ -236,7 +236,7 @@ function LogoUpload({
             />
             <div className="flex-1 text-left">
               <p className="text-xs text-gray-600 truncate max-w-[200px]">{currentUrl.split('/').pop()}</p>
-              <p className="text-xs text-purple-600 mt-1">Click or drop to replace</p>
+              <p className="text-xs text-brand mt-1">Click or drop to replace</p>
             </div>
           </div>
         ) : (
@@ -368,7 +368,7 @@ export default function BrandingSettingsPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-purple-600 mx-auto mb-3" />
+          <Loader2 className="w-8 h-8 animate-spin text-brand mx-auto mb-3" />
           <p className="text-gray-500 font-medium">Loading branding settings...</p>
         </div>
       </div>
@@ -387,7 +387,7 @@ export default function BrandingSettingsPage() {
               </Link>
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-purple-600" />
+                  <Palette className="w-5 h-5 text-brand" />
                   Company Branding
                 </h1>
                 <p className="text-gray-500 text-xs">Customize company name, logos, colors, and feature modules</p>
@@ -396,7 +396,7 @@ export default function BrandingSettingsPage() {
             <button
               onClick={handleSave}
               disabled={saving || !isDirty}
-              className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
+              className="px-5 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl disabled:opacity-50 flex items-center gap-2"
             >
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
               {saving ? 'Saving...' : 'Save Changes'}
@@ -581,7 +581,7 @@ export default function BrandingSettingsPage() {
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
+                className="px-5 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                 {saving ? 'Saving...' : 'Save Changes'}

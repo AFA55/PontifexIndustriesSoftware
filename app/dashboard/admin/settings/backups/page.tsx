@@ -129,7 +129,7 @@ export default function BackupsPage() {
           </button>
           <div>
             <h1 className="text-2xl font-black text-white flex items-center gap-3">
-              <Database className="w-6 h-6 text-violet-400" />
+              <Database className="w-6 h-6 text-brand" />
               Data Backups
             </h1>
             <p className="text-zinc-500 text-sm mt-0.5">
@@ -164,11 +164,11 @@ export default function BackupsPage() {
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-violet-500/10 to-violet-900/10 border border-violet-500/30 rounded-2xl p-6 mb-6">
+        <div className="bg-gradient-to-br from-brand/10 to-brand/5 border border-brand/30 rounded-2xl p-6 mb-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-white mb-1 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-violet-400" />
+                <FileText className="w-5 h-5 text-brand" />
                 Contact Backup (CSV)
               </h2>
               <p className="text-zinc-400 text-sm">
@@ -179,7 +179,7 @@ export default function BackupsPage() {
             <button
               onClick={downloadBackup}
               disabled={downloading}
-              className="flex items-center gap-2 px-6 py-3 bg-violet-600 hover:bg-violet-500 disabled:opacity-60 disabled:cursor-not-allowed rounded-xl text-white font-bold text-sm transition-all whitespace-nowrap"
+              className="flex items-center gap-2 px-6 py-3 bg-brand hover:bg-brand-dark disabled:opacity-60 disabled:cursor-not-allowed rounded-xl text-white font-bold text-sm transition-all whitespace-nowrap"
             >
               {downloading ? (
                 <>
@@ -209,8 +209,8 @@ export default function BackupsPage() {
             </div>
           </div>
           <div className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-5 flex gap-4">
-            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-violet-500/10 border border-violet-500/20 flex items-center justify-center">
-              <Clock className="w-5 h-5 text-violet-400" />
+            <div className="flex-shrink-0 w-10 h-10 rounded-lg bg-brand/10 border border-brand/20 flex items-center justify-center">
+              <Clock className="w-5 h-5 text-brand" />
             </div>
             <div>
               <p className="font-semibold text-white text-sm mb-1">Manual CSV Exports</p>

@@ -232,7 +232,7 @@ export default function HolidaysSettingsPage() {
             </Link>
             <div className="h-6 w-px bg-slate-200" />
             <h1 className="text-lg font-bold text-slate-900 flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-sm">
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center shadow-sm">
                 <CalendarDays size={16} className="text-white" />
               </div>
               Company Holidays
@@ -252,8 +252,8 @@ export default function HolidaysSettingsPage() {
         {/* ── Add holiday ───────────────────────────────── */}
         <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center">
-              <Plus size={16} className="text-purple-600" />
+            <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center">
+              <Plus size={16} className="text-brand" />
             </div>
             <div>
               <h2 className="text-sm font-bold text-slate-800">Add a holiday</h2>
@@ -376,7 +376,7 @@ export default function HolidaysSettingsPage() {
                           <p className={`text-sm font-bold ${h.is_active ? 'text-slate-800' : 'text-slate-400 line-through'}`}>
                             {h.name}
                           </p>
-                          <span className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded-full">
+                          <span className="text-xs font-semibold text-brand bg-brand/10 border border-brand/20 px-2 py-0.5 rounded-full">
                             {Number(h.pay_hours)} hrs
                           </span>
                           <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full">

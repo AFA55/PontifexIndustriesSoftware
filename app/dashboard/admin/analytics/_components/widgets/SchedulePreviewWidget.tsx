@@ -69,7 +69,7 @@ export default function SchedulePreviewWidget({ data, timeRange, isLoading }: Wi
       </div>
       <Link
         href="/dashboard/admin/schedule"
-        className="mt-3 text-center text-xs text-purple-600 hover:text-purple-800 font-medium"
+        className="mt-3 text-center text-xs text-brand hover:text-brand-dark font-medium"
       >
         View Full Schedule &rarr;
       </Link>

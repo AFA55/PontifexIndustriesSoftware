@@ -285,7 +285,7 @@ export default function OpsHubPage() {
             {/* ═══ ROLE / PERMISSION MATRIX ═══ */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-500" />
+                <Users className="w-4 h-4 text-brand" />
                 Role &amp; Permission Overview
               </h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
