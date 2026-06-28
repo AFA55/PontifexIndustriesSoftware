@@ -94,7 +94,7 @@ const getMeta = (s: string) => STATUS_META[s] ?? { label: s, color: '#6b7280', b
 function Spinner() {
   return (
     <div className="flex items-center justify-center py-8">
-      <div className="w-8 h-8 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+      <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
     </div>
   );
 }
@@ -117,7 +117,7 @@ interface KPICardProps {
 
 function KPICard({ label, value, delta, icon: Icon, iconBg, iconColor, loading }: KPICardProps) {
   return (
-    <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm p-5 flex items-center gap-4">
+    <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6 flex items-center gap-4">
       <div className={`w-12 h-12 ${iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}>
         <Icon className={`w-6 h-6 ${iconColor}`} />
       </div>
@@ -146,7 +146,7 @@ function KPICard({ label, value, delta, icon: Icon, iconBg, iconColor, loading }
 function RevenueTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="bg-white dark:bg-[#1a0f3a] border border-gray-100 dark:border-white/10 rounded-xl shadow-xl px-3 py-2 text-sm">
+    <div className="bg-white dark:bg-[#1a0f3a] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl px-3 py-2 text-sm">
       <p className="text-gray-500 dark:text-white/50 text-xs mb-1">{label}</p>
       <p className="font-bold text-gray-900 dark:text-white">{fmtFull$(payload[0].value)}</p>
     </div>
@@ -242,7 +242,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-purple-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <div className="animate-spin w-12 h-12 border-4 border-brand border-t-transparent rounded-full mx-auto mb-4" />
           <p className="text-gray-500 dark:text-white/50 font-medium">Loading analytics…</p>
         </div>
       </div>
@@ -256,7 +256,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       {!embedded && (
-        <div className="bg-gradient-to-r from-slate-900 via-purple-950 to-indigo-950 dark:from-[#0b0618] dark:via-[#120a2e] dark:to-[#0e0720] border-b border-purple-800/40 dark:border-white/10 sticky top-0 z-20 shadow-xl">
+        <div className="bg-gradient-to-r from-brand-secondary to-brand dark:from-[#0b0618] dark:via-[#120a2e] dark:to-[#0e0720] border-b border-white/10 sticky top-0 z-20 shadow-xl">
           <div className="container mx-auto px-4 py-3 max-w-7xl flex items-center justify-between gap-3">
             <div className="flex items-center gap-3">
               <Link
@@ -267,10 +267,10 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
               </Link>
               <div>
                 <h1 className="text-lg font-bold text-white flex items-center gap-2">
-                  <BarChart3 className="w-5 h-5 text-purple-300" />
+                  <BarChart3 className="w-5 h-5 text-white/80" />
                   Analytics Dashboard
                 </h1>
-                <p className="text-xs text-purple-200/70">{today}</p>
+                <p className="text-xs text-white/70">{today}</p>
               </div>
             </div>
 
@@ -283,8 +283,8 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
                     onClick={() => setTimeRange(r)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                       timeRange === r
-                        ? 'bg-white text-purple-900 shadow-sm'
-                        : 'text-purple-200 hover:text-white'
+                        ? 'bg-white text-brand shadow-sm'
+                        : 'text-white/70 hover:text-white'
                     }`}
                   >
                     {r.charAt(0).toUpperCase() + r.slice(1)}
@@ -295,7 +295,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
               <button
                 onClick={fetchData}
                 disabled={dataLoading}
-                className="p-2 bg-white/10 border border-white/20 rounded-xl text-purple-200 hover:bg-white/20 hover:text-white transition-all disabled:opacity-50"
+                className="p-2 bg-white/10 border border-white/20 rounded-xl text-white/80 hover:bg-white/20 hover:text-white transition-all disabled:opacity-50"
                 title="Refresh"
               >
                 <RefreshCw className={`w-4 h-4 ${dataLoading ? 'animate-spin' : ''}`} />
@@ -317,7 +317,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
                   onClick={() => setTimeRange(r)}
                   className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
                     timeRange === r
-                      ? 'bg-white text-blue-600 shadow-sm dark:bg-white/20 dark:text-white'
+                      ? 'bg-white text-brand shadow-sm dark:bg-white/20 dark:text-white'
                       : 'text-gray-500 hover:text-gray-700 dark:text-white/50'
                   }`}
                 >
@@ -341,8 +341,8 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
             label="Total Revenue"
             value={fmt$(kpi.total_revenue ?? 0)}
             icon={DollarSign}
-            iconBg="bg-purple-100 dark:bg-purple-500/20"
-            iconColor="text-purple-600 dark:text-purple-400"
+            iconBg="bg-brand/10"
+            iconColor="text-brand"
             loading={dataLoading}
           />
           <KPICard
@@ -375,10 +375,10 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-5">
 
           {/* Revenue Chart — 60% */}
-          <div className="lg:col-span-3 bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm p-5">
+          <div className="lg:col-span-3 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-purple-500" />
+                <TrendingUp className="w-4 h-4 text-brand" />
                 <h3 className="font-semibold text-gray-800 dark:text-white text-sm">Revenue Trend</h3>
               </div>
               <span className="text-xs text-gray-400 dark:text-white/40">Last 12 months</span>
@@ -419,15 +419,15 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
                   <AreaChart data={revenueTrend.map((d) => ({ ...d, month: formatMonthLabel(d.month) }))} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.25} />
-                        <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                        <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.25} />
+                        <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" className="dark:stroke-white/5" />
                     <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                     <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} width={44} />
                     <Tooltip content={<RevenueTooltip />} />
-                    <Area type="monotone" dataKey="revenue" stroke="#7c3aed" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: '#7c3aed' }} />
+                    <Area type="monotone" dataKey="revenue" stroke="var(--color-primary)" strokeWidth={2} fill="url(#revGrad)" dot={false} activeDot={{ r: 4, fill: 'var(--color-primary)' }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -435,7 +435,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
           </div>
 
           {/* Job Status Donut — 40% */}
-          <div className="lg:col-span-2 bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm p-5 flex flex-col">
+          <div className="lg:col-span-2 rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6 flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <PieChart className="w-4 h-4 text-blue-500" />
               <h3 className="font-semibold text-gray-800 dark:text-white text-sm">Job Status</h3>
@@ -518,10 +518,10 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
 
           {/* Top Operators */}
-          <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm p-5">
+          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-orange-500" />
+                <Users className="w-4 h-4 text-brand" />
                 <h3 className="font-semibold text-gray-800 dark:text-white text-sm">Crew Performance</h3>
               </div>
               <div className="flex items-center gap-4">
@@ -560,7 +560,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
                   return (
                     <div key={op.name} className="flex items-center gap-3">
                       {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center flex-shrink-0">
+                      <div className="w-9 h-9 rounded-full bg-gradient-to-br from-brand to-brand-secondary flex items-center justify-center flex-shrink-0">
                         <span className="text-white text-xs font-bold">{initials(op.name)}</span>
                       </div>
                       <div className="flex-1 min-w-0">
@@ -574,7 +574,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
                         <div className="flex items-center gap-2">
                           <div className="flex-1 h-1.5 bg-gray-100 dark:bg-white/10 rounded-full overflow-hidden">
                             <div
-                              className="h-full rounded-full bg-gradient-to-r from-purple-500 to-blue-500 transition-all duration-500"
+                              className="h-full rounded-full bg-gradient-to-r from-brand to-brand-secondary transition-all duration-500"
                               style={{ width: `${pct}%` }}
                             />
                           </div>
@@ -589,7 +589,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
           </div>
 
           {/* Recent Jobs */}
-          <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm p-5">
+          <div className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-5 sm:p-6">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Activity className="w-4 h-4 text-emerald-500" />
@@ -597,7 +597,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
               </div>
               <Link
                 href="/dashboard/admin/jobs"
-                className="text-xs text-purple-600 dark:text-purple-400 hover:underline flex items-center gap-0.5"
+                className="text-xs text-brand hover:underline flex items-center gap-0.5"
               >
                 View all <ChevronRight className="w-3 h-3" />
               </Link>
@@ -681,9 +681,9 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
               label: 'Jobs This Period',
               value: String(kpi.active_jobs ?? 0),
               sub: timeRange.charAt(0).toUpperCase() + timeRange.slice(1) + ' view',
-              color: 'text-purple-600 dark:text-purple-400',
+              color: 'text-brand',
               icon: BarChart3,
-              iconBg: 'bg-purple-50 dark:bg-purple-500/10',
+              iconBg: 'bg-brand/10',
             },
             {
               label: 'Crew Utilization',
@@ -698,7 +698,7 @@ export default function AnalyticsDashboardContent({ embedded = false }: { embedd
           ].map((card) => (
             <div
               key={card.label}
-              className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 shadow-sm p-4 flex items-center gap-3"
+              className="rounded-2xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4 flex items-center gap-3"
             >
               <div className={`w-10 h-10 ${card.iconBg} rounded-xl flex items-center justify-center flex-shrink-0`}>
                 <card.icon className={`w-5 h-5 ${card.color}`} />
