@@ -87,6 +87,18 @@
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
 
+## 🟠 P1 (added Jun 28 — founder testing findings, admin + super_admin)
+
+- [x] ~~Remove broken "Operator View" button~~ ✅ (`3d80ec2f`) — gone from sidebar.
+- [x] ~~Settings not visible to admins~~ ✅ (`3d80ec2f`) — sidebar Settings now admin+super_admin+ops.
+- [x] ~~Admins can't edit branding/colors~~ ✅ (`3d80ec2f`) — branding write routes requireSuperAdmin→requireAdmin (tenant-scoped; guardian PASS).
+- [x] ~~Site Visit Reports: admins shouldn't add (supervisors/PMs do)~~ ✅ (`3d80ec2f`+`a5c86b2b`) — New-Visit button hidden for admins + server-enforced (READ_ROLES vs CREATE_ROLES; create = supervisor/ops/super_admin). No `project_manager` role exists — supervisor/ops cover it; flag if a dedicated PM role is wanted.
+- [x] ~~Visit Report detail UI redesign~~ ✅ (`02a4fb6e`) — brand-token hero + design-system surfaces.
+- [x] ~~Analytics looks off / "no data"~~ ✅ (`a83013c7`) — data was REAL+tenant-scoped (looked empty = sparse demo data); fixed the VISUAL (design-system cards + brand header + chart reads var(--color-primary)).
+- [ ] **🎨 BIG: full color-palette → ENTIRE-app theming + Twilio-style Settings/branding editor.** Founder: changing colors in Settings must recolor the WHOLE app, "not just some areas." Foundation done (brand tokens + admins can edit), BUT the long-tail brand sweep (~290 files still hardcode purple/violet/indigo) must be completed so every screen follows the tenant palette. Plus: polish the Settings + color-palette editor UI (clean/professional, mirror Twilio's settings layout; live preview + presets + contrast check). This is the next dedicated effort — run as multiple `parallel-burndown` brand-sweep waves (see the 4-scout audit list + `docs/playbooks/PARALLEL_BURNDOWN.md`).
+- [ ] **Face ID enroll prompt may not fire via the DEMO-account login path** — founder on v1.0.4/Build 9 (plugin present) saw no Face ID button (correct pre-enrollment) AND wants to confirm the post-password-login "Enable Face ID?" prompt appears. Investigate whether the "Demo Account Access" login bypasses the enroll prompt; confirm normal password login shows it. (Native — verify on-device; can't loop-test.)
+- [ ] **Demo super_admin** — `super@pontifex.com` / `super0202!` exists (Patriot). If broken, reset via admin tools (Claude can't create accounts).
+
 ## 🟠 P1 (added Jun 27 — surfaced during dev-velocity sweep)
 
 - [ ] **🎨 Tenant brand-token sweep — finish the long tail (~290 files).** ROOT CAUSE FIXED + 2 waves done (`90493401`/`f653b4e3`/`7c60735d`, pushed). The `tailwind.config` now has tenant-aware `brand`/`brand-dark`/`brand-secondary`/`brand-accent` tokens (driven by `--color-*-rgb` vars BrandingProvider sets; safelisted; verified live = Patriot red/navy). 16 highest-impact files converted (~213 swaps): NotificationBell, DashboardSidebar, NFC/QuickAdd/Invite/RichEdit modals, dashboard home, timecard, my-profile, request-time-off, JobHistory ×2, EquipmentUsageForm, AddBladeWizard, admin home, admin/customers. **Remaining:** ~290 files still hardcode purple/violet/indigo as brand (rest of admin pages, remaining modals, equipment/job components). Run more `parallel-burndown` waves (4 builders × 2 files, guardian-review each, convert brand-purple→`brand` tokens, LEAVE semantic status/category colors + night-shift indigo). Full per-file list was produced by the Jun 27 4-scout audit. **NIT to fold in:** several redundant `dark:text-brand` (== base) can be dropped for tidiness.
