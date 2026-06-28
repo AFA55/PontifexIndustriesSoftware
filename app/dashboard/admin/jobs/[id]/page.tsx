@@ -62,6 +62,10 @@ const EditScheduleModal = dynamicImport(() => import('./_components/EditSchedule
   ssr: false,
   loading: () => null,
 });
+const CustomerCommentsPanel = dynamicImport(() => import('./_components/CustomerCommentsPanel'), {
+  ssr: false,
+  loading: () => <div className="h-64 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />,
+});
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1730,6 +1734,9 @@ export default function AdminJobDetailPage({
 
             {/* ── Live Status Panel (rendered via shared renderer) ── */}
             {renderLiveStatusPanel()}
+
+            {/* ── Customer Messages (2-way customer ↔ staff thread) ── */}
+            <CustomerCommentsPanel jobId={jobId} />
 
             {/* ── Office Documents (management-only; component self-guards) ── */}
             {['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(userRole) && (

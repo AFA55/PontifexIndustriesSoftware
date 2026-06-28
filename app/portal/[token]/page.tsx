@@ -363,9 +363,10 @@ export default function CustomerPortalPage() {
                 const dateToShow = job.completed_at || job.scheduled_date;
 
                 return (
-                  <div
+                  <Link
                     key={job.id}
-                    className="bg-white/5 hover:bg-white/8 border border-white/10 rounded-2xl p-4 transition-colors"
+                    href={`/portal/${token}/job/${job.id}`}
+                    className="block bg-white/5 hover:bg-white/8 border border-white/10 rounded-2xl p-4 transition-colors active:scale-[0.99]"
                   >
                     {/* Top row: name + status */}
                     <div className="flex items-start justify-between gap-3 mb-3">
@@ -414,7 +415,7 @@ export default function CustomerPortalPage() {
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>
