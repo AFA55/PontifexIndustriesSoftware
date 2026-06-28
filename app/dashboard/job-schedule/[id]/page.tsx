@@ -9,6 +9,7 @@ import { getCurrentUser, type User } from '@/lib/auth';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
+import { jobStatusSolidClasses } from '@/lib/status-colors';
 
 // Enhanced job data structure with real DSM-style information
 const jobDetails = {
@@ -311,15 +312,7 @@ export default function JobDetail() {
     );
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'scheduled': return 'bg-blue-500 border-blue-600';
-      case 'in-route': return 'bg-yellow-500 border-yellow-600';
-      case 'in-progress': return 'bg-orange-500 border-orange-600';
-      case 'completed': return 'bg-green-500 border-green-600';
-      default: return 'bg-gray-500 border-gray-600';
-    }
-  };
+  const getStatusColor = jobStatusSolidClasses;
 
   const getStatusIcon = (status: string) => {
     switch (status) {

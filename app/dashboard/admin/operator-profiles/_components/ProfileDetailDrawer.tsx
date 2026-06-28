@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, Calendar, Briefcase, MapPin, Clock, AlertCircle, Shield, BadgeCheck, Building2, ExternalLink, Loader2 } from 'lucide-react';
+import { jobStatusPillClasses, expiryStatusClasses } from '@/lib/status-colors';
 
 interface ProfileDetail {
   id: string;
@@ -93,15 +94,7 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
     return new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const statusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'bg-green-100 text-green-700';
-      case 'in_progress': return 'bg-blue-100 text-blue-700';
-      case 'scheduled': case 'assigned': return 'bg-purple-100 text-purple-700';
-      case 'cancelled': return 'bg-red-100 text-red-700';
-      default: return 'bg-gray-100 text-gray-700';
-    }
-  };
+  const statusColor = jobStatusPillClasses;
 
   return (
     <>
@@ -198,11 +191,7 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
                 ) : badges.length > 0 ? (
                   <div className="space-y-2">
                     {badges.map((badge) => {
-                      const expiryColorClass =
-                        badge.expiry_status === 'valid' ? 'bg-green-100 text-green-700 border-green-200' :
-                        badge.expiry_status === 'expiring_soon' ? 'bg-amber-100 text-amber-700 border-amber-200' :
-                        badge.expiry_status === 'expired' ? 'bg-red-100 text-red-700 border-red-200' :
-                        'bg-gray-100 text-gray-600 border-gray-200';
+                      const expiryColorClass = expiryStatusClasses(badge.expiry_status);
                       const expiryText =
                         badge.expiry_status === 'valid' ? 'Valid' :
                         badge.expiry_status === 'expiring_soon' ? 'Expiring Soon' :

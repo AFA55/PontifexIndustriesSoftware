@@ -15,6 +15,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { signStoragePath } from '@/lib/signed-urls';
 import { requireAuth } from '@/lib/api-auth';
 
 const UPLOAD_ROLES = new Set(['shop_manager','admin','super_admin','operations_manager','supervisor']);
@@ -78,13 +79,11 @@ export async function POST(request: NextRequest) {
 
   // Signed URL valid 30 days — long enough for audit replay while the checkout
   // is being investigated, but bounded so the URL can't be passed around forever.
-  const signed = await supabaseAdmin.storage
-    .from('voice-checkouts')
-    .createSignedUrl(path, 60 * 60 * 24 * 30);
+  const url = await signStoragePath('voice-checkouts', path, 60 * 60 * 24 * 30);
 
   return NextResponse.json({
     success: true,
     path,
-    url: signed.data?.signedUrl || null,
+    url,
   });
 }

@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { signStoragePath } from '@/lib/signed-urls';
 import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
@@ -108,10 +109,7 @@ export async function GET(request: NextRequest) {
       if (!val) return null;
       if (val === 'photo-upload-failed') return null;
       if (val.startsWith('http://') || val.startsWith('https://')) return null;
-      const { data: signed } = await supabaseAdmin.storage
-        .from('timecard-photos')
-        .createSignedUrl(val, 3600);
-      return signed?.signedUrl ?? null;
+      return signStoragePath('timecard-photos', val, 3600);
     };
 
     const enriched = await Promise.all((data || []).map(async t => ({

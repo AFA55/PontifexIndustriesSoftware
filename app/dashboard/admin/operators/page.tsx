@@ -9,6 +9,7 @@ import { getCurrentUser, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { MapPin, Clock, User as UserIcon, Activity, Navigation, CheckCircle } from 'lucide-react';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
+import { liveOperatorStatusBg } from '@/lib/status-colors';
 
 interface OperatorStatus {
   id: string;
@@ -108,15 +109,7 @@ export default function OperatorsMonitoringPage() {
     return `https://www.google.com/maps?q=${lat},${lng}`;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'clocked_in': return 'bg-green-500';
-      case 'en_route': return 'bg-blue-500';
-      case 'in_progress': return 'bg-orange-500';
-      case 'job_completed': return 'bg-purple-500';
-      default: return 'bg-gray-500';
-    }
-  };
+  const getStatusColor = liveOperatorStatusBg;
 
   const getStatusText = (status: string) => {
     switch (status) {

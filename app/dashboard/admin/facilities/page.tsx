@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useModuleGate } from '@/components/ModuleGuard';
+import { credentialStatusClasses } from '@/lib/status-colors';
 
 // ============================================================
 // Types
@@ -102,15 +103,7 @@ function expiryLabel(status: string) {
   }
 }
 
-function badgeStatusColor(status: string) {
-  switch (status) {
-    case 'active': return 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300';
-    case 'expired': return 'bg-red-100 text-red-700 dark:bg-rose-500/15 dark:text-rose-300';
-    case 'revoked': return 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white/60';
-    case 'pending': return 'bg-yellow-100 text-yellow-700 dark:bg-amber-500/15 dark:text-amber-300';
-    default: return 'bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-white/60';
-  }
-}
+const badgeStatusColor = credentialStatusClasses;
 
 // ============================================================
 // Add Facility Modal

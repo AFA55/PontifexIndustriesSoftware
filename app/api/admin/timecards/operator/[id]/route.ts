@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { signStoragePath } from '@/lib/signed-urls';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
 
@@ -302,10 +303,7 @@ export async function GET(
       if (!val) return null;
       if (val === 'photo-upload-failed') return null;
       if (val.startsWith('http://') || val.startsWith('https://')) return null;
-      const { data: signed } = await supabaseAdmin.storage
-        .from('timecard-photos')
-        .createSignedUrl(val, 3600);
-      return signed?.signedUrl ?? null;
+      return signStoragePath('timecard-photos', val, 3600);
     };
 
     const finalEntries = await Promise.all(enrichedEntries.map(async (entry: any) => {

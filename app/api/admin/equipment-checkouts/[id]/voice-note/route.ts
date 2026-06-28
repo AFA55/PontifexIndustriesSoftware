@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { signStoragePath } from '@/lib/signed-urls';
 import { requireAdmin } from '@/lib/api-auth';
 
 export async function GET(
@@ -56,16 +57,14 @@ export async function GET(
   const [bucket, ...rest] = storagePath.split('/');
   const filePath = rest.join('/');
 
-  const { data: signed, error } = await supabaseAdmin.storage
-    .from(bucket)
-    .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 more days
+  const signedUrl = await signStoragePath(bucket, filePath, 60 * 60 * 24 * 30); // 30 more days
 
-  if (error || !signed) {
+  if (!signedUrl) {
     return NextResponse.json(
-      { error: 'Failed to re-sign URL', details: error?.message },
+      { error: 'Failed to re-sign URL' },
       { status: 500 }
     );
   }
 
-  return NextResponse.json({ success: true, url: signed.signedUrl });
+  return NextResponse.json({ success: true, url: signedUrl });
 }

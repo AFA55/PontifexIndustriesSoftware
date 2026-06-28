@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { signStoragePath } from '@/lib/signed-urls';
 import { requireSalesStaff } from '@/lib/api-auth';
 
 const BUCKET = 'office-documents';
@@ -72,12 +73,12 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     return NextResponse.json({ error: 'Upload failed', details: uploadRes.error.message }, { status: 500 });
   }
 
-  const signed = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, SIGNED_URL_TTL);
+  const url = await signStoragePath(BUCKET, path, SIGNED_URL_TTL);
 
   return NextResponse.json({
     success: true,
     path,
-    url: signed.data?.signedUrl || null,
+    url,
     file_name: safeName,
     file_size: file.size,
   });
