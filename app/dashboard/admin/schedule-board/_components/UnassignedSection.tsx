@@ -47,7 +47,7 @@ export default function UnassignedSection({
               className={`rounded-xl border-2 border-orange-200 dark:border-orange-500/40 bg-orange-50/50 dark:bg-orange-500/10 p-4 hover:shadow-md transition-all cursor-pointer ${canEdit ? 'active:cursor-grabbing' : ''}`}
             >
               <h4 className="font-bold text-gray-900 dark:text-white text-sm mb-1">{job.customer_name}</h4>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mb-2">{job.job_type?.split(',')[0]?.trim()}</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand mb-2">{job.job_type?.split(',')[0]?.trim()}</span>
               <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><MapPin className="w-3 h-3 text-gray-400" /> {job.location}</p>
               {job.equipment_needed.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
@@ -59,7 +59,7 @@ export default function UnassignedSection({
               {canEdit && (
                 <button
                   onClick={(e) => { e.stopPropagation(); onAssign(job); }}
-                  className="w-full py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
+                  className="w-full py-2 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
                 >
                   <Users className="w-3.5 h-3.5 inline mr-1.5" /> Assign Operator
                 </button>

@@ -151,10 +151,10 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
 
           {/* Multi-day info */}
           {job.day_label && (
-            <div className="bg-purple-50 dark:bg-purple-500/10 border border-purple-200 dark:border-purple-500/30 rounded-xl p-3">
-              <p className="text-sm font-bold text-purple-700 dark:text-purple-400">{job.day_label}</p>
+            <div className="bg-brand/5 dark:bg-brand/10 border border-brand/30 dark:border-brand/30 rounded-xl p-3">
+              <p className="text-sm font-bold text-brand dark:text-brand">{job.day_label}</p>
               {job.end_date && (
-                <p className="text-xs text-purple-600 dark:text-purple-500">
+                <p className="text-xs text-brand dark:text-brand">
                   Ends: {new Date(job.end_date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                 </p>
               )}

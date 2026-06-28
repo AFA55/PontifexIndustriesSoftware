@@ -149,7 +149,7 @@ export default function PendingQueueSidebar({
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h3 className="font-bold text-gray-900 dark:text-white">{job.customer_name}</h3>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 mt-1">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand mt-1">
                         {job.job_type?.split(',')[0]?.trim()}
                       </span>
                     </div>

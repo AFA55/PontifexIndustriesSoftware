@@ -821,13 +821,13 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                 )}
 
                 {nextAvailable && (
-                  <div className="bg-purple-50 rounded-xl p-3 border border-purple-200">
-                    <p className="text-xs text-purple-700 font-semibold">
+                  <div className="bg-brand/5 rounded-xl p-3 border border-brand">
+                    <p className="text-xs text-brand font-semibold">
                       Next available: <strong>{formatDate(nextAvailable.date)}</strong> ({nextAvailable.jobCount} jobs, {nextAvailable.availableSlots} slots open)
                     </p>
                     <button
                       onClick={() => { setScheduledDate(nextAvailable.date); setNextAvailable(null); }}
-                      className="mt-1.5 px-3 py-1.5 bg-purple-100 hover:bg-purple-200 text-purple-700 rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
+                      className="mt-1.5 px-3 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand rounded-lg text-xs font-bold transition-colors flex items-center gap-1"
                     >
                       <ArrowRight className="w-3.5 h-3.5" />
                       Use This Date

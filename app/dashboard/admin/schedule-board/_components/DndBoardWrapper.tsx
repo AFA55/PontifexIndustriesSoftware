@@ -88,9 +88,9 @@ export default function DndBoardWrapper({ children, canDrag, onReorder }: DndBoa
       {children}
       <DragOverlay>
         {activeJob && (
-          <div className="bg-white rounded-xl shadow-2xl border-2 border-purple-400 p-3 max-w-xs opacity-90 rotate-2">
+          <div className="bg-white rounded-xl shadow-2xl border-2 border-brand p-3 max-w-xs opacity-90 rotate-2">
             <p className="font-bold text-gray-900 text-sm">{activeJob.customer_name}</p>
-            <p className="text-xs text-purple-600 font-semibold">{activeJob.job_type?.split(',')[0]?.trim()}</p>
+            <p className="text-xs text-brand font-semibold">{activeJob.job_type?.split(',')[0]?.trim()}</p>
             <p className="text-[10px] text-gray-500 mt-1">{activeJob.job_number}</p>
           </div>
         )}

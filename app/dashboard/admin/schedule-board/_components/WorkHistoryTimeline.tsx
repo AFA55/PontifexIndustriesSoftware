@@ -89,7 +89,7 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
   if (loading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="w-5 h-5 animate-spin text-purple-500" />
+        <Loader2 className="w-5 h-5 animate-spin text-brand" />
         <span className="ml-2 text-sm text-gray-500 dark:text-white/50">Loading work history...</span>
       </div>
     );
@@ -139,8 +139,8 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
 
             <div className="flex gap-3">
               {/* Day marker */}
-              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
-                <span className="text-sm font-bold text-purple-700 dark:text-purple-400">{log.day_number}</span>
+              <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+                <span className="text-sm font-bold text-brand dark:text-brand">{log.day_number}</span>
               </div>
 
               {/* Day content */}

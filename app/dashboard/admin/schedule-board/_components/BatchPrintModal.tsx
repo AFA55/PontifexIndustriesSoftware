@@ -117,7 +117,7 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
       <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
         <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-700 to-purple-500 px-6 py-4 flex items-center justify-between">
+          <div className="bg-gradient-to-r from-brand-dark to-brand px-6 py-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Printer className="w-5 h-5 text-white" />
               <h2 className="text-lg font-semibold text-white">Print Schedules</h2>
@@ -134,11 +134,11 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
           <div className="px-6 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between">
             <button
               onClick={toggleSelectAll}
-              className="flex items-center gap-2 text-sm font-medium text-purple-700 dark:text-purple-400 hover:text-purple-900 dark:hover:text-purple-300 transition-colors"
+              className="flex items-center gap-2 text-sm font-medium text-brand dark:text-brand hover:text-brand-dark dark:hover:text-brand transition-colors"
             >
               <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${
                 allSelected
-                  ? 'bg-purple-600 border-purple-600'
+                  ? 'bg-brand border-brand'
                   : 'border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.05]'
               }`}>
                 {allSelected && <Check className="w-3 h-3 text-white" />}
@@ -158,13 +158,13 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
                 <label
                   key={job.id}
                   className={`flex items-center gap-3 py-3 cursor-pointer rounded-lg px-2 -mx-2 transition-colors ${
-                    isSelected ? 'bg-purple-50/60 dark:bg-purple-500/10' : 'hover:bg-gray-50 dark:hover:bg-white/[0.05]'
+                    isSelected ? 'bg-brand/5 dark:bg-brand/10' : 'hover:bg-gray-50 dark:hover:bg-white/[0.05]'
                   }`}
                 >
                   {/* Checkbox */}
                   <div className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-colors ${
                     isSelected
-                      ? 'bg-purple-600 border-purple-600'
+                      ? 'bg-brand border-brand'
                       : 'border-gray-300 dark:border-white/20 bg-white dark:bg-white/[0.05]'
                   }`}>
                     {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -177,7 +177,7 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
                   />
 
                   {/* Job Icon */}
-                  <FileText className="w-4 h-4 text-purple-400 flex-shrink-0" />
+                  <FileText className="w-4 h-4 text-brand flex-shrink-0" />
 
                   {/* Job Details */}
                   <div className="flex-1 min-w-0">
@@ -186,7 +186,7 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
                       <span className="text-xs text-gray-500 dark:text-white/50">{job.customer_name}</span>
                     </div>
                     <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs text-purple-600 font-medium">{job.job_type}</span>
+                      <span className="text-xs text-brand font-medium">{job.job_type}</span>
                       {job.assigned_to_name && (
                         <>
                           <span className="text-xs text-gray-300">|</span>
@@ -233,7 +233,7 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
             <button
               onClick={handlePrint}
               disabled={printing || selectedCount === 0}
-              className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-700 hover:to-purple-600 rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-white bg-gradient-to-r from-brand to-brand hover:from-brand-dark hover:to-brand-dark rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {printing ? (
                 <>

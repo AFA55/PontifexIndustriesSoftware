@@ -110,7 +110,7 @@ export default function DailyNotesSection({ date, notes, canEdit, onAddNote, onD
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder="Add a note — schedule changes, crew out, reminders..."
                   rows={2}
-                  className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-purple-500 dark:focus:border-purple-400 focus:ring-2 focus:ring-purple-200 dark:focus:ring-purple-500/20 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none bg-white dark:bg-white/[0.05] transition-all"
+                  className="flex-1 px-3 py-2 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand dark:focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none bg-white dark:bg-white/[0.05] transition-all"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -121,7 +121,7 @@ export default function DailyNotesSection({ date, notes, canEdit, onAddNote, onD
                 <button
                   onClick={handleSubmit}
                   disabled={!newNote.trim()}
-                  className="p-3 bg-purple-600 text-white rounded-xl transition-all hover:bg-purple-700 hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-3 bg-brand text-white rounded-xl transition-all hover:bg-brand-dark hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Send className="w-4 h-4" />
                 </button>

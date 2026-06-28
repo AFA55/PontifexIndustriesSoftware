@@ -388,7 +388,7 @@ export default function EditJobPanel({
       <div className="fixed inset-4 sm:inset-6 lg:inset-x-[10%] lg:inset-y-6 bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl z-[80] flex flex-col animate-in zoom-in-95 duration-200 overflow-hidden">
         {/* Header */}
         <div className={`px-6 py-4 text-white flex-shrink-0 ${canEdit
-          ? 'bg-gradient-to-r from-purple-600 to-pink-500'
+          ? 'bg-gradient-to-r from-brand to-brand-accent'
           : 'bg-gradient-to-r from-gray-600 to-gray-700'
         }`}>
           <div className="flex items-center justify-between">
@@ -461,7 +461,7 @@ export default function EditJobPanel({
           {(['details', 'documents'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors capitalize ${
-                activeTab === tab ? 'border-purple-500 text-purple-700 dark:text-purple-400' : 'border-transparent text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80'
+                activeTab === tab ? 'border-brand text-brand dark:text-brand' : 'border-transparent text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80'
               }`}>
               {tab === 'documents' ? `Documents (${documents.length})` : 'Job Details'}
             </button>
@@ -478,7 +478,7 @@ export default function EditJobPanel({
                 {/* Job Information */}
                 <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-3">
                   <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Building2 className="w-4 h-4 text-purple-500" /> Job Information
+                    <Building2 className="w-4 h-4 text-brand" /> Job Information
                   </h3>
 
                   {/* Customer Name */}
@@ -487,7 +487,7 @@ export default function EditJobPanel({
                     {canEdit ? (
                       <input type="text" value={editedCustomerName}
                         onChange={e => { setEditedCustomerName(e.target.value); markChanged(); }}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                     ) : (
                       <p className="text-sm text-gray-900 dark:text-white font-medium">{editedCustomerName || customerName || '--'}</p>
                     )}
@@ -500,7 +500,7 @@ export default function EditJobPanel({
                       <input type="text" value={editedLocation}
                         onChange={e => { setEditedLocation(e.target.value); markChanged(); }}
                         placeholder="e.g. Downtown Office Tower"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                     ) : (
                       <div className="flex items-start gap-2 text-sm">
                         <MapPin className="w-4 h-4 text-gray-400 dark:text-white/30 mt-0.5 flex-shrink-0" />
@@ -516,7 +516,7 @@ export default function EditJobPanel({
                       <input type="text" value={editedAddress}
                         onChange={e => { setEditedAddress(e.target.value); markChanged(); }}
                         placeholder="123 Main St, City, State"
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                     ) : (
                       (editedAddress || address) && (
                         <p className="text-xs text-gray-500 dark:text-white/50">{editedAddress || address}</p>
@@ -531,14 +531,14 @@ export default function EditJobPanel({
                         <label className="block text-xs font-semibold text-gray-500 dark:text-white/50">SCOPE OF WORK</label>
                         <Link
                           href={`/dashboard/admin/schedule-form?editJobId=${job.id}`}
-                          className="flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 bg-purple-50 dark:bg-purple-900/20 px-2.5 py-1 rounded-lg border border-purple-200 dark:border-purple-700/50 transition-colors"
+                          className="flex items-center gap-1.5 text-xs font-medium text-brand dark:text-brand hover:text-brand-dark dark:hover:text-brand bg-brand/5 dark:bg-brand/20 px-2.5 py-1 rounded-lg border border-brand dark:border-brand/50 transition-colors"
                         >
                           <ExternalLink className="h-3 w-3" />
                           Full Editor
                         </Link>
                       </div>
                       <textarea value={description} onChange={e => { setDescription(e.target.value); markChanged(); }}
-                        rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
+                        rows={3} className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-brand/30 focus:border-brand dark:placeholder-white/30" />
                     </div>
                   ) : (
                     description && (
@@ -552,7 +552,7 @@ export default function EditJobPanel({
                     {canEdit ? (
                       <textarea value={editedJobsiteConditions} onChange={e => { setEditedJobsiteConditions(e.target.value); markChanged(); }}
                         rows={2} placeholder="Any special jobsite conditions or access requirements..."
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] resize-none focus:ring-2 focus:ring-brand/30 focus:border-brand dark:placeholder-white/30" />
                     ) : (
                       editedJobsiteConditions
                         ? <p className="text-sm text-gray-600 dark:text-white/60 italic border-l-2 border-amber-300 pl-3">{editedJobsiteConditions}</p>
@@ -565,7 +565,7 @@ export default function EditJobPanel({
                       <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">PO #</label>
                       {canEdit ? (
                         <input type="text" value={poNumber} onChange={e => { setPoNumber(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                       ) : (
                         <p className="text-sm text-gray-900 dark:text-white font-medium">{poNumber || '--'}</p>
                       )}
@@ -576,7 +576,7 @@ export default function EditJobPanel({
                         <input type="number" value={editedEstimatedCost} min={0} step={0.01}
                           onChange={e => { setEditedEstimatedCost(e.target.value); markChanged(); }}
                           placeholder="0.00"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand dark:placeholder-white/30" />
                       ) : (
                         <p className="text-sm text-gray-900 dark:text-white font-medium">
                           {editedEstimatedCost ? `$${parseFloat(editedEstimatedCost).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '--'}
@@ -591,7 +591,7 @@ export default function EditJobPanel({
                     {canEdit ? (
                       <input type="text" value={editedSalesmanName}
                         onChange={e => { setEditedSalesmanName(e.target.value); markChanged(); }}
-                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                     ) : (
                       <p className="text-sm text-gray-900 dark:text-white font-medium">{editedSalesmanName || '--'}</p>
                     )}
@@ -615,7 +615,7 @@ export default function EditJobPanel({
                 {/* Site Contact */}
                 <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-3">
                   <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Phone className="w-4 h-4 text-purple-500" /> Site Contact
+                    <Phone className="w-4 h-4 text-brand" /> Site Contact
                   </h3>
                   {canEdit ? (
                     <div className="space-y-2">
@@ -623,7 +623,7 @@ export default function EditJobPanel({
                       <div className="relative">
                         <button
                           onClick={() => setShowContactDropdown(!showContactDropdown)}
-                          className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-white/[0.05] hover:border-purple-400 transition-colors"
+                          className="w-full flex items-center justify-between px-3 py-2.5 border border-gray-300 dark:border-white/10 rounded-lg text-sm bg-white dark:bg-white/[0.05] hover:border-brand transition-colors"
                         >
                           <span className={selectedContact ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-400 dark:text-white/30'}>
                             {selectedContact || 'Select site contact...'}
@@ -640,7 +640,7 @@ export default function EditJobPanel({
                             ) : contacts.length > 0 ? (
                               contacts.map(c => (
                                 <button key={c.id} onClick={() => handleSelectContact(c)}
-                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-purple-50 dark:hover:bg-white/[0.08] text-left transition-colors border-b border-gray-100 dark:border-white/10 last:border-0">
+                                  className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-brand/5 dark:hover:bg-white/[0.08] text-left transition-colors border-b border-gray-100 dark:border-white/10 last:border-0">
                                   <User className="w-4 h-4 text-gray-400 dark:text-white/30 flex-shrink-0" />
                                   <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{c.name}</p>
@@ -648,15 +648,15 @@ export default function EditJobPanel({
                                       {c.phone || 'No phone'} {c.role && `· ${c.role}`}
                                     </p>
                                   </div>
-                                  {c.is_primary && <span className="px-1.5 py-0.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 rounded text-[10px] font-bold">PRIMARY</span>}
-                                  {selectedContact === c.name && <Check className="w-4 h-4 text-purple-600 flex-shrink-0" />}
+                                  {c.is_primary && <span className="px-1.5 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded text-[10px] font-bold">PRIMARY</span>}
+                                  {selectedContact === c.name && <Check className="w-4 h-4 text-brand flex-shrink-0" />}
                                 </button>
                               ))
                             ) : (
                               <p className="p-3 text-sm text-gray-400 dark:text-white/30 text-center">No contacts found</p>
                             )}
                             <button onClick={() => { setShowAddContact(true); setShowContactDropdown(false); }}
-                              className="w-full flex items-center gap-2 px-3 py-2.5 text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-white/[0.08] text-sm font-semibold border-t border-gray-200 dark:border-white/10">
+                              className="w-full flex items-center gap-2 px-3 py-2.5 text-brand dark:text-brand hover:bg-brand/5 dark:hover:bg-white/[0.08] text-sm font-semibold border-t border-gray-200 dark:border-white/10">
                               <Plus className="w-4 h-4" /> Add New Contact
                             </button>
                           </div>
@@ -669,34 +669,34 @@ export default function EditJobPanel({
                           <input type="text" value={selectedContact}
                             onChange={e => { setSelectedContact(e.target.value); markChanged(); }}
                             placeholder="Contact name"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand dark:placeholder-white/30" />
                         </div>
                         <div className="flex-1">
                           <input type="tel" value={selectedContactPhone}
                             onChange={e => { setSelectedContactPhone(e.target.value); markChanged(); }}
                             placeholder="Phone number"
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500 dark:placeholder-white/30" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand dark:placeholder-white/30" />
                         </div>
                       </div>
 
                       {/* Add new contact inline form */}
                       {showAddContact && (
-                        <div className="bg-purple-50 rounded-lg p-3 border border-purple-200 space-y-2">
-                          <p className="text-xs font-bold text-purple-700 uppercase">New Contact</p>
+                        <div className="bg-brand/5 rounded-lg p-3 border border-brand space-y-2">
+                          <p className="text-xs font-bold text-brand uppercase">New Contact</p>
                           <div className="grid grid-cols-2 gap-2">
                             <input type="text" value={newContact.name} onChange={e => setNewContact(p => ({ ...p, name: e.target.value }))}
-                              placeholder="Name *" className="px-2.5 py-1.5 border border-purple-200 rounded-lg text-sm bg-white" />
+                              placeholder="Name *" className="px-2.5 py-1.5 border border-brand rounded-lg text-sm bg-white" />
                             <input type="tel" value={newContact.phone} onChange={e => setNewContact(p => ({ ...p, phone: e.target.value }))}
-                              placeholder="Phone" className="px-2.5 py-1.5 border border-purple-200 rounded-lg text-sm bg-white" />
+                              placeholder="Phone" className="px-2.5 py-1.5 border border-brand rounded-lg text-sm bg-white" />
                             <input type="email" value={newContact.email} onChange={e => setNewContact(p => ({ ...p, email: e.target.value }))}
-                              placeholder="Email" className="px-2.5 py-1.5 border border-purple-200 rounded-lg text-sm bg-white" />
+                              placeholder="Email" className="px-2.5 py-1.5 border border-brand rounded-lg text-sm bg-white" />
                             <input type="text" value={newContact.role} onChange={e => setNewContact(p => ({ ...p, role: e.target.value }))}
-                              placeholder="Role (e.g. Foreman)" className="px-2.5 py-1.5 border border-purple-200 rounded-lg text-sm bg-white" />
+                              placeholder="Role (e.g. Foreman)" className="px-2.5 py-1.5 border border-brand rounded-lg text-sm bg-white" />
                           </div>
                           <div className="flex gap-2 justify-end">
                             <button onClick={() => setShowAddContact(false)} className="px-3 py-1.5 text-xs text-gray-600 hover:text-gray-800">Cancel</button>
                             <button onClick={handleAddNewContact} disabled={!newContact.name.trim()}
-                              className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-xs font-bold disabled:opacity-50">
+                              className="px-3 py-1.5 bg-brand text-white rounded-lg text-xs font-bold disabled:opacity-50">
                               Save & Select
                             </button>
                           </div>
@@ -714,7 +714,7 @@ export default function EditJobPanel({
                 {/* Equipment */}
                 <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-3">
                   <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Wrench className="w-4 h-4 text-purple-500" /> Equipment ({equipment.length})
+                    <Wrench className="w-4 h-4 text-brand" /> Equipment ({equipment.length})
                   </h3>
                   {canEdit ? (
                     <>
@@ -767,7 +767,7 @@ export default function EditJobPanel({
                 {/* Schedule & Assignment */}
                 <section className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-4 border border-gray-200 dark:border-white/10 space-y-4">
                   <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wide">
-                    <Calendar className="w-4 h-4 text-purple-500" /> Schedule & Assignment
+                    <Calendar className="w-4 h-4 text-brand" /> Schedule & Assignment
                   </h3>
                   {canEdit ? (
                     <>
@@ -775,25 +775,25 @@ export default function EditJobPanel({
                         <div>
                           <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">START DATE</label>
                           <input type="date" value={scheduledDate} onChange={e => { setScheduledDate(e.target.value); markChanged(); }}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                         </div>
                         <div>
                           <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">END DATE</label>
                           <input type="date" value={endDate} onChange={e => { setEndDate(e.target.value); markChanged(); }}
-                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                         </div>
                       </div>
                       <div>
                         <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">ARRIVAL TIME</label>
                         <input type="time" value={arrivalTime} onChange={e => { setArrivalTime(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500" />
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                       </div>
 
                       {/* Operator */}
                       <div>
                         <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">OPERATOR</label>
                         <select value={selectedOperator} onChange={e => { setSelectedOperator(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500">
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand">
                           <option value="">Unassigned</option>
                           {allOperators.map(name => {
                             const skill = operatorSkillMap?.[name];
@@ -823,7 +823,7 @@ export default function EditJobPanel({
                       <div>
                         <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">HELPER <span className="text-gray-400 dark:text-white/30 font-normal">(optional)</span></label>
                         <select value={selectedHelper} onChange={e => { setSelectedHelper(e.target.value); markChanged(); }}
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-purple-200 focus:border-purple-500">
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand">
                           <option value="">No Helper</option>
                           {allHelpers.map(name => (
                             <option key={name} value={name}>
@@ -884,7 +884,7 @@ export default function EditJobPanel({
             <div className="px-6 pb-4 mt-4 pt-4 border-t border-gray-200 dark:border-white/10">
               <Link
                 href={`/dashboard/admin/schedule-form?editJobId=${job.id}`}
-                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium transition-colors"
+                className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-brand hover:bg-brand-dark text-white text-sm font-medium transition-colors"
               >
                 <ExternalLink className="h-4 w-4" />
                 Edit Full Job in Schedule Form
@@ -897,7 +897,7 @@ export default function EditJobPanel({
             <div className="p-6 space-y-4">
               {canEdit && (
                 <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold cursor-pointer transition-colors">
+                  <label className="flex items-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-bold cursor-pointer transition-colors">
                     {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
                     Upload Document
                     <input type="file" multiple onChange={handleUploadDocument} className="hidden" accept=".pdf,.doc,.docx,.jpg,.png,.jpeg" />
@@ -910,7 +910,7 @@ export default function EditJobPanel({
                   {documents.map(doc => (
                     <a key={doc.id} href={doc.url} target="_blank" rel="noopener noreferrer"
                       className="flex items-center gap-3 px-4 py-3 bg-gray-50 dark:bg-white/[0.05] hover:bg-gray-100 dark:hover:bg-white/[0.08] rounded-xl border border-gray-200 dark:border-white/10 transition-colors">
-                      <Paperclip className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                      <Paperclip className="w-4 h-4 text-brand flex-shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">{doc.name}</p>
                         <p className="text-xs text-gray-400 dark:text-white/30">{doc.type} · {new Date(doc.uploaded_at).toLocaleDateString()}</p>
@@ -972,7 +972,7 @@ export default function EditJobPanel({
                   jobsite_conditions: editedJobsiteConditions || undefined,
                 })}
                 disabled={!hasChanges}
-                className="px-8 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
+                className="px-8 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">
                 <Save className="w-4 h-4" />
                 Save Changes
               </button>

@@ -38,7 +38,7 @@ export default function DraggableJobCard({ job, canDrag, onClick, children }: Dr
       ref={setNodeRef}
       style={style}
       className={`relative group ${
-        isDragging ? 'ring-2 ring-purple-500 ring-offset-2 rounded-xl shadow-2xl' : ''
+        isDragging ? 'ring-2 ring-brand ring-offset-2 rounded-xl shadow-2xl' : ''
       }`}
       onClick={onClick}
     >

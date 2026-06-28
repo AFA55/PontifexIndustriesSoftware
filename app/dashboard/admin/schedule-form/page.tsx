@@ -715,7 +715,7 @@ function CreateFacilityModal({ onClose, onSaved }: { onClose: () => void; onSave
         <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto border border-transparent dark:border-white/10">
           <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <Building2 className="w-5 h-5 text-purple-600 dark:text-violet-400" />
+              <Building2 className="w-5 h-5 text-brand dark:text-brand" />
               Add Facility
             </h2>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
@@ -729,47 +729,47 @@ function CreateFacilityModal({ onClose, onSaved }: { onClose: () => void; onSave
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Facility Name *</label>
               <input type="text" value={facilityForm.name} onChange={e => setFacilityForm({ ...facilityForm, name: e.target.value })}
-                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" placeholder="e.g., Intel D1X Fab" />
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" placeholder="e.g., Intel D1X Fab" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Address</label>
               <input type="text" value={facilityForm.address} onChange={e => setFacilityForm({ ...facilityForm, address: e.target.value })}
-                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" placeholder="Street address" />
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" placeholder="Street address" />
             </div>
             <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">City</label>
                 <input type="text" value={facilityForm.city} onChange={e => setFacilityForm({ ...facilityForm, city: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" />
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">State</label>
                 <input type="text" value={facilityForm.state} onChange={e => setFacilityForm({ ...facilityForm, state: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" maxLength={2} placeholder="OR" />
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" maxLength={2} placeholder="OR" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">ZIP</label>
                 <input type="text" value={facilityForm.zip} onChange={e => setFacilityForm({ ...facilityForm, zip: e.target.value })}
-                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" maxLength={10} />
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" maxLength={10} />
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Special Requirements</label>
               <textarea value={facilityForm.special_requirements} onChange={e => setFacilityForm({ ...facilityForm, special_requirements: e.target.value })}
-                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" rows={2}
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" rows={2}
                 placeholder="PPE requirements, site rules, etc." />
             </div>
             <div className="flex items-center gap-6">
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setFacilityForm({ ...facilityForm, orientation_required: !facilityForm.orientation_required })}
-                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.orientation_required ? 'bg-purple-600' : 'bg-gray-300 dark:bg-white/20'}`}>
+                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.orientation_required ? 'bg-brand' : 'bg-gray-300 dark:bg-white/20'}`}>
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${facilityForm.orientation_required ? 'translate-x-4' : ''}`} />
                 </button>
                 <span className="text-sm text-gray-700 dark:text-white/70">Orientation Required</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <button type="button" onClick={() => setFacilityForm({ ...facilityForm, badging_required: !facilityForm.badging_required })}
-                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.badging_required ? 'bg-purple-600' : 'bg-gray-300 dark:bg-white/20'}`}>
+                  className={`relative w-10 h-6 rounded-full transition-colors ${facilityForm.badging_required ? 'bg-brand' : 'bg-gray-300 dark:bg-white/20'}`}>
                   <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${facilityForm.badging_required ? 'translate-x-4' : ''}`} />
                 </button>
                 <span className="text-sm text-gray-700 dark:text-white/70">Badging Required</span>
@@ -778,14 +778,14 @@ function CreateFacilityModal({ onClose, onSaved }: { onClose: () => void; onSave
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-white/60 mb-1">Notes</label>
               <textarea value={facilityForm.notes} onChange={e => setFacilityForm({ ...facilityForm, notes: e.target.value })}
-                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" rows={2} />
+                className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30" rows={2} />
             </div>
             <div className="flex justify-end gap-3 pt-2">
               <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10 rounded-xl transition-colors">
                 Cancel
               </button>
               <button type="submit" disabled={saving}
-                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
+                className="px-4 py-2 text-sm font-medium text-white bg-brand hover:bg-brand-dark rounded-xl transition-colors disabled:opacity-50 flex items-center gap-2">
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {saving ? 'Creating...' : 'Create Facility'}
               </button>
@@ -1982,7 +1982,7 @@ export default function ScheduleFormPage() {
                   <button
                     type="button"
                     onClick={() => setShowNewCustomerModal(true)}
-                    className="flex items-center justify-center gap-2 px-4 py-3.5 sm:py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-sm whitespace-nowrap flex-shrink-0"
+                    className="flex items-center justify-center gap-2 px-4 py-3.5 sm:py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl font-bold text-sm transition-all shadow-sm whitespace-nowrap flex-shrink-0"
                   >
                     <Plus className="w-4 h-4" />
                     New Customer
@@ -2874,7 +2874,7 @@ export default function ScheduleFormPage() {
                                       ? `Perimeter ${lf.perimeterLF.toFixed(1)} ft${lf.doubled ? ' (doubled — no overcut)' : ''} + Cross-cuts ${lf.crossCutLF.toFixed(1)} ft`
                                       : 'Enter length, width, and qty to calculate';
                                     return (
-                                      <div className="mt-3 rounded-xl border border-violet-200 dark:border-violet-500/20 bg-gradient-to-br from-violet-50/60 to-sky-50/60 dark:from-violet-500/5 dark:to-sky-500/5 p-3 space-y-3">
+                                      <div className="mt-3 rounded-xl border border-brand/30 dark:border-brand/20 bg-gradient-to-br from-brand/5 to-sky-50/60 dark:from-brand/5 dark:to-sky-500/5 p-3 space-y-3">
                                         {/* Overcut toggle */}
                                         <button
                                           type="button"
@@ -2923,7 +2923,7 @@ export default function ScheduleFormPage() {
                                                   updated[idx] = { ...updated[idx], cross_cut_lengthwise_ft: e.target.value };
                                                   updateAreas(updated);
                                                 }}
-                                                className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                                                className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                                               />
                                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                             </div>
@@ -2947,7 +2947,7 @@ export default function ScheduleFormPage() {
                                                   updated[idx] = { ...updated[idx], cross_cut_widthwise_ft: e.target.value };
                                                   updateAreas(updated);
                                                 }}
-                                                className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-400 transition-all"
+                                                className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-brand/20 focus:border-brand transition-all"
                                               />
                                               <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                             </div>
@@ -2956,7 +2956,7 @@ export default function ScheduleFormPage() {
 
                                         {/* Per-area linear-ft pill */}
                                         <div
-                                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-white/5 border border-violet-200 dark:border-violet-500/30 text-violet-800 dark:text-violet-200 cursor-help"
+                                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/80 dark:bg-white/5 border border-brand/30 dark:border-brand/30 text-brand dark:text-brand cursor-help"
                                           title={breakdownTitle}
                                         >
                                           <span className="text-[10px] font-bold uppercase tracking-wider opacity-70">Total</span>
@@ -2991,9 +2991,9 @@ export default function ScheduleFormPage() {
                               )}
 
                               {isSawingScope && grandTotalLinearFt > 0 && (
-                                <div className="flex items-center gap-3 px-3 py-2 bg-gradient-to-r from-violet-50 to-sky-50 dark:from-violet-500/10 dark:to-sky-500/10 rounded-xl border border-violet-200 dark:border-violet-500/30">
-                                  <span className="text-xs font-bold text-violet-700 dark:text-violet-200 uppercase tracking-wider">Total Linear Feet:</span>
-                                  <span className="text-sm font-bold text-violet-900 dark:text-white">
+                                <div className="flex items-center gap-3 px-3 py-2 bg-gradient-to-r from-brand/10 to-sky-50 dark:from-brand/10 dark:to-sky-500/10 rounded-xl border border-brand/30 dark:border-brand/30">
+                                  <span className="text-xs font-bold text-brand dark:text-brand uppercase tracking-wider">Total Linear Feet:</span>
+                                  <span className="text-sm font-bold text-brand-dark dark:text-white">
                                     {grandTotalLinearFt.toLocaleString(undefined, { maximumFractionDigits: 1 })} ft
                                   </span>
                                 </div>
@@ -3400,7 +3400,7 @@ export default function ScheduleFormPage() {
                   <button
                     type="button"
                     onClick={addCustomEquipment}
-                    className="px-4 py-3 bg-gradient-to-r from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg"
+                    className="px-4 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg"
                   >
                     Add
                   </button>
@@ -3417,8 +3417,8 @@ export default function ScheduleFormPage() {
                           })}
                           className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
                             form.equipment_rental_flags[eq]
-                              ? 'bg-purple-500 text-white'
-                              : 'bg-slate-200 text-slate-500 hover:bg-purple-100 hover:text-purple-700'
+                              ? 'bg-brand text-white'
+                              : 'bg-slate-200 text-slate-500 hover:bg-brand/10 hover:text-brand'
                           }`}
                           title="Toggle rental"
                         >
@@ -4135,12 +4135,12 @@ export default function ScheduleFormPage() {
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
                           isSelected
-                            ? 'border-purple-400 bg-purple-50 dark:bg-violet-500/15 text-purple-800 dark:text-violet-200 ring-2 ring-offset-1 ring-purple-300 dark:ring-violet-400/30'
+                            ? 'border-brand bg-brand/10 dark:bg-brand/15 text-brand-dark dark:text-brand ring-2 ring-offset-1 ring-brand/30 dark:ring-brand/30'
                             : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-600 dark:text-white/60 hover:border-slate-300 dark:hover:border-white/20'
                         }`}
                       >
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
-                          isSelected ? 'border-purple-500 bg-purple-500' : 'border-slate-300 dark:border-white/20'
+                          isSelected ? 'border-brand bg-brand' : 'border-slate-300 dark:border-white/20'
                         }`}>
                           {isSelected && <Check size={12} className="text-white" />}
                         </div>
@@ -4465,7 +4465,7 @@ export default function ScheduleFormPage() {
               <span className="hidden sm:inline">{isEditMode ? 'Edit Scope' : 'Schedule Form'}</span>
             </h1>
             {isEditMode && (
-              <span className="ml-2 hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-violet-100 text-violet-700 border border-violet-200">
+              <span className="ml-2 hidden md:inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wide bg-brand/10 text-brand border border-brand/20">
                 Editing existing job
               </span>
             )}
@@ -5130,7 +5130,7 @@ export default function ScheduleFormPage() {
       {!submitted && currentStep <= 8 && (
         <button
           onClick={() => setShowAISmartFill(true)}
-          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center gap-2 font-bold text-sm group"
+          className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-40 px-4 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-2xl shadow-xl hover:shadow-2xl transition-all flex items-center gap-2 font-bold text-sm group"
         >
           <Brain className="w-5 h-5 group-hover:scale-110 transition-transform" />
           <span className="hidden sm:inline">AI Smart Fill</span>

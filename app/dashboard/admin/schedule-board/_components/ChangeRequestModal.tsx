@@ -88,11 +88,11 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
                   onClick={() => setRequestType(type.key)}
                   className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-all ${
                     requestType === type.key
-                      ? 'border-purple-500 bg-purple-500/10'
+                      ? 'border-brand bg-brand/10'
                       : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] hover:border-gray-300 dark:hover:border-white/20 dark:hover:bg-white/[0.08]'
                   }`}
                 >
-                  <type.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${requestType === type.key ? 'text-purple-500' : 'text-gray-400 dark:text-white/30'}`} />
+                  <type.icon className={`w-4 h-4 mt-0.5 flex-shrink-0 ${requestType === type.key ? 'text-brand' : 'text-gray-400 dark:text-white/30'}`} />
                   <div>
                     <div className={`text-sm font-medium ${requestType === type.key ? 'text-gray-900 dark:text-white' : 'text-gray-700 dark:text-white/70'}`}>{type.label}</div>
                     <div className="text-xs text-gray-500 dark:text-white/40 mt-0.5">{type.desc}</div>
@@ -113,7 +113,7 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
                 value={requestedValue}
                 onChange={e => setRequestedValue(e.target.value)}
                 min={new Date().toISOString().split('T')[0]}
-                className="w-full bg-white dark:bg-white/[0.05] border border-gray-300 dark:border-white/10 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-purple-500 focus:ring-purple-500"
+                className="w-full bg-white dark:bg-white/[0.05] border border-gray-300 dark:border-white/10 rounded-lg px-4 py-3 text-gray-900 dark:text-white focus:outline-none focus:border-brand focus:ring-brand"
               />
             </div>
           )}
@@ -132,7 +132,7 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
                   ? 'e.g. Customer cancelled due to...'
                   : 'Explain why this change is needed...'
               }
-              className="w-full bg-white dark:bg-white/[0.05] border border-gray-300 dark:border-white/10 rounded-lg px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:outline-none focus:border-purple-500 focus:ring-purple-500 resize-none"
+              className="w-full bg-white dark:bg-white/[0.05] border border-gray-300 dark:border-white/10 rounded-lg px-4 py-3 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:outline-none focus:border-brand focus:ring-brand resize-none"
             />
           </div>
 
@@ -155,7 +155,7 @@ export default function ChangeRequestModal({ job, onClose, onSuccess }: ChangeRe
           <button
             onClick={handleSubmit}
             disabled={submitting}
-            className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2"
+            className="flex-1 bg-brand hover:bg-brand-dark disabled:opacity-50 text-white rounded-xl py-3 font-semibold transition-colors flex items-center justify-center gap-2"
           >
             {submitting ? (
               <><Loader2 className="w-4 h-4 animate-spin" /> Sending...</>

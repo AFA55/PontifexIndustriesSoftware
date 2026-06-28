@@ -61,7 +61,7 @@ export default function SendBackModal({ job, onConfirm, onClose }: SendBackModal
                     onClick={() => setReason(r)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                       reason === r
-                        ? 'bg-purple-600 text-white'
+                        ? 'bg-brand text-white'
                         : 'bg-gray-100 dark:bg-white/[0.05] text-gray-600 dark:text-white/60 hover:bg-gray-200 dark:hover:bg-white/[0.08]'
                     }`}
                   >

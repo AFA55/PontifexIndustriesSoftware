@@ -62,14 +62,14 @@ export default function AssignOperatorModal({
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
         <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-5 rounded-t-2xl text-white">
+          <div className="bg-gradient-to-r from-brand to-brand-accent p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <UserCheck className="w-5 h-5" />
                   Assign Operator
                 </h2>
-                <p className="text-purple-200 text-sm">Select who handles this job</p>
+                <p className="text-white/80 text-sm">Select who handles this job</p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -81,7 +81,7 @@ export default function AssignOperatorModal({
             {/* Job summary */}
             <div className="bg-orange-50 dark:bg-white/[0.05] rounded-xl p-3 border border-orange-200 dark:border-white/10">
               <h3 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h3>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 text-purple-700 mt-1">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand/10 text-brand mt-1">
                 {job.job_type?.split(',')[0]?.trim()}
               </span>
               {job.location && (
@@ -119,7 +119,7 @@ export default function AssignOperatorModal({
               <select
                 value={selectedOperator}
                 onChange={(e) => setSelectedOperator(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               >
                 <option value="">Select Operator...</option>
                 {allOperators.map(name => (
@@ -147,7 +147,7 @@ export default function AssignOperatorModal({
               <select
                 value={selectedHelper}
                 onChange={(e) => setSelectedHelper(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               >
                 <option value="">No Helper</option>
                 {allHelpers.map(name => (
@@ -177,7 +177,7 @@ export default function AssignOperatorModal({
               <button
                 onClick={() => selectedOperator && onConfirm(selectedOperator, selectedHelper || null)}
                 disabled={!selectedOperator}
-                className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 ✓ Assign
               </button>

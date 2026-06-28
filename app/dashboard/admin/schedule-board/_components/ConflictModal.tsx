@@ -57,9 +57,9 @@ export default function ConflictModal({
 
               <button
                 onClick={onMoveToJob}
-                className="w-full flex items-center gap-3 px-4 py-3 bg-purple-50 dark:bg-purple-500/10 hover:bg-purple-100 dark:hover:bg-purple-500/20 border-2 border-purple-200 dark:border-purple-500/30 hover:border-purple-300 rounded-xl text-left transition-all"
+                className="w-full flex items-center gap-3 px-4 py-3 bg-brand/5 dark:bg-brand/10 hover:bg-brand/10 dark:hover:bg-brand/20 border-2 border-brand/30 dark:border-brand/30 hover:border-brand/50 rounded-xl text-left transition-all"
               >
-                <ArrowRight className="w-5 h-5 text-purple-600 flex-shrink-0" />
+                <ArrowRight className="w-5 h-5 text-brand flex-shrink-0" />
                 <div>
                   <p className="font-bold text-gray-900 dark:text-white text-sm">Move to {newJobName}</p>
                   <p className="text-xs text-gray-500 dark:text-white/50">Remove from {currentJobName} and assign here</p>

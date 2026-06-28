@@ -35,13 +35,13 @@ export default function WeeklyView({
                 <button
                   onClick={() => onDayClick(date)}
                   className={`w-full px-3 py-2.5 text-center border-b-2 transition-all ${
-                    isToday ? 'bg-purple-50 dark:bg-purple-500/15 border-purple-500' :
+                    isToday ? 'bg-brand/5 dark:bg-brand/15 border-brand' :
                     isSelected ? 'bg-blue-50 dark:bg-blue-500/15 border-blue-400' :
                     'bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
                   }`}
                 >
-                  <p className={`text-xs font-bold uppercase ${isToday ? 'text-purple-600 dark:text-purple-400' : 'text-gray-500 dark:text-white/60'}`}>{dayName}</p>
-                  <p className={`text-lg font-bold ${isToday ? 'text-purple-700 dark:text-purple-300' : 'text-gray-900 dark:text-white'}`}>{monthName} {dayNum}</p>
+                  <p className={`text-xs font-bold uppercase ${isToday ? 'text-brand dark:text-brand' : 'text-gray-500 dark:text-white/60'}`}>{dayName}</p>
+                  <p className={`text-lg font-bold ${isToday ? 'text-brand-dark dark:text-brand' : 'text-gray-900 dark:text-white'}`}>{monthName} {dayNum}</p>
                   <p className={`text-[10px] font-semibold ${
                     jobs.length === 0 ? 'text-green-500 dark:text-green-400' :
                     jobs.length >= capacityMaxSlots ? 'text-red-500 dark:text-red-400' :

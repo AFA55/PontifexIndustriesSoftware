@@ -158,7 +158,7 @@ function StatusTimeline({ data }: { data: FullJobData }) {
               <div className={`w-6 h-0.5 ${isComplete ? 'bg-emerald-400' : 'bg-gray-200'}`} />
             )}
             <div className="flex flex-col items-center">
-              <div className={`w-3 h-3 rounded-full ${isComplete ? step.color : 'bg-gray-200'} ${isCurrent ? 'ring-2 ring-offset-1 ring-purple-400' : ''}`} />
+              <div className={`w-3 h-3 rounded-full ${isComplete ? step.color : 'bg-gray-200'} ${isCurrent ? 'ring-2 ring-offset-1 ring-brand' : ''}`} />
               <span className={`text-[9px] font-bold mt-0.5 whitespace-nowrap ${isComplete ? 'text-gray-700 dark:text-slate-200' : 'text-gray-400 dark:text-slate-500'}`}>
                 {step.label}
               </span>
@@ -448,7 +448,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
         <div className="bg-white dark:bg-[#1a0f35] text-slate-900 dark:text-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
 
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 via-purple-700 to-indigo-700 p-5 text-white flex-shrink-0">
+          <div className="bg-gradient-to-r from-brand via-brand to-brand-accent p-5 text-white flex-shrink-0">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-bold bg-white/20 px-3 py-1 rounded-lg">{job.job_number}</span>
@@ -535,7 +535,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
               onClick={() => setActiveTab('details')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'details'
-                  ? 'border-purple-600 text-purple-700 dark:text-purple-300'
+                  ? 'border-brand text-brand dark:text-brand'
                   : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
@@ -546,7 +546,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
               onClick={() => setActiveTab('history')}
               className={`px-4 py-2.5 text-sm font-bold border-b-2 transition-colors ${
                 activeTab === 'history'
-                  ? 'border-purple-600 text-purple-700 dark:text-purple-300'
+                  ? 'border-brand text-brand dark:text-brand'
                   : 'border-transparent text-gray-500 dark:text-slate-400 hover:text-gray-700 dark:hover:text-slate-200'
               }`}
             >
@@ -559,14 +559,14 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+                <Loader2 className="w-8 h-8 animate-spin text-brand" />
                 <span className="ml-3 text-gray-500 dark:text-slate-400 font-medium">Loading job details...</span>
               </div>
             ) : activeTab === 'history' ? (
               <div className="p-5">
                 <Suspense fallback={
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-5 h-5 animate-spin text-purple-500" />
+                    <Loader2 className="w-5 h-5 animate-spin text-brand" />
                     <span className="ml-2 text-sm text-gray-500">Loading...</span>
                   </div>
                 }>
@@ -692,16 +692,16 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   >
                     <>
                       {/* Full Scope Editor — opens the schedule-form's scope step with calculator, areas, etc. */}
-                      <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-violet-50 to-indigo-50 border border-violet-200">
+                      <div className="mb-3 flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-gradient-to-r from-brand/5 to-brand-accent/5 border border-brand/30">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Edit3 className="w-3.5 h-3.5 text-violet-600 flex-shrink-0" />
-                          <p className="text-xs text-violet-800 truncate">
+                          <Edit3 className="w-3.5 h-3.5 text-brand flex-shrink-0" />
+                          <p className="text-xs text-brand-dark truncate">
                             <span className="font-semibold">Need more detail?</span> Open the full scope editor with calculator, areas, photos.
                           </p>
                         </div>
                         <Link
                           href={`/dashboard/admin/schedule-form?editJobId=${job.id}&jumpTo=scope`}
-                          className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 active:scale-[0.98] transition-all whitespace-nowrap"
+                          className="flex-shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-bold text-white bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand active:scale-[0.98] transition-all whitespace-nowrap"
                         >
                           Edit Scope
                           <span aria-hidden>→</span>
@@ -1252,7 +1252,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               <textarea
                                 value={editFields.additional_info}
                                 onChange={(e) => setEditFields(f => ({ ...f, additional_info: e.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 dark:text-white dark:bg-white/5"
+                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                                 rows={3}
                                 placeholder="Additional job notes..."
                               />
@@ -1262,7 +1262,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               <textarea
                                 value={editFields.directions}
                                 onChange={(e) => setEditFields(f => ({ ...f, directions: e.target.value }))}
-                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 dark:text-white dark:bg-white/5"
+                                className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm text-gray-900 dark:text-white dark:bg-white/5"
                                 rows={3}
                                 placeholder="Directions to the job site..."
                               />
@@ -1292,9 +1292,9 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                 {/* Right column — 30% notes sidebar */}
                 <div className="lg:w-[30%] lg:border-l border-gray-200 dark:border-white/10 p-5 bg-gray-50/50 dark:bg-white/5">
                   <div className="flex items-center gap-2 mb-3">
-                    <MessageSquare className="w-4 h-4 text-purple-600 dark:text-purple-300" />
+                    <MessageSquare className="w-4 h-4 text-brand dark:text-brand" />
                     <h3 className="text-sm font-bold text-gray-900 dark:text-white">Notes</h3>
-                    <span className="text-[10px] px-1.5 py-0.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-200 rounded-full font-bold">
+                    <span className="text-[10px] px-1.5 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-bold">
                       {jobNotes.length}
                     </span>
                   </div>
@@ -1307,12 +1307,12 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       onChange={(e) => setNewNote(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
                       placeholder="Add a note..."
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 focus:border-purple-400 focus:ring-1 focus:ring-purple-200 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 placeholder:text-gray-400 dark:placeholder:text-slate-500"
+                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 focus:border-brand focus:ring-1 focus:ring-brand/30 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 placeholder:text-gray-400 dark:placeholder:text-slate-500"
                     />
                     <button
                       onClick={handleAddNote}
                       disabled={addingNote || !newNote.trim()}
-                      className="px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                      className="px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg transition-colors disabled:opacity-50"
                     >
                       {addingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                     </button>
@@ -1329,7 +1329,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       jobNotes.map((note) => (
                         <div key={note.id} className="bg-white dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 p-3">
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-bold text-purple-600 dark:text-purple-300">{note.author_name}</span>
+                            <span className="text-[10px] font-bold text-brand dark:text-brand">{note.author_name}</span>
                             <span className="text-[10px] text-gray-400 dark:text-slate-500">
                               {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               {' '}
@@ -1414,7 +1414,7 @@ function EditFieldRow({ label, value, onChange, type = 'text' }: { label: string
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="flex-1 px-2 py-1 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 focus:ring-1 focus:ring-purple-200 text-sm font-medium text-gray-900 dark:text-white bg-purple-50/30 dark:bg-white/5"
+        className="flex-1 px-2 py-1 rounded-lg border-2 border-brand/40 dark:border-brand/40 focus:border-brand focus:ring-1 focus:ring-brand/30 text-sm font-medium text-gray-900 dark:text-white bg-brand/5 dark:bg-white/5"
       />
     </div>
   );
@@ -1520,7 +1520,7 @@ function ScopeEditor({
         <textarea
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm text-gray-900 dark:text-white dark:bg-white/5"
+          className="w-full px-3 py-2 rounded-lg border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm text-gray-900 dark:text-white dark:bg-white/5"
           rows={3}
         />
       </div>
@@ -1595,7 +1595,7 @@ function ScopeEditor({
                               type="number"
                               value={cut.num_cuts}
                               onChange={(e) => updateCutRow(svc, ci, 'num_cuts', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                              className="w-full px-2 py-1 rounded border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder="0"
                             />
                           </td>
@@ -1604,7 +1604,7 @@ function ScopeEditor({
                               type="number"
                               value={cut.linear_feet}
                               onChange={(e) => updateCutRow(svc, ci, 'linear_feet', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                              className="w-full px-2 py-1 rounded border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder="0"
                             />
                           </td>
@@ -1613,7 +1613,7 @@ function ScopeEditor({
                               type="text"
                               value={cut.depth}
                               onChange={(e) => updateCutRow(svc, ci, 'depth', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                              className="w-full px-2 py-1 rounded border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder='e.g. 6"'
                             />
                           </td>
@@ -1662,7 +1662,7 @@ function ScopeEditor({
                               type="number"
                               value={hole.qty}
                               onChange={(e) => updateHoleRow(svc, hi, 'qty', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                              className="w-full px-2 py-1 rounded border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder="0"
                             />
                           </td>
@@ -1671,7 +1671,7 @@ function ScopeEditor({
                               type="text"
                               value={hole.bit_size}
                               onChange={(e) => updateHoleRow(svc, hi, 'bit_size', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                              className="w-full px-2 py-1 rounded border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder='e.g. 4"'
                             />
                           </td>
@@ -1680,7 +1680,7 @@ function ScopeEditor({
                               type="text"
                               value={hole.depth}
                               onChange={(e) => updateHoleRow(svc, hi, 'depth', e.target.value)}
-                              className="w-full px-2 py-1 rounded border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                              className="w-full px-2 py-1 rounded border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                               placeholder='e.g. 8"'
                             />
                           </td>
@@ -1715,7 +1715,7 @@ function ScopeEditor({
                     <textarea
                       value={svcData.description || ''}
                       onChange={(e) => updateServiceField(svc, 'description', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                      className="w-full px-3 py-2 rounded-lg border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                       rows={2}
                       placeholder={`${svc} details...`}
                     />
@@ -1726,7 +1726,7 @@ function ScopeEditor({
                       type="text"
                       value={svcData.method || ''}
                       onChange={(e) => updateServiceField(svc, 'method', e.target.value)}
-                      className="w-full px-3 py-1.5 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white dark:bg-white/5"
+                      className="w-full px-3 py-1.5 rounded-lg border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white dark:bg-white/5"
                       placeholder="e.g. flat_sawing, wire_sawing..."
                     />
                   </div>
@@ -1809,7 +1809,7 @@ function EquipmentEditor({
             <select
               defaultValue=""
               onChange={(e) => { addEquipment(e.target.value); e.target.value = ''; }}
-              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-purple-300 dark:border-purple-500/40 focus:border-purple-500 text-xs text-gray-900 dark:text-white bg-white dark:bg-white/5"
+              className="flex-1 px-2 py-1.5 rounded-lg border-2 border-brand/40 dark:border-brand/40 focus:border-brand text-xs text-gray-900 dark:text-white bg-white dark:bg-white/5"
             >
               <option value="" disabled>+ Add equipment...</option>
               {availableToAdd.map(p => (

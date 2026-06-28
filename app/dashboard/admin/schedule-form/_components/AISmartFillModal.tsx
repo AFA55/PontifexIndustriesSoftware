@@ -242,14 +242,14 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 px-6 py-4 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-brand via-brand to-brand-accent px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-white/20 rounded-xl">
               <Brain className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">AI Smart Fill</h2>
-              <p className="text-violet-200 text-sm">Speak or type a job description — AI fills the form</p>
+              <p className="text-white/80 text-sm">Speak or type a job description — AI fills the form</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-all">
@@ -265,7 +265,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
               value={text}
               onChange={e => setText(e.target.value)}
               placeholder='Try: "Schedule a wall saw job for Turner Construction at 450 Main Street next Tuesday, 50 linear feet at 6 inches deep, estimated $3500, water available, outside job, moderate difficulty, contact Mike Johnson 555-1234"'
-              className="w-full h-32 px-4 py-3 text-gray-900 bg-gray-50 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent text-sm placeholder:text-gray-400"
+              className="w-full h-32 px-4 py-3 text-gray-900 bg-gray-50 border border-gray-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-brand focus:border-transparent text-sm placeholder:text-gray-400"
             />
 
             {/* Voice + Send buttons */}
@@ -300,7 +300,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
                 disabled={!text.trim() || isProcessing}
                 className={`px-4 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-1.5 shadow-sm ${
                   text.trim() && !isProcessing
-                    ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white'
+                    ? 'bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white'
                     : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
@@ -329,7 +329,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
                 <button
                   key={i}
                   onClick={() => { setText(example); textareaRef.current?.focus(); }}
-                  className="text-xs px-2.5 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-600 rounded-lg transition-all border border-purple-100"
+                  className="text-xs px-2.5 py-1.5 bg-brand/10 hover:bg-brand/20 text-brand rounded-lg transition-all border border-brand/20"
                 >
                   {example.slice(0, 40)}...
                 </button>
@@ -400,13 +400,13 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
                   onClick={() => toggleField(field.key)}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                     selectedFields.has(field.key)
-                      ? 'bg-purple-50 border-purple-200'
+                      ? 'bg-brand/10 border-brand/30'
                       : 'bg-gray-50 border-gray-200 opacity-60'
                   }`}
                 >
                   <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                     selectedFields.has(field.key)
-                      ? 'bg-purple-600 border-purple-600'
+                      ? 'bg-brand border-brand'
                       : 'border-gray-300'
                   }`}>
                     {selectedFields.has(field.key) && (
@@ -448,7 +448,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
                 <button
                   onClick={handleApply}
                   disabled={selectedFields.size === 0}
-                  className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2"
+                  className="px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-bold transition-all shadow-sm hover:shadow-md flex items-center gap-2"
                 >
                   <Sparkles className="w-4 h-4" /> Apply to Form
                 </button>

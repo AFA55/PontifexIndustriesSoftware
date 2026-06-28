@@ -90,7 +90,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
         <div className="bg-white dark:bg-[#1a0f35] rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-gray-200 dark:border-white/10 animate-in zoom-in-95 duration-200">
           {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-indigo-600 p-5 rounded-t-2xl text-white">
+          <div className="bg-gradient-to-r from-brand to-brand-accent p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold flex items-center gap-2">
@@ -119,7 +119,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
               <select
                 value={operatorId}
                 onChange={(e) => setOperatorId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               >
                 <option value="">Select Operator...</option>
                 {operators.map(op => (
@@ -135,7 +135,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white transition-all"
               />
             </div>
 
@@ -187,7 +187,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Any additional details..."
                 rows={2}
-                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder-white/30 transition-all resize-none"
+                className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand focus:ring-2 focus:ring-brand/30 text-sm font-medium bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder-white/30 transition-all resize-none"
               />
             </div>
 
@@ -202,7 +202,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
               <button
                 onClick={handleSubmit}
                 disabled={saving || !operatorId}
-                className="flex-1 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {saving ? 'Saving...' : 'Add Time Off'}
@@ -213,7 +213,7 @@ export default function AddTimeOffModal({ operators, defaultDate, onSuccess, onC
             <div className="text-center pt-1">
               <Link
                 href="/dashboard/admin/time-off"
-                className="inline-flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 dark:text-purple-400 dark:hover:text-purple-300 transition-colors"
+                className="inline-flex items-center gap-1 text-xs text-brand hover:text-brand-dark dark:text-brand dark:hover:text-brand transition-colors"
                 onClick={onClose}
               >
                 <ExternalLink className="w-3 h-3" />

@@ -66,8 +66,8 @@ export default function NotesDrawer({ job, notes, onAddNote, onClose }: NotesDra
             notes.map((note) => (
               <div key={note.id} className="bg-gray-50 dark:bg-white/[0.05] rounded-xl p-3 border border-gray-200 dark:border-white/10">
                 <div className="flex items-center gap-2 mb-1.5">
-                  <div className="w-6 h-6 rounded-full bg-purple-100 dark:bg-purple-500/20 flex items-center justify-center">
-                    <User className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
+                  <div className="w-6 h-6 rounded-full bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+                    <User className="w-3.5 h-3.5 text-brand" />
                   </div>
                   <span className="text-sm font-bold text-gray-900 dark:text-white">{note.author}</span>
                   <span className="text-gray-300 dark:text-white/20">•</span>

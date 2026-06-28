@@ -19,7 +19,7 @@ export default function DroppableOperatorRow({ operatorId, operatorName, childre
       ref={setNodeRef}
       className={`transition-all rounded-xl ${
         isOver
-          ? 'ring-2 ring-purple-400 ring-offset-2 bg-purple-50/40 shadow-lg scale-[1.005]'
+          ? 'ring-2 ring-brand ring-offset-2 bg-brand/5 shadow-lg scale-[1.005]'
           : ''
       }`}
     >

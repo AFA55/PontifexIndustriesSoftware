@@ -17,21 +17,21 @@ export default function NextAvailableBanner({
 }: NextAvailableBannerProps) {
   return (
     <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 duration-300">
-      <div className="bg-white dark:bg-[#0e0720] dark:border-white/10 rounded-2xl shadow-2xl border-2 border-purple-200 p-4 flex items-center gap-4 max-w-md">
-        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center flex-shrink-0">
+      <div className="bg-white dark:bg-[#0e0720] dark:border-white/10 rounded-2xl shadow-2xl border-2 border-brand/30 p-4 flex items-center gap-4 max-w-md">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-brand to-brand-accent flex items-center justify-center flex-shrink-0">
           <CalendarDays className="w-6 h-6 text-white" />
         </div>
         <div className="flex-1">
           <p className="text-sm font-bold text-gray-900 dark:text-white">Next Available Date</p>
           <p className="text-xs text-gray-600 dark:text-white/60">
             {new Date(date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            <span className="text-purple-600 font-semibold"> — {availableSlots} slots open</span>
+            <span className="text-brand font-semibold"> — {availableSlots} slots open</span>
           </p>
         </div>
         <div className="flex gap-2">
           <button
             onClick={onGo}
-            className="px-3 py-2 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl text-xs font-bold transition-all hover:shadow-md"
+            className="px-3 py-2 bg-gradient-to-r from-brand to-brand-accent text-white rounded-xl text-xs font-bold transition-all hover:shadow-md"
           >
             Go
           </button>

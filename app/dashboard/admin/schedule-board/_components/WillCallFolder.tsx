@@ -44,7 +44,7 @@ export default function WillCallFolder({
                     <h4 className="font-bold text-gray-900 dark:text-white text-sm">{job.customer_name}</h4>
                     <span className="px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-bold whitespace-nowrap">WILL CALL</span>
                   </div>
-                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-400 mb-1">{job.job_type}</span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand mb-1">{job.job_type}</span>
                   <p className="text-xs text-gray-500 dark:text-white/60 flex items-center gap-1 mb-1"><MapPin className="w-3 h-3" /> {job.location}</p>
 
                   <div className="flex items-center justify-between mt-2 mb-2">
@@ -69,7 +69,7 @@ export default function WillCallFolder({
                       </button>
                       <button
                         onClick={() => onAssign(job)}
-                        className="py-1.5 px-2.5 text-xs font-bold text-purple-700 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-lg transition-colors"
+                        className="py-1.5 px-2.5 text-xs font-bold text-brand bg-brand/5 hover:bg-brand/10 border border-brand rounded-lg transition-colors"
                       >
                         <Users className="w-3.5 h-3.5" />
                       </button>

@@ -28,8 +28,8 @@ export default function DailyCodeModal({
       >
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-500/20 flex items-center justify-center">
-              <KeyRound className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            <div className="w-10 h-10 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+              <KeyRound className="w-5 h-5 text-brand dark:text-brand" />
             </div>
             <div>
               <h3 className="font-bold text-gray-900 dark:text-white">Today&apos;s Shop Code</h3>
@@ -46,18 +46,18 @@ export default function DailyCodeModal({
 
         {codeLoading ? (
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+            <Loader2 className="w-8 h-8 animate-spin text-brand" />
           </div>
         ) : dailyCode ? (
           <>
-            <div className="bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-500/10 dark:to-purple-500/10 rounded-2xl border-2 border-indigo-200 dark:border-indigo-500/30 p-6 text-center mb-4">
-              <p className="text-4xl font-black tracking-[0.3em] text-indigo-700 dark:text-indigo-300 font-mono">{dailyCode}</p>
-              <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-2">Valid today only • Resets at midnight</p>
+            <div className="bg-gradient-to-br from-brand/5 to-brand-accent/10 dark:from-brand/10 dark:to-brand-accent/10 rounded-2xl border-2 border-brand dark:border-brand/30 p-6 text-center mb-4">
+              <p className="text-4xl font-black tracking-[0.3em] text-brand-dark dark:text-brand font-mono">{dailyCode}</p>
+              <p className="text-xs text-brand dark:text-brand mt-2">Valid today only • Resets at midnight</p>
             </div>
             <div className="flex gap-2">
               <button
                 onClick={onCopy}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-indigo-50 dark:bg-indigo-500/15 hover:bg-indigo-100 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-500/30 rounded-xl text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-brand/5 dark:bg-brand/15 hover:bg-brand/10 dark:hover:bg-brand/25 border border-brand dark:border-brand/30 rounded-xl text-brand dark:text-brand text-sm font-semibold transition-all"
               >
                 <Copy className="w-4 h-4" /> Copy
               </button>
@@ -78,7 +78,7 @@ export default function DailyCodeModal({
             <p className="text-gray-500 dark:text-white/50 mb-4 text-sm">No code set for today yet.</p>
             <button
               onClick={onRegenerate}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-semibold text-sm transition-all flex items-center gap-2 mx-auto"
+              className="px-6 py-2.5 bg-brand hover:bg-brand-dark text-white rounded-xl font-semibold text-sm transition-all flex items-center gap-2 mx-auto"
             >
               <KeyRound className="w-4 h-4" /> Generate Today&apos;s Code
             </button>

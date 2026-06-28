@@ -216,7 +216,7 @@ export default function CrewScheduleGrid({ onDateClick }: CrewScheduleGridProps)
                 onClick={() => setDays(d)}
                 className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
                   days === d
-                    ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-lg'
+                    ? 'bg-gradient-to-r from-blue-500 to-brand-accent text-white shadow-lg'
                     : 'text-gray-600 dark:text-white/60 hover:bg-gray-100 dark:hover:bg-white/10'
                 }`}
               >
@@ -304,7 +304,7 @@ export default function CrewScheduleGrid({ onDateClick }: CrewScheduleGridProps)
                         {isUnassigned ? (
                           <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                         ) : (
-                          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-brand-accent rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
                             {row.name.charAt(0)}
                           </div>
                         )}

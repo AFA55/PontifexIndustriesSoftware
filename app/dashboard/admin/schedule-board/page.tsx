@@ -1683,7 +1683,7 @@ export default function ScheduleBoardPage() {
   if (moduleGate.blocked) return moduleGate.fallback;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand/5 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
       {/* ═══ STICKY HEADER ════════════════════════════════════════════════ */}
       <div className="backdrop-blur-xl bg-white/90 dark:bg-[#0e0720]/95 border-b border-gray-200 dark:border-white/10 sticky top-0 z-30 shadow-lg">
         <div className="container mx-auto px-4 md:px-6 py-3">
@@ -1694,7 +1694,7 @@ export default function ScheduleBoardPage() {
               </Link>
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-purple-600" />
+                  <Calendar className="w-5 h-5 text-brand" />
                   {canEdit ? 'Operations Schedule Board' : 'Schedule Board'}
                 </h1>
                 <p className="text-gray-500 dark:text-white/60 text-xs">
@@ -1737,7 +1737,7 @@ export default function ScheduleBoardPage() {
                     disabled={autoScheduleLoading || unassignedJobs.length === 0}
                     className={`relative h-9 px-3 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md ${
                       unassignedJobs.length > 0
-                        ? 'bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white'
+                        ? 'bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-dark text-white'
                         : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                     }`}
                   >
@@ -1830,7 +1830,7 @@ export default function ScheduleBoardPage() {
                   onClick={() => setViewMode('day')}
                   className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
                     viewMode === 'day'
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-brand to-brand-accent text-white shadow-lg'
                       : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-white/15'
                   }`}
                 >
@@ -1840,7 +1840,7 @@ export default function ScheduleBoardPage() {
                   onClick={() => setViewMode('week')}
                   className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
                     viewMode === 'week'
-                      ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white shadow-lg'
+                      ? 'bg-gradient-to-r from-brand to-brand-accent text-white shadow-lg'
                       : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-white/15'
                   }`}
                 >
@@ -1851,10 +1851,10 @@ export default function ScheduleBoardPage() {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 px-3 py-2 bg-purple-50 dark:bg-purple-500/15 rounded-xl border border-purple-200 dark:border-purple-400/30">
-                <UserCheck className="w-4 h-4 text-purple-600 dark:text-purple-300" />
+              <div className="flex items-center gap-2 px-3 py-2 bg-brand/5 dark:bg-brand/15 rounded-xl border border-brand/30 dark:border-brand/30">
+                <UserCheck className="w-4 h-4 text-brand dark:text-brand" />
                 <div>
-                  <div className="text-[10px] font-bold text-purple-500 dark:text-purple-400 uppercase">Active</div>
+                  <div className="text-[10px] font-bold text-brand dark:text-brand uppercase">Active</div>
                   <div className="text-lg font-bold text-gray-900 dark:text-white">{activeOperators}</div>
                 </div>
               </div>
@@ -1883,7 +1883,7 @@ export default function ScheduleBoardPage() {
                 <button
                   onClick={handleFindNextAvailable}
                   disabled={findingNextAvailable}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-purple-50 hover:bg-purple-100 dark:bg-purple-500/15 dark:hover:bg-purple-500/25 border border-purple-200 dark:border-purple-400/30 rounded-xl text-purple-700 dark:text-purple-300 text-sm font-semibold transition-all"
+                  className="flex items-center gap-1.5 px-3 py-2 bg-brand/5 hover:bg-brand/10 dark:bg-brand/15 dark:hover:bg-brand/25 border border-brand/30 dark:border-brand/30 rounded-xl text-brand dark:text-brand text-sm font-semibold transition-all"
                 >
                   {findingNextAvailable ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
                   Next Available

@@ -231,7 +231,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             {canEdit ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit?.(job); }}
-                className="p-1.5 rounded-lg hover:bg-purple-100 dark:hover:bg-white/10 text-purple-600 dark:text-purple-400 transition-colors"
+                className="p-1.5 rounded-lg hover:bg-brand/10 dark:hover:bg-white/10 text-brand dark:text-brand transition-colors"
                 title="Edit Job"
               >
                 <Edit3 className="w-4 h-4" />

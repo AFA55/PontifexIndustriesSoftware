@@ -25,14 +25,14 @@ export default function CapacitySettingsModal({
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={onClose} />
       <div className="fixed inset-0 flex items-center justify-center z-[80] p-4">
         <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-sm animate-in zoom-in-95 duration-200">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-500 p-5 rounded-t-2xl text-white">
+          <div className="bg-gradient-to-r from-brand to-brand-accent p-5 rounded-t-2xl text-white">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold flex items-center gap-2">
                   <Settings className="w-5 h-5" />
                   Capacity Settings
                 </h2>
-                <p className="text-purple-200 text-sm">Adjust crew slots as your team grows</p>
+                <p className="text-white/70 text-sm">Adjust crew slots as your team grows</p>
               </div>
               <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-xl transition-colors">
                 <X className="w-5 h-5" />
@@ -56,7 +56,7 @@ export default function CapacitySettingsModal({
                   setMaxSlots(v);
                   if (warningThreshold > v) setWarningThreshold(v);
                 }}
-                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-200 text-lg font-bold text-gray-900 bg-white transition-all"
+                className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 text-lg font-bold text-gray-900 bg-white transition-all"
               />
             </div>
 
@@ -100,7 +100,7 @@ export default function CapacitySettingsModal({
               <button
                 onClick={() => onSave(maxSlots, warningThreshold)}
                 disabled={!isValid}
-                className="flex-1 py-3 bg-gradient-to-r from-purple-600 to-pink-500 hover:from-purple-700 hover:to-pink-600 text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 py-3 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save Settings
               </button>

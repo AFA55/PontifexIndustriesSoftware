@@ -139,7 +139,7 @@ function PersonDropdown({
                 onClick={() => { onSelect(name); setOpen(false); }}
                 className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between ${
                   isCurrent
-                    ? 'bg-purple-50 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300'
+                    ? 'bg-brand/5 dark:bg-brand/20 text-brand dark:text-brand'
                     : 'hover:bg-gray-50 dark:hover:bg-white/5 text-gray-700 dark:text-white/80'
                 }`}
               >
@@ -149,7 +149,7 @@ function PersonDropdown({
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Assigned: {busyJob}</p>
                   )}
                 </div>
-                {isCurrent && <Check className="w-4 h-4 text-purple-600 dark:text-purple-400" />}
+                {isCurrent && <Check className="w-4 h-4 text-brand dark:text-brand" />}
               </button>
             );
           })}
@@ -255,7 +255,7 @@ export default function OperatorRow({
           : `${colorScheme.border} bg-white dark:bg-white/[0.05] dark:ring-white/10 dark:hover:ring-white/20`
       } ${
         dragOver
-          ? 'ring-2 ring-purple-400 ring-offset-2 shadow-lg scale-[1.01] bg-purple-50/30 dark:bg-purple-500/10 dark:ring-purple-400/60'
+          ? 'ring-2 ring-brand ring-offset-2 shadow-lg scale-[1.01] bg-brand/5 dark:bg-brand/10 dark:ring-brand/60'
           : ''
       }`}
       onDragOver={handleDragOver}
@@ -404,7 +404,7 @@ export default function OperatorRow({
                       onChange={(e) => setTimeOffNotes(e.target.value)}
                       placeholder="Add a note (optional)..."
                       rows={2}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 mb-3"
+                      className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-brand mb-3"
                     />
 
                     {/* Action buttons */}
@@ -417,7 +417,7 @@ export default function OperatorRow({
                       </button>
                       <button
                         onClick={handleSaveTimeOff}
-                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-700 text-white transition-colors"
+                        className="flex-1 py-1.5 rounded-lg text-xs font-semibold bg-brand hover:bg-brand-dark text-white transition-colors"
                       >
                         Save Time Off
                       </button>
@@ -507,13 +507,13 @@ export default function OperatorRow({
         {!timeOff && jobs.length === 0 && (
           <div className={`flex items-center justify-center py-3 rounded-lg border-2 border-dashed transition-all ${
             dragOver
-              ? 'bg-purple-50 dark:bg-purple-500/10 border-purple-400 dark:border-purple-400/60'
+              ? 'bg-brand/5 dark:bg-brand/10 border-brand dark:border-brand/60'
               : 'bg-green-50/50 dark:bg-green-500/5 border-green-200 dark:border-green-500/30'
           }`}>
-            <p className={`text-sm font-medium flex items-center gap-2 ${dragOver ? 'text-purple-600 dark:text-purple-300' : 'text-green-500 dark:text-green-400'}`}>
+            <p className={`text-sm font-medium flex items-center gap-2 ${dragOver ? 'text-brand dark:text-brand' : 'text-green-500 dark:text-green-400'}`}>
               {dragOver ? (
                 <>
-                  <span className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" />
+                  <span className="w-2 h-2 bg-brand rounded-full animate-pulse" />
                   Drop here to assign
                 </>
               ) : (
@@ -523,7 +523,7 @@ export default function OperatorRow({
                   {canEdit && (
                     <button
                       onClick={onAssignJob}
-                      className="ml-1 text-purple-600 dark:text-purple-400 hover:text-purple-800 dark:hover:text-purple-300 font-semibold hover:underline"
+                      className="ml-1 text-brand dark:text-brand hover:text-brand-dark dark:hover:text-brand font-semibold hover:underline"
                     >
                       + Assign
                     </button>
@@ -558,7 +558,7 @@ export default function OperatorRow({
                     onBlur={() => onSaveRowNote?.(noteText)}
                     placeholder="Add shift notes (e.g. 'Alex leaving at 2pm')..."
                     rows={2}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-purple-400 transition-colors"
+                    className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 text-gray-800 dark:text-white placeholder-gray-400 dark:placeholder-white/30 resize-none focus:outline-none focus:ring-2 focus:ring-brand transition-colors"
                   />
                   <p className="text-[10px] text-gray-400 dark:text-white/30 mt-1">Auto-saves on blur</p>
                 </div>

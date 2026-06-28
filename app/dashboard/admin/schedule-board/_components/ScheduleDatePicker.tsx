@@ -146,11 +146,11 @@ export default function ScheduleDatePicker({ value, onChange }: ScheduleDatePick
           onClick={() => setIsOpen(!isOpen)}
           className={`flex items-center gap-3 px-5 py-3 rounded-xl border cursor-pointer transition-all group ${
             isOpen
-              ? 'bg-purple-50 border-purple-300 ring-2 ring-purple-200 shadow-lg'
-              : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-purple-300'
+              ? 'bg-brand/5 border-brand ring-2 ring-brand/30 shadow-lg'
+              : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-brand'
           }`}
         >
-          <Calendar className="w-5 h-5 text-purple-600 group-hover:scale-110 transition-transform" />
+          <Calendar className="w-5 h-5 text-brand group-hover:scale-110 transition-transform" />
           <div className="text-left">
             <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Viewing</div>
             <span className="text-lg font-bold text-gray-900">{formatDisplayDate(value)}</span>
@@ -166,7 +166,7 @@ export default function ScheduleDatePicker({ value, onChange }: ScheduleDatePick
               <button
                 type="button"
                 onClick={goToPrevMonth}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-700 active:bg-purple-100 transition-all"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-600 dark:text-slate-300 hover:bg-brand/5 dark:hover:bg-white/10 hover:text-brand-dark active:bg-brand/10 transition-all"
               >
                 <ChevronLeft size={18} />
               </button>
@@ -176,7 +176,7 @@ export default function ScheduleDatePicker({ value, onChange }: ScheduleDatePick
               <button
                 type="button"
                 onClick={goToNextMonth}
-                className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-600 dark:text-slate-300 hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-700 active:bg-purple-100 transition-all"
+                className="w-9 h-9 rounded-xl flex items-center justify-center text-gray-600 dark:text-slate-300 hover:bg-brand/5 dark:hover:bg-white/10 hover:text-brand-dark active:bg-brand/10 transition-all"
               >
                 <ChevronRight size={18} />
               </button>
@@ -207,12 +207,12 @@ export default function ScheduleDatePicker({ value, onChange }: ScheduleDatePick
                     onClick={() => selectDay(day)}
                     className={`aspect-square rounded-xl flex items-center justify-center text-sm font-semibold transition-all duration-150 ${
                       selected
-                        ? 'bg-gradient-to-br from-purple-600 to-pink-500 text-white shadow-lg shadow-purple-200/50 scale-110'
+                        ? 'bg-gradient-to-br from-brand to-brand-accent text-white shadow-lg shadow-brand/30 scale-110'
                         : todayMark
-                          ? 'border-2 border-purple-400 text-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-white/10'
+                          ? 'border-2 border-brand text-brand dark:text-brand hover:bg-brand/5 dark:hover:bg-white/10'
                           : weekend
                             ? 'text-gray-300 dark:text-slate-600 hover:bg-gray-50 dark:hover:bg-white/5'
-                            : 'text-gray-700 dark:text-slate-200 hover:bg-purple-50 dark:hover:bg-white/10 hover:text-purple-700 active:bg-purple-100'
+                            : 'text-gray-700 dark:text-slate-200 hover:bg-brand/5 dark:hover:bg-white/10 hover:text-brand-dark active:bg-brand/10'
                     }`}
                   >
                     {day}
@@ -226,7 +226,7 @@ export default function ScheduleDatePicker({ value, onChange }: ScheduleDatePick
               <button
                 type="button"
                 onClick={() => { goToToday(); setIsOpen(false); }}
-                className="flex-1 py-2 text-xs font-bold text-purple-600 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-white/10 rounded-lg transition-colors"
+                className="flex-1 py-2 text-xs font-bold text-brand dark:text-brand hover:bg-brand/5 dark:hover:bg-white/10 rounded-lg transition-colors"
               >
                 Today
               </button>
@@ -257,8 +257,8 @@ export default function ScheduleDatePicker({ value, onChange }: ScheduleDatePick
         onClick={goToToday}
         className={`px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
           isValueToday
-            ? 'bg-purple-100 text-purple-700 border border-purple-300'
-            : 'bg-gray-100 hover:bg-purple-50 text-gray-600 hover:text-purple-700 border border-gray-200 hover:border-purple-200'
+            ? 'bg-brand/10 text-brand border border-brand'
+            : 'bg-gray-100 hover:bg-brand/5 text-gray-600 hover:text-brand-dark border border-gray-200 hover:border-brand/30'
         }`}
       >
         Today
