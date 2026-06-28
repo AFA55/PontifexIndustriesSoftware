@@ -12,7 +12,7 @@ export default function Loading() {
             >
               <div className="flex items-center justify-between">
                 <div className="h-5 w-32 bg-slate-200 rounded" />
-                <div className="h-6 w-16 bg-violet-100 rounded-full" />
+                <div className="h-6 w-16 bg-brand/10 rounded-full" />
               </div>
               <div className="h-4 w-full bg-slate-100 rounded" />
               <div className="h-4 w-2/3 bg-slate-100 rounded" />

@@ -106,7 +106,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
     <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200/60 dark:border-white/10 overflow-hidden animate-in slide-in-from-top-2 duration-200">
       {/* Multi-day continuation banner */}
       {isMultiDayContinuation && (
-        <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-2 text-sm font-semibold flex items-center gap-2">
+        <div className="bg-gradient-to-r from-brand to-brand-accent text-white px-4 py-2 text-sm font-semibold flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4" />
           Continuing from previous day — equipment checklist not required
         </div>
@@ -177,7 +177,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
                     <div className="space-y-3">
                       {/* Service Type */}
                       <div className="flex items-center gap-2">
-                        <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-lg text-sm font-bold">
+                        <span className="px-3 py-1 bg-brand/10 text-brand rounded-lg text-sm font-bold">
                           {job.job_type}
                         </span>
                         {job.estimated_hours && (

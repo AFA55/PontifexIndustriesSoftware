@@ -7,7 +7,7 @@ export default function Loading() {
         {/* Service code chips */}
         <div className="flex flex-wrap gap-2">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="h-8 w-20 bg-violet-100 rounded-full animate-pulse" />
+            <div key={i} className="h-8 w-20 bg-brand/10 rounded-full animate-pulse" />
           ))}
         </div>
         {/* Work entry cards */}
@@ -25,7 +25,7 @@ export default function Loading() {
             </div>
           ))}
         </div>
-        <div className="h-12 w-full bg-violet-200 rounded-lg animate-pulse" />
+        <div className="h-12 w-full bg-brand/20 rounded-lg animate-pulse" />
       </div>
     </div>
   );

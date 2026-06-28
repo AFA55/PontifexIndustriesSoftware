@@ -89,12 +89,12 @@ export default function EquipmentPanel({
 
       {/* Special Equipment */}
       {specialEquipment && (
-        <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-xl">
-          <div className="flex items-center gap-2 text-sm font-bold text-purple-700 mb-1">
+        <div className="mt-3 p-3 bg-brand/5 border border-brand/30 rounded-xl">
+          <div className="flex items-center gap-2 text-sm font-bold text-brand mb-1">
             <Wrench className="w-4 h-4" />
             Special Equipment
           </div>
-          <p className="text-sm text-purple-800">{specialEquipment}</p>
+          <p className="text-sm text-brand">{specialEquipment}</p>
         </div>
       )}
     </div>

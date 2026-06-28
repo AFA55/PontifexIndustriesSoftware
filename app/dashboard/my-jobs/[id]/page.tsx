@@ -480,14 +480,14 @@ export default function JobDetailPage() {
         >
           <div className="flex items-start gap-4">
             <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              isImage ? 'bg-indigo-100 dark:bg-indigo-500/20' : 'bg-gray-100 dark:bg-white/10'
+              isImage ? 'bg-brand/10 dark:bg-brand/20' : 'bg-gray-100 dark:bg-white/10'
             }`}>
-              {isImage ? <Image className="w-7 h-7 text-indigo-500 dark:text-indigo-400" /> : <File className="w-7 h-7 text-gray-400 dark:text-white/40" />}
+              {isImage ? <Image className="w-7 h-7 text-brand dark:text-brand" /> : <File className="w-7 h-7 text-gray-400 dark:text-white/40" />}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-base font-bold text-gray-900 dark:text-white truncate">{doc.file_name}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
-                <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
+                <span className="text-xs font-semibold text-white bg-brand px-2 py-0.5 rounded-full">
                   {categoryLabels[doc.category] || doc.category}
                 </span>
                 {doc.uploaded_by_name && (
@@ -743,7 +743,7 @@ export default function JobDetailPage() {
               </Link>
               <Link
                 href="/dashboard/request-time-off"
-                className="flex items-center gap-3 px-4 py-4 bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30 rounded-2xl text-violet-700 dark:text-violet-300 font-semibold text-base hover:bg-violet-100 dark:hover:bg-violet-500/20 transition-colors"
+                className="flex items-center gap-3 px-4 py-4 bg-brand/5 dark:bg-brand/10 border border-brand/30 dark:border-brand/30 rounded-2xl text-brand dark:text-brand font-semibold text-base hover:bg-brand/10 dark:hover:bg-brand/20 transition-colors"
               >
                 <Clock className="w-5 h-5 flex-shrink-0" />
                 Request Time Off
@@ -764,7 +764,7 @@ export default function JobDetailPage() {
 
         {/* Equipment already confirmed banner */}
         {equipmentAlreadyConfirmed && (
-          <div className="bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-4 py-3 rounded-xl text-base font-semibold flex items-center gap-2">
+          <div className="bg-gradient-to-r from-brand to-brand-accent text-white px-4 py-3 rounded-xl text-base font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
             Equipment confirmed — checklist not required
           </div>
@@ -788,7 +788,7 @@ export default function JobDetailPage() {
             {job.readable_status}
           </span>
           {isMultiDay && (
-            <span className="text-sm px-3 py-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-full font-bold border border-purple-200 dark:border-purple-500/30">
+            <span className="text-sm px-3 py-1.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-bold border border-brand/30 dark:border-brand/30">
               Multi-Day
             </span>
           )}
@@ -1033,7 +1033,7 @@ export default function JobDetailPage() {
           {workDetailsOpen && (
             <div className="px-5 pb-5 space-y-4">
               <div className="flex items-center gap-3 flex-wrap">
-                <span className="px-4 py-1.5 bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 rounded-lg text-base font-bold">
+                <span className="px-4 py-1.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-lg text-base font-bold">
                   {job.job_type}
                 </span>
                 {job.estimated_hours && (
@@ -1112,15 +1112,15 @@ export default function JobDetailPage() {
 
         {/* Site Compliance — collapsible */}
         {hasCompliance && (
-          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-indigo-200/60 dark:border-white/10 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-brand/30 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setComplianceOpen(!complianceOpen)}
               className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <Shield className="w-5 h-5 text-brand dark:text-brand" />
                 <span className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</span>
-                <span className="text-xs px-2 py-0.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-full font-bold">Required</span>
+                <span className="text-xs px-2 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-bold">Required</span>
               </div>
               <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
             </button>
@@ -1130,9 +1130,9 @@ export default function JobDetailPage() {
                   const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
                   const displayValue = typeof value === 'boolean' ? (value ? 'Required' : 'Not Required') : String(value);
                   return (
-                    <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl border border-indigo-100 dark:border-indigo-500/20">
-                      <span className="text-sm font-semibold text-indigo-800 dark:text-indigo-300">{label}</span>
-                      <span className="text-sm font-bold text-indigo-900 dark:text-white ml-2">{displayValue}</span>
+                    <div key={key} className="flex items-center justify-between p-3 bg-brand/5 dark:bg-brand/10 rounded-xl border border-brand/30 dark:border-brand/20">
+                      <span className="text-sm font-semibold text-brand dark:text-brand">{label}</span>
+                      <span className="text-sm font-bold text-brand dark:text-white ml-2">{displayValue}</span>
                     </div>
                   );
                 })}
@@ -1143,13 +1143,13 @@ export default function JobDetailPage() {
 
         {/* Additional Notes & Directions — collapsible */}
         {hasAdditionalNotes && (
-          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-purple-200/60 dark:border-white/10 overflow-hidden">
+          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-brand/30 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setNotesOpen(!notesOpen)}
               className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex items-center gap-2">
-                <FileText className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                <FileText className="w-5 h-5 text-brand dark:text-brand" />
                 <span className="text-base font-bold text-gray-800 dark:text-white">Additional Notes</span>
               </div>
               <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${notesOpen ? 'rotate-180' : ''}`} />
@@ -1157,8 +1157,8 @@ export default function JobDetailPage() {
             {notesOpen && (
               <div className="px-5 pb-5 space-y-3">
                 {job.additional_info && (
-                  <div className="p-4 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
-                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase mb-1">Notes</p>
+                  <div className="p-4 bg-brand/5 dark:bg-brand/10 rounded-xl border border-brand/30 dark:border-brand/20">
+                    <p className="text-xs text-brand dark:text-brand font-semibold uppercase mb-1">Notes</p>
                     <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.additional_info}</p>
                   </div>
                 )}
@@ -1169,8 +1169,8 @@ export default function JobDetailPage() {
                   </div>
                 )}
                 {job.special_equipment_notes && (
-                  <div className="p-4 bg-purple-50 dark:bg-purple-500/10 rounded-xl border border-purple-100 dark:border-purple-500/20">
-                    <p className="text-xs text-purple-600 dark:text-purple-400 font-semibold uppercase mb-1">Special Equipment Notes</p>
+                  <div className="p-4 bg-brand/5 dark:bg-brand/10 rounded-xl border border-brand/30 dark:border-brand/20">
+                    <p className="text-xs text-brand dark:text-brand font-semibold uppercase mb-1">Special Equipment Notes</p>
                     <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap leading-relaxed">{job.special_equipment_notes}</p>
                   </div>
                 )}
@@ -1278,11 +1278,11 @@ export default function JobDetailPage() {
 
         {/* Admin Documents & Photos - Prominent section */}
         {adminDocs.length > 0 && (
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:bg-none dark:bg-white/[0.05] rounded-2xl shadow-xl border-2 border-indigo-200 dark:border-white/10 p-5">
+          <div className="bg-gradient-to-br from-brand/5 to-blue-50 dark:bg-none dark:bg-white/[0.05] rounded-2xl shadow-xl border-2 border-brand/30 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Paperclip className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
-              <h3 className="text-base font-bold text-indigo-900 dark:text-white">Job Documents & Photos</h3>
-              <span className="text-xs px-2 py-0.5 bg-indigo-500 text-white rounded-full font-bold">
+              <Paperclip className="w-5 h-5 text-brand dark:text-brand" />
+              <h3 className="text-base font-bold text-brand dark:text-white">Job Documents & Photos</h3>
+              <span className="text-xs px-2 py-0.5 bg-brand text-white rounded-full font-bold">
                 {adminDocs.length}
               </span>
             </div>
@@ -1349,7 +1349,7 @@ export default function JobDetailPage() {
           <div className="pt-2">
             <button
               onClick={handleResumeJob}
-              className="w-full py-5 bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
+              className="w-full py-5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand/90 hover:to-brand-accent/90 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
             >
               <PlayCircle className="w-6 h-6" />
               Resume This Job

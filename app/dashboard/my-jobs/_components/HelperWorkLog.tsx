@@ -419,8 +419,8 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
             onClick={() => setShowScopeDetails(!showScopeDetails)}
             className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-colors"
           >
-            <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
-              <FileText className="w-4 h-4 text-indigo-600" />
+            <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center flex-shrink-0">
+              <FileText className="w-4 h-4 text-brand" />
             </div>
             <span className="font-semibold text-gray-900 text-sm flex-1">Job Scope & Details</span>
             {showScopeDetails ? (
@@ -448,7 +448,7 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
                   <p className="text-xs font-semibold text-gray-500 mb-1.5 uppercase">Equipment</p>
                   <div className="flex flex-wrap gap-1.5">
                     {job.equipment_needed.map((eq: string, i: number) => (
-                      <span key={i} className="px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-full text-xs text-indigo-700 font-medium">
+                      <span key={i} className="px-2 py-0.5 bg-brand/5 border border-brand/30 rounded-full text-xs text-brand font-medium">
                         {eq}
                       </span>
                     ))}

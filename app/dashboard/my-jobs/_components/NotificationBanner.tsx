@@ -65,7 +65,7 @@ export default function NotificationBanner() {
   const Icon = isAssignment ? Briefcase : Bell;
   const gradientClass = isAssignment
     ? 'bg-gradient-to-r from-orange-500 via-orange-600 to-red-600'
-    : 'bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600';
+    : 'bg-gradient-to-r from-brand via-brand-accent to-brand';
 
   return (
     <div className={`${gradientClass} text-white rounded-2xl shadow-xl p-4 mb-4 animate-in slide-in-from-top-2 duration-300`}>

@@ -351,7 +351,7 @@ export default function InRoutePage() {
             {job.job_type && (
               <div>
                 <p className="text-sm text-gray-600 dark:text-gray-400">Service Type</p>
-                <p className="text-lg font-semibold text-purple-700 dark:text-purple-400">{job.job_type}</p>
+                <p className="text-lg font-semibold text-brand dark:text-brand">{job.job_type}</p>
               </div>
             )}
           </div>
@@ -359,9 +359,9 @@ export default function InRoutePage() {
 
         {/* Work Description */}
         {job.description && (
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:bg-white/[0.05] dark:from-transparent dark:to-transparent backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200 dark:border-white/10 p-5 mb-5">
+          <div className="bg-gradient-to-br from-brand/5 to-brand/10 dark:bg-white/[0.05] dark:from-transparent dark:to-transparent backdrop-blur-lg rounded-2xl shadow-xl border-2 border-blue-200 dark:border-white/10 p-5 mb-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-2xl flex items-center justify-center flex-shrink-0">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-brand rounded-2xl flex items-center justify-center flex-shrink-0">
                 <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
               </div>
               <h2 className="text-lg sm:text-xl font-bold text-gray-800 dark:text-white">Work Description</h2>
@@ -383,7 +383,7 @@ export default function InRoutePage() {
         {(job.salesman_name || job.created_by_name) && (
           <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5 sm:p-6 mb-5">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-brand rounded-xl flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -399,7 +399,7 @@ export default function InRoutePage() {
               {job.created_by_email && (
                 <a
                   href={`tel:${job.created_by_email}`}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/30 dark:hover:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 rounded-xl font-semibold text-sm transition-all"
+                  className="flex items-center gap-2 px-4 py-2 bg-brand/10 hover:bg-brand/20 dark:bg-brand/20 dark:hover:bg-brand/30 text-brand dark:text-brand rounded-xl font-semibold text-sm transition-all"
                 >
                   <Phone className="w-4 h-4" />
                   Call
@@ -557,7 +557,7 @@ export default function InRoutePage() {
             {(job.salesman_name || job.created_by_name) && (
               <a
                 href={job.created_by_email ? `tel:${job.created_by_email}` : '#'}
-                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-700 hover:to-indigo-600 text-white rounded-xl font-bold text-lg transition-all shadow-lg mb-4"
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-brand to-brand-accent hover:from-brand/90 hover:to-brand-accent/90 text-white rounded-xl font-bold text-lg transition-all shadow-lg mb-4"
               >
                 <Phone className="w-5 h-5" />
                 Call {job.salesman_name || job.created_by_name}

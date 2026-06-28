@@ -294,7 +294,7 @@ export default function JobSurveyPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-purple-600 dark:text-purple-400 mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 animate-spin text-brand dark:text-brand mx-auto mb-4" />
           <p className="text-gray-600 dark:text-white/60 font-medium">Loading survey...</p>
         </div>
       </div>
@@ -315,7 +315,7 @@ export default function JobSurveyPage() {
           </p>
           <button
             onClick={loadData}
-            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold transition-colors"
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] py-3 px-4 rounded-xl bg-brand hover:bg-brand/90 text-white text-sm font-semibold transition-colors"
           >
             <RefreshCw className="w-4 h-4" /> Try again
           </button>
@@ -329,8 +329,8 @@ export default function JobSurveyPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 shadow-sm">
-        {/* Violet→Indigo accent stripe */}
-        <div className="h-1 w-full bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-600" />
+        {/* Brand accent stripe */}
+        <div className="h-1 w-full bg-gradient-to-r from-brand to-brand-accent" />
         <div className="container mx-auto px-4 py-3 max-w-lg">
           <div className="flex items-center gap-3">
             <Link
@@ -348,7 +348,7 @@ export default function JobSurveyPage() {
             >
               <Home className="w-5 h-5 text-gray-600 dark:text-white" />
             </button>
-            <div className="w-10 h-10 bg-gradient-to-br from-violet-500 via-purple-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
+            <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-accent rounded-xl flex items-center justify-center shadow-lg flex-shrink-0">
               <ClipboardList className="w-5 h-5 text-white" />
             </div>
             <div className="flex-1 min-w-0">
@@ -374,7 +374,7 @@ export default function JobSurveyPage() {
             </div>
             <div className="h-1.5 w-full rounded-full bg-gray-200 dark:bg-white/10 overflow-hidden">
               <div
-                className="h-full bg-gradient-to-r from-violet-500 via-purple-500 to-indigo-600 transition-all duration-300"
+                className="h-full bg-gradient-to-r from-brand to-brand-accent transition-all duration-300"
                 style={{ width: `${progressPct}%` }}
               />
             </div>
@@ -523,7 +523,7 @@ export default function JobSurveyPage() {
         {equipmentCategories.length > 0 && (
           <section className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-5">
             <div className="flex items-start gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-300 flex items-center justify-center flex-shrink-0">
+              <div className="w-9 h-9 rounded-xl bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand flex items-center justify-center flex-shrink-0">
                 <Wrench className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
@@ -539,7 +539,7 @@ export default function JobSurveyPage() {
                 return (
                   <span
                     key={cat}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-500/30 text-violet-700 dark:text-violet-300 text-[11px] font-semibold"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-brand/5 dark:bg-brand/10 border border-brand/30 dark:border-brand/30 text-brand dark:text-brand text-[11px] font-semibold"
                   >
                     <Icon className="w-3.5 h-3.5" />
                     {EQUIPMENT_LABELS[cat] || cat}
@@ -721,15 +721,15 @@ export default function JobSurveyPage() {
             value={additionalNotes}
             onChange={(e) => setAdditionalNotes(e.target.value)}
             placeholder="Any other notes about the job..."
-            className="w-full px-3 py-3 border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/40 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 focus:outline-none resize-none transition"
+            className="w-full px-3 py-3 border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/40 focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none resize-none transition"
             rows={3}
           />
         </section>
 
         {/* ─── Summary card (review before submit) ────────────────────────── */}
-        <section className="bg-gradient-to-br from-violet-50 via-white to-indigo-50 dark:from-violet-500/10 dark:via-white/[0.03] dark:to-indigo-500/10 rounded-2xl shadow-sm border border-violet-200/60 dark:border-violet-500/20 p-5">
+        <section className="bg-gradient-to-br from-brand/5 via-white to-brand/5 dark:from-brand/10 dark:via-white/[0.03] dark:to-brand/10 rounded-2xl shadow-sm border border-brand/30 dark:border-brand/20 p-5">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-brand to-brand-accent text-white flex items-center justify-center flex-shrink-0 shadow">
               <ListChecks className="w-5 h-5" />
             </div>
             <div className="flex-1 min-w-0">
@@ -1019,7 +1019,7 @@ function SummaryRow({
   filled: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-violet-200/40 dark:border-white/5 last:border-b-0">
+    <div className="flex items-start justify-between gap-3 py-1.5 border-b border-brand/20 dark:border-white/5 last:border-b-0">
       <dt className="text-xs font-semibold text-gray-500 dark:text-white/50 flex-shrink-0">{label}</dt>
       <dd className={`text-xs font-semibold text-right ${filled ? 'text-gray-800 dark:text-white' : 'text-gray-400 dark:text-white/40 italic'}`}>
         {value}

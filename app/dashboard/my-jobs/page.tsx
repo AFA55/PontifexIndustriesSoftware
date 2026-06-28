@@ -424,7 +424,7 @@ export default function MyJobsPage() {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <Loader2 className="w-12 h-12 animate-spin text-brand mx-auto mb-4" />
           <p className="text-gray-600 dark:text-white/60 text-lg font-medium">Loading your schedule...</p>
         </div>
       </div>
@@ -443,8 +443,8 @@ export default function MyJobsPage() {
             >
               <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-white/80" />
             </Link>
-            <div className="w-10 h-10 bg-purple-100 rounded-xl flex items-center justify-center">
-              <Briefcase className="w-5 h-5 text-purple-600" />
+            <div className="w-10 h-10 bg-brand/10 rounded-xl flex items-center justify-center">
+              <Briefcase className="w-5 h-5 text-brand" />
             </div>
             <div className="flex-1">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white">
@@ -522,30 +522,30 @@ export default function MyJobsPage() {
 
         {/* Continuing Projects (on_hold / in_progress from past dates) */}
         {continuingProjects.length > 0 && (
-          <div className="mb-5 bg-purple-50 border-2 border-purple-200 rounded-2xl overflow-hidden shadow-md">
-            <div className="flex items-center gap-3 px-4 py-3 bg-purple-600">
+          <div className="mb-5 bg-brand/5 border-2 border-brand/30 rounded-2xl overflow-hidden shadow-md">
+            <div className="flex items-center gap-3 px-4 py-3 bg-brand">
               <PauseCircle className="w-5 h-5 text-white" />
               <h3 className="text-sm font-bold text-white">
                 Continuing Projects ({continuingProjects.length})
               </h3>
             </div>
-            <div className="divide-y divide-purple-100">
+            <div className="divide-y divide-brand/10">
               {continuingProjects.map((job: any) => (
                 <div key={job.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-purple-500' : 'bg-orange-400'}`} />
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-brand' : 'bg-orange-400'}`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-slate-800 truncate">{job.customer_name}</p>
                     <p className="text-xs text-slate-500 truncate">{job.job_number} &bull; {job.address || job.location || 'No address'}</p>
                     {job.status === 'on_hold' && job.pause_reason && (
-                      <p className="text-xs text-purple-600 mt-0.5 truncate">Hold: {job.pause_reason}</p>
+                      <p className="text-xs text-brand mt-0.5 truncate">Hold: {job.pause_reason}</p>
                     )}
                     {job.status === 'on_hold' && job.return_date && (
-                      <p className="text-xs text-purple-500">Return: {job.return_date}</p>
+                      <p className="text-xs text-brand/70">Return: {job.return_date}</p>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
-                      job.status === 'on_hold' ? 'bg-purple-100 text-purple-700' :
+                      job.status === 'on_hold' ? 'bg-brand/10 text-brand' :
                       job.status === 'pending_completion' ? 'bg-blue-100 text-blue-700' :
                       'bg-orange-100 text-orange-700'
                     }`}>
@@ -555,7 +555,7 @@ export default function MyJobsPage() {
                     </span>
                     <a
                       href={`/dashboard/my-jobs/${job.id}`}
-                      className="text-xs text-purple-600 font-semibold flex items-center gap-1 hover:text-purple-800 px-2 py-1.5 min-h-[32px]"
+                      className="text-xs text-brand font-semibold flex items-center gap-1 hover:text-brand/80 px-2 py-1.5 min-h-[32px]"
                     >
                       <PlayCircle className="w-3.5 h-3.5" />
                       Resume

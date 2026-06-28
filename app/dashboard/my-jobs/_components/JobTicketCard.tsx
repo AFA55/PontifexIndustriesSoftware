@@ -155,7 +155,7 @@ export default function JobTicketCard({ job, doneToday }: JobTicketCardProps) {
                 {job.readable_status}
               </span>
               {isMultiDay && (
-                <span className="text-xs px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full font-semibold border border-purple-200">
+                <span className="text-xs px-2 py-0.5 bg-brand/10 text-brand rounded-full font-semibold border border-brand/30">
                   Multi-Day
                 </span>
               )}
@@ -185,7 +185,7 @@ export default function JobTicketCard({ job, doneToday }: JobTicketCardProps) {
                 <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-red-400" />
                 <span className="truncate">{job.location || job.address}</span>
               </div>
-              <div className="flex items-center gap-1 text-sm text-purple-600 flex-shrink-0">
+              <div className="flex items-center gap-1 text-sm text-brand flex-shrink-0">
                 <Wrench className="w-3.5 h-3.5" />
                 <span className="font-semibold">{job.job_type}</span>
               </div>

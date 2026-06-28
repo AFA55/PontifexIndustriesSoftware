@@ -74,8 +74,8 @@ function NumericRating({ value, onChange }: { value: number; onChange: (v: numbe
           onClick={() => onChange(n)}
           className={`w-12 h-12 rounded-xl flex items-center justify-center text-sm font-bold border-2 transition-all ${
             n === value
-              ? 'bg-purple-600 border-purple-600 text-white scale-110 shadow-md'
-              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-purple-300'
+              ? 'bg-brand border-brand text-white scale-110 shadow-md'
+              : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-brand/50'
           }`}
           aria-label={`Rate ${n} out of 10`}
         >

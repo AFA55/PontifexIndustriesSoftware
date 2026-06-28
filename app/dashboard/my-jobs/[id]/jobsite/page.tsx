@@ -323,12 +323,12 @@ export default function JobsitePage() {
         {hasCompliance && (
           <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5 text-indigo-600" />
+              <Shield className="w-5 h-5 text-brand" />
               <h3 className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</h3>
             </div>
             <div className="space-y-2">
               {filledCompliance.map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                <div key={key} className="flex items-center justify-between p-3 bg-brand/5 rounded-xl border border-brand/30">
                   <span className="text-sm text-gray-600 dark:text-white/60 font-semibold capitalize">{key.replace(/_/g, ' ')}</span>
                   <span className="text-base font-bold text-gray-900 dark:text-white">
                     {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
@@ -343,7 +343,7 @@ export default function JobsitePage() {
         {(job.additional_info || job.special_equipment_notes || job.description) && (
           <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <FileText className="w-5 h-5 text-purple-600" />
+              <FileText className="w-5 h-5 text-brand" />
               <h3 className="text-base font-bold text-gray-800 dark:text-white">Additional Notes</h3>
             </div>
             <div className="space-y-3">
@@ -354,14 +354,14 @@ export default function JobsitePage() {
                 </div>
               )}
               {job.additional_info && (
-                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                  <p className="text-xs text-purple-600 font-semibold mb-1">Additional Info</p>
+                <div className="p-4 bg-brand/5 rounded-xl border border-brand/30">
+                  <p className="text-xs text-brand font-semibold mb-1">Additional Info</p>
                   <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap">{job.additional_info}</p>
                 </div>
               )}
               {job.special_equipment_notes && (
-                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                  <p className="text-xs text-purple-600 font-semibold mb-1">Special Equipment Notes</p>
+                <div className="p-4 bg-brand/5 rounded-xl border border-brand/30">
+                  <p className="text-xs text-brand font-semibold mb-1">Special Equipment Notes</p>
                   <p className="text-base text-gray-800 dark:text-white/80 whitespace-pre-wrap">{job.special_equipment_notes}</p>
                 </div>
               )}
@@ -371,11 +371,11 @@ export default function JobsitePage() {
 
         {/* Admin Documents & Photos */}
         {documents.length > 0 && (
-          <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-2xl shadow-xl border-2 border-indigo-200 p-5">
+          <div className="bg-gradient-to-br from-brand/5 to-blue-50 rounded-2xl shadow-xl border-2 border-brand/30 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Paperclip className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-bold text-indigo-900">Job Documents & Photos</h3>
-              <span className="text-xs px-2 py-0.5 bg-indigo-500 text-white rounded-full font-bold">
+              <Paperclip className="w-5 h-5 text-brand" />
+              <h3 className="text-base font-bold text-brand">Job Documents & Photos</h3>
+              <span className="text-xs px-2 py-0.5 bg-brand text-white rounded-full font-bold">
                 {documents.length}
               </span>
             </div>
@@ -392,14 +392,14 @@ export default function JobsitePage() {
                   >
                     <div className="flex items-start gap-4">
                       <div className={`w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                        isImage ? 'bg-indigo-100' : 'bg-gray-100'
+                        isImage ? 'bg-brand/10' : 'bg-gray-100'
                       }`}>
-                        {isImage ? <Image className="w-7 h-7 text-indigo-500" /> : <File className="w-7 h-7 text-gray-400" />}
+                        {isImage ? <Image className="w-7 h-7 text-brand" /> : <File className="w-7 h-7 text-gray-400" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-base font-bold text-gray-900 dark:text-white truncate">{doc.file_name}</p>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <span className="text-xs font-semibold text-white bg-indigo-500 px-2 py-0.5 rounded-full">
+                          <span className="text-xs font-semibold text-white bg-brand px-2 py-0.5 rounded-full">
                             {categoryLabels[doc.category] || doc.category}
                           </span>
                           {doc.uploaded_by_name && (

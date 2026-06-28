@@ -94,7 +94,7 @@ export default function DayNavigator({ selectedDate, onChange, hasLongDurationJo
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-600"></span>
             </span>
           )}
-          <div className={`text-lg font-bold ${isToday ? 'bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent' : 'text-gray-900'}`}>
+          <div className={`text-lg font-bold ${isToday ? 'bg-gradient-to-r from-brand to-brand-accent bg-clip-text text-transparent' : 'text-gray-900'}`}>
             {displayLabel}
           </div>
           {!isToday && (

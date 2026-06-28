@@ -660,11 +660,11 @@ export default function DayCompletePage() {
   // ─── Customer satisfaction survey screen (after signature, before success) ─
   if (surveyMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-violet-50 via-white to-indigo-50 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0f0a1e] py-8 px-4">
+      <div className="min-h-screen bg-gradient-to-br from-brand/5 via-white to-brand/5 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0f0a1e] py-8 px-4">
         <div className="max-w-lg mx-auto space-y-5">
           {/* Branded header */}
           <div className="text-center">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-indigo-600 shadow-lg shadow-violet-500/30 mb-3">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-gradient-to-br from-brand to-brand-accent shadow-lg shadow-brand/30 mb-3">
               <Sparkles className="w-7 h-7 text-white" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -729,9 +729,9 @@ export default function DayCompletePage() {
 
           {/* Survey thanks */}
           {surveySubmitted && successMode === 'complete' && (
-            <div className="flex items-center justify-center gap-2 bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/40 rounded-xl px-4 py-3 mb-3">
-              <Heart className="w-4 h-4 text-violet-600 dark:text-violet-400 flex-shrink-0" />
-              <p className="text-sm font-medium text-violet-800 dark:text-violet-300">Thanks for your feedback ✓</p>
+            <div className="flex items-center justify-center gap-2 bg-brand/5 dark:bg-brand/20 border border-brand/30 dark:border-brand/20 rounded-xl px-4 py-3 mb-3">
+              <Heart className="w-4 h-4 text-brand dark:text-brand flex-shrink-0" />
+              <p className="text-sm font-medium text-brand dark:text-brand">Thanks for your feedback ✓</p>
             </div>
           )}
 
@@ -751,7 +751,7 @@ export default function DayCompletePage() {
                   onClick={() => setShowSupervisorNoteForm(true)}
                   className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 text-sm font-medium hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
                 >
-                  <MessageSquarePlus className="w-4 h-4 text-purple-500 dark:text-purple-400" />
+                  <MessageSquarePlus className="w-4 h-4 text-brand dark:text-brand" />
                   Add a note for your supervisor
                 </button>
               ) : (
@@ -761,13 +761,13 @@ export default function DayCompletePage() {
                     onChange={(e) => setSupervisorNote(e.target.value)}
                     placeholder="Leave a note for your supervisor..."
                     rows={4}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 resize-none"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.07] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30 text-sm focus:outline-none focus:ring-2 focus:ring-brand focus:border-brand resize-none"
                   />
                   <div className="flex gap-2">
                     <button
                       onClick={handleSubmitSupervisorNote}
                       disabled={supervisorNoteSubmitting || !supervisorNote.trim()}
-                      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
+                      className="flex-1 flex items-center justify-center gap-2 bg-gradient-to-r from-brand to-brand-accent text-white py-3 rounded-xl font-semibold text-sm disabled:opacity-50 transition-all"
                     >
                       {supervisorNoteSubmitting
                         ? <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
@@ -870,21 +870,21 @@ export default function DayCompletePage() {
   if (remoteSent) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-indigo-100 dark:border-indigo-900/30 p-8 max-w-sm w-full text-center">
-          <div className="w-16 h-16 bg-indigo-100 dark:bg-indigo-900/40 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Send className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-brand/30 dark:border-brand/20 p-8 max-w-sm w-full text-center">
+          <div className="w-16 h-16 bg-brand/10 dark:bg-brand/20 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Send className="w-8 h-8 text-brand dark:text-brand" />
           </div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">Link Sent!</h2>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">
             A signature link was sent to
           </p>
-          <p className="text-indigo-600 dark:text-indigo-400 font-semibold mb-4">{remoteSentPhone}</p>
+          <p className="text-brand dark:text-brand font-semibold mb-4">{remoteSentPhone}</p>
           <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
             The customer will receive a text to review and sign the work. Your supervisor has been notified.
           </p>
           <button
             onClick={() => router.push('/dashboard/my-jobs')}
-            className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold"
+            className="w-full bg-gradient-to-r from-brand to-brand-accent text-white py-3 rounded-xl font-semibold"
           >
             Back to My Jobs
           </button>
@@ -1092,7 +1092,7 @@ export default function DayCompletePage() {
             <button
               onClick={() => setShowRemotePanel(true)}
               disabled={submitting || subsistenceUnanswered}
-              className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 text-left shadow-lg shadow-violet-500/30 ring-1 ring-violet-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-violet-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-brand to-brand-accent text-left shadow-lg shadow-brand/30 ring-1 ring-brand/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-brand/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
               <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
                 <Send className="w-6 h-6 text-white" />
@@ -1323,7 +1323,7 @@ export default function DayCompletePage() {
               />
 
               {/* Thank-you callout */}
-              <div className="rounded-2xl p-4 bg-gradient-to-br from-violet-500 via-violet-600 to-indigo-600 shadow-md shadow-violet-500/25 ring-1 ring-violet-400/30">
+              <div className="rounded-2xl p-4 bg-gradient-to-br from-brand to-brand-accent shadow-md shadow-brand/25 ring-1 ring-brand/30">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white/20 backdrop-blur-sm ring-1 ring-white/30">
                     <Heart className="w-5 h-5 text-white" />
@@ -1395,8 +1395,8 @@ export default function DayCompletePage() {
           <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-white/10 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center">
-                  <Send className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <div className="w-10 h-10 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center">
+                  <Send className="w-5 h-5 text-brand dark:text-brand" />
                 </div>
                 <h2 className="text-lg font-bold text-gray-900 dark:text-white">Send Signature Link</h2>
               </div>
@@ -1423,7 +1423,7 @@ export default function DayCompletePage() {
                   value={remotePhone}
                   onChange={(e) => setRemotePhone(e.target.value)}
                   placeholder="(555) 867-5309"
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-white/20 rounded-xl focus:ring-2 focus:ring-brand focus:border-brand text-gray-900 dark:text-white bg-white dark:bg-white/[0.07] placeholder:text-gray-400 dark:placeholder:text-white/30"
                 />
               </div>
             </div>
@@ -1432,7 +1432,7 @@ export default function DayCompletePage() {
               <button
                 onClick={handleSendRemoteLink}
                 disabled={remoteSending || !remotePhone.trim()}
-                className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
+                className="flex-1 bg-gradient-to-r from-brand to-brand-accent text-white py-3 rounded-xl font-semibold disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {remoteSending ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
