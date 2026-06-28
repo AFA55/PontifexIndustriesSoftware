@@ -93,6 +93,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
     (job as any).profiles = operatorProfile;
 
+    // Fetch helper profile separately (same pattern as operator above).
+    // Without this the schedule-form edit-load can't repopulate the helper and a
+    // re-save silently drops helper_assigned_to.
+    let helperProfile: { full_name: string } | null = null;
+    if ((job as any).helper_assigned_to) {
+      const { data: helperProf } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', (job as any).helper_assigned_to)
+        .maybeSingle();
+      helperProfile = helperProf;
+    }
+
     // ── 2. Fetch scope items ────────────────────────────────────────────────
     let scopeQuery = supabaseAdmin
       .from('job_scope_items')
@@ -362,7 +375,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
           project_name: (job as any).project_name ?? null,
           assigned_to: job.assigned_to ?? null,
           operator_name: ((job as any).profiles as any)?.full_name ?? null,
-          helper_name: null,
+          helper_assigned_to: (job as any).helper_assigned_to ?? null,
+          helper_name: helperProfile?.full_name ?? null,
           completion_submitted_at: job.completion_submitted_at,
           completion_requested_at: completionRequest?.submitted_at ?? job.completion_submitted_at ?? null,
           completion_request_notes: completionRequest?.operator_notes ?? null,

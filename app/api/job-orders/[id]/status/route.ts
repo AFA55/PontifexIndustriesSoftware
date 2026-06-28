@@ -165,10 +165,12 @@ async function updateJobStatus(
       }
     }
 
-    // Set in_route_at on first transition to in_route
-    if (status === 'in_route' && !existingJob.in_route_at) {
-      updateData.in_route_at = now;
-    }
+    // NOTE: in_route_at / work_completed_at are NO LONGER stamped via this
+    // shared update. They are the notification-dedup keys, so they're written
+    // by a separate atomically-guarded update below (claimTransition) whose
+    // RETURNING result tells us whether THIS request actually performed the
+    // transition. Stamping them here (read-then-write off the pre-update row)
+    // is racy: two concurrent identical POSTs both read null and both notify.
 
     // Set arrived_at_jobsite_at on first transition to on_site
     if (status === 'on_site' && !existingJob.arrived_at_jobsite_at) {
@@ -181,8 +183,45 @@ async function updateJobStatus(
       updateData.work_start_longitude = longitude;
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Atomically CLAIM the first transition into in_route / completed.
+    //
+    // in_route_at and work_completed_at are the customer-notification dedup
+    // keys. To make "first transition" detection retry/race-safe, we set them
+    // with a guarded update that only writes when the column is currently NULL
+    // (`.is(col, null)`), and we use RETURNING to see if a row was affected.
+    // Exactly ONE of two concurrent identical POSTs wins the claim; only the
+    // winner gets a returned row and only the winner notifies the customer.
+    // ─────────────────────────────────────────────────────────────────────
+    let claimedInRoute = false;
+    let claimedCompleted = false;
+
+    if (status === 'in_route' && !existingJob.in_route_at) {
+      let claimQuery = supabaseAdmin
+        .from('job_orders')
+        .update({ in_route_at: now })
+        .eq('id', jobId)
+        .is('in_route_at', null);
+      if (tenantId) claimQuery = claimQuery.eq('tenant_id', tenantId);
+      const { data: claimRows } = await claimQuery.select('id');
+      claimedInRoute = !!(claimRows && claimRows.length > 0);
+    }
+
     if (status === 'completed' && !existingJob.work_completed_at) {
-      updateData.work_completed_at = now;
+      let claimQuery = supabaseAdmin
+        .from('job_orders')
+        .update({ work_completed_at: now })
+        .eq('id', jobId)
+        .is('work_completed_at', null);
+      if (tenantId) claimQuery = claimQuery.eq('tenant_id', tenantId);
+      const { data: claimRows } = await claimQuery.select('id');
+      claimedCompleted = !!(claimRows && claimRows.length > 0);
+    }
+
+    // Only the request that actually claimed the completion transition writes
+    // the completion-side fields + runs the (idempotent-but-redundant) daily-log
+    // aggregation. This mirrors the prior "first completed" gate, now race-safe.
+    if (claimedCompleted) {
       updateData.work_end_latitude = latitude;
       updateData.work_end_longitude = longitude;
 
@@ -387,14 +426,17 @@ async function updateJobStatus(
     }
 
     // Fire-and-forget CUSTOMER notifications (email always if present + best-effort
-    // SMS). Dedup: only fire on the FIRST real transition into the state — we key
-    // off the SAME timestamp guards the update used above (in_route_at /
-    // work_completed_at were unset before this update), so repeated POSTs that
-    // re-send the same status never re-notify the customer. No-ops when there's
-    // no customer email/phone. Reuses the customer_portal_tokens magic-link.
+    // SMS). Dedup: only fire on the FIRST real transition into the state. We key
+    // off the ATOMIC CLAIM above (the guarded `.is(col, null)` update that wrote
+    // in_route_at / work_completed_at) — `claimedInRoute` / `claimedCompleted`
+    // are true ONLY for the single request that actually performed the
+    // transition. Two near-simultaneous identical POSTs → exactly one claim →
+    // exactly one customer email. (Previously this read the pre-update row, so
+    // both racers saw null and both notified.) No-ops when there's no customer
+    // email/phone. Reuses the customer_portal_tokens magic-link.
     try {
-      const firstInRoute = status === 'in_route' && !existingJob.in_route_at;
-      const firstCompleted = status === 'completed' && !existingJob.work_completed_at;
+      const firstInRoute = claimedInRoute;
+      const firstCompleted = claimedCompleted;
       if (firstInRoute || firstCompleted) {
         notifyCustomer({
           event: firstInRoute ? 'en_route' : 'completed',

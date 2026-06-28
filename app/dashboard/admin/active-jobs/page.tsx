@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getCurrentUser } from '@/lib/auth';
+import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
@@ -257,6 +258,11 @@ export default function ActiveJobsPage() {
       setLoading(false);
     }
   };
+
+  // Background refresh while the tab is visible (auto-pauses when hidden to
+  // save Vercel calls). runOnMount defaults to false — the mount effect above
+  // already fetches, so this won't double-fetch.
+  useVisiblePoll(fetchJobs, { intervalMs: 120_000 });
 
   // ── Lazy-fetch per-job progress (% complete) with concurrency limit ─────
   useEffect(() => {

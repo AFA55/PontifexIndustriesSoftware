@@ -251,11 +251,24 @@ export async function POST(
     // double-bills, and surface failures instead of silently producing a $0 invoice.
     if (workPerformed && Array.isArray(workPerformed) && workPerformed.length > 0) {
       const dayNum = dailyLog?.day_number ?? 1;
-      const workItemRows = workPerformed.map((item: any) => ({
+      const workItemRows = workPerformed.map((item: any) => {
+        // The work-performed flow carries the category in `item.name` (see
+        // /api/job-orders/[id]/work-items, which maps `work_type: item.name`).
+        // The day-complete hydrate path uses `work_type`/`type`. Accept all three
+        // rather than silently miscategorizing everything as 'General'.
+        const resolvedWorkType = item.work_type || item.type || item.name;
+        if (!resolvedWorkType) {
+          // Surface the problem instead of hiding it under a friendly default.
+          console.warn(
+            `[daily-log] work item missing work_type/type/name for job ${jobId}, operator ${user.id}; storing as 'unspecified'`,
+            item
+          );
+        }
+        return {
         job_order_id: jobId,
         operator_id: user.id,
         day_number: dayNum,
-        work_type: item.work_type || item.type || 'General',
+        work_type: resolvedWorkType || 'unspecified',
         quantity: Number(item.quantity) || 1,
         core_quantity: item.core_quantity ? Number(item.core_quantity) : null,
         core_size: item.core_size || null,
@@ -266,7 +279,8 @@ export async function POST(
           ? ({ easy: 1, moderate: 2, medium: 3, difficult: 4, hard: 5 } as Record<string, number>)[item.accessibility_rating] || null
           : item.accessibility_rating ? Number(item.accessibility_rating) : null,
         notes: item.notes || null,
-      }));
+        };
+      });
 
       // Replace any prior rows for this job/operator/day (idempotent resubmit, no double-billing).
       await supabaseAdmin

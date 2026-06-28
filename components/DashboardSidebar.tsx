@@ -207,7 +207,7 @@ function useBadgeCounts(): BadgeCounts {
 
       const [tcRes, notifRes] = await Promise.allSettled([
         fetch('/api/admin/timecards?pending=true', { headers }),
-        fetch('/api/notifications?unread=true', { headers }),
+        fetch('/api/notifications?unread_only=true', { headers }),
       ]);
 
       let timecards = 0;
