@@ -27,6 +27,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
 
+    // NOTE: do NOT use a PostgREST embed (e.g. uploader:uploaded_by(full_name)) here —
+    // it depends on PostgREST resolving a FK relationship + a fresh schema cache, which
+    // proved fragile in prod (caused a 500 on this launch-critical page). Fetch the docs
+    // with plain columns, then resolve uploader names in a second, reliable query.
     let query = supabaseAdmin
       .from('office_documents')
       .select(`
@@ -40,8 +44,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         description,
         total_cost,
         uploaded_by,
-        created_at,
-        uploader:uploaded_by(full_name)
+        created_at
       `)
       .eq('job_order_id', jobId)
       .order('created_at', { ascending: false });
@@ -55,11 +58,29 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Failed to fetch office documents' }, { status: 500 });
     }
 
-    const totalCost = (data || []).reduce((sum, d) => sum + Number(d.total_cost || 0), 0);
+    const docs = data || [];
+
+    // Resolve uploader display names (best-effort; never fail the list over a name).
+    const uploaderIds = [...new Set(docs.map((d) => d.uploaded_by).filter(Boolean))];
+    let nameById: Record<string, string> = {};
+    if (uploaderIds.length) {
+      const { data: profs } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', uploaderIds);
+      nameById = Object.fromEntries((profs || []).map((p) => [p.id, p.full_name]));
+    }
+
+    const documents = docs.map((d) => ({
+      ...d,
+      uploader: d.uploaded_by ? { full_name: nameById[d.uploaded_by] ?? null } : null,
+    }));
+
+    const totalCost = docs.reduce((sum, d) => sum + Number(d.total_cost || 0), 0);
 
     return NextResponse.json({
       success: true,
-      data: { documents: data || [], total_cost: totalCost },
+      data: { documents, total_cost: totalCost },
     });
   } catch (error: unknown) {
     console.error('Unexpected error in GET /office-documents:', error);
