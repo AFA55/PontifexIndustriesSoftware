@@ -294,6 +294,7 @@ export async function GET(
       role: profile.role,
       active: profile.active,
       profile_picture_url: profile.profile_picture_url,
+      avatar_url: profile.avatar_url,
       hire_date: profile.hire_date,
       years_experience: profile.years_experience,
       skill_level: profile.skill_level,

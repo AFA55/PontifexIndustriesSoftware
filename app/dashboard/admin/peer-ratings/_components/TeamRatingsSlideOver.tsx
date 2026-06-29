@@ -3,11 +3,15 @@
 import { useEffect, useState } from 'react';
 import { X, Star, Loader2, MessageSquare, Calendar, CheckCircle2, XCircle, BarChart3 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import UserAvatar from '@/components/UserAvatar';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 interface TeamMemberRating {
   id: string;
   full_name: string;
   role: string;
+  avatar_url?: string | null;
+  profile_picture_url?: string | null;
   avg_score: number | null;
   submission_count: number;
 }
@@ -152,9 +156,7 @@ export default function TeamRatingsSlideOver({ member, onClose }: Props) {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-5 pt-5 pb-4 z-10">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-brand to-brand-secondary rounded-full flex items-center justify-center text-white font-bold flex-shrink-0">
-              {member.full_name?.charAt(0)?.toUpperCase() || '?'}
-            </div>
+            <UserAvatar src={resolveAvatarUrl(member)} name={member.full_name} size={40} />
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-bold text-gray-900 truncate">{member.full_name}</h2>
               <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded-full">

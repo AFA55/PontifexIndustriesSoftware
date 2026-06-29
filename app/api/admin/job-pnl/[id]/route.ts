@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 export async function GET(
   request: NextRequest,
@@ -60,11 +61,29 @@ export async function GET(
           full_name,
           email,
           role,
-          hourly_rate
+          hourly_rate,
+          avatar_url,
+          profile_picture_url
         )
       `)
       .eq('job_order_id', jobId)
       .order('log_date', { ascending: true });
+
+    // The timecards_with_users view does not expose avatar columns, so fetch
+    // operator avatars separately by the view's user_id and build an id->url map.
+    const operatorIds = Array.from(
+      new Set((timecards || []).map((t: any) => t.user_id).filter(Boolean))
+    );
+    const operatorAvatarById: Record<string, string | null> = {};
+    if (operatorIds.length > 0) {
+      const { data: operatorProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, avatar_url, profile_picture_url')
+        .in('id', operatorIds);
+      for (const op of operatorProfiles || []) {
+        operatorAvatarById[op.id] = resolveAvatarUrl(op);
+      }
+    }
 
     // Aggregate timecard labor
     const timecardEntries = (timecards || []).map((t: any) => {
@@ -74,6 +93,7 @@ export async function GET(
       return {
         id: t.id,
         worker_name: t.full_name,
+        avatar_url: operatorAvatarById[t.user_id] ?? null,
         role: t.role,
         hourly_rate: t.hourly_rate,
         date: t.date,
@@ -97,6 +117,7 @@ export async function GET(
       return {
         id: h.id,
         worker_name: profile?.full_name || 'Unknown',
+        avatar_url: resolveAvatarUrl(profile),
         role: profile?.role || 'apprentice',
         hourly_rate: hourlyRate,
         date: h.log_date,
@@ -109,12 +130,12 @@ export async function GET(
     });
 
     // Combine all workers for per-person summary
-    const workerMap: Record<string, { name: string; role: string; hourly_rate: number | null; total_hours: number; labor_cost: number; type: string }> = {};
+    const workerMap: Record<string, { name: string; avatar_url: string | null; role: string; hourly_rate: number | null; total_hours: number; labor_cost: number; type: string }> = {};
 
     for (const entry of timecardEntries) {
       const key = entry.worker_name || 'Unknown';
       if (!workerMap[key]) {
-        workerMap[key] = { name: key, role: entry.role, hourly_rate: entry.hourly_rate, total_hours: 0, labor_cost: 0, type: 'operator' };
+        workerMap[key] = { name: key, avatar_url: entry.avatar_url ?? null, role: entry.role, hourly_rate: entry.hourly_rate, total_hours: 0, labor_cost: 0, type: 'operator' };
       }
       workerMap[key].total_hours += entry.total_hours || 0;
       workerMap[key].labor_cost  += entry.labor_cost  || 0;
@@ -123,7 +144,7 @@ export async function GET(
     for (const entry of helperEntries) {
       const key = entry.worker_name;
       if (!workerMap[key]) {
-        workerMap[key] = { name: key, role: entry.role, hourly_rate: entry.hourly_rate, total_hours: 0, labor_cost: 0, type: 'helper' };
+        workerMap[key] = { name: key, avatar_url: entry.avatar_url ?? null, role: entry.role, hourly_rate: entry.hourly_rate, total_hours: 0, labor_cost: 0, type: 'helper' };
       }
       workerMap[key].total_hours += entry.total_hours || 0;
       workerMap[key].labor_cost  += entry.labor_cost  || 0;

@@ -18,6 +18,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { signStoragePath } from '@/lib/signed-urls';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { resolveAvatarUrl } from '@/lib/avatar';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
 
 export async function GET(
@@ -57,7 +58,7 @@ export async function GET(
     // 1. Fetch operator profile
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, role, phone, profile_picture_url')
+      .select('id, full_name, email, role, phone, avatar_url, profile_picture_url')
       .eq('id', operatorId)
       .single();
 
@@ -331,7 +332,7 @@ export async function GET(
           email: profile.email,
           role: profile.role,
           phone: profile.phone,
-          avatar_url: (profile as any).profile_picture_url || null,
+          avatar_url: resolveAvatarUrl(profile as any),
         },
         weekStart: startDateStr,
         weekEnd: endDateStr,

@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
 import SharedUserAvatar from '@/components/UserAvatar';
+import { resolveAvatarUrl } from '@/lib/avatar';
 import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -362,7 +363,7 @@ function SidebarContent({
         if (!token) return;
         fetch('/api/my-profile', { headers: { Authorization: `Bearer ${token}` } })
           .then(r => r.ok ? r.json() : null)
-          .then(json => { if (json?.data?.profile_picture_url) setAvatarUrl(json.data.profile_picture_url); })
+          .then(json => { if (json?.data) setAvatarUrl(resolveAvatarUrl(json.data)); })
           .catch(() => {});
       });
     });

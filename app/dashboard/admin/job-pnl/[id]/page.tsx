@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import UserAvatar from '@/components/UserAvatar';
 import {
   ArrowLeft, Clock, DollarSign, Users, TrendingUp, TrendingDown,
   CheckCircle, AlertTriangle, BarChart3, Calendar, User as UserIcon,
@@ -54,6 +55,7 @@ interface HelperEntry {
 
 interface WorkerSummary {
   name: string;
+  avatar_url: string | null;
   role: string;
   hourly_rate: number | null;
   total_hours: number;
@@ -264,9 +266,7 @@ export default function JobPnlDetailPage() {
                   {workerSummary.map((w, i) => (
                     <div key={i} className="flex items-center justify-between px-5 py-3.5 hover:bg-slate-50/50 transition-colors">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                          {w.name.charAt(0)}
-                        </div>
+                        <UserAvatar src={w.avatar_url} name={w.name} size={36} />
                         <div>
                           <p className="text-sm font-semibold text-slate-800">{w.name}</p>
                           <p className="text-xs text-slate-400 capitalize">

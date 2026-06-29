@@ -23,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { MANAGEMENT_REQUESTER_ROLES } from '@/lib/time-off';
 import LogTimeOffModal from './_components/LogTimeOffModal';
+import UserAvatar from '@/components/UserAvatar';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +48,7 @@ interface TimeOffRequest {
 interface OperatorStats {
   operator_id: string;
   operator_name: string;
+  avatar_url?: string | null;
   role?: string;
   callout_count: number;
   pto_days_used: number;
@@ -75,6 +77,7 @@ interface TeamMember {
 interface ScorecardData {
   operatorId: string;
   name: string;
+  avatarUrl: string | null;
   role: string;
   ptoDaysUsed: number;
   ptoDaysAllocated: number;
@@ -105,15 +108,6 @@ function countDays(start: string, end?: string | null) {
   const s = new Date(start + 'T00:00:00');
   const e = new Date(end + 'T00:00:00');
   return Math.round((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-}
-
-function getInitials(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((n) => n[0].toUpperCase())
-    .join('');
 }
 
 function roleBadgeColor(role: string) {
@@ -535,6 +529,7 @@ function ScorecardsTab({ token }: { token: string }) {
     return stats.map((s) => ({
       operatorId: s.operator_id,
       name: s.operator_name,
+      avatarUrl: s.avatar_url ?? null,
       role: s.role ?? 'operator',
       ptoDaysUsed: s.pto_days_used,
       ptoDaysAllocated: s.pto_days_allocated,
@@ -635,9 +630,8 @@ function ScorecardsTab({ token }: { token: string }) {
                 <div className="p-5">
                   {/* Header */}
                   <div className="flex items-start gap-3 mb-4">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-sm font-bold text-white bg-gradient-to-br from-brand to-brand-secondary flex-shrink-0`}>
-                      {getInitials(card.name)}
-                    </div>
+                    <UserAvatar src={card.avatarUrl} name={card.name} size={44} />
+
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-gray-900 dark:text-white truncate">{card.name}</p>
                       <span className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-md capitalize mt-0.5 ${roleBadgeColor(card.role)}`}>

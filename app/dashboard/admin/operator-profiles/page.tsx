@@ -16,6 +16,8 @@ import SkillsTab from './_components/SkillsTab';
 import { supabase } from '@/lib/supabase';
 import AddProfileModal from './_components/AddProfileModal';
 import { jobStatusSoftClasses } from '@/lib/status-colors';
+import UserAvatar from '@/components/UserAvatar';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 // Dynamic import for Recharts (SSR issues)
 const BarChart = dynamic(() => import('recharts').then(m => m.BarChart), { ssr: false });
@@ -37,6 +39,7 @@ interface Profile {
   role: string;
   active: boolean;
   profile_picture_url: string | null;
+  avatar_url: string | null;
   created_at: string;
   emergency_contact_name: string | null;
   emergency_contact_phone: string | null;
@@ -503,15 +506,7 @@ export default function OperatorProfilesPage() {
                       }`}
                     >
                       {/* Avatar */}
-                      <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${rc.avatar} flex items-center justify-center flex-shrink-0`}>
-                        {p.profile_picture_url ? (
-                          <img src={p.profile_picture_url} alt="" className="w-full h-full rounded-full object-cover" />
-                        ) : (
-                          <span className="text-white font-bold text-sm">
-                            {p.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+                      <UserAvatar src={resolveAvatarUrl(p)} name={p.full_name} size={40} />
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
@@ -584,15 +579,7 @@ export default function OperatorProfilesPage() {
               {/* Profile Header */}
               <div className="p-4 sm:p-6 border-b border-gray-200 bg-white">
                 <div className="flex items-start gap-4">
-                  <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${roleConfig.avatar} flex items-center justify-center flex-shrink-0 shadow-lg`}>
-                    {history.profile.profile_picture_url ? (
-                      <img src={history.profile.profile_picture_url} alt="" className="w-full h-full rounded-xl object-cover" />
-                    ) : (
-                      <span className="text-white font-bold text-xl">
-                        {history.profile.full_name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                      </span>
-                    )}
-                  </div>
+                  <UserAvatar src={resolveAvatarUrl(history.profile)} name={history.profile.full_name} size={56} className="shadow-lg" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-lg font-bold text-gray-900">{history.profile.full_name}</h2>

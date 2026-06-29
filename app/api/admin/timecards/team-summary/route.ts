@@ -26,6 +26,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
@@ -84,7 +85,7 @@ export async function GET(request: NextRequest) {
     // 1. Fetch all team members (operators, apprentices, shop managers, etc.)
     let profilesQuery = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, role, active, avatar_url')
+      .select('id, full_name, email, role, active, avatar_url, profile_picture_url')
       .in('role', ['operator', 'apprentice', 'shop_manager', 'admin', 'operations_manager', 'supervisor'])
       .order('full_name', { ascending: true });
 
@@ -275,7 +276,7 @@ export async function GET(request: NextRequest) {
           fullName: profile.full_name || profile.email,
           email: profile.email,
           role: profile.role,
-          avatarUrl: profile.avatar_url || null,
+          avatarUrl: resolveAvatarUrl(profile),
           dailyHours,
           weeklyTotal: parseFloat(weeklyTotal.toFixed(2)),
           regularHours: parseFloat(regularHours.toFixed(2)),

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 export async function GET(request: NextRequest) {
   try {
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
     const statsMap: Record<string, {
       operator_id: string;
       role: string;
+      avatar_url: string | null;
       callout_count: number;
       pto_days_used: number;
       pto_days_allocated: number;
@@ -91,7 +93,7 @@ export async function GET(request: NextRequest) {
     const ATTENDANCE_ROLES = ['operator', 'apprentice'];
     let profilesQuery = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, avatar_url, role')
+      .select('id, full_name, avatar_url, profile_picture_url, role')
       .eq('tenant_id', tenantId)
       .in('role', ATTENDANCE_ROLES);
     if (operatorId) {
@@ -107,6 +109,7 @@ export async function GET(request: NextRequest) {
       statsMap[p.id] = {
         operator_id: p.id,
         role: p.role ?? 'operator',
+        avatar_url: resolveAvatarUrl(p),
         callout_count: 0,
         pto_days_used: 0,
         pto_days_allocated: 10,
@@ -131,6 +134,7 @@ export async function GET(request: NextRequest) {
         statsMap[b.operator_id] = {
           operator_id: b.operator_id,
           role: 'operator',
+          avatar_url: null,
           callout_count: b.callout_count ?? 0,
           pto_days_used: b.pto_days_used ?? 0,
           pto_days_allocated: b.pto_days_allocated ?? 10,
@@ -148,6 +152,7 @@ export async function GET(request: NextRequest) {
         statsMap[oid] = {
           operator_id: oid,
           role: 'operator',
+          avatar_url: null,
           callout_count: 0,
           pto_days_used: 0,
           pto_days_allocated: 10,
@@ -200,10 +205,14 @@ export async function GET(request: NextRequest) {
     if (operatorIds.length > 0) {
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('id, full_name, avatar_url')
+        .select('id, full_name, avatar_url, profile_picture_url')
         .in('id', operatorIds);
       for (const p of profiles ?? []) {
         nameMap[p.id] = p.full_name ?? 'Unknown';
+        // Backfill the photo for entries seeded from balance/history (which
+        // start with avatar_url: null) so every metrics card can show a photo.
+        const s = statsMap[p.id];
+        if (s && !s.avatar_url) s.avatar_url = resolveAvatarUrl(p);
       }
     }
 

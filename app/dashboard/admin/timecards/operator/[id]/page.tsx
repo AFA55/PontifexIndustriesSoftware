@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
 import { defaultLunchMinutes } from '@/lib/lunch';
 import UserAvatar from '@/components/UserAvatar';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 // ── Types ─────────────────────────────────────────────────────
 interface OperatorInfo {
@@ -1146,13 +1147,12 @@ function OperatorTimecardDetailPageInner() {
 
             {/* Operator avatar & name */}
             <div className="flex items-center gap-2.5 min-w-0">
-              {operator?.avatar_url ? (
-                <UserAvatar src={operator.avatar_url} name={operator.full_name} size={36} className="shadow-lg shadow-purple-500/20" />
-              ) : (
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-lg shadow-purple-500/20">
-                  {operator?.full_name?.charAt(0) || '?'}
-                </div>
-              )}
+              <UserAvatar
+                src={resolveAvatarUrl(operator)}
+                name={operator?.full_name}
+                size={36}
+                className="shadow-lg shadow-purple-500/20"
+              />
               <div className="min-w-0">
                 <h1 className="text-sm font-bold text-gray-900 dark:text-white truncate">
                   {operator?.full_name || 'Loading...'}

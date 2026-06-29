@@ -14,6 +14,8 @@ import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 import RatingFormBuilderModal from './_components/RatingFormBuilderModal';
 import TeamRatingsSlideOver from './_components/TeamRatingsSlideOver';
+import UserAvatar from '@/components/UserAvatar';
+import { resolveAvatarUrl } from '@/lib/avatar';
 
 const ALLOWED_ROLES = ['admin', 'operations_manager', 'super_admin'];
 
@@ -33,6 +35,8 @@ interface TeamMemberRating {
   id: string;
   full_name: string;
   role: string;
+  avatar_url?: string | null;
+  profile_picture_url?: string | null;
   avg_score: number | null;
   submission_count: number;
 }
@@ -122,23 +126,30 @@ export default function PeerRatingsPage() {
       // Fetch submission stats per member via received endpoint
       const statsArr: TeamMemberRating[] = await Promise.all(
         members.map(async (m: any) => {
+          const base = {
+            id: m.id,
+            full_name: m.full_name,
+            role: m.role,
+            avatar_url: m.avatar_url ?? null,
+            profile_picture_url: m.profile_picture_url ?? null,
+          };
           try {
             const res = await fetch(`/api/ratings/received?user_id=${m.id}`, {
               headers: { Authorization: `Bearer ${session.access_token}` },
             });
-            if (!res.ok) return { id: m.id, full_name: m.full_name, role: m.role, avg_score: null, submission_count: 0 };
+            if (!res.ok) return { ...base, avg_score: null, submission_count: 0 };
             const json = await res.json();
             const subs: any[] = json.data ?? [];
             if (subs.length === 0) {
-              return { id: m.id, full_name: m.full_name, role: m.role, avg_score: null, submission_count: 0 };
+              return { ...base, avg_score: null, submission_count: 0 };
             }
             const scores = subs.map((s: any) => s.overall_score).filter((s: any) => s !== null && s !== undefined);
             const avg = scores.length > 0
               ? Math.round((scores.reduce((a: number, b: number) => a + b, 0) / scores.length) * 10) / 10
               : null;
-            return { id: m.id, full_name: m.full_name, role: m.role, avg_score: avg, submission_count: subs.length };
+            return { ...base, avg_score: avg, submission_count: subs.length };
           } catch {
-            return { id: m.id, full_name: m.full_name, role: m.role, avg_score: null, submission_count: 0 };
+            return { ...base, avg_score: null, submission_count: 0 };
           }
         })
       );
@@ -406,9 +417,7 @@ export default function PeerRatingsPage() {
                         <tr key={member.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-3">
-                              <div className="w-8 h-8 bg-gradient-to-br from-brand to-brand-secondary rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                                {member.full_name?.charAt(0)?.toUpperCase() || '?'}
-                              </div>
+                              <UserAvatar src={resolveAvatarUrl(member)} name={member.full_name} size={32} />
                               <span className="text-sm font-semibold text-gray-800">{member.full_name}</span>
                             </div>
                           </td>
