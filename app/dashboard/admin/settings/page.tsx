@@ -9,7 +9,7 @@ import {
   ChevronLeft, Settings, Calendar, Save, Loader2,
   LayoutGrid, StickyNote, AlertTriangle, CheckCircle,
   Hash, Bell, Minus, Plus, Palette, ChevronRight,
-  CreditCard, ExternalLink, ArrowUpRight,
+  CreditCard, ExternalLink, ArrowUpRight, MessageSquareWarning,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -422,6 +422,29 @@ export default function SettingsPage() {
                       Branding &amp; White-Label
                     </h2>
                     <p className="text-white/80 text-sm mt-0.5">Logo, colors, company name and tagline</p>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-white/70 flex-shrink-0" />
+              </div>
+            </Link>
+          )}
+
+          {/* ══════════════════════════════════════════════
+              REPORT AN ISSUE / REQUEST A CHANGE
+             ══════════════════════════════════════════════ */}
+          {['admin', 'super_admin', 'operations_manager'].includes(userRole) && (
+            <Link
+              href="/dashboard/admin/settings/feedback"
+              className="block bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.01]"
+            >
+              <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 min-w-0">
+                  <div className="h-10 w-10 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
+                    <MessageSquareWarning className="w-5 h-5 text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold">Report an Issue / Request a Change</h2>
+                    <p className="text-white/80 text-sm mt-0.5">Report a bug, request a tweak, or share an idea with the Pontifex team</p>
                   </div>
                 </div>
                 <ChevronRight className="w-5 h-5 text-white/70 flex-shrink-0" />
