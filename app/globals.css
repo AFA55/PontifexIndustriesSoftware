@@ -114,6 +114,16 @@ select {
 
 /* Modern Utility Classes */
 @layer utilities {
+  /* Hide the scrollbar on horizontally-scrolling toolbars (e.g. the Payroll
+   * action bar) while keeping the content scrollable on touch/trackpad. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .card-gradient {
     background: linear-gradient(135deg, white 0%, #f8fafc 100%);
   }

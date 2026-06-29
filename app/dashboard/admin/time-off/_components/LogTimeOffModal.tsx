@@ -319,7 +319,7 @@ export default function LogTimeOffModal({
               <button
                 onClick={handleSubmit}
                 disabled={saving || !operatorId || !startDate}
-                className="flex-1 py-3 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-3 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {saving && <Loader2 className="w-4 h-4 animate-spin" />}
                 {saving ? 'Saving...' : selectedType?.isCallout ? 'Log & Notify' : 'Save Entry'}

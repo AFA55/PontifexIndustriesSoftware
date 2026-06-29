@@ -722,7 +722,7 @@ export default function SettingsPage() {
               </p>
               <Link
                 href="/dashboard/admin/settings/backups"
-                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-brand-secondary to-brand hover:from-brand hover:to-brand-dark text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
+                className="block w-full text-center px-4 py-3 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white rounded-xl font-bold text-sm transition-all hover:scale-[1.02] shadow-sm"
               >
                 Manage Backups →
               </Link>

@@ -795,7 +795,7 @@ export default function NewSiteVisitPage() {
                 }
                 setStep((step + 1) as 1 | 2 | 3);
               }}
-              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 min-h-[44px] px-6 rounded-xl bg-gradient-to-br from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white text-sm font-semibold shadow-lg shadow-brand/30 transition"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 min-h-[44px] px-6 rounded-xl bg-gradient-to-br from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white text-sm font-semibold shadow-lg shadow-brand/30 transition"
             >
               Continue
               <ArrowRight className="w-4 h-4" />

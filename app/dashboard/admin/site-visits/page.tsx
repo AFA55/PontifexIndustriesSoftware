@@ -133,7 +133,7 @@ export default function SiteVisitsListPage() {
           {canCreate && (
             <Link
               href="/dashboard/admin/site-visits/new"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white text-sm font-semibold shadow-lg shadow-brand/30 transition"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-gradient-to-br from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white text-sm font-semibold shadow-lg shadow-brand/30 transition"
             >
               <Plus className="w-4 h-4" />
               New Visit Report

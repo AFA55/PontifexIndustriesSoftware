@@ -661,70 +661,75 @@ export default function AdminTimecardsPage() {
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Add Time — admin manual entry (PTO, sick, holiday, manual hours) */}
-            <button
-              onClick={() => setShowAddTimeModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md shadow-emerald-500/30"
-              title="Add manual time entry (PTO, sick, holiday)"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline">Add Time</span>
-            </button>
-            <button
-              onClick={handleExportCSV}
-              disabled={exportingCSV || teamMembers.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <FileText size={14} />
-              <span className="hidden sm:inline">CSV</span>
-            </button>
-            <button
-              onClick={handleExportPDF}
-              disabled={exportingPDF || teamMembers.length === 0}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              {exportingPDF ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              <span className="hidden sm:inline">PDF</span>
-            </button>
+          {/* Action bar — labels always visible; scrolls horizontally on narrow screens so it never overflows the viewport */}
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 py-1">
+              {/* Add Time — admin manual entry (PTO, sick, holiday, manual hours) */}
+              <button
+                onClick={() => setShowAddTimeModal(true)}
+                className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-sm font-semibold transition-all bg-gradient-to-br from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white shadow-md shadow-emerald-500/30 shrink-0 whitespace-nowrap"
+                title="Add manual time entry (PTO, sick, holiday)"
+              >
+                <Plus size={16} />
+                <span>Add Time</span>
+              </button>
+              <button
+                onClick={handleExportCSV}
+                disabled={exportingCSV || teamMembers.length === 0}
+                className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
+                title="Export payroll to CSV"
+              >
+                {exportingCSV ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
+                <span>Export CSV</span>
+              </button>
+              <button
+                onClick={handleExportPDF}
+                disabled={exportingPDF || teamMembers.length === 0}
+                className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
+                title="Export payroll to PDF"
+              >
+                {exportingPDF ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                <span>Export PDF</span>
+              </button>
 
-            <button
-              onClick={() => router.push('/dashboard/admin/timecards/corrections')}
-              className={`relative flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all border ${
-                pendingCorrectionCount > 0
-                  ? 'bg-brand hover:bg-brand-dark text-white border-brand shadow-md shadow-brand/30'
-                  : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border-gray-200 dark:border-white/10'
-              }`}
-              title="Time Edit Requests"
-            >
-              <ClipboardEdit size={14} />
-              <span className="hidden sm:inline">Time Edit Requests</span>
-              {pendingCorrectionCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
-                  {pendingCorrectionCount > 9 ? '9+' : pendingCorrectionCount}
-                </span>
-              )}
-            </button>
+              <button
+                onClick={() => router.push('/dashboard/admin/timecards/corrections')}
+                className={`relative flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-sm font-semibold transition-all border shrink-0 whitespace-nowrap ${
+                  pendingCorrectionCount > 0
+                    ? 'bg-brand hover:bg-brand-dark text-white border-brand shadow-md shadow-brand/30'
+                    : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border-gray-200 dark:border-white/10'
+                }`}
+                title="Time Edit Requests"
+              >
+                <ClipboardEdit size={16} />
+                <span>Edit Requests</span>
+                {pendingCorrectionCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                    {pendingCorrectionCount > 9 ? '9+' : pendingCorrectionCount}
+                  </span>
+                )}
+              </button>
 
-            <Link
-              href="/dashboard/admin/timecards/late"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10"
-              title="Late Entries & Start Time"
-            >
-              <AlertTriangle size={14} className="text-amber-500" />
-              <span className="hidden sm:inline">Late Entries</span>
-            </Link>
+              <Link
+                href="/dashboard/admin/timecards/late"
+                className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10 shrink-0 whitespace-nowrap"
+                title="Late Entries & Start Time"
+              >
+                <AlertTriangle size={16} className="text-amber-500" />
+                <span>Late Entries</span>
+              </Link>
 
-            <button
-              onClick={() => setShowNightShiftSettings(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10"
-              title="Night Shift Settings"
-            >
-              <Moon size={14} className="text-purple-500 dark:text-violet-400" />
-              <span className="hidden sm:inline">Night Shift</span>
-            </button>
+              <button
+                onClick={() => setShowNightShiftSettings(true)}
+                className="flex items-center gap-1.5 min-h-[44px] px-3.5 rounded-lg text-sm font-semibold transition-all bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border border-gray-200 dark:border-white/10 shrink-0 whitespace-nowrap"
+                title="Night Shift Settings"
+              >
+                <Moon size={16} className="text-purple-500 dark:text-violet-400" />
+                <span>Night Shift</span>
+              </button>
+            </div>
 
-            <div className="hidden sm:flex items-center gap-2.5 pl-3 border-l border-gray-200 dark:border-white/10">
+            <div className="hidden lg:flex items-center gap-2.5 pl-3 border-l border-gray-200 dark:border-white/10 shrink-0">
               <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold text-xs shadow-sm">
                 {user?.name?.charAt(0) || 'A'}
               </div>

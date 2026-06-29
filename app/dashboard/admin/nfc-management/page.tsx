@@ -322,7 +322,7 @@ export default function NfcManagementPage() {
 
           <button
             onClick={() => { setError(''); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all"
+            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white rounded-lg text-sm font-semibold shadow-md hover:shadow-lg transition-all"
           >
             <Plus size={15} />
             <span className="hidden sm:inline">Register Tag</span>
@@ -632,7 +632,7 @@ export default function NfcManagementPage() {
               <button
                 onClick={handleCreate}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
               >
                 {saving ? (
                   <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
@@ -756,7 +756,7 @@ export default function NfcManagementPage() {
               <button
                 onClick={handleUpdate}
                 disabled={saving}
-                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
+                className="flex items-center gap-2 px-5 py-2 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50"
               >
                 {saving ? (
                   <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />

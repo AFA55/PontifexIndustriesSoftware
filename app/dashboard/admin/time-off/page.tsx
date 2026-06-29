@@ -295,7 +295,7 @@ function RequestsTab({ token, currentRole, onRefresh }: { token: string; current
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
+          className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white text-sm font-semibold rounded-xl shadow-sm transition-all"
         >
           <Plus className="w-4 h-4" />
           Log Time Off
@@ -816,7 +816,7 @@ export default function TimeOffPage() {
 
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand to-brand-secondary hover:from-brand-dark hover:to-brand-secondary text-white font-semibold rounded-xl shadow-lg transition-all"
+          className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand to-brand-dark hover:from-brand-dark hover:to-brand text-white font-semibold rounded-xl shadow-lg transition-all"
         >
           <Plus className="w-4 h-4" />
           Log Time Off
