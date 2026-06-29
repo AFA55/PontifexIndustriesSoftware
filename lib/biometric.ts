@@ -48,6 +48,15 @@ const SERVER = 'com.pontifexindustries.app';
 export const BIOMETRIC_EMAIL_KEY = 'pontifex.biometricEmail';
 
 /**
+ * localStorage flag (native-only) recording that the user declined an
+ * "enable Face ID?" enrollment offer, so we don't nag them again. Distinct from
+ * being enrolled. Shared by BOTH offer surfaces — the post-password-login prompt
+ * (app/login/page.tsx) and the post-resume dashboard nudge
+ * (components/BiometricEnrollNudge.tsx) — so declining either one suppresses both.
+ */
+export const BIOMETRIC_DECLINED_KEY = 'pontifex.biometricDeclined';
+
+/**
  * AccessControl.BIOMETRY_CURRENT_SET from @capgo/capacitor-native-biometric.
  * Mirrored as a literal so we don't have to statically import the plugin's enum on
  * web (the plugin is dynamic-import-only). Verified against the plugin's

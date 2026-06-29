@@ -4,6 +4,7 @@ import { Fragment } from 'react';
 import PushRegistration from '@/components/PushRegistration';
 import SubscriptionGate from '@/components/SubscriptionGate';
 import WelcomeProfileModal from '@/components/WelcomeProfileModal';
+import BiometricEnrollNudge from '@/components/BiometricEnrollNudge';
 import { GoogleMapsProvider } from '@/components/providers/GoogleMapsProvider';
 
 /**
@@ -37,6 +38,9 @@ export default function DashboardLayout({
       <SubscriptionGate key="subscription-gate" />
       {/* One-time "finish your profile" nudge for accounts missing photo/nickname/phone */}
       <WelcomeProfileModal key="welcome-profile-modal" />
+      {/* One-time "Enable Face ID?" offer for native users whose session auto-resumed
+          (so they never hit the post-password-login enroll prompt). Native-only no-op. */}
+      <BiometricEnrollNudge key="biometric-enroll-nudge" />
       <Fragment key="page">{children}</Fragment>
     </GoogleMapsProvider>
   );

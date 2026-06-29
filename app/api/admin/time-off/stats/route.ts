@@ -74,6 +74,7 @@ export async function GET(request: NextRequest) {
     // Build stats by operator
     const statsMap: Record<string, {
       operator_id: string;
+      role: string;
       callout_count: number;
       pto_days_used: number;
       pto_days_allocated: number;
@@ -82,17 +83,62 @@ export async function GET(request: NextRequest) {
       recent_history: unknown[];
     }> = {};
 
-    // Seed from balance table
-    for (const b of balances ?? []) {
-      statsMap[b.operator_id] = {
-        operator_id: b.operator_id,
-        callout_count: b.callout_count ?? 0,
-        pto_days_used: b.pto_days_used ?? 0,
-        pto_days_allocated: b.pto_days_allocated ?? 10,
-        pto_days_remaining: (b.pto_days_allocated ?? 10) - (b.pto_days_used ?? 0),
+    // Seed from profiles so EVERY current operator/apprentice shows up — even
+    // brand-new ones who have no PTO balance row or time-off history yet.
+    // (Previously this map was seeded only from operator_pto_balance +
+    // operator_time_off, so new hires with no rows in those tables were
+    // silently dropped from the Operator Metrics list.)
+    const ATTENDANCE_ROLES = ['operator', 'apprentice'];
+    let profilesQuery = supabaseAdmin
+      .from('profiles')
+      .select('id, full_name, avatar_url, role')
+      .eq('tenant_id', tenantId)
+      .in('role', ATTENDANCE_ROLES);
+    if (operatorId) {
+      profilesQuery = profilesQuery.eq('id', operatorId);
+    }
+    const { data: opProfiles, error: profErr } = await profilesQuery;
+    if (profErr) {
+      console.error('stats GET profiles error:', profErr);
+      return NextResponse.json({ error: 'Failed to fetch operator profiles' }, { status: 500 });
+    }
+
+    for (const p of opProfiles ?? []) {
+      statsMap[p.id] = {
+        operator_id: p.id,
+        role: p.role ?? 'operator',
+        callout_count: 0,
+        pto_days_used: 0,
+        pto_days_allocated: 10,
+        pto_days_remaining: 10,
         last_callout_date: null,
         recent_history: [],
       };
+    }
+
+    // Seed/merge from balance table
+    for (const b of balances ?? []) {
+      const existing = statsMap[b.operator_id];
+      if (existing) {
+        // Merge real PTO numbers onto the profile-seeded defaults.
+        existing.callout_count = b.callout_count ?? 0;
+        existing.pto_days_used = b.pto_days_used ?? 0;
+        existing.pto_days_allocated = b.pto_days_allocated ?? 10;
+        existing.pto_days_remaining = (b.pto_days_allocated ?? 10) - (b.pto_days_used ?? 0);
+      } else {
+        // Operator has a balance row but no matching operator/apprentice
+        // profile (e.g. role changed). Keep showing them for continuity.
+        statsMap[b.operator_id] = {
+          operator_id: b.operator_id,
+          role: 'operator',
+          callout_count: b.callout_count ?? 0,
+          pto_days_used: b.pto_days_used ?? 0,
+          pto_days_allocated: b.pto_days_allocated ?? 10,
+          pto_days_remaining: (b.pto_days_allocated ?? 10) - (b.pto_days_used ?? 0),
+          last_callout_date: null,
+          recent_history: [],
+        };
+      }
     }
 
     // Enrich with live data from operator_time_off
@@ -101,6 +147,7 @@ export async function GET(request: NextRequest) {
       if (!statsMap[oid]) {
         statsMap[oid] = {
           operator_id: oid,
+          role: 'operator',
           callout_count: 0,
           pto_days_used: 0,
           pto_days_allocated: 10,

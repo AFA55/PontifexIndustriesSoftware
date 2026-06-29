@@ -279,7 +279,7 @@ export default function BrandingSettingsPage() {
   useEffect(() => {
     const user = getCurrentUser();
     if (!user) { router.push('/login'); return; }
-    if (!['super_admin', 'admin'].includes(user.role)) { router.push('/dashboard'); return; }
+    if (!['super_admin', 'admin', 'operations_manager'].includes(user.role)) { router.push('/dashboard'); return; }
   }, [router]);
 
   // Fetch branding data

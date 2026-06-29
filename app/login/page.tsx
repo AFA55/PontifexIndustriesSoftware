@@ -9,12 +9,8 @@ import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { biometricAvailable, biometryLabel, disableBiometric, enrolledBiometricEmail, enrollBiometric, hasEnrolledBiometric, verifyAndGetSession } from '@/lib/biometric';
+import { BIOMETRIC_DECLINED_KEY, biometricAvailable, biometryLabel, disableBiometric, enrolledBiometricEmail, enrollBiometric, hasEnrolledBiometric, verifyAndGetSession } from '@/lib/biometric';
 import { isNativeApp } from '@/lib/is-native';
-
-// localStorage flag (native-only) recording that the user declined the post-login
-// "enable Face ID?" prompt, so we don't nag them again. Distinct from being enrolled.
-const BIOMETRIC_DECLINED_KEY = 'pontifex.biometricDeclined';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.

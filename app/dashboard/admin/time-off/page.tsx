@@ -47,6 +47,7 @@ interface TimeOffRequest {
 interface OperatorStats {
   operator_id: string;
   operator_name: string;
+  role?: string;
   callout_count: number;
   pto_days_used: number;
   pto_days_allocated: number;
@@ -534,7 +535,7 @@ function ScorecardsTab({ token }: { token: string }) {
     return stats.map((s) => ({
       operatorId: s.operator_id,
       name: s.operator_name,
-      role: 'operator',
+      role: s.role ?? 'operator',
       ptoDaysUsed: s.pto_days_used,
       ptoDaysAllocated: s.pto_days_allocated,
       calloutCount: s.callout_count,

@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireScheduleBoardAccess, requireSuperAdmin } from '@/lib/api-auth';
+import { requireScheduleBoardAccess, requireAdmin } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await requireSuperAdmin(request);
+    const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();

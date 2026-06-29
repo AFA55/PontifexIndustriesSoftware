@@ -211,7 +211,6 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
-  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [userRole, setUserRole] = useState('');
   const [settings, setSettings] = useState<ScheduleSettings>({
     max_slots: 10,
@@ -225,9 +224,12 @@ export default function SettingsPage() {
     const guard = async () => {
       const user = getCurrentUser();
       if (!user) { router.push('/login'); return; }
-      setIsSuperAdmin(user.role === 'super_admin');
       setUserRole(user.role);
-      const bypassRoles = ['super_admin', 'operations_manager'];
+      // Admin, super_admin, and operations_manager always manage their own tenant's
+      // settings — consistent with the sidebar gating and the branding sub-page guard.
+      // (The can_manage_settings flag below is a fallback for any OTHER role a super_admin
+      // has explicitly granted; plain admins have no flag row, so don't gate on it.)
+      const bypassRoles = ['admin', 'super_admin', 'operations_manager'];
       if (bypassRoles.includes(user.role)) return;
 
       // Check feature flag
@@ -395,9 +397,9 @@ export default function SettingsPage() {
 
         <div className="space-y-6">
           {/* ══════════════════════════════════════════════
-              COMPANY BRANDING (super_admin only)
+              COMPANY BRANDING (admin + super_admin, tenant-scoped)
              ══════════════════════════════════════════════ */}
-          {isSuperAdmin && (
+          {['admin', 'super_admin', 'operations_manager'].includes(userRole) && (
             <Link
               href="/dashboard/admin/settings/branding"
               className="block bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden hover:shadow-2xl transition-all hover:scale-[1.01]"
@@ -418,9 +420,6 @@ export default function SettingsPage() {
                   <div className="min-w-0">
                     <h2 className="text-lg font-bold flex items-center gap-2 flex-wrap">
                       Branding &amp; White-Label
-                      <span className="text-xs font-semibold bg-white/20 text-white px-2 py-0.5 rounded-full">
-                        Super Admin Only
-                      </span>
                     </h2>
                     <p className="text-white/80 text-sm mt-0.5">Logo, colors, company name and tagline</p>
                   </div>
