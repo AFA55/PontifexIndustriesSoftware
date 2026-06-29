@@ -87,6 +87,17 @@
       typo'd `EXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (same paste-error class as the RESEND key).
       Remaining cosmetic: the malformed `RESEND_API_KEY` value (code self-heals it).
 
+## 🟠 P1 (added Jun 28 PT2 — founder testing batch: bugs FIXED, features triaged)
+
+**FIXED + pushed (`f7d4a536`+`8eb9a46d`):** Settings access for admins · Attendance shows ALL operators (5→14) · Face ID enroll nudge (Remember-Me resume skipped the prompt) · coherent button gradients · Payroll header button labels/spacing.
+
+**Features to build (founder testing):**
+- [ ] **In-app issue/feedback reporting → Pontifex dashboard.** In Settings, a "Report an issue / request a change" form for each tenant → stored → surfaced per-company in the Platform Hub (extends the existing `app/dashboard/platform/feedback` page). Founder's bigger vision: later, agents read a tenant's reports, ask qualifying questions, and auto-make the fix/change, showing in the Pontifex dashboard which agent handled it. v1 = the capture form + the per-company inbox; the auto-fix agents are a Phase-2/Jarvis-track item. Buildable now (medium).
+- [ ] **Inventory voice checkout overhaul** — split by feasibility:
+  - **Buildable now (no deps):** add **truck number to operator Team Profile**; a **"checked-out equipment BY operator"** view; manual (tap) checkout-to-operator/truck; **blade checkout** = photo capture of the blade sticker + fields for serial # / blade size / spec (manual entry v1).
+  - **Voice — has hard deps:** the "service-not-allowed" error = **Web Speech API doesn't work in the iOS app webview** (memory-confirmed) + needs mic permission/HTTPS on web. To do voice IN THE APP needs the **native `@capgo/capacitor-speech-recognition` plugin → a NEW iOS build**. And "must be spot on" multi-item parsing ("zack gas power pack 4, baker scaffold, chainsaw 4, 2 chains and binders, done"; "checkin all") really wants an **LLM parse (Claude via AI-Gateway — not greenlit yet)** for accuracy vs a brittle rules parser. So voice = native-build + AI-Gateway dependent; the data model + manual + blade-photo parts ship first.
+  - Blade-sticker **OCR** (auto-extract serial/spec from the photo) = vision step, later; manual entry first.
+
 ## 🟡 P2/P3 (added Jun 28 — launch workflow validation nits; core flow verified ✅ + fixed)
 
 > Full create→assign→schedule→operator→board→maintenance flow traced (4 validators) + the launch-relevant
