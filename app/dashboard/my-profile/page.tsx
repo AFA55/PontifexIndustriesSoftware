@@ -13,7 +13,7 @@ import {
 import { getCurrentUser, logout } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { isNativeApp } from '@/lib/is-native';
-import { biometricAvailable, biometryLabel, disableBiometric, enrollBiometric, hasEnrolledBiometric } from '@/lib/biometric';
+import { BIOMETRIC_DECLINED_KEY, biometricDiagnostics, biometryLabel, disableBiometric, enrollBiometric, type BiometricDiagnostics } from '@/lib/biometric';
 import Avatar from '@/components/Avatar';
 
 interface MyProfile {
@@ -74,24 +74,47 @@ export default function MyProfilePage() {
   const [deleteError, setDeleteError] = useState('');
 
   // Biometric ("Sign in with Face ID / Touch ID") — native app only.
-  const [bioShow, setBioShow] = useState(false);       // hardware available + native
+  // The whole Security card renders whenever we're in the native shell (bioNative);
+  // it NEVER silently hides when biometrics are unavailable — instead it explains why
+  // and offers a "Check again" action, so the user always has a clear path + status.
+  const [bioNative, setBioNative] = useState(false);   // running inside the native app
+  const [bioDiag, setBioDiag] = useState<BiometricDiagnostics | null>(null);
   const [bioLabel, setBioLabel] = useState('Face ID');
   const [bioEnrolled, setBioEnrolled] = useState(false);
   const [bioBusy, setBioBusy] = useState(false);
   const [bioError, setBioError] = useState('');
 
+  const refreshBioDiag = async () => {
+    const diag = await biometricDiagnostics();
+    setBioDiag(diag);
+    setBioLabel(biometryLabel(diag.biometryType));
+    setBioEnrolled(diag.enrolled);
+    return diag;
+  };
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      if (!isNativeApp()) return;
-      const { available, biometryType } = await biometricAvailable();
-      if (cancelled || !available) return;
-      setBioShow(true);
-      setBioLabel(biometryLabel(biometryType));
-      setBioEnrolled(await hasEnrolledBiometric());
+      if (!isNativeApp()) return;        // web: no Face ID section at all
+      setBioNative(true);
+      const diag = await biometricDiagnostics();
+      if (cancelled) return;
+      setBioDiag(diag);
+      setBioLabel(biometryLabel(diag.biometryType));
+      setBioEnrolled(diag.enrolled);
     })();
     return () => { cancelled = true; };
   }, []);
+
+  const handleRecheckBiometric = async () => {
+    setBioError('');
+    setBioBusy(true);
+    try {
+      await refreshBioDiag();
+    } finally {
+      setBioBusy(false);
+    }
+  };
 
   const handleToggleBiometric = async () => {
     setBioError('');
@@ -111,11 +134,13 @@ export default function MyProfilePage() {
         const ok = await enrollBiometric(email, refreshToken);
         if (ok) {
           setBioEnrolled(true);
+          // Clear any prior "decline" so the login prompt + dashboard nudge re-sync.
+          try { localStorage.removeItem(BIOMETRIC_DECLINED_KEY); } catch { /* non-fatal */ }
           // Enabling biometrics IS the durable "remember this device" opt-in — persist
           // the session to localStorage so a biometric restore survives an app kill.
           try { localStorage.setItem('pontifex.rememberMe', 'true'); } catch { /* non-fatal */ }
         } else {
-          setBioError('Could not enable biometric sign-in.');
+          setBioError(`Couldn't turn on ${bioLabel}. Make sure ${bioLabel} is set up in your device Settings and that Pontifex is allowed to use it, then try again.`);
         }
       }
     } catch {
@@ -468,44 +493,96 @@ export default function MyProfilePage() {
               </div>
             </div>
 
-            {/* Security — biometric sign-in toggle (native app only) */}
-            {bioShow && (
+            {/* Security — biometric sign-in (native app only). Always rendered in the
+                app: if biometrics aren't available it explains why + offers Check again,
+                so there's never a silent dead-end. */}
+            {bioNative && (
               <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 shadow-sm">
                 <h3 className="text-sm font-bold text-gray-600 dark:text-gray-200 uppercase tracking-wider flex items-center gap-2 mb-4">
                   <Shield className="w-4 h-4 text-brand dark:text-brand" />
                   Security
                 </h3>
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
-                      <ScanFace className="w-4.5 h-4.5 text-blue-600 dark:text-blue-300" />
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Sign in with {bioLabel}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        {bioEnrolled ? `${bioLabel} sign-in is on for this device` : `Skip your password using ${bioLabel}`}
-                      </p>
-                    </div>
+
+                <div className="flex items-center gap-3 min-w-0 mb-4">
+                  <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center flex-shrink-0">
+                    <ScanFace className="w-4.5 h-4.5 text-blue-600 dark:text-blue-300" />
                   </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 dark:text-white">Sign in with {bioLabel}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {bioDiag?.available
+                        ? (bioEnrolled
+                            ? `${bioLabel} sign-in is on for this device`
+                            : `Skip your password using ${bioLabel}`)
+                        : `Use ${bioLabel} to sign in without typing your password`}
+                    </p>
+                  </div>
+                </div>
+
+                {/* State 1: available + enrolled → toggle (lets them turn it off). */}
+                {bioDiag?.available && bioEnrolled && (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">On</span>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={true}
+                      aria-label={`Turn off ${bioLabel} sign-in`}
+                      onClick={handleToggleBiometric}
+                      disabled={bioBusy}
+                      className="relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 bg-blue-600"
+                    >
+                      <span className="inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform translate-x-6" />
+                    </button>
+                  </div>
+                )}
+
+                {/* State 2: available + not enrolled → a clear Enable button. */}
+                {bioDiag?.available && !bioEnrolled && (
                   <button
                     type="button"
-                    role="switch"
-                    aria-checked={bioEnrolled}
-                    aria-label={`Toggle ${bioLabel} sign-in`}
                     onClick={handleToggleBiometric}
                     disabled={bioBusy}
-                    className={`relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-                      bioEnrolled ? 'bg-blue-600' : 'bg-gray-300 dark:bg-white/20'
-                    }`}
+                    className="w-full py-3 rounded-xl text-white font-bold bg-gradient-to-r from-blue-600 to-blue-700 hover:brightness-110 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    <span
-                      className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                        bioEnrolled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                    />
+                    <ScanFace className="w-4 h-4" />
+                    {bioBusy ? 'Enabling…' : `Enable ${bioLabel}`}
                   </button>
-                </div>
+                )}
+
+                {/* State 3: not available → explain + Check again (no dead-end). */}
+                {bioDiag && !bioDiag.available && (
+                  <div className="rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 p-4">
+                    <p className="text-sm text-amber-800 dark:text-amber-200 font-medium mb-1">
+                      {bioLabel} isn’t available yet
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-300/90 mb-3">
+                      Open your iPhone <span className="font-semibold">Settings → Pontifex</span> and turn on
+                      {' '}<span className="font-semibold">Face ID</span>, and make sure Face ID is set up on your device.
+                      Then tap Check again.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleRecheckBiometric}
+                      disabled={bioBusy}
+                      className="px-4 py-2 rounded-lg text-sm font-semibold bg-amber-600 text-white hover:bg-amber-700 transition-colors disabled:opacity-50"
+                    >
+                      {bioBusy ? 'Checking…' : 'Check again'}
+                    </button>
+                  </div>
+                )}
+
                 {bioError && <p className="text-xs text-red-500 dark:text-red-400 mt-3">{bioError}</p>}
+
+                {/* Status line — lets the user read the exact state back for support. */}
+                {bioDiag && (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-3">
+                    Status: app {bioDiag.nativeShell ? '✓' : '✗'} · plugin {bioDiag.pluginPresent ? '✓' : '✗'} ·
+                    {' '}{bioDiag.available ? `${bioDiag.biometryType} ready` : 'not available'} ·
+                    {' '}{bioDiag.enrolled ? 'enrolled' : 'not enrolled'}
+                    {bioDiag.errorCode ? ` · ${bioDiag.errorCode}` : ''}
+                  </p>
+                )}
               </div>
             )}
 

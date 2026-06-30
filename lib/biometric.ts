@@ -95,6 +95,54 @@ export async function biometricAvailable(): Promise<BiometricStatus> {
   }
 }
 
+/**
+ * Full snapshot of the device's biometric state for the My Profile → Security UI.
+ * Unlike biometricAvailable(), this NEVER throws and reports WHY enrollment can't be
+ * offered, so the UI can show actionable guidance (and a status line the user can read
+ * back) instead of silently hiding the whole feature.
+ */
+export interface BiometricDiagnostics {
+  /** Running inside the native iOS/Android Capacitor shell? */
+  nativeShell: boolean;
+  /** Was the native biometric plugin resolvable in this build? */
+  pluginPresent: boolean;
+  /** Hardware present + enrolled at the OS level AND Pontifex allowed to use it? */
+  available: boolean;
+  /** 'faceId' | 'touchId' | 'fingerprint' | 'none' */
+  biometryType: string;
+  /** Has the user already enrolled biometric sign-in on this device? */
+  enrolled: boolean;
+  /** Plugin error code / message when not available (e.g. permission denied). */
+  errorCode?: string;
+}
+
+/** Non-throwing snapshot of biometric state for the settings UI. Native-only. */
+export async function biometricDiagnostics(): Promise<BiometricDiagnostics> {
+  const nativeShell = isNativeApp();
+  const NB = await getPlugin();
+  const pluginPresent = !!NB;
+  let available = false;
+  let biometryType = 'none';
+  let enrolled = false;
+  let errorCode: string | undefined;
+  if (NB) {
+    try {
+      const res = await NB.isAvailable({ useFallback: false });
+      available = !!res?.isAvailable;
+      biometryType = String(res?.biometryType ?? 'none');
+      if (!available && res?.errorCode != null) errorCode = String(res.errorCode);
+    } catch (e: unknown) {
+      errorCode = e instanceof Error && e.message ? e.message : 'isAvailable failed';
+    }
+    try {
+      enrolled = await hasEnrolledBiometric();
+    } catch {
+      /* leave enrolled=false */
+    }
+  }
+  return { nativeShell, pluginPresent, available, biometryType, enrolled, errorCode };
+}
+
 /** Friendly label for the device's biometry type. */
 export function biometryLabel(biometryType: string): string {
   const t = (biometryType || '').toLowerCase();
