@@ -579,7 +579,7 @@ function LoginPageInner() {
           >
             {branding.login_welcome_text || 'Welcome Back'}
           </motion.h1>
-          <p className="text-gray-600 text-sm font-medium">{branding.tagline || 'Concrete Cutting Management System'}</p>
+          <p className="text-gray-600 text-sm font-medium">{branding.tagline || 'Operations Management System'}</p>
           {tenantId && (
             <Link href="/company-login" className="mt-3 flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
               <ArrowLeft className="w-3 h-3" /> Change company

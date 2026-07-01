@@ -193,7 +193,7 @@ export default function PricingPage() {
           </span>
         </h1>
         <p className="text-lg text-slate-400 max-w-xl mx-auto mb-10">
-          Everything your concrete cutting crew needs, in one platform. Start your 14-day free trial — no credit card required.
+          Everything your crew needs, in one platform. Start your 14-day free trial — no credit card required.
         </p>
 
         {/* Annual toggle */}
@@ -277,7 +277,7 @@ export default function PricingPage() {
       <section className="border-t border-white/5 py-12">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <p className="text-slate-500 text-sm mb-6">
-            Trusted by concrete cutting professionals across North America
+            Trusted by growing service businesses across North America
           </p>
           <div className="flex flex-wrap items-center justify-center gap-8 text-slate-600">
             <div className="flex items-center gap-2">
@@ -305,7 +305,7 @@ export default function PricingPage() {
             Ready to streamline your operations?
           </h2>
           <p className="text-slate-400 mb-6">
-            Join concrete cutting companies using Pontifex to run their business.
+            Join companies using Pontifex to run their operations.
           </p>
           <Link
             href="/dashboard/admin/subscription"

@@ -574,7 +574,7 @@ function PatriotPageContent() {
           <FadeIn delay={0}>
             <div className="space-y-2">
               <div className="text-3xl sm:text-4xl font-black tracking-tight text-white leading-none">
-                PATRIOT CONCRETE CUTTING
+                PATRIOT
               </div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-800/80 border border-zinc-700/60 text-zinc-500 text-xs font-medium">
                 <Layers className="w-3 h-3 text-violet-500" />
@@ -901,7 +901,7 @@ function PatriotPageContent() {
       <footer className="border-t border-zinc-800/60 py-8 px-5">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-zinc-600 text-sm text-center sm:text-left">
-            © 2026 Patriot Concrete Cutting · Powered by Pontifex Industries
+            © 2026 Patriot · Powered by Pontifex Industries
           </p>
           <a
             href="https://www.pontifexindustries.com"

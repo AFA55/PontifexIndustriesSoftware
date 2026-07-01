@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     url: 'https://www.pontifexindustries.com',
     title: 'Custom Software & AI Automations Built Around How You Work',
     description:
-      'Own the digital tools that run your business — adaptable custom software built around your workflow, not the other way around. Proven with Patriot Concrete Cutting.',
+      'Own the digital tools that run your business — adaptable custom software built around your workflow, not the other way around. Proven with Patriot, our first customer.',
     siteName: 'Pontifex Industries',
   },
   twitter: {
@@ -67,7 +67,7 @@ const FAQS = [
   },
   {
     q: 'How do I get started?',
-    a: 'Request a demo. We will walk through how you work today, show you what we have built for companies like Patriot Concrete Cutting, and map out what an adaptable, tailored solution would look like for your business.',
+    a: 'Request a demo. We will walk through how you work today, show you what we have built for companies like Patriot, and map out what an adaptable, tailored solution would look like for your business.',
   },
 ];
 
@@ -412,7 +412,7 @@ export default function HomePage() {
                 </span>
               </h2>
               <p className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                Patriot Concrete Cutting runs its entire operation on a custom platform we built around
+                Patriot runs its entire operation on a custom platform we built around
                 their crews — scheduling, dispatch, GPS timecards, equipment, job logs, invoicing, and a
                 customer portal. One source of truth, owned by them.
               </p>
@@ -425,8 +425,8 @@ export default function HomePage() {
                     <Hammer className="w-6 h-6 text-violet-300" />
                   </span>
                   <div>
-                    <h3 className="text-xl font-bold text-white">Patriot Concrete Cutting</h3>
-                    <p className="text-zinc-500 text-sm">Concrete cutting &amp; field operations</p>
+                    <h3 className="text-xl font-bold text-white">Patriot</h3>
+                    <p className="text-zinc-500 text-sm">Field service &amp; operations</p>
                   </div>
                 </div>
                 <blockquote className="text-zinc-300 text-lg leading-relaxed border-l-2 border-violet-500/50 pl-5">
@@ -482,7 +482,7 @@ export default function HomePage() {
               software.
             </h2>
             <p className="text-zinc-400 text-lg leading-relaxed">
-              Concrete cutting, field service, and the trades are our home base. But the same idea works
+              Field service, construction, and the trades are our home base. But the same idea works
               for any operations-heavy business stuck with spreadsheets, paper, and software it
               doesn&apos;t control. If the tools in your industry don&apos;t fit how you work, that&apos;s
               exactly the problem we solve.

@@ -83,7 +83,7 @@ function SuccessContent() {
           transition={{ delay: 0.3 }}
           className="text-xl text-zinc-400 mb-12 leading-relaxed"
         >
-          Your 30-day trial is officially started. Andres will reach out within 24 hours to get Patriot Concrete Cutting fully set up and live.
+          Your 30-day trial is officially started. Andres will reach out within 24 hours to get Patriot fully set up and live.
         </motion.p>
 
         {/* Guarantee reminder */}

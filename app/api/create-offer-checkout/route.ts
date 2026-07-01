@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
         amount_usd: '1647',
       },
       payment_intent_data: {
-        description: 'Pontifex Industries — 30-Day Trial for Patriot Concrete Cutting',
+        description: 'Pontifex Industries — 30-Day Trial for Patriot',
         metadata: {
           type: 'trial_offer',
           client: 'patriot_concrete_cutting',

@@ -284,7 +284,7 @@ const comparisonRows = [
     pontifex: true,
   },
   {
-    label: 'Built for concrete cutting',
+    label: 'Built around how you work',
     dsm: false,
     cenpoint: false,
     pontifex: true,
@@ -496,7 +496,7 @@ export default function OfferPage() {
         <Reveal>
           <div className="inline-flex items-center gap-2 bg-violet-500/10 border border-violet-500/30 rounded-full px-4 py-2 text-violet-300 text-sm font-semibold mb-8">
             <Star className="w-4 h-4" />
-            Exclusive Offer — Built for Patriot Concrete Cutting
+            Exclusive Offer — Built for Patriot
           </div>
         </Reveal>
 
@@ -511,7 +511,7 @@ export default function OfferPage() {
         <Reveal delay={0.2}>
           <p className="text-xl md:text-2xl text-zinc-400 max-w-3xl mx-auto mb-12 leading-relaxed">
             One platform that runs your whole operation — scheduling, payroll, jobs, and compliance.
-            Custom-built for concrete cutting.{' '}
+            Custom-built around your crews.{' '}
             <span className="text-white font-semibold">Risk-free for 30 days.</span>
           </p>
         </Reveal>
@@ -857,7 +857,7 @@ export default function OfferPage() {
                   <p className="text-xl font-black text-zinc-300">$30k–$100k+</p>
                 </div>
                 <p className="text-zinc-400 text-sm leading-relaxed">
-                  Hiring a developer to build a platform shaped around concrete cutting ops costs $150–$250/hr. A real custom build runs <span className="text-white font-semibold">$30k to $100k+</span>. Off-the-shelf tools (DSM, Cenpoint) ignore 80% of how you actually work. You&apos;re getting the custom build for the price of a small fraction.
+                  Hiring a developer to build a platform shaped around your field operations costs $150–$250/hr. A real custom build runs <span className="text-white font-semibold">$30k to $100k+</span>. Off-the-shelf tools (DSM, Cenpoint) ignore 80% of how you actually work. You&apos;re getting the custom build for the price of a small fraction.
                 </p>
               </div>
 
@@ -1073,7 +1073,7 @@ export default function OfferPage() {
             <span className="text-zinc-500 text-sm">Pontifex Industries</span>
           </div>
           <p className="text-zinc-600 text-xs text-center">
-            Built specifically for Patriot Concrete Cutting &mdash; pontifexindustries.com
+            Built specifically for Patriot &mdash; pontifexindustries.com
           </p>
           <div className="flex items-center gap-4 text-xs text-zinc-600">
             <a href="/privacy" className="hover:text-zinc-400 transition-colors">Privacy</a>

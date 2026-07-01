@@ -54,7 +54,7 @@ const INITIAL_FORM: FormData = {
 
 // ─── Step Config ─────────────────────────────────────────────
 const COMPANY_OPTIONS: { value: CompanyType; label: string; icon: React.ElementType; desc: string }[] = [
-  { value: 'concrete_cutting', label: 'Concrete Cutting', icon: HardHat, desc: 'Slab sawing, wall sawing, core drilling' },
+  { value: 'concrete_cutting', label: 'Field Service Trades', icon: HardHat, desc: 'Sawing, drilling, demolition, and similar specialty crews' },
   { value: 'general_contractor', label: 'General Contractor', icon: Building2, desc: 'Commercial or residential GC' },
   { value: 'specialty_contractor', label: 'Specialty Contractor', icon: Wrench, desc: 'Demolition, scanning, GPR' },
   { value: 'other', label: 'Other', icon: Layers, desc: 'Tell us more during the demo' },
@@ -294,7 +294,7 @@ export default function RequestDemoPage() {
           {/* Social Proof */}
           <div className="mt-12 text-center">
             <p className="text-zinc-600 text-xs">
-              Trusted by concrete cutting professionals &middot; No credit card required &middot; 15-minute setup
+              Trusted by growing service businesses &middot; No credit card required &middot; 15-minute setup
             </p>
           </div>
         </div>
