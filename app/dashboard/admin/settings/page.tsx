@@ -66,15 +66,19 @@ const VARIANT_CLASSES: Record<StatusVariant, string> = {
 };
 
 // ─── Billing section component ─────────────────────────────────────────────
+const BILLING_ROLES = ['admin', 'super_admin', 'operations_manager'];
+
 function BillingSection({ userRole }: { userRole: string }) {
-  const BILLING_ROLES = ['admin', 'super_admin', 'operations_manager'];
-  if (!BILLING_ROLES.includes(userRole)) return null;
+  const isBillingRole = BILLING_ROLES.includes(userRole);
 
   const [billing, setBilling] = useState<TenantBilling | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
   const [portalError, setPortalError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Only fetch billing data for roles that can see this section — but the
+    // hook itself must run unconditionally on every render (rules-of-hooks).
+    if (!isBillingRole) return;
     const load = async () => {
       try {
         const { supabase } = await import('@/lib/supabase');
@@ -91,7 +95,7 @@ function BillingSection({ userRole }: { userRole: string }) {
       }
     };
     load();
-  }, []);
+  }, [isBillingRole]);
 
   const handleManage = async () => {
     setPortalLoading(true);
@@ -117,6 +121,8 @@ function BillingSection({ userRole }: { userRole: string }) {
       setPortalLoading(false);
     }
   };
+
+  if (!isBillingRole) return null;
 
   const isTrialOrNull = !billing?.subscription_status ||
     billing.subscription_status === 'trialing';
