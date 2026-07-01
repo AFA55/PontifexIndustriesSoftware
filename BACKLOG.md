@@ -10,7 +10,7 @@
 |---|---|
 | **Phase** | 🚀 **LAUNCHING** — web live; both mobile apps in store review |
 | **Prod** | ✅ LIVE — pontifexindustries.com (deployed `0e8c1506` — tenant-brand redesign of Time Edit Requests + drive-time auto-suggest + smart notif auto-ack + resend acceptance email) |
-| **iOS** | ✅ **APPROVED — v1.0.4 / Build 9 "Ready for Distribution"**, auto-releasing. Apple Developer Agreement re-accept = **DONE**. |
+| **iOS** | ✅ **LIVE — v1.0.5 / Build 10 "Ready for Distribution"** (submitted + processed Jun 30 — App Store metadata scrub of non-compete vertical language). |
 | **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). **Org account → closed testing NOT required** (confirmed Jun 27); empty closed-test draft discarded. Auto-publishes on approval. See `android-release` skill. |
 | **Open** | P0: ~0 · P1: ~3 · P2: ~13 · P3: ~8 |
 | **In flight** | Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
@@ -52,6 +52,14 @@
 **Non-blocking nits found in the audit (P2/P3):** PTO balance adjust + weekend-pay-mismatch are fire-and-forget (already logged below); correction-rejection doesn't notify operator; signature-request orphan rows; lunch column duplication (`break_minutes` vs `lunch_duration_minutes`); maintenance equipment-status sync is fire-and-forget; mobile audit of maintenance wizard/inbox.
 
 ## 🔴 P0 — Verify / unblock now
+
+### Jul 1 — live-blocker sweep (director-audit follow-through; team plan: `docs/plans/JULY1_LAUNCH_BLOCKERS_TEAM_PLAN.md`) — 4/6 DONE
+- [x] ~~**Non-compete leak on the LIVE WEBSITE**~~ — ✅ FIXED. 9 files scrubbed (`app/page.tsx`, `pricing`, `request-demo`, `offer`, `offer/success`, `patriot`, `request-access`, `login` fallback tagline, Stripe checkout description). Also caught the platform-WIDE login-page fallback tagline (`'Concrete Cutting Management System'` shown to any tenant, not just Patriot) — bigger leak than originally scoped. Left legal/operational docs (invoices, work orders, liability waivers) untouched since they describe Patriot's real business and must stay accurate.
+- [x] ~~**Conditional React hooks bug, LIVE in prod**~~ — ✅ FIXED. `app/dashboard/admin/settings/page.tsx` `BillingSection`: early `return null` was gating hooks. Moved all hooks unconditional-first, role-check now inside `useEffect` body + a post-hooks return. `eslint` 0 errors (was 4), `tsc` clean, build clean.
+- [x] ~~**CI red for 30+ consecutive pushes**~~ — ✅ FIXED as a side effect of the hooks fix (the 4 lint errors WERE the entire CI failure — confirmed against real GitHub Actions logs). Also fixed `.eslintrc.json` missing `"root": true"` (was cascading into ancestor configs when run from nested worktrees).
+- [x] ~~**Public storage buckets allow anonymous file-listing**~~ — ✅ FIXED + applied to prod. Migrations `20260701_storage_buckets_deny_anon_listing.sql` + `20260701b_storage_buckets_drop_select_policies.sql`: removed SELECT/list policies entirely on `avatars`, `job-photos`, `jobsite-area-docs`, `scope-photos`, `site-compliance-docs` (reads still work via `getPublicUrl()`, which bypasses RLS by design; uploads/deletes unchanged). Advisor re-scan: 0/5 `public_bucket_allows_listing` findings remain. Residual (not done): object paths aren't tenant-namespaced, so true per-tenant storage isolation would need a path-restructure — flagged as future hardening, not urgent (a still-authenticated user can't enumerate, only direct-URL-access paths they already have).
+- [ ] **Twilio toll-free verification REJECTED** (30530, Entity Misclassification) — root cause + exact fix in `docs/playbooks/TWILIO_TOLLFREE_RESUBMIT.md`. Founder-action only (Claude can't log into Twilio). Resubmit before **Jul 9** to keep priority queue.
+- [ ] **Google Play submission #4 still "In review" 9+ days** (since Jun 22) — confirmed no policy issues, developer verification complete, nothing missing on our end. Only lever left: contact Play support for a status check (drafted, not sent).
 
 ### ✅ LAUNCH — DONE (Jun 21–22) — both apps submitted, web live
 - [x] ~~Jun-14 in-app fixes~~ — ✅ shipped & live (`2e8c4df0`/`a0bf8bcb`): notification-bell light-mode contrast, operator Manage-Profile hub, clock-in "asks Shop twice" removed, Face ID auto-prompt on launch.
