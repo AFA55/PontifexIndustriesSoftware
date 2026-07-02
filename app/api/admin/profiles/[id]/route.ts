@@ -30,7 +30,7 @@ export async function GET(
 
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, created_at, tenant_id')
+      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, truck_number, created_at, tenant_id')
       .eq('id', id)
       .single();
 
@@ -179,7 +179,7 @@ export async function PATCH(
     // Letting it through here would desync auth.users ↔ profiles.
     const selfOnlyFields = [
       'full_name', 'nickname', 'phone', 'phone_number',
-      'date_of_birth', 'profile_picture_url',
+      'date_of_birth', 'profile_picture_url', 'truck_number',
       'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
     ];
     const adminOnlyFields = ['hire_date', 'next_review_date', 'role', 'active'];

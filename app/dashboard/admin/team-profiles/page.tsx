@@ -35,6 +35,7 @@ interface TeamMember {
   hire_date?: string | null;
   next_review_date?: string | null;
   nickname?: string | null;
+  truck_number?: string | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -653,6 +654,7 @@ interface EditInfoForm {
   emergency_contact_phone: string;
   emergency_contact_relationship: string;
   next_review_date: string;
+  truck_number: string;
 }
 
 function seedEditInfoForm(member: TeamMember): EditInfoForm {
@@ -666,6 +668,7 @@ function seedEditInfoForm(member: TeamMember): EditInfoForm {
     emergency_contact_phone: (member as any).emergency_contact_phone ?? '',
     emergency_contact_relationship: (member as any).emergency_contact_relationship ?? '',
     next_review_date: member.next_review_date ?? '',
+    truck_number: member.truck_number ?? '',
   };
 }
 
@@ -712,6 +715,7 @@ function EditInfoTab({
         'nickname', 'phone_number', 'date_of_birth',
         'emergency_contact_name', 'emergency_contact_phone',
         'emergency_contact_relationship', 'next_review_date',
+        'truck_number',
       ];
       let emailError: string | null = null;
       (Object.keys(form) as Array<keyof EditInfoForm>).forEach(k => {
@@ -859,6 +863,17 @@ function EditInfoTab({
               value={form.date_of_birth}
               onChange={e => set('date_of_birth', e.target.value)}
               className={inputCls}
+            />
+          </div>
+          <div>
+            <label className={labelCls} htmlFor="ei-truck">Truck Number</label>
+            <input
+              id="ei-truck"
+              type="text"
+              value={form.truck_number}
+              onChange={e => set('truck_number', e.target.value)}
+              className={inputCls}
+              placeholder="e.g. 12 or T-104"
             />
           </div>
           {canEditAdminFields && (

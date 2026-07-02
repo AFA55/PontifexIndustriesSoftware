@@ -25,6 +25,7 @@ interface Equipment {
   id: string;
   asset_tag: string | null;
   kind: string | null;
+  category: string | null;
   name: string;
   short_name: string | null;
   unit_number: string | null;
@@ -58,7 +59,8 @@ interface CheckoutRow {
   hour_meter_out: number | null;
   hour_meter_in: number | null;
   voice_note_url: string | null;
-  equipment: { id: string; name: string; short_name: string | null; unit_number: string | null; asset_tag: string | null } | null;
+  blade_details: { serial_number: string | null; size: string | null; spec: string | null; photo_url: string | null } | null;
+  equipment: { id: string; name: string; short_name: string | null; unit_number: string | null; asset_tag: string | null; category?: string | null } | null;
   truck: { id: string; name: string; short_name: string | null; unit_number: string | null } | null;
   custodian: { id: string; full_name: string; email: string } | null;
   job: { id: string; job_number: string | null; customer_name: string | null } | null;
@@ -237,9 +239,14 @@ export default function InventoryControlPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-slate-900 pb-12">
       <div className="max-w-6xl mx-auto p-4 sm:p-6 space-y-5 sm:space-y-6">
-        <Link href="/dashboard/admin" className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-cyan-600 min-h-[44px] py-2">
-          <ArrowLeft className="w-4 h-4" /> Dashboard
-        </Link>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <Link href="/dashboard/admin" className="inline-flex items-center gap-1.5 text-sm text-gray-600 dark:text-slate-300 hover:text-cyan-600 min-h-[44px] py-2">
+            <ArrowLeft className="w-4 h-4" /> Dashboard
+          </Link>
+          <Link href="/dashboard/admin/equipment-by-operator" className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-700 dark:text-cyan-300 hover:text-cyan-800 min-h-[44px] py-2">
+            <UserIcon className="w-4 h-4" /> View by Operator
+          </Link>
+        </div>
 
         {/* Hero — gradient swaps based on active tab */}
         <div className={`relative overflow-hidden rounded-2xl bg-gradient-to-br ${currentMeta.gradient} p-5 sm:p-7 ${currentMeta.shadow} shadow-xl text-white transition-all`}>
@@ -408,6 +415,19 @@ function CheckoutTab({
   const [submitting, setSubmitting] = useState(false);
   const [msg, setMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // ── Blade-specific manual entry (v1 — no OCR) ────────────────────────────
+  // Only shown when the selected equipment is a blade/bit. Serial/size/spec
+  // are free text; the sticker photo uploads immediately on capture to the
+  // private blade-checkout-photos bucket and we hold onto the returned
+  // storage PATH (not the preview URL) to persist on the checkout.
+  const [bladeSerial, setBladeSerial] = useState('');
+  const [bladeSize, setBladeSize] = useState('');
+  const [bladeSpec, setBladeSpec] = useState('');
+  const [bladePhotoPath, setBladePhotoPath] = useState('');
+  const [bladePhotoPreviewUrl, setBladePhotoPreviewUrl] = useState('');
+  const [bladePhotoUploading, setBladePhotoUploading] = useState(false);
+  const bladePhotoInputRef = useRef<HTMLInputElement>(null);
+
   // ── Pending tray (voice drafts) ──────────────────────────────────────────
   // Voice creates DRAFTS in a tray instead of auto-filling the manual form.
   // User can speak multiple items, edit amber-tier matches, then Confirm All
@@ -571,6 +591,36 @@ function CheckoutTab({
   const truckCurrentOperatorId = (selectedTruck as any)?.current_custodian?.id || null;
   const truckHasNoDriver = !!truckId && !truckCurrentOperatorId;
 
+  // Blade/bit-specific manual entry appears when the picked equipment is one.
+  const selectedEquipment = useMemo(() => availableEquipment.find(e => e.id === equipmentId) || null, [availableEquipment, equipmentId]);
+  const isSelectedEquipmentBlade = selectedEquipment?.kind === 'blade' || selectedEquipment?.category === 'blade' || selectedEquipment?.category === 'bit';
+
+  async function handleBladePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBladePhotoUploading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const formData = new FormData();
+      formData.append('photo', file);
+      const res = await fetch('/api/admin/equipment-checkouts/blade-photo-upload', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: formData,
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Upload failed');
+      setBladePhotoPath(json.path);
+      setBladePhotoPreviewUrl(json.url || '');
+    } catch (err: any) {
+      setMsg({ type: 'error', text: err?.message || 'Photo upload failed.' });
+    } finally {
+      setBladePhotoUploading(false);
+      if (bladePhotoInputRef.current) bladePhotoInputRef.current.value = '';
+    }
+  }
+
   // Effective custodian sent to API:
   //   - truck mode + truck has driver → derived (server resolves from truck)
   //   - truck mode + truck has no driver → custodianOverrideId (required from picker)
@@ -601,6 +651,14 @@ function CheckoutTab({
       } else {
         body.custodian_id = custodianOverrideId; // handheld
       }
+      if (isSelectedEquipmentBlade && (bladeSerial.trim() || bladeSize.trim() || bladeSpec.trim() || bladePhotoPath)) {
+        body.blade_details = {
+          serial_number: bladeSerial.trim() || null,
+          size: bladeSize.trim() || null,
+          spec: bladeSpec.trim() || null,
+          photo_url: bladePhotoPath || null,
+        };
+      }
       const res = await fetch('/api/admin/equipment-checkouts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
@@ -613,6 +671,7 @@ function CheckoutTab({
       }
       setMsg({ type: 'success', text: 'Checked out.' });
       setEquipmentId(''); setTruckId(''); setCustodianOverrideId(''); setNotes('');
+      setBladeSerial(''); setBladeSize(''); setBladeSpec(''); setBladePhotoPath(''); setBladePhotoPreviewUrl('');
       onSuccess();
     } finally {
       setSubmitting(false);
@@ -695,6 +754,57 @@ function CheckoutTab({
         />
         <p className="text-[11px] text-gray-500 dark:text-slate-400 mt-1.5">{availableEquipment.length} available pieces · type to search by name, asset tag, or unit number</p>
       </div>
+
+      {/* Blade/bit manual entry — serial, size, spec + sticker photo. Manual
+          entry only (v1) — no OCR auto-extraction. */}
+      {isSelectedEquipmentBlade && (
+        <div className="rounded-xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-900/10 p-4 space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-widest text-amber-700 dark:text-amber-400">
+            Blade details (optional but recommended)
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Serial Number</label>
+              <input type="text" value={bladeSerial} onChange={(e) => setBladeSerial(e.target.value)} placeholder="e.g. SN-48213" className={inputClass} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Size</label>
+              <input type="text" value={bladeSize} onChange={(e) => setBladeSize(e.target.value)} placeholder='e.g. 14"' className={inputClass} />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Spec</label>
+              <input type="text" value={bladeSpec} onChange={(e) => setBladeSpec(e.target.value)} placeholder="e.g. wet/segmented" className={inputClass} />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-semibold text-gray-700 dark:text-slate-200 mb-1.5 block">Sticker photo</label>
+            <input
+              ref={bladePhotoInputRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleBladePhotoSelect}
+              className="hidden"
+            />
+            {bladePhotoPreviewUrl && (
+              <img src={bladePhotoPreviewUrl} alt="Blade sticker" className="w-20 h-20 rounded-lg object-cover border border-gray-200 dark:border-slate-600 mb-2" />
+            )}
+            <button
+              type="button"
+              onClick={() => bladePhotoInputRef.current?.click()}
+              disabled={bladePhotoUploading}
+              className="flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-xl border-2 border-dashed border-amber-300 dark:border-amber-800 hover:border-amber-400 text-sm text-amber-700 dark:text-amber-400 transition w-full justify-center"
+            >
+              {bladePhotoUploading ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Uploading…</>
+              ) : (
+                <>📷 {bladePhotoPreviewUrl ? 'Retake photo' : 'Take photo of sticker'}</>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Step 2: Truck OR direct operator */}
       {mode === 'truck' ? (
@@ -1030,6 +1140,60 @@ function VoiceNotePlayer({ checkoutId, initialUrl }: { checkoutId: string; initi
   );
 }
 
+// ─── Blade Details Summary (History tab) ───────────────────────────────────
+// Renders the manual-entry blade fields captured at checkout + a click-to-view
+// sticker photo. photo_url is a bare storage PATH (not a URL) — re-signed on
+// demand via the blade-photo route, same lazy pattern as VoiceNotePlayer.
+function BladeDetailsSummary({
+  checkoutId, details,
+}: {
+  checkoutId: string;
+  details: { serial_number: string | null; size: string | null; spec: string | null; photo_url: string | null };
+}) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [loadingPhoto, setLoadingPhoto] = useState(false);
+  const [showPhoto, setShowPhoto] = useState(false);
+
+  async function loadPhoto() {
+    if (photoUrl) { setShowPhoto(v => !v); return; }
+    if (!details.photo_url) { setShowPhoto(true); return; }
+    setLoadingPhoto(true);
+    try {
+      const res = await fetch(`/api/admin/equipment-checkouts/${checkoutId}/blade-photo`);
+      if (res.ok) {
+        const json = await res.json();
+        setPhotoUrl(json.url);
+      }
+    } finally {
+      setLoadingPhoto(false);
+      setShowPhoto(true);
+    }
+  }
+
+  return (
+    <div className="mt-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-100 dark:border-amber-900/30 p-2 text-[11px] text-amber-800 dark:text-amber-300 space-y-1">
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {details.serial_number && <span><strong>S/N:</strong> {details.serial_number}</span>}
+        {details.size && <span><strong>Size:</strong> {details.size}</span>}
+        {details.spec && <span><strong>Spec:</strong> {details.spec}</span>}
+      </div>
+      {details.photo_url && (
+        <button
+          type="button"
+          onClick={loadPhoto}
+          disabled={loadingPhoto}
+          className="inline-flex items-center gap-1 text-amber-700 dark:text-amber-400 hover:underline disabled:opacity-50"
+        >
+          {loadingPhoto ? 'Loading…' : showPhoto ? 'Hide sticker photo' : '📷 View sticker photo'}
+        </button>
+      )}
+      {showPhoto && photoUrl && (
+        <img src={photoUrl} alt="Blade sticker" className="mt-1 w-24 h-24 rounded-lg object-cover border border-amber-200 dark:border-amber-800" />
+      )}
+    </div>
+  );
+}
+
 // ─── History Tab ────────────────────────────────────────────────────────────
 function HistoryTab({
   rows, loading, search, onSearchChange,
@@ -1086,6 +1250,9 @@ function HistoryTab({
                   <p>In: {co.checked_in_at ? new Date(co.checked_in_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) : '—'}</p>
                 </div>
                 {co.notes && <p className="mt-2 text-xs text-gray-600 dark:text-slate-400 italic">"{co.notes}"</p>}
+                {co.blade_details && (co.blade_details.serial_number || co.blade_details.size || co.blade_details.spec || co.blade_details.photo_url) && (
+                  <BladeDetailsSummary checkoutId={co.id} details={co.blade_details} />
+                )}
                 {co.voice_note_url && (
                   <VoiceNotePlayer checkoutId={co.id} initialUrl={co.voice_note_url} />
                 )}

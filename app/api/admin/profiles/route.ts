@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, avatar_url, created_at')
+      .select('id, full_name, nickname, email, phone, phone_number, date_of_birth, hire_date, next_review_date, role, active, profile_picture_url, avatar_url, truck_number, created_at')
       .in('role', ['operator', 'apprentice'])
       .is('deleted_at', null) // hide removed users
       .order('full_name');

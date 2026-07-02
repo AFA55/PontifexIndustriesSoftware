@@ -25,6 +25,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { checkoutEquipmentItem } from '@/lib/equipment-checkout';
 
 const READ_ROLES = new Set(['shop_manager','admin','super_admin','operations_manager','supervisor']);
 const WRITE_ROLES = new Set(['shop_manager','admin','super_admin','operations_manager','supervisor']);
@@ -48,7 +49,7 @@ export async function GET(request: NextRequest) {
     .select(`
       id, tenant_id, equipment_id, custodian_id, job_order_id, truck_equipment_id,
       checked_out_at, checked_out_by, checked_in_at, checked_in_by,
-      hour_meter_out, hour_meter_in, notes, voice_note_url, created_at
+      hour_meter_out, hour_meter_in, notes, voice_note_url, blade_details, created_at
     `, { count: 'exact' })
     .order('checked_out_at', { ascending: false });
 
@@ -80,7 +81,7 @@ export async function GET(request: NextRequest) {
 
   const [eqRes, custRes, jobRes] = await Promise.all([
     allEquipmentIds.length > 0
-      ? supabaseAdmin.from('equipment').select('id, name, short_name, unit_number, asset_tag, kind').in('id', allEquipmentIds)
+      ? supabaseAdmin.from('equipment').select('id, name, short_name, unit_number, asset_tag, kind, category').in('id', allEquipmentIds)
       : Promise.resolve({ data: [], error: null }),
     custodianIds.length > 0
       ? supabaseAdmin.from('profiles').select('id, full_name, email, role').in('id', custodianIds)
@@ -132,146 +133,32 @@ export async function POST(request: NextRequest) {
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
 
-  const equipment_id = body.equipment_id;
-  const truck_equipment_id = body.truck_equipment_id || null;
-  let custodian_id: string | null = body.custodian_id || null;
+  // All business logic (truck→operator derivation, tenant/status checks,
+  // status flip, rollback, voice-correction learning loop) lives in the
+  // shared checkoutEquipmentItem() primitive — see lib/equipment-checkout.ts.
+  // This is the SAME function the voice-checkout builder calls, so both entry
+  // points share one set of invariants.
+  const result = await checkoutEquipmentItem({
+    tenantId: auth.tenantId,
+    actorUserId: auth.userId,
+    actorRole: auth.role,
+    equipmentId: body.equipment_id,
+    truckEquipmentId: body.truck_equipment_id || null,
+    custodianId: body.custodian_id || null,
+    jobOrderId: body.job_order_id || null,
+    hourMeterOut: typeof body.hour_meter_out === 'number' ? body.hour_meter_out : null,
+    notes: body.notes || null,
+    voiceNoteUrl: body.voice_note_url || null,
+    voiceCorrections: Array.isArray(body.voice_corrections) ? body.voice_corrections : [],
+    bladeDetails: body.blade_details || null,
+  });
 
-  if (!equipment_id) {
-    return NextResponse.json({ error: 'equipment_id is required' }, { status: 400 });
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: result.error, ...(result.details ? { details: result.details } : {}) },
+      { status: result.status }
+    );
   }
 
-  // Truck-as-custodian model: client passes a truck; we derive the operator
-  // from the truck's current_custodian_id (the driver). If the truck has no
-  // current driver, the client must explicitly pass custodian_id.
-  // Either truck OR custodian is required.
-  if (!truck_equipment_id && !custodian_id) {
-    return NextResponse.json({
-      error: 'Either truck_equipment_id or custodian_id is required',
-      details: 'Pick a truck (operator is derived from its current driver), or pass an explicit custodian_id for handheld checkouts.',
-    }, { status: 400 });
-  }
-
-  if (truck_equipment_id) {
-    const { data: truck, error: truckErr } = await supabaseAdmin
-      .from('equipment')
-      .select('id, tenant_id, kind, status, name, short_name, unit_number, current_custodian_id')
-      .eq('id', truck_equipment_id)
-      .single();
-    if (truckErr || !truck) return NextResponse.json({ error: 'Truck not found' }, { status: 404 });
-    if (truck.kind !== 'vehicle') return NextResponse.json({ error: 'truck_equipment_id must point to a vehicle' }, { status: 400 });
-    if (auth.role !== 'super_admin' && truck.tenant_id !== auth.tenantId) {
-      return NextResponse.json({ error: 'Truck not in your tenant' }, { status: 403 });
-    }
-    // If client didn't pass an explicit custodian, derive from the truck's
-    // current driver. If the truck has no driver assigned, fail loudly so
-    // the client knows to surface the operator picker.
-    if (!custodian_id) {
-      if (!truck.current_custodian_id) {
-        return NextResponse.json({
-          error: 'Truck has no operator assigned',
-          details: `${truck.short_name && truck.unit_number ? `${truck.short_name} #${truck.unit_number}` : truck.name} has no current driver. Either assign a driver to the truck first, or pass custodian_id explicitly.`,
-        }, { status: 400 });
-      }
-      custodian_id = truck.current_custodian_id;
-    }
-  }
-
-  // Verify equipment belongs to this tenant + isn't already checked out.
-  const { data: equipment, error: eqError } = await supabaseAdmin
-    .from('equipment')
-    .select('id, tenant_id, status, name, short_name, unit_number')
-    .eq('id', equipment_id)
-    .single();
-  if (eqError || !equipment) {
-    return NextResponse.json({ error: 'Equipment not found' }, { status: 404 });
-  }
-  if (auth.role !== 'super_admin' && equipment.tenant_id !== auth.tenantId) {
-    return NextResponse.json({ error: 'Equipment not in your tenant' }, { status: 403 });
-  }
-  if (equipment.status === 'in_use') {
-    return NextResponse.json({
-      error: 'Equipment already checked out',
-      details: 'This piece of equipment is currently in use. Check it back in first.',
-    }, { status: 409 });
-  }
-  if (equipment.status === 'retired' || equipment.status === 'out_of_service') {
-    return NextResponse.json({
-      error: `Equipment is ${equipment.status.replace(/_/g, ' ')} — cannot be checked out.`,
-    }, { status: 409 });
-  }
-
-  // Insert checkout row. custodian_id was resolved above (either from the
-  // truck's current driver or an explicit body field).
-  const { data: checkout, error: coError } = await supabaseAdmin
-    .from('equipment_checkouts')
-    .insert({
-      tenant_id: auth.tenantId,
-      equipment_id,
-      custodian_id,
-      job_order_id: body.job_order_id || null,
-      truck_equipment_id,
-      checked_out_by: auth.userId,
-      hour_meter_out: typeof body.hour_meter_out === 'number' ? body.hour_meter_out : null,
-      notes: body.notes?.trim() || null,
-      voice_note_url: body.voice_note_url || null,
-    })
-    .select('*')
-    .single();
-
-  if (coError) {
-    console.error('equipment-checkouts POST error:', coError);
-    return NextResponse.json({ error: 'Failed to create checkout', details: coError.message }, { status: 500 });
-  }
-
-  // Flip equipment.status + set current_custodian / current_job
-  const { error: updateError } = await supabaseAdmin
-    .from('equipment')
-    .update({
-      status: 'in_use',
-      current_custodian_id: custodian_id,
-      current_job_order_id: body.job_order_id || null,
-    })
-    .eq('id', equipment_id);
-
-  if (updateError) {
-    console.error('equipment status flip error:', updateError);
-    // Roll back the checkout to keep invariants
-    await supabaseAdmin.from('equipment_checkouts').delete().eq('id', checkout.id);
-    return NextResponse.json({ error: 'Failed to update equipment status', details: updateError.message }, { status: 500 });
-  }
-
-  // ── Learning loop: persist voice corrections (fire-and-forget). ──────────
-  // Each entry: { phrase, normalized, kind: 'equipment'|'truck'|'operator',
-  //               resolved_id, confidence, was_corrected }
-  // Future voice-parse calls hit these via normalized_phrase before falling
-  // back to fuzzy search, so the system learns aliases without manual input.
-  // We don't block the response — if the insert fails, the checkout still
-  // succeeded.
-  const voiceCorrections = Array.isArray(body.voice_corrections) ? body.voice_corrections : [];
-  if (voiceCorrections.length > 0 && auth.tenantId) {
-    const rows = voiceCorrections
-      .filter((c: any) =>
-        c && typeof c.phrase === 'string' && typeof c.normalized === 'string'
-        && ['equipment', 'truck', 'operator'].includes(c.kind)
-        && typeof c.resolved_id === 'string'
-        && typeof c.confidence === 'number'
-      )
-      .map((c: any) => ({
-        tenant_id: auth.tenantId,
-        spoken_text: String(c.phrase).slice(0, 500),
-        normalized_phrase: String(c.normalized).slice(0, 500),
-        resolved_kind: c.kind,
-        resolved_id: c.resolved_id,
-        confidence: Math.max(0, Math.min(1, c.confidence)),
-        was_corrected: !!c.was_corrected,
-        created_by: auth.userId,
-      }));
-    if (rows.length > 0) {
-      // Don't await — fire-and-forget. Logged on error but doesn't fail response.
-      supabaseAdmin.from('voice_recognition_corrections').insert(rows)
-        .then(({ error }) => { if (error) console.error('voice_recognition_corrections insert error:', error); });
-    }
-  }
-
-  return NextResponse.json({ success: true, data: checkout });
+  return NextResponse.json({ success: true, data: result.checkout });
 }

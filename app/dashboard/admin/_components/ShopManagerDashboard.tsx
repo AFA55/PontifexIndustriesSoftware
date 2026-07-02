@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Clock, Plus, ChevronRight, AlertTriangle, Wrench, Truck, Package,
-  Mic, Loader2, RotateCcw, ClipboardList, CheckCircle2,
+  Mic, Loader2, RotateCcw, ClipboardList, CheckCircle2, User as UserIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/lib/auth';
@@ -301,6 +301,13 @@ export default function ShopManagerDashboard({ user }: { user: User }) {
           title="Equipment Inventory"
           subtitle="All saws, drills, generators, hand tools"
           tone="cyan"
+        />
+        <ActionCard
+          href="/dashboard/admin/equipment-by-operator"
+          icon={<UserIcon className="w-5 h-5" />}
+          title="Equipment by Operator"
+          subtitle="Who has what checked out, right now"
+          tone="rose"
         />
         <ActionCard
           href="/dashboard/admin/fleet"
