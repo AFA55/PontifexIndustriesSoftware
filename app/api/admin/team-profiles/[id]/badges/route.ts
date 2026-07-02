@@ -3,7 +3,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -11,7 +10,7 @@ export async function GET(request: NextRequest, { params }: Ctx) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
   const { id: operatorId } = await params;
-  const tenantId = await getTenantId(auth.userId);
+  const tenantId = auth.tenantId;
 
   const { data, error } = await supabaseAdmin
     .from('operator_badges')
@@ -27,7 +26,7 @@ export async function POST(request: NextRequest, { params }: Ctx) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
   const { id: operatorId } = await params;
-  const tenantId = await getTenantId(auth.userId);
+  const tenantId = auth.tenantId;
   const body = await request.json();
   const { badge_type, badge_number, issued_date, expiry_date, notes } = body;
 
@@ -65,7 +64,7 @@ export async function DELETE(request: NextRequest, { params }: Ctx) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
   const { id: operatorId } = await params;
-  const tenantId = await getTenantId(auth.userId);
+  const tenantId = auth.tenantId;
   const { badgeId } = await request.json();
 
   if (!badgeId) return NextResponse.json({ error: 'badgeId is required' }, { status: 400 });

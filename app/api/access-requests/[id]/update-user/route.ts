@@ -10,7 +10,6 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireOpsManager } from '@/lib/api-auth';
-import { getTenantId } from '@/lib/get-tenant-id';
 import { ROLES_WITH_LABELS, ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
 
 const VALID_ROLES = ROLES_WITH_LABELS.map(r => r.value);
@@ -24,7 +23,7 @@ export async function POST(
     // Security: only super_admin/operations_manager can update user profiles
     const auth = await requireOpsManager(request);
     if (!auth.authorized) return auth.response;
-    const tenantId = await getTenantId(auth.userId);
+    const tenantId = auth.tenantId;
 
     const { id } = await params;
     const body = await request.json();
