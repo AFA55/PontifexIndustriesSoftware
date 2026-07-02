@@ -24,8 +24,13 @@ import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { formatTime } from '@/lib/dates';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
-import ArcReactor, { type ArcReactorState } from '@/components/command-center/ArcReactor';
-import ArtifexChat from '@/components/command-center/ArtifexChat';
+import NeuralBrain, { type NeuralBrainState } from '@/components/command-center/NeuralBrain';
+import ArtifexChat, { type ArtifexConversationSummary } from '@/components/command-center/ArtifexChat';
+
+// Placeholder — the backend track wires real conversation persistence into
+// these props later. An empty list keeps the sidebar contract exercised (and
+// its "no conversations yet" empty state visible) without a backend.
+const CONVERSATIONS: ArtifexConversationSummary[] = [];
 
 interface OverviewData {
   clockedIn: number;
@@ -66,7 +71,11 @@ export default function CommandCenterPage() {
 
   // Artifex chat: open/closed, and the reactor state it drives while active.
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatReactorState, setChatReactorState] = useState<ArcReactorState>('idle');
+  const [chatReactorState, setChatReactorState] = useState<NeuralBrainState>('idle');
+
+  // Conversation history — placeholder until the backend track wires real
+  // persistence; keeping the sidebar contract live now avoids a second pass.
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   // Focus mode — hides the management tabs + live rail for a clean recording
   // (just the reactor + chat), toggled by the founder before a demo/reveal.
@@ -146,8 +155,8 @@ export default function CommandCenterPage() {
 
   if (!authChecked || !user) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#0d0820]">
-        <ArcReactor state="thinking" size={120} />
+      <div className="flex h-full w-full items-center justify-center bg-[#030208]">
+        <NeuralBrain state="thinking" size={120} />
       </div>
     );
   }
@@ -175,7 +184,7 @@ export default function CommandCenterPage() {
             <ChevronLeft className="h-5 w-5" />
           </Link>
           <div className="flex items-center gap-2.5">
-            <ArcReactor state="idle" size={28} />
+            <NeuralBrain state="idle" size={28} />
             <h1 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/90 sm:text-base">
               Pontifex <span className="text-white/50">Command Center</span>
             </h1>
@@ -206,7 +215,7 @@ export default function CommandCenterPage() {
         {/* CENTER — reactor first in DOM so it stacks on TOP on mobile */}
         <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-0">
           <div className="relative flex items-center justify-center">
-            <ArcReactor
+            <NeuralBrain
               state={chatOpen ? chatReactorState : 'idle'}
               size={reactorSize}
               className="drop-shadow-[0_0_40px_rgba(124,58,237,0.35)]"
@@ -235,7 +244,13 @@ export default function CommandCenterPage() {
 
           {chatOpen && (
             <div className="mt-6 w-full px-2">
-              <ArtifexChat onStateChange={setChatReactorState} />
+              <ArtifexChat
+                onStateChange={setChatReactorState}
+                conversations={CONVERSATIONS}
+                activeConversationId={activeConversationId}
+                onSelectConversation={setActiveConversationId}
+                onNewConversation={() => setActiveConversationId(null)}
+              />
             </div>
           )}
         </main>
