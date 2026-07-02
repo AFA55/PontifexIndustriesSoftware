@@ -23,6 +23,18 @@ interface JobDetail {
   scheduled_date: string;
   job_quote: number;
   estimated_hours: number | null;
+  track_financials: boolean;
+}
+
+interface CostBreakdown {
+  driveDistanceMiles: number;
+  mileageRate: number;
+  driveCost: number;
+  equipmentCost: number;
+  materialCost: number;
+  otherCost: number;
+  subcontractorCost: number;
+  totalNonLaborCost: number;
 }
 
 interface TimecardEntry {
@@ -66,6 +78,7 @@ interface WorkerSummary {
 interface Totals {
   totalLaborHours: number;
   totalLaborCost: number;
+  totalNonLaborCost: number;
   jobQuote: number;
   grossProfit: number;
   grossMarginPct: number | null;
@@ -104,6 +117,7 @@ export default function JobPnlDetailPage() {
   const [helperEntries, setHelperEntries] = useState<HelperEntry[]>([]);
   const [workerSummary, setWorkerSummary] = useState<WorkerSummary[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
+  const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const params = useParams();
@@ -135,6 +149,7 @@ export default function JobPnlDetailPage() {
         setHelperEntries(result.data.helperEntries);
         setWorkerSummary(result.data.workerSummary);
         setTotals(result.data.totals);
+        setCostBreakdown(result.data.costBreakdown);
       }
     } catch (err) {
       console.error('Job P&L detail fetch error:', err);
@@ -243,6 +258,12 @@ export default function JobPnlDetailPage() {
                     <p className="opacity-60 mb-0.5">Labor Cost</p>
                     <p className="font-bold">${fmt(totals.totalLaborCost)}</p>
                   </div>
+                  {job.track_financials && (
+                    <div>
+                      <p className="opacity-60 mb-0.5">Other Costs</p>
+                      <p className="font-bold">${fmt(totals.totalNonLaborCost)}</p>
+                    </div>
+                  )}
                   <div>
                     <p className="opacity-60 mb-0.5">Total Hours</p>
                     <p className="font-bold">{totals.totalLaborHours.toFixed(1)}h</p>
@@ -254,6 +275,77 @@ export default function JobPnlDetailPage() {
                 </div>
               </div>
             </div>
+
+            {/* Cost Breakdown (only for jobs with financial tracking enabled) */}
+            {job.track_financials && costBreakdown && (
+              <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden mb-4">
+                <div className="px-5 py-4 border-b border-slate-100">
+                  <h3 className="text-sm font-bold text-slate-800">Cost Breakdown</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">Full job cost vs. quote — financial tracking enabled</p>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-slate-50/80 border-b border-slate-100">
+                        <th className="px-4 py-3 text-left text-[10px] font-bold text-slate-500 uppercase tracking-wider">Cost Category</th>
+                        <th className="px-4 py-3 text-right text-[10px] font-bold text-slate-500 uppercase tracking-wider">Amount</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">Labor</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(totals.totalLaborCost)}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">
+                          Drive
+                          {costBreakdown.driveDistanceMiles > 0 && (
+                            <span className="text-xs text-slate-400"> ({costBreakdown.driveDistanceMiles} mi @ ${costBreakdown.mileageRate}/mi)</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.driveCost)}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">Equipment</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.equipmentCost)}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">Material</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.materialCost)}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">Subcontractor</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.subcontractorCost)}</td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">Other</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.otherCost)}</td>
+                      </tr>
+                      <tr className="bg-slate-50/60">
+                        <td className="px-4 py-3 text-sm font-bold text-slate-800">Total Cost</td>
+                        <td className="px-4 py-3 text-right text-sm font-bold tabular-nums text-slate-900">
+                          ${fmt(totals.totalLaborCost + costBreakdown.totalNonLaborCost)}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="px-4 py-3 text-sm text-slate-700">Quote</td>
+                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">
+                          {totals.jobQuote > 0 ? `$${fmt(totals.jobQuote)}` : '—'}
+                        </td>
+                      </tr>
+                      <tr className={profitPositive ? 'bg-emerald-50/60' : 'bg-red-50/60'}>
+                        <td className={`px-4 py-3 text-sm font-bold ${profitPositive ? 'text-emerald-700' : 'text-red-700'}`}>
+                          Gross Profit{totals.grossMarginPct != null ? ` (${totals.grossMarginPct}% margin)` : ''}
+                        </td>
+                        <td className={`px-4 py-3 text-right text-sm font-bold tabular-nums ${profitPositive ? 'text-emerald-700' : 'text-red-700'}`}>
+                          {profitPositive ? '+' : ''}${fmt(totals.grossProfit)}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Worker Summary */}
             {workerSummary.length > 0 && (

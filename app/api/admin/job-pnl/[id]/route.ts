@@ -30,7 +30,7 @@ export async function GET(
     // Fetch job details
     const { data: job, error: jobError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to')
+      .select('id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate, equipment_cost, material_cost, other_cost, subcontractor_cost')
       .eq('id', jobId)
       .is('deleted_at', null)
       .single();
@@ -153,7 +153,20 @@ export async function GET(
     const totalLaborHours = [...timecardEntries, ...helperEntries].reduce((s, e) => s + (e.total_hours || 0), 0);
     const totalLaborCost  = [...timecardEntries, ...helperEntries].reduce((s, e) => s + (e.labor_cost  || 0), 0);
     const jobQuote = job.job_quote || 0;
-    const grossProfit = jobQuote - totalLaborCost;
+
+    // track_financials gates the non-labor cost fields; jobs created before this
+    // feature default to false and must reduce to the original labor-only formula.
+    const trackFinancials = job.track_financials === true;
+    const driveCost = trackFinancials
+      ? (job.drive_distance_miles ?? 0) * (job.mileage_rate ?? 0)
+      : 0;
+    const equipmentCost = trackFinancials ? (job.equipment_cost ?? 0) : 0;
+    const materialCost = trackFinancials ? (job.material_cost ?? 0) : 0;
+    const otherCost = trackFinancials ? (job.other_cost ?? 0) : 0;
+    const subcontractorCost = trackFinancials ? (job.subcontractor_cost ?? 0) : 0;
+    const totalNonLaborCost = driveCost + equipmentCost + materialCost + otherCost + subcontractorCost;
+
+    const grossProfit = jobQuote - totalLaborCost - totalNonLaborCost;
     const grossMarginPct = jobQuote > 0 ? parseFloat(((grossProfit / jobQuote) * 100).toFixed(1)) : null;
 
     return NextResponse.json({
@@ -168,13 +181,25 @@ export async function GET(
           scheduled_date: job.scheduled_date,
           job_quote: jobQuote,
           estimated_hours: job.estimated_hours,
+          track_financials: trackFinancials,
         },
         timecardEntries,
         helperEntries,
         workerSummary: Object.values(workerMap).sort((a, b) => b.total_hours - a.total_hours),
+        costBreakdown: trackFinancials ? {
+          driveDistanceMiles: job.drive_distance_miles ?? 0,
+          mileageRate: job.mileage_rate ?? 0,
+          driveCost: parseFloat(driveCost.toFixed(2)),
+          equipmentCost: parseFloat(equipmentCost.toFixed(2)),
+          materialCost: parseFloat(materialCost.toFixed(2)),
+          otherCost: parseFloat(otherCost.toFixed(2)),
+          subcontractorCost: parseFloat(subcontractorCost.toFixed(2)),
+          totalNonLaborCost: parseFloat(totalNonLaborCost.toFixed(2)),
+        } : null,
         totals: {
           totalLaborHours:  parseFloat(totalLaborHours.toFixed(2)),
           totalLaborCost:   parseFloat(totalLaborCost.toFixed(2)),
+          totalNonLaborCost: parseFloat(totalNonLaborCost.toFixed(2)),
           jobQuote,
           grossProfit:      parseFloat(grossProfit.toFixed(2)),
           grossMarginPct,
