@@ -44,10 +44,10 @@ export function createCommandCenterTools(tenantId: string, role: string) {
       inputSchema: z.object({}),
       execute: async () => {
         const today = toLocalYMD();
-        const [{ data: openTimecards }, { count: rosterCount }] = await Promise.all([
+        const [timecardsRes, rosterRes] = await Promise.all([
           supabaseAdmin
             .from('timecards')
-            .select('operator_id, clock_in_time')
+            .select('user_id, clock_in_time')
             .eq('tenant_id', tenantId)
             .eq('date', today)
             .is('clock_out_time', null),
@@ -59,12 +59,14 @@ export function createCommandCenterTools(tenantId: string, role: string) {
             .eq('active', true)
             .is('deleted_at', null),
         ]);
-        const namesById = await lookupNames(tenantId, (openTimecards ?? []).map((t: any) => t.operator_id));
-        const clockedIn = (openTimecards ?? []).map((t: any) => ({
-          name: namesById.get(t.operator_id) ?? 'Unknown',
+        if (timecardsRes.error) throw new Error(`get_clocked_in_status: ${timecardsRes.error.message}`);
+        const openTimecards = timecardsRes.data ?? [];
+        const namesById = await lookupNames(tenantId, openTimecards.map((t: any) => t.user_id));
+        const clockedIn = openTimecards.map((t: any) => ({
+          name: namesById.get(t.user_id) ?? 'Unknown',
           clockInTime: t.clock_in_time,
         }));
-        return { clockedInCount: clockedIn.length, rosterSize: rosterCount ?? 0, clockedIn };
+        return { clockedInCount: clockedIn.length, rosterSize: rosterRes.count ?? 0, clockedIn };
       },
     }),
 
@@ -74,13 +76,16 @@ export function createCommandCenterTools(tenantId: string, role: string) {
       inputSchema: z.object({}),
       execute: async () => {
         const today = toLocalYMD();
-        const { data } = await supabaseAdmin
-          .from('job_orders')
+        // schedule_board_view (not the base job_orders table) is this repo's
+        // established source for operator_name/helper_name — job_orders itself
+        // only has assigned_to (an id). See schedule-board/page.tsx's own comment.
+        const { data, error } = await supabaseAdmin
+          .from('schedule_board_view')
           .select('job_number, customer_name, status, operator_name, scheduled_date')
           .eq('tenant_id', tenantId)
           .eq('scheduled_date', today)
-          .is('deleted_at', null)
           .order('job_number');
+        if (error) throw new Error(`get_todays_jobs: ${error.message}`);
         return { count: data?.length ?? 0, jobs: data ?? [] };
       },
     }),
@@ -90,22 +95,50 @@ export function createCommandCenterTools(tenantId: string, role: string) {
         "Pending time-off requests and pending job-completion requests awaiting management approval. Use for 'what needs my approval' or 'anything pending'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const [{ data: timeOff }, { data: completions }] = await Promise.all([
+        const [timeOffRes, completionsRes] = await Promise.all([
           supabaseAdmin
             .from('operator_time_off')
-            .select('operator_name, start_date, end_date, reason')
+            .select('operator_id, date, end_date, type, notes')
             .eq('tenant_id', tenantId)
             .eq('status', 'pending'),
           supabaseAdmin
             .from('job_completion_requests')
-            .select('job_number, submitted_by_name')
+            .select('job_order_id, submitted_by, operator_notes')
             .eq('tenant_id', tenantId)
             .eq('status', 'pending'),
         ]);
+        if (timeOffRes.error) throw new Error(`get_pending_approvals (time off): ${timeOffRes.error.message}`);
+        if (completionsRes.error) throw new Error(`get_pending_approvals (completions): ${completionsRes.error.message}`);
+        const timeOff = timeOffRes.data ?? [];
+        const completions = completionsRes.data ?? [];
+
+        const jobOrderIds = [...new Set(completions.map((c: any) => c.job_order_id).filter(Boolean))];
+        const [namesById, jobNumbersById] = await Promise.all([
+          lookupNames(tenantId, timeOff.map((t: any) => t.operator_id).concat(completions.map((c: any) => c.submitted_by))),
+          jobOrderIds.length
+            ? supabaseAdmin
+                .from('job_orders')
+                .select('id, job_number')
+                .eq('tenant_id', tenantId)
+                .in('id', jobOrderIds)
+                .then(({ data }) => new Map((data ?? []).map((j: any) => [j.id, j.job_number])))
+            : Promise.resolve(new Map<string, string>()),
+        ]);
+
         return {
-          pendingTimeOff: timeOff ?? [],
-          pendingCompletions: completions ?? [],
-          totalPending: (timeOff?.length ?? 0) + (completions?.length ?? 0),
+          pendingTimeOff: timeOff.map((t: any) => ({
+            operatorName: namesById.get(t.operator_id) ?? 'Unknown',
+            startDate: t.date,
+            endDate: t.end_date,
+            type: t.type,
+            notes: t.notes,
+          })),
+          pendingCompletions: completions.map((c: any) => ({
+            jobNumber: jobNumbersById.get(c.job_order_id) ?? 'Unknown',
+            submittedBy: namesById.get(c.submitted_by) ?? 'Unknown',
+            notes: c.operator_notes,
+          })),
+          totalPending: timeOff.length + completions.length,
         };
       },
     }),
@@ -129,7 +162,8 @@ export function createCommandCenterTools(tenantId: string, role: string) {
           .is('deleted_at', null)
           .order('full_name');
         if (nameContains) q = q.ilike('full_name', `%${nameContains}%`);
-        const { data } = await q;
+        const { data, error } = await q;
+        if (error) throw new Error(`get_team_roster: ${error.message}`);
         // hourly_rate is compensation data — only surface it to admin+ callers.
         const canSeeRate = role !== 'operator' && role !== 'apprentice';
         return {
@@ -148,16 +182,18 @@ export function createCommandCenterTools(tenantId: string, role: string) {
         "The last 10 timecard clock-in/clock-out events across the team. Use for 'what's been happening' or 'recent activity'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const { data } = await supabaseAdmin
+        const { data, error } = await supabaseAdmin
           .from('timecards')
-          .select('operator_id, clock_in_time, clock_out_time, date')
+          .select('user_id, clock_in_time, clock_out_time, date')
           .eq('tenant_id', tenantId)
           .order('clock_in_time', { ascending: false })
           .limit(10);
-        const namesById = await lookupNames(tenantId, (data ?? []).map((t: any) => t.operator_id));
+        if (error) throw new Error(`get_recent_activity: ${error.message}`);
+        const events = data ?? [];
+        const namesById = await lookupNames(tenantId, events.map((t: any) => t.user_id));
         return {
-          events: (data ?? []).map((t: any) => ({
-            name: namesById.get(t.operator_id) ?? 'Unknown',
+          events: events.map((t: any) => ({
+            name: namesById.get(t.user_id) ?? 'Unknown',
             date: t.date,
             clockInTime: t.clock_in_time,
             clockOutTime: t.clock_out_time,
@@ -178,7 +214,7 @@ export function createCommandCenterTools(tenantId: string, role: string) {
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const yearStart = new Date(now.getFullYear(), 0, 1);
-        const [{ data: mtd }, { data: ytd }] = await Promise.all([
+        const [mtdRes, ytdRes] = await Promise.all([
           supabaseAdmin
             .from('invoices')
             .select('total_amount')
@@ -192,9 +228,11 @@ export function createCommandCenterTools(tenantId: string, role: string) {
             .in('status', ['paid', 'sent', 'partial'])
             .gte('invoice_date', toLocalYMD(yearStart)),
         ]);
+        if (mtdRes.error) throw new Error(`get_revenue_snapshot (mtd): ${mtdRes.error.message}`);
+        if (ytdRes.error) throw new Error(`get_revenue_snapshot (ytd): ${ytdRes.error.message}`);
         const sum = (rows: { total_amount: number | null }[] | null) =>
           (rows ?? []).reduce((s, r) => s + (r.total_amount ?? 0), 0);
-        return { monthToDateRevenue: sum(mtd), yearToDateRevenue: sum(ytd) };
+        return { monthToDateRevenue: sum(mtdRes.data), yearToDateRevenue: sum(ytdRes.data) };
       },
     }),
   };

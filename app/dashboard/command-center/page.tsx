@@ -16,13 +16,16 @@ import {
   ClipboardCheck,
   ChevronLeft,
   Mic,
+  Maximize2,
+  Minimize2,
   type LucideIcon,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { formatTime } from '@/lib/dates';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
-import ArcReactor from '@/components/command-center/ArcReactor';
+import ArcReactor, { type ArcReactorState } from '@/components/command-center/ArcReactor';
+import ArtifexChat from '@/components/command-center/ArtifexChat';
 
 interface OverviewData {
   clockedIn: number;
@@ -60,6 +63,14 @@ export default function CommandCenterPage() {
 
   // Reactor size, responsive (SSR-safe: starts at a sane default, set on mount).
   const [reactorSize, setReactorSize] = useState(360);
+
+  // Artifex chat: open/closed, and the reactor state it drives while active.
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatReactorState, setChatReactorState] = useState<ArcReactorState>('idle');
+
+  // Focus mode — hides the management tabs + live rail for a clean recording
+  // (just the reactor + chat), toggled by the founder before a demo/reveal.
+  const [focusMode, setFocusMode] = useState(false);
 
   // ── auth guard (client-side, same pattern as other dashboard pages) ────────
   useEffect(() => {
@@ -170,7 +181,16 @@ export default function CommandCenterPage() {
             </h1>
           </div>
         </div>
-        <div className="flex items-center gap-2 text-right">
+        <div className="flex items-center gap-3 text-right">
+          <button
+            type="button"
+            onClick={() => setFocusMode((v) => !v)}
+            aria-label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
+            title={focusMode ? 'Exit focus mode' : 'Focus mode (for demos)'}
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+          >
+            {focusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
           <Clock className="hidden h-4 w-4 text-violet-300/70 sm:block" />
           <div className="leading-tight">
             <div className="font-mono text-sm font-semibold tabular-nums text-white sm:text-base">
@@ -187,100 +207,109 @@ export default function CommandCenterPage() {
         <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-0">
           <div className="relative flex items-center justify-center">
             <ArcReactor
-              state="idle"
+              state={chatOpen ? chatReactorState : 'idle'}
               size={reactorSize}
               className="drop-shadow-[0_0_40px_rgba(124,58,237,0.35)]"
             />
           </div>
-          <p className="mt-6 max-w-sm text-center text-sm text-white/55">
-            Systems nominal. Standing by.
-          </p>
-          <p className="mt-1 text-center text-xs uppercase tracking-[0.25em] text-white/30">
-            {asOfLabel}
-          </p>
 
-          {/* Talk to Jarvis — Phase 3 placeholder */}
-          <div className="group relative mt-8">
-            <button
-              type="button"
-              disabled
-              className="flex h-12 min-w-[200px] cursor-not-allowed items-center justify-center gap-2 rounded-full border border-white/10 bg-gradient-to-r from-[#7C3AED]/30 via-[#DB2777]/30 to-[#EF4444]/30 px-6 text-sm font-medium text-white/60"
-            >
-              <Mic className="h-4 w-4" />
-              Talk to Jarvis
-            </button>
-            <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md border border-white/10 bg-[#1e1b4b] px-2.5 py-1 text-[11px] text-white/70 opacity-0 transition-opacity group-hover:opacity-100">
-              Voice arrives in a later phase
-            </span>
-          </div>
+          {!chatOpen && (
+            <>
+              <p className="mt-6 max-w-sm text-center text-sm text-white/55">
+                Systems nominal. Standing by.
+              </p>
+              <p className="mt-1 text-center text-xs uppercase tracking-[0.25em] text-white/30">
+                {asOfLabel}
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setChatOpen(true)}
+                className="mt-8 flex h-12 min-w-[200px] items-center justify-center gap-2 rounded-full border border-white/10 bg-gradient-to-r from-[#7C3AED] via-[#DB2777] to-[#EF4444] px-6 text-sm font-medium text-white shadow-[0_0_25px_rgba(219,39,119,0.3)] transition-transform hover:scale-[1.02]"
+              >
+                <Mic className="h-4 w-4" />
+                Talk to Artifex
+              </button>
+            </>
+          )}
+
+          {chatOpen && (
+            <div className="mt-6 w-full px-2">
+              <ArtifexChat onStateChange={setChatReactorState} />
+            </div>
+          )}
         </main>
 
-        {/* LEFT — management tabs */}
-        <nav
-          aria-label="Management"
-          className="order-2 shrink-0 border-t border-white/10 px-4 py-5 lg:order-1 lg:w-64 lg:border-r lg:border-t-0 lg:px-4 lg:py-6"
-        >
-          <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
-            Management
-          </p>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
-            {TABS.map(({ label, href, icon: Icon }) => (
-              <li key={href}>
-                <Link
-                  href={href}
-                  className="group flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm text-white/75 transition-all hover:border-violet-400/40 hover:bg-white/[0.07] hover:text-white"
-                >
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED]/25 to-[#EF4444]/25 text-violet-200 transition-colors group-hover:from-[#7C3AED]/45 group-hover:to-[#EF4444]/45">
-                    <Icon className="h-4 w-4" />
-                  </span>
-                  <span className="truncate font-medium">{label}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        {/* LEFT — management tabs (hidden in focus mode) */}
+        {!focusMode && (
+          <nav
+            aria-label="Management"
+            className="order-2 shrink-0 border-t border-white/10 px-4 py-5 lg:order-1 lg:w-64 lg:border-r lg:border-t-0 lg:px-4 lg:py-6"
+          >
+            <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+              Management
+            </p>
+            <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
+              {TABS.map(({ label, href, icon: Icon }) => (
+                <li key={href}>
+                  <Link
+                    href={href}
+                    className="group flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm text-white/75 transition-all hover:border-violet-400/40 hover:bg-white/[0.07] hover:text-white"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED]/25 to-[#EF4444]/25 text-violet-200 transition-colors group-hover:from-[#7C3AED]/45 group-hover:to-[#EF4444]/45">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    <span className="truncate font-medium">{label}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        )}
 
-        {/* RIGHT — live metric rail */}
-        <aside
-          aria-label="Live metrics"
-          className="order-3 shrink-0 border-t border-white/10 px-4 py-5 lg:w-72 lg:border-l lg:border-t-0 lg:px-4 lg:py-6"
-        >
-          <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
-            Live
-          </p>
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-            <MetricCard
-              icon={Users}
-              label="Clocked in"
-              accent="from-[#7C3AED] to-[#DB2777]"
-              loading={overviewLoading}
-              value={
-                overview ? `${overview.clockedIn} / ${overview.rosterCount}` : null
-              }
-            />
-            <MetricCard
-              icon={Bell}
-              label="Notifications"
-              accent="from-[#DB2777] to-[#EF4444]"
-              loading={overviewLoading}
-              value={overview ? `${overview.unreadAlerts}` : null}
-            />
-            <MetricCard
-              icon={Briefcase}
-              label="Jobs today"
-              accent="from-[#7C3AED] to-[#EF4444]"
-              loading={overviewLoading}
-              value={overview ? `${overview.todaysJobs}` : null}
-            />
-            <MetricCard
-              icon={ClipboardCheck}
-              label="Pending approvals"
-              accent="from-[#DB2777] to-[#7C3AED]"
-              loading={overviewLoading}
-              value={overview ? `${overview.pendingApprovals}` : null}
-            />
-          </div>
-        </aside>
+        {/* RIGHT — live metric rail (hidden in focus mode) */}
+        {!focusMode && (
+          <aside
+            aria-label="Live metrics"
+            className="order-3 shrink-0 border-t border-white/10 px-4 py-5 lg:w-72 lg:border-l lg:border-t-0 lg:px-4 lg:py-6"
+          >
+            <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+              Live
+            </p>
+            <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+              <MetricCard
+                icon={Users}
+                label="Clocked in"
+                accent="from-[#7C3AED] to-[#DB2777]"
+                loading={overviewLoading}
+                value={
+                  overview ? `${overview.clockedIn} / ${overview.rosterCount}` : null
+                }
+              />
+              <MetricCard
+                icon={Bell}
+                label="Notifications"
+                accent="from-[#DB2777] to-[#EF4444]"
+                loading={overviewLoading}
+                value={overview ? `${overview.unreadAlerts}` : null}
+              />
+              <MetricCard
+                icon={Briefcase}
+                label="Jobs today"
+                accent="from-[#7C3AED] to-[#EF4444]"
+                loading={overviewLoading}
+                value={overview ? `${overview.todaysJobs}` : null}
+              />
+              <MetricCard
+                icon={ClipboardCheck}
+                label="Pending approvals"
+                accent="from-[#DB2777] to-[#7C3AED]"
+                loading={overviewLoading}
+                value={overview ? `${overview.pendingApprovals}` : null}
+              />
+            </div>
+          </aside>
+        )}
       </div>
     </div>
   );
