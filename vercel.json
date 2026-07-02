@@ -22,6 +22,7 @@
     "app/api/admin/timecards/export/route.ts": { "maxDuration": 60 },
     "app/api/admin/dashboard-summary/route.ts": { "maxDuration": 30 },
     "app/api/cron/health-check/route.ts": { "maxDuration": 60 },
+    "app/api/cron/health-checks/route.ts": { "maxDuration": 60 },
     "app/api/cron/invoice-30d-reminders/route.ts": { "maxDuration": 60 },
     "app/api/cron/auto-clockout/route.ts": { "maxDuration": 60 },
     "app/api/cron/clock-in-reminders/route.ts": { "maxDuration": 60 },
@@ -32,6 +33,10 @@
     {
       "path": "/api/cron/health-check",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/health-checks",
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/invoice-30d-reminders",

@@ -8,6 +8,7 @@ import {
   Building2, Plus, ChevronRight, Users as UsersIcon, ToggleRight,
   RefreshCw, ShieldCheck, Globe, Activity, AlertTriangle, Bug,
   CheckCircle2, ArrowRight, ServerCog, MessageSquareWarning, Inbox,
+  HeartPulse, Info, OctagonAlert,
 } from 'lucide-react';
 import {
   type Tenant, getHeaders, statusColors, planIcons,
@@ -55,6 +56,16 @@ interface FeedbackItem {
   created_at?: string | null;
 }
 
+interface HealthAlert {
+  id: string;
+  tenantId: string | null;
+  tenantName: string;
+  checkType: string;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  createdAt: string;
+}
+
 const FEEDBACK_STATUSES = ['open', 'in_review', 'planned', 'done'] as const;
 type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
 
@@ -63,6 +74,18 @@ const statusChip: Record<string, string> = {
   in_review: 'bg-amber-100 text-amber-700 border-amber-200',
   planned: 'bg-sky-100 text-sky-700 border-sky-200',
   done: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+};
+
+const severityChip: Record<HealthAlert['severity'], string> = {
+  critical: 'bg-rose-100 text-rose-700 border-rose-200',
+  warning: 'bg-amber-100 text-amber-700 border-amber-200',
+  info: 'bg-sky-100 text-sky-700 border-sky-200',
+};
+
+const severityIcon: Record<HealthAlert['severity'], React.ElementType> = {
+  critical: OctagonAlert,
+  warning: AlertTriangle,
+  info: Info,
 };
 
 function timeAgo(iso?: string | null): string {
@@ -116,17 +139,20 @@ export default function PlatformHubPage() {
   const [health, setHealth] = useState<HealthData | null>(null);
   const [feedback, setFeedback] = useState<FeedbackItem[] | null>(null);
   const [feedbackAvailable, setFeedbackAvailable] = useState(true);
+  const [healthAlerts, setHealthAlerts] = useState<HealthAlert[] | null>(null);
+  const [healthAlertsAvailable, setHealthAlertsAvailable] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
     const headers = await getHeaders();
 
-    // All three sources load in parallel; each fails soft so one missing
+    // All sources load in parallel; each fails soft so one missing
     // data source never blanks the whole cockpit.
-    const [tenantsRes, healthRes, feedbackRes] = await Promise.allSettled([
+    const [tenantsRes, healthRes, feedbackRes, healthAlertsRes] = await Promise.allSettled([
       fetch('/api/admin/tenants', { headers }),
       fetch('/api/admin/platform/health?limit=6', { headers }),
       fetch('/api/admin/feedback', { headers }),
+      fetch('/api/admin/platform/health-alerts', { headers }),
     ]);
 
     // Tenants
@@ -163,6 +189,26 @@ export default function PlatformHubPage() {
       setFeedback([]);
     }
 
+    // Health alerts (platform_health_alerts cron output)
+    if (healthAlertsRes.status === 'fulfilled' && healthAlertsRes.value.ok) {
+      try {
+        const json = await healthAlertsRes.value.json();
+        if (json.success) {
+          setHealthAlerts(json.data || []);
+          setHealthAlertsAvailable(true);
+        } else {
+          setHealthAlerts([]);
+          setHealthAlertsAvailable(false);
+        }
+      } catch {
+        setHealthAlerts([]);
+        setHealthAlertsAvailable(false);
+      }
+    } else {
+      setHealthAlertsAvailable(false);
+      setHealthAlerts([]);
+    }
+
     setLoading(false);
   }, []);
 
@@ -187,6 +233,11 @@ export default function PlatformHubPage() {
     .slice()
     .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
     .slice(0, 5);
+
+  // Derived: health alerts, already sorted critical-first by the API
+  const sortedHealthAlerts = healthAlerts || [];
+  const criticalAlertCount = sortedHealthAlerts.filter((a) => a.severity === 'critical').length;
+  const warningAlertCount = sortedHealthAlerts.filter((a) => a.severity === 'warning').length;
 
   if (loading) {
     return (
@@ -247,6 +298,17 @@ export default function PlatformHubPage() {
             accent="bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
           />
         )}
+        <KpiTile
+          icon={HeartPulse}
+          label="Health Alerts"
+          value={healthAlertsAvailable ? sortedHealthAlerts.length : '—'}
+          accent="bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
+          sub={
+            healthAlertsAvailable
+              ? `${criticalAlertCount} critical · ${warningAlertCount} warning`
+              : 'health-checks offline'
+          }
+        />
       </div>
 
       {/* ---------------------------------------------------------------- */}
@@ -507,6 +569,55 @@ export default function PlatformHubPage() {
           )}
         </section>
       </div>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Platform health alerts (automated health-check results) */}
+      {/* ---------------------------------------------------------------- */}
+      <section className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-amber-500 flex items-center gap-1.5">
+            <HeartPulse className="w-4 h-4" /> Platform Health Alerts
+          </h2>
+        </div>
+
+        {!healthAlertsAvailable ? (
+          <div className="text-center py-6 px-3 rounded-xl border border-dashed border-gray-200 dark:border-slate-700">
+            <HeartPulse className="w-7 h-7 text-gray-300 mx-auto mb-2" />
+            <p className="text-sm text-gray-500 dark:text-slate-400">Health-check feed not available.</p>
+          </div>
+        ) : sortedHealthAlerts.length === 0 ? (
+          <div className="text-center py-6 px-3 rounded-xl border border-dashed border-emerald-200 dark:border-emerald-500/20">
+            <CheckCircle2 className="w-7 h-7 text-emerald-400 mx-auto mb-2" />
+            <p className="text-sm text-emerald-600 dark:text-emerald-400">No open alerts. All checks clean.</p>
+          </div>
+        ) : (
+          <ul className="space-y-1.5">
+            {sortedHealthAlerts.map((a) => {
+              const Icon = severityIcon[a.severity];
+              return (
+                <li
+                  key={a.id}
+                  className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-gray-50 dark:bg-slate-800"
+                >
+                  <span className={`mt-0.5 px-1.5 py-0.5 text-[9px] font-bold rounded border flex items-center gap-1 flex-shrink-0 ${severityChip[a.severity]}`}>
+                    <Icon className="w-3 h-3" /> {a.severity.toUpperCase()}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-semibold text-gray-900 dark:text-white truncate">
+                      {a.message}
+                    </p>
+                    <p className="text-[10px] text-gray-400 truncate">
+                      {[a.tenantName, a.checkType.replace(/_/g, ' '), timeAgo(a.createdAt)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }
