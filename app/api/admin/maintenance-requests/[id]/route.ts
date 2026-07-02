@@ -148,6 +148,14 @@ export async function PATCH(
   if (update.status === 'done') {
     Promise.resolve((async () => {
       const equipmentLabel = existing.equipment_name ?? 'your equipment';
+      // NOTE: '/dashboard/maintenance/new' is the NEW-REQUEST form, not a
+      // detail/history view — linking a "resolved" notification there was
+      // wrong (nothing there shows the resolved request). There is no
+      // per-request detail route for submitters (the triage inbox at
+      // /dashboard/admin/maintenance is role-gated to shop_manager/admin/
+      // super_admin/operations_manager, which most submitters are not), so
+      // the safe, always-accessible landing spot is the notifications page,
+      // where this exact message (with resolution context) lives.
       await supabaseAdmin.from('notifications').insert({
         user_id: existing.submitted_by,
         tenant_id: existing.tenant_id,
@@ -157,14 +165,14 @@ export async function PATCH(
         notification_type: 'maintenance_resolved',
         related_entity_type: 'maintenance_request',
         related_entity_id: id,
-        action_url: '/dashboard/maintenance/new',
+        action_url: '/dashboard/notifications',
       });
 
       // Parallel native push to the submitter — fire-and-forget.
       sendPushToUser(existing.submitted_by, {
         title: 'Issue Resolved',
         body: `Your maintenance request for ${equipmentLabel} has been resolved.`,
-        data: { route: '/dashboard/maintenance/new' },
+        data: { route: '/dashboard/notifications' },
       }).catch(() => {});
     })()).catch(() => {});
 

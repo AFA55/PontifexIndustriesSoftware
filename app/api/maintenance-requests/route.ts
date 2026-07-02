@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
-import { sendPushToUser } from '@/lib/send-push';
+import { sendNotification } from '@/lib/send-reminder';
 
 const VALID_PRIORITIES = ['low', 'medium', 'high', 'critical'] as const;
 type Priority = typeof VALID_PRIORITIES[number];
@@ -52,7 +52,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to submit request', details: error.message }, { status: 500 });
   }
 
-  // Fire-and-forget: notify shop_managers + admins in tenant
+  // Fire-and-forget: notify shop_managers + admins in tenant across every
+  // channel they have enabled (in-app bell + push + SMS + email), per each
+  // manager's own `notification_preferences` — same dispatcher used for
+  // job-dispatch notifications (see lib/send-reminder.ts).
   Promise.resolve((async () => {
     const { data: submitter } = await supabaseAdmin
       .from('profiles')
@@ -72,27 +75,22 @@ export async function POST(request: NextRequest) {
       .in('role', ['shop_manager', 'admin', 'super_admin', 'operations_manager']);
 
     if (managers && managers.length > 0) {
-      const notifRows = managers.map((m: { id: string }) => ({
-        user_id: m.id,
-        tenant_id: auth.tenantId,
-        type: 'info',
-        title,
-        message,
-        notification_type: 'maintenance_request',
-        related_entity_type: 'maintenance_request',
-        related_entity_id: data.id,
-        action_url: '/dashboard/admin/maintenance',
-      }));
-      await supabaseAdmin.from('notifications').insert(notifRows);
-
-      // Parallel native push to each notified manager — fire-and-forget.
-      for (const m of managers as { id: string }[]) {
-        sendPushToUser(m.id, {
-          title,
-          body: message,
-          data: { route: '/dashboard/admin/maintenance' },
-        }).catch(() => {});
-      }
+      await Promise.allSettled(
+        (managers as { id: string }[]).map((m) =>
+          sendNotification({
+            userId: m.id,
+            tenantId: auth.tenantId,
+            category: 'maintenance_update',
+            notificationType: 'maintenance_request',
+            title,
+            message,
+            inAppType: 'info',
+            actionUrl: '/dashboard/admin/maintenance',
+            relatedEntityType: 'maintenance_request',
+            relatedEntityId: data.id,
+          })
+        )
+      );
     }
   })()).catch(() => {});
 

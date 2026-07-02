@@ -56,7 +56,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  badgeKey?: 'timecards' | 'notifications';
+  badgeKey?: 'timecards' | 'notifications' | 'maintenance';
   title?: string;
   /** If set, this nav item is hidden when the flag is false (bypassed for super_admin/ops_manager) */
   flagKey?: keyof UserFeatureFlags;
@@ -116,7 +116,7 @@ const NAV_SECTIONS: NavSection[] = [
       // Unified Inventory Control replaces the 3 separate items: Pull Equipment, Voice Check-Out, Returned Equipment.
       // One page with 4 tabs (Inventory / Checkout / Check-In / History) + voice layer (Phase B-ii) on top.
       { label: 'Inventory Control', href: '/dashboard/admin/inventory-control', icon: RotateCcw, roles: ['shop_manager', 'supervisor', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'inventory_control' },
-      { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'maintenance' },
+      { label: 'Maintenance Inbox', href: '/dashboard/admin/maintenance', icon: Wrench, badgeKey: 'maintenance', roles: ['shop_manager', 'admin', 'super_admin', 'operations_manager'], moduleKey: 'maintenance' },
       // 'Shop Tasks' removed — it had no page (404) and is redundant with the
       // Maintenance Inbox, which is where equipment/maintenance requests land.
       // The /shop-tasks route now redirects to the Maintenance Inbox as a safety net.
@@ -191,10 +191,11 @@ const SIDEBAR_STORAGE_KEY = 'admin-sidebar-collapsed';
 interface BadgeCounts {
   timecards: number;
   notifications: number;
+  maintenance: number;
 }
 
 function useBadgeCounts(): BadgeCounts {
-  const [counts, setCounts] = useState<BadgeCounts>({ timecards: 0, notifications: 0 });
+  const [counts, setCounts] = useState<BadgeCounts>({ timecards: 0, notifications: 0, maintenance: 0 });
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -206,13 +207,15 @@ function useBadgeCounts(): BadgeCounts {
         Authorization: `Bearer ${session.access_token}`,
       };
 
-      const [tcRes, notifRes] = await Promise.allSettled([
+      const [tcRes, notifRes, maintRes] = await Promise.allSettled([
         fetch('/api/admin/timecards?pending=true', { headers }),
         fetch('/api/notifications?unread_only=true', { headers }),
+        fetch('/api/admin/maintenance-requests?status=open', { headers }),
       ]);
 
       let timecards = 0;
       let notifications = 0;
+      let maintenance = 0;
 
       if (tcRes.status === 'fulfilled' && tcRes.value.ok) {
         const json = await tcRes.value.json();
@@ -224,7 +227,14 @@ function useBadgeCounts(): BadgeCounts {
         notifications = json.unread_count ?? json.total ?? (Array.isArray(json.data) ? json.data.length : 0);
       }
 
-      setCounts({ timecards, notifications });
+      // Non-shop-role users get a 403 here — that's expected, .ok is false and
+      // the badge just stays 0 (same graceful-degrade as the other two).
+      if (maintRes.status === 'fulfilled' && maintRes.value.ok) {
+        const json = await maintRes.value.json();
+        maintenance = json.total ?? json.count ?? (Array.isArray(json.data) ? json.data.length : 0);
+      }
+
+      setCounts({ timecards, notifications, maintenance });
     } catch {
       // silently fail — badges are non-critical
     }
@@ -466,6 +476,8 @@ function SidebarContent({
                       ? badgeCounts.timecards
                       : item.badgeKey === 'notifications'
                       ? badgeCounts.notifications
+                      : item.badgeKey === 'maintenance'
+                      ? badgeCounts.maintenance
                       : 0;
 
                   // Exact match for index routes (dashboard root + platform Hub),
