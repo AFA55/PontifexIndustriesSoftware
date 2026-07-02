@@ -76,6 +76,8 @@ export async function POST(request: NextRequest) {
       admin_name,
       admin_role,
       admin_temp_password,
+      // Optional: converting a demo-request lead into this tenant.
+      demo_request_id,
     } = body;
 
     if (!name || !slug) {
@@ -165,6 +167,16 @@ export async function POST(request: NextRequest) {
 
     // Seed branding so the login page is white-labeled day one (non-fatal).
     await seedBranding(tenant.id, { name, primaryColor: primary_color || undefined });
+
+    // Link the originating demo-request lead (non-fatal — a bad/stale id must
+    // never block tenant creation, which already succeeded above).
+    if (demo_request_id && typeof demo_request_id === 'string') {
+      await supabaseAdmin
+        .from('demo_requests')
+        .update({ status: 'converted', tenant_id: tenant.id })
+        .eq('id', demo_request_id)
+        .then(() => undefined, () => undefined);
+    }
 
     // Optionally create + invite the first admin user IN this new tenant.
     let firstAdmin: { userId: string; invited: boolean } | null = null;

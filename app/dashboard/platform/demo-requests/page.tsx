@@ -256,7 +256,7 @@ export default function DemoRequestsPage() {
                     {/* Convert CTA */}
                     <div className="mt-4 pt-3 border-t border-gray-100 dark:border-slate-800">
                       <Link
-                        href="/dashboard/platform/tenants/new"
+                        href={`/dashboard/platform/tenants/new?fromLead=${r.id}`}
                         className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:text-brand-dark"
                       >
                         Convert to tenant — create company code <ArrowRight className="w-4 h-4" />
