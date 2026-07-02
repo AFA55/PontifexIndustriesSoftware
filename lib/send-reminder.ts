@@ -37,7 +37,23 @@ export interface ReminderOptions {
   message: string;
   /** in-app notification.type (visual tone). Defaults to 'info'. */
   inAppType?: string;
+  /**
+   * Overrides the stored `notifications.notification_type` (defaults to
+   * `category`). Use when the category is a shared preference bucket (e.g.
+   * `maintenance_update`) but the UI keys icon/copy off a more specific
+   * value (e.g. `maintenance_request` for a new submission vs.
+   * `maintenance_update`-the-literal for a resolution).
+   */
+  notificationType?: string;
   jobOrderId?: string;
+  /**
+   * Generic related-entity link, stored as related_entity_type/_id. Prefer
+   * this over jobOrderId for non-job-order entities (maintenance requests,
+   * etc). If both jobOrderId and relatedEntityType/Id are supplied, the
+   * explicit relatedEntityType/Id wins.
+   */
+  relatedEntityType?: string;
+  relatedEntityId?: string;
   /** Phone number for SMS fallback (only used if user has SMS enabled). */
   smsPhone?: string | null;
   /** Deep-link route delivered in push data + stored as action_url. */
@@ -82,12 +98,12 @@ export async function sendNotification(opts: ReminderOptions): Promise<DeliveryR
       user_id: opts.userId,
       tenant_id: opts.tenantId ?? null,
       type: opts.inAppType || 'info',
-      notification_type: opts.category,
+      notification_type: opts.notificationType ?? opts.category,
       title: opts.title,
       message: opts.message,
       action_url: opts.actionUrl ?? null,
-      related_entity_type: opts.jobOrderId ? 'job_order' : null,
-      related_entity_id: opts.jobOrderId ?? null,
+      related_entity_type: opts.relatedEntityType ?? (opts.jobOrderId ? 'job_order' : null),
+      related_entity_id: opts.relatedEntityId ?? opts.jobOrderId ?? null,
       metadata: opts.metadata ?? {},
       read: false,
       is_read: false,
