@@ -14,6 +14,16 @@ import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { sendNotification } from '@/lib/send-reminder';
 
+/** A bad/negative/NaN cost value must never silently corrupt job_pnl's gross-profit math. */
+const NON_NEGATIVE_NUMERIC_FIELDS = [
+  'drive_distance_miles', 'mileage_rate', 'equipment_cost', 'material_cost', 'other_cost', 'subcontractor_cost',
+];
+function nonNegativeNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -110,7 +120,9 @@ export async function PATCH(
 
     allowedFields.forEach(field => {
       if (field in updates) {
-        updateFields[field] = updates[field];
+        updateFields[field] = NON_NEGATIVE_NUMERIC_FIELDS.includes(field)
+          ? nonNegativeNumberOrNull(updates[field])
+          : updates[field];
       }
     });
 

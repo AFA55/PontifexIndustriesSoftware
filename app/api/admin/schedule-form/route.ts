@@ -20,6 +20,13 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
+/** A bad/negative/NaN cost value must never silently corrupt job_pnl's gross-profit math. */
+function nonNegativeNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : null;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireSalesStaff(request);
@@ -111,12 +118,12 @@ export async function POST(request: NextRequest) {
 
       // ── Optional Job Financials (opt-in via track_financials) ──
       track_financials: body.track_financials || false,
-      drive_distance_miles: body.drive_distance_miles ?? null,
-      mileage_rate: body.mileage_rate ?? null,
-      equipment_cost: body.equipment_cost ?? null,
-      material_cost: body.material_cost ?? null,
-      other_cost: body.other_cost ?? null,
-      subcontractor_cost: body.subcontractor_cost ?? null,
+      drive_distance_miles: nonNegativeNumberOrNull(body.drive_distance_miles),
+      mileage_rate: nonNegativeNumberOrNull(body.mileage_rate),
+      equipment_cost: nonNegativeNumberOrNull(body.equipment_cost),
+      material_cost: nonNegativeNumberOrNull(body.material_cost),
+      other_cost: nonNegativeNumberOrNull(body.other_cost),
+      subcontractor_cost: nonNegativeNumberOrNull(body.subcontractor_cost),
 
       // ── Step 4: Equipment Requirements ──────────────────────
       equipment_needed: body.equipment_needed || [],
