@@ -5,11 +5,18 @@ export const dynamic = 'force-dynamic';
 import { useState, useEffect, useCallback } from 'react';
 import {
   MessageSquareWarning, RefreshCw, Bug, Wand2, Lightbulb, Building2,
-  Save, Check, Trash2,
+  Save, Check, Trash2, Sparkles, ChevronDown, ChevronUp, HelpCircle,
 } from 'lucide-react';
 import { getHeaders, getJsonHeaders } from '@/components/platform/shared';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
+
+interface AiAnalysis {
+  diagnosis: string;
+  proposedFix: string;
+  confidence: 'low' | 'medium' | 'high';
+  followUpQuestion?: string;
+}
 
 interface FeedbackItem {
   id: string;
@@ -23,10 +30,20 @@ interface FeedbackItem {
   page_url: string | null;
   admin_response: string | null;
   created_at: string;
+  ai_analysis: AiAnalysis | null;
+  ai_analyzed_at: string | null;
 }
 
 const STATUSES = ['open', 'in_review', 'planned', 'done', 'declined'] as const;
 type Status = (typeof STATUSES)[number];
+
+const CONFIDENCE_CHIP: Record<AiAnalysis['confidence'], string> = {
+  low: 'bg-rose-100 text-rose-700 border-rose-200',
+  medium: 'bg-amber-100 text-amber-700 border-amber-200',
+  high: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+};
+
+const ANALYZABLE_STATUSES = new Set<string>(['open', 'in_review']);
 
 const STATUS_CHIP: Record<string, string> = {
   open: 'bg-rose-100 text-rose-700 border-rose-200',
@@ -54,6 +71,52 @@ function timeAgo(iso: string): string {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// ─── AI draft analysis panel ────────────────────────────────────────────────
+
+function AiAnalysisPanel({ analysis, analyzedAt }: { analysis: AiAnalysis; analyzedAt: string | null }) {
+  return (
+    <div className="rounded-xl border-2 border-dashed border-violet-300 dark:border-violet-700 bg-violet-50/60 dark:bg-violet-950/20 p-3.5 space-y-2.5">
+      <div className="flex items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-violet-700 dark:text-violet-300">
+          <Sparkles className="w-3.5 h-3.5" />
+          AI Draft Analysis (not yet applied)
+        </span>
+        <span className="px-2 py-0.5 text-[9px] font-black tracking-wide rounded-full bg-violet-600 text-white uppercase">
+          Draft
+        </span>
+      </div>
+
+      <div>
+        <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wide mb-0.5">Diagnosis</p>
+        <p className="text-sm text-gray-800 dark:text-slate-200 whitespace-pre-wrap">{analysis.diagnosis}</p>
+      </div>
+
+      <div>
+        <p className="text-[10px] font-bold text-violet-500 uppercase tracking-wide mb-0.5">Proposed fix</p>
+        <p className="text-sm text-gray-800 dark:text-slate-200 whitespace-pre-wrap">{analysis.proposedFix}</p>
+      </div>
+
+      {analysis.followUpQuestion && (
+        <div className="flex items-start gap-1.5 rounded-lg bg-white/70 dark:bg-slate-900/40 p-2">
+          <HelpCircle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <p className="text-xs text-gray-700 dark:text-slate-300">
+            <span className="font-semibold">Ask the customer:</span> {analysis.followUpQuestion}
+          </p>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-1">
+        <span
+          className={`px-2 py-0.5 text-[10px] font-bold rounded-full border capitalize ${CONFIDENCE_CHIP[analysis.confidence]}`}
+        >
+          {analysis.confidence} confidence
+        </span>
+        {analyzedAt && <span className="text-[10px] text-gray-400">Analyzed {timeAgo(analyzedAt)}</span>}
+      </div>
+    </div>
+  );
+}
+
 // ─── Row ────────────────────────────────────────────────────────────────────
 
 function FeedbackRow({
@@ -70,6 +133,9 @@ function FeedbackRow({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   const dirty = status !== item.status || (response ?? '') !== (item.admin_response ?? '');
 
@@ -112,8 +178,36 @@ function FeedbackRow({
     }
   }
 
+  async function analyze() {
+    setAnalyzing(true);
+    setAnalysisError(null);
+    try {
+      const headers = await getHeaders();
+      const res = await fetch(`/api/admin/feedback/${item.id}/analyze`, {
+        method: 'POST',
+        headers,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.data) {
+        onChanged({
+          id: item.id,
+          ai_analysis: json.data.ai_analysis,
+          ai_analyzed_at: json.data.ai_analyzed_at,
+        });
+        setShowAnalysis(true);
+      } else {
+        setAnalysisError(json?.error || 'Analysis failed. Try again.');
+      }
+    } catch {
+      setAnalysisError('Analysis failed. Try again.');
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   const meta = TYPE_META[item.type] ?? TYPE_META.idea;
   const Icon = meta.icon;
+  const canAnalyze = ANALYZABLE_STATUSES.has(item.status);
 
   return (
     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 sm:p-5">
@@ -152,6 +246,41 @@ function FeedbackRow({
       </p>
       {item.page_url && (
         <p className="text-[11px] text-gray-400 font-mono mb-3 truncate">{item.page_url}</p>
+      )}
+
+      {/* AI draft analysis */}
+      {canAnalyze && (
+        <div className="mb-3">
+          {item.ai_analysis ? (
+            <div className="space-y-2">
+              <button
+                onClick={() => setShowAnalysis(v => !v)}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-violet-600 dark:text-violet-400 hover:text-violet-700"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                {showAnalysis ? 'Hide' : 'View'} AI draft analysis
+                {showAnalysis ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              {showAnalysis && (
+                <AiAnalysisPanel analysis={item.ai_analysis} analyzedAt={item.ai_analyzed_at} />
+              )}
+            </div>
+          ) : (
+            <button
+              onClick={analyze}
+              disabled={analyzing}
+              className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[36px] rounded-lg border border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 text-xs font-semibold hover:bg-violet-50 dark:hover:bg-violet-950/30 disabled:opacity-50 transition-colors"
+            >
+              {analyzing ? (
+                <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Sparkles className="w-3.5 h-3.5" />
+              )}
+              {analyzing ? 'Analyzing…' : 'Analyze with AI'}
+            </button>
+          )}
+          {analysisError && <p className="text-xs text-rose-500 mt-1">{analysisError}</p>}
+        </div>
       )}
 
       {/* Triage controls */}
