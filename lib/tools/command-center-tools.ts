@@ -271,17 +271,34 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
         limit: z.number().int().positive().max(50).optional().describe(`Max notes to return (default ${MEMORY_RECALL_DEFAULT_LIMIT}).`),
       }),
       execute: async ({ query, limit }) => {
-        let q = supabaseAdmin
-          .from('artifex_memory_notes')
-          .select('note, category, created_at')
-          .eq('tenant_id', tenantId)
-          .order('created_at', { ascending: false })
-          .limit(limit ?? MEMORY_RECALL_DEFAULT_LIMIT);
-        if (query) q = q.ilike('note', `%${query}%`);
-        const { data, error } = await q;
+        const cap = limit ?? MEMORY_RECALL_DEFAULT_LIMIT;
+        const baseQuery = () =>
+          supabaseAdmin
+            .from('artifex_memory_notes')
+            .select('note, category, created_at')
+            .eq('tenant_id', tenantId)
+            .order('created_at', { ascending: false })
+            .limit(cap);
+
+        let usedRecentFallback = false;
+        let { data, error } = query ? await baseQuery().ilike('note', `%${query}%`) : await baseQuery();
         if (error) throw new Error(`recall_memory_notes: ${error.message}`);
+
+        // A keyword filter is a substring match, not semantic search — a real,
+        // relevant note can easily use different wording than the query. Rather
+        // than report "nothing found" (which reads as "nothing was ever saved"),
+        // fall back to the tenant's most recent notes so the model still has
+        // something to reason over and can judge relevance itself.
+        if (query && (data?.length ?? 0) === 0) {
+          usedRecentFallback = true;
+          const fallback = await baseQuery();
+          if (fallback.error) throw new Error(`recall_memory_notes: ${fallback.error.message}`);
+          data = fallback.data;
+        }
+
         return {
           count: data?.length ?? 0,
+          usedRecentFallback,
           notes: (data ?? []).map((n: any) => ({ note: n.note, category: n.category, createdAt: n.created_at })),
         };
       },

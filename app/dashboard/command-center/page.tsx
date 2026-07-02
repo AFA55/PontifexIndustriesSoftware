@@ -27,11 +27,6 @@ import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import NeuralBrain, { type NeuralBrainState } from '@/components/command-center/NeuralBrain';
 import ArtifexChat, { type ArtifexConversationSummary } from '@/components/command-center/ArtifexChat';
 
-// Placeholder — the backend track wires real conversation persistence into
-// these props later. An empty list keeps the sidebar contract exercised (and
-// its "no conversations yet" empty state visible) without a backend.
-const CONVERSATIONS: ArtifexConversationSummary[] = [];
-
 interface OverviewData {
   clockedIn: number;
   rosterCount: number;
@@ -73,9 +68,34 @@ export default function CommandCenterPage() {
   const [chatOpen, setChatOpen] = useState(false);
   const [chatReactorState, setChatReactorState] = useState<NeuralBrainState>('idle');
 
-  // Conversation history — placeholder until the backend track wires real
-  // persistence; keeping the sidebar contract live now avoids a second pass.
+  // Conversation history — the "2nd brain" sidebar's list + selection state.
+  const [conversations, setConversations] = useState<ArtifexConversationSummary[]>([]);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  // Bumped ONLY on an explicit user switch (sidebar select / New chat) so the
+  // component remounts with a clean useChat instance. Must NOT bump when
+  // onConversationStarted silently backfills activeConversationId mid-stream
+  // for a brand-new chat — that would unmount the response while it's still
+  // streaming in.
+  const [chatInstanceKey, setChatInstanceKey] = useState(0);
+
+  const loadConversations = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/command-center/conversations', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (json?.success && Array.isArray(json.data)) {
+        setConversations(
+          json.data.map((c: any) => ({ id: c.id, title: c.title ?? 'New chat', updatedAt: c.updated_at }))
+        );
+      }
+    } catch {
+      // fail-soft: sidebar just stays empty/stale, never crashes the panel
+    }
+  };
 
   // Focus mode — hides the management tabs + live rail for a clean recording
   // (just the reactor + chat), toggled by the founder before a demo/reveal.
@@ -116,6 +136,13 @@ export default function CommandCenterPage() {
     window.addEventListener('resize', apply);
     return () => window.removeEventListener('resize', apply);
   }, []);
+
+  // ── conversation history: load once the chat is first opened ──────────────
+  useEffect(() => {
+    if (!authChecked || !user || !chatOpen) return;
+    loadConversations();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authChecked, user, chatOpen]);
 
   // ── overview data: fetch + poll every 30s, fail-soft ───────────────────────
   const overviewRef = useRef<OverviewData | null>(null);
@@ -245,11 +272,22 @@ export default function CommandCenterPage() {
           {chatOpen && (
             <div className="mt-6 w-full px-2">
               <ArtifexChat
+                key={chatInstanceKey}
                 onStateChange={setChatReactorState}
-                conversations={CONVERSATIONS}
+                conversations={conversations}
                 activeConversationId={activeConversationId}
-                onSelectConversation={setActiveConversationId}
-                onNewConversation={() => setActiveConversationId(null)}
+                onSelectConversation={(id) => {
+                  setActiveConversationId(id);
+                  setChatInstanceKey((k) => k + 1);
+                }}
+                onNewConversation={() => {
+                  setActiveConversationId(null);
+                  setChatInstanceKey((k) => k + 1);
+                }}
+                onConversationStarted={(id) => {
+                  setActiveConversationId(id);
+                  loadConversations();
+                }}
               />
             </div>
           )}

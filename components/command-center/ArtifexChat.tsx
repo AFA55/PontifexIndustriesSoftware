@@ -19,15 +19,20 @@
  * state-wiring notes for the idle/listening/thinking/speaking contract.
  *
  * Conversation list: `conversations`/`activeConversationId`/`onSelectConversation`/
- * `onNewConversation` are optional so this component still works standing alone
- * (persistence lands from a parallel backend track) — omit them and the sidebar
- * just doesn't render.
+ * `onNewConversation` are optional so this component still works standing alone —
+ * omit them and the sidebar just doesn't render. When `activeConversationId` is
+ * set, prior turns are fetched from GET .../conversations/[id] and seeded before
+ * the transport ever fires; `onConversationStarted` reports the id the backend
+ * assigns a brand-new conversation (read off the streamed 'start' metadata) so
+ * the parent can track it for the next turn + refresh the sidebar. The parent
+ * should key this component by `activeConversationId` so switching conversations
+ * remounts it with a fresh `useChat` instance instead of blending message state.
  */
 import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart } from 'ai';
-import { Send, Search, CheckCircle2, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, MessageSquare } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { Send, Search, CheckCircle2, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, MessageSquare } from 'lucide-react';
 import type { ArtifexUIMessage } from '@/lib/agents/artifex-agent';
 import type { ArcReactorState } from './ArcReactor';
 
@@ -62,6 +67,8 @@ interface ArtifexChatProps {
   activeConversationId?: string | null;
   onSelectConversation?: (id: string) => void;
   onNewConversation?: () => void;
+  /** Fires once when the backend assigns a fresh conversation id (first turn of a new chat). */
+  onConversationStarted?: (id: string) => void;
 }
 
 export default function ArtifexChat({
@@ -70,16 +77,74 @@ export default function ArtifexChat({
   activeConversationId,
   onSelectConversation,
   onNewConversation,
+  onConversationStarted,
 }: ArtifexChatProps) {
   const [input, setInput] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(!!activeConversationId);
+
+  // Read at send-time (not at transport-construction time) so switching
+  // conversations doesn't require rebuilding the transport.
+  const conversationIdRef = useRef<string | null>(activeConversationId ?? null);
+  useEffect(() => {
+    conversationIdRef.current = activeConversationId ?? null;
+  }, [activeConversationId]);
+
   const [transport] = useState(
-    () => new DefaultChatTransport<ArtifexUIMessage>({ api: '/api/command-center/assistant', fetch: authedFetch })
+    () =>
+      new DefaultChatTransport<ArtifexUIMessage>({
+        api: '/api/command-center/assistant',
+        fetch: authedFetch,
+        prepareSendMessagesRequest: ({ id, messages }) => ({
+          body: { id, messages, conversationId: conversationIdRef.current },
+        }),
+      })
   );
-  const { messages, sendMessage, status, error } = useChat<ArtifexUIMessage>({ transport });
+  const { messages, sendMessage, setMessages, status, error } = useChat<ArtifexUIMessage>({ transport });
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const hasHistory = Array.isArray(conversations);
+
+  // Resume a past conversation: fetch its prior turns and seed them before
+  // the transport ever fires. Runs once per mount — the parent keys this
+  // component by activeConversationId so a switch remounts it fresh.
+  useEffect(() => {
+    if (!activeConversationId) return;
+    let cancelled = false;
+    setHistoryLoading(true);
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/command-center/conversations/${activeConversationId}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (!cancelled && json?.success && Array.isArray(json.data)) {
+          setMessages(json.data as ArtifexUIMessage[]);
+        }
+      } catch {
+        // fail-soft: worst case the resumed chat just starts empty
+      } finally {
+        if (!cancelled) setHistoryLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Pick up a freshly-assigned conversation id off the streamed 'start' metadata.
+  useEffect(() => {
+    const last = messages[messages.length - 1] as (ArtifexUIMessage & { metadata?: { conversationId?: string } }) | undefined;
+    const newId = last?.metadata?.conversationId;
+    if (newId && newId !== conversationIdRef.current) {
+      conversationIdRef.current = newId;
+      onConversationStarted?.(newId);
+    }
+  }, [messages, onConversationStarted]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -91,10 +156,23 @@ export default function ArtifexChat({
     else onStateChange('idle');
   }, [status, onStateChange]);
 
+  // The backend sets a conversation's title (fire-and-forget) only once the
+  // full turn finishes, after onConversationStarted already fired on 'start' —
+  // re-notify once the turn completes so the parent can refresh the sidebar
+  // and pick up the real title instead of the "New chat" placeholder.
+  const wasStreamingRef = useRef(false);
+  useEffect(() => {
+    const isActive = status === 'submitted' || status === 'streaming';
+    if (wasStreamingRef.current && !isActive && conversationIdRef.current) {
+      onConversationStarted?.(conversationIdRef.current);
+    }
+    wasStreamingRef.current = isActive;
+  }, [status, onConversationStarted]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || status === 'submitted' || status === 'streaming') return;
+    if (!text || status === 'submitted' || status === 'streaming' || historyLoading) return;
     sendMessage({ text });
     setInput('');
   };
@@ -140,7 +218,10 @@ export default function ArtifexChat({
         </div>
 
         <div ref={scrollRef} className="flex max-h-[42vh] min-h-[160px] flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-5">
-          {messages.length === 0 && (
+          {historyLoading && (
+            <p className="text-center text-sm text-white/35">Loading conversation…</p>
+          )}
+          {!historyLoading && messages.length === 0 && (
             <p className="text-center text-sm text-white/35">
               Ask Artifex about jobs, the team, approvals, or activity.
             </p>
@@ -199,7 +280,7 @@ export default function ArtifexChat({
           />
           <button
             type="submit"
-            disabled={!input.trim() || status === 'submitted' || status === 'streaming'}
+            disabled={!input.trim() || status === 'submitted' || status === 'streaming' || historyLoading}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#DB2777] text-white transition-opacity disabled:opacity-30"
             aria-label="Send"
           >
