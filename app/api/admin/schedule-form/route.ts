@@ -109,6 +109,15 @@ export async function POST(request: NextRequest) {
       scope_details: body.scope_details || {},
       scope_photo_urls: body.scope_photo_urls || [],
 
+      // ── Optional Job Financials (opt-in via track_financials) ──
+      track_financials: body.track_financials || false,
+      drive_distance_miles: body.drive_distance_miles ?? null,
+      mileage_rate: body.mileage_rate ?? null,
+      equipment_cost: body.equipment_cost ?? null,
+      material_cost: body.material_cost ?? null,
+      other_cost: body.other_cost ?? null,
+      subcontractor_cost: body.subcontractor_cost ?? null,
+
       // ── Step 4: Equipment Requirements ──────────────────────
       equipment_needed: body.equipment_needed || [],
       equipment_selections: body.equipment_selections || {},

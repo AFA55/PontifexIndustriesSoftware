@@ -102,6 +102,10 @@ export async function PATCH(
       // Direct column names that the schedule-form + schedule-board edit panels
       // send and previously had silently dropped on save.
       'po_number', 'customer_id', 'customer_contact', 'site_contact_phone',
+      // Optional job financials (opt-in via track_financials) — schema-only
+      // until this route's PATCH wired them through.
+      'track_financials', 'drive_distance_miles', 'mileage_rate',
+      'equipment_cost', 'material_cost', 'other_cost', 'subcontractor_cost',
     ];
 
     allowedFields.forEach(field => {
