@@ -11,7 +11,7 @@ import {
   Bell, Minus, Plus, Palette, ChevronRight,
   CreditCard, ExternalLink, ArrowUpRight, MessageSquareWarning,
   Building2, Shield, Wifi, Coins, CalendarDays, DatabaseBackup,
-  DollarSign, Car, Wrench, Receipt,
+  DollarSign, Car,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -380,63 +380,26 @@ function JobCostStandardsSection({ userRole }: { userRole: string }) {
         )}
 
         <p className="text-sm text-gray-600 dark:text-white/60">
-          These defaults pre-fill the cost fields on new job tickets. Dispatchers can still override
-          them per job — this just sets the starting point.
+          Keeping this simple for now: labor (from timecards) + mileage. This pre-fills the mileage
+          rate on new job tickets — dispatchers can still override it per job. Equipment/material/
+          other cost tracking can be added later if you want it.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Car className="w-4 h-4 text-brand" />
-              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Mileage Rate ($/mile)</label>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={standards.default_mileage_rate}
-                onChange={(e) => update('default_mileage_rate', e.target.value)}
-                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
-              />
-            </div>
+        <div className="max-w-xs">
+          <div className="flex items-center gap-2 mb-1.5">
+            <Car className="w-4 h-4 text-brand" />
+            <label className="text-xs font-bold text-gray-600 dark:text-white/60">Mileage Rate ($/mile)</label>
           </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Wrench className="w-4 h-4 text-brand" />
-              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Default Equipment Cost ($)</label>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={standards.default_equipment_cost}
-                onChange={(e) => update('default_equipment_cost', e.target.value)}
-                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
-              />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <Receipt className="w-4 h-4 text-brand" />
-              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Default Other Cost ($)</label>
-            </div>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-              <input
-                type="number"
-                min={0}
-                step={0.01}
-                value={standards.default_other_cost}
-                onChange={(e) => update('default_other_cost', e.target.value)}
-                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
-              />
-            </div>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+            <input
+              type="number"
+              min={0}
+              step={0.01}
+              value={standards.default_mileage_rate}
+              onChange={(e) => update('default_mileage_rate', e.target.value)}
+              className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
+            />
           </div>
         </div>
       </div>

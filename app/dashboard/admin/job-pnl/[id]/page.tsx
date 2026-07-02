@@ -30,10 +30,6 @@ interface CostBreakdown {
   driveDistanceMiles: number;
   mileageRate: number;
   driveCost: number;
-  equipmentCost: number;
-  materialCost: number;
-  otherCost: number;
-  subcontractorCost: number;
   totalNonLaborCost: number;
 }
 
@@ -281,7 +277,7 @@ export default function JobPnlDetailPage() {
               <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden mb-4">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-800">Cost Breakdown</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Full job cost vs. quote — financial tracking enabled</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Labor + mileage vs. quote — financial tracking enabled</p>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -304,22 +300,6 @@ export default function JobPnlDetailPage() {
                           )}
                         </td>
                         <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.driveCost)}</td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm text-slate-700">Equipment</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.equipmentCost)}</td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm text-slate-700">Material</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.materialCost)}</td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm text-slate-700">Subcontractor</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.subcontractorCost)}</td>
-                      </tr>
-                      <tr>
-                        <td className="px-4 py-3 text-sm text-slate-700">Other</td>
-                        <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">${fmt(costBreakdown.otherCost)}</td>
                       </tr>
                       <tr className="bg-slate-50/60">
                         <td className="px-4 py-3 text-sm font-bold text-slate-800">Total Cost</td>

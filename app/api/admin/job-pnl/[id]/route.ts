@@ -30,7 +30,7 @@ export async function GET(
     // Fetch job details (tenant-scoped — this response includes payroll/hourly-rate data)
     let jobQuery = supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate, equipment_cost, material_cost, other_cost, subcontractor_cost')
+      .select('id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate')
       .eq('id', jobId)
       .is('deleted_at', null);
     if (authResult.role !== 'super_admin') {
@@ -162,15 +162,14 @@ export async function GET(
 
     // track_financials gates the non-labor cost fields; jobs created before this
     // feature default to false and must reduce to the original labor-only formula.
+    // Keeping this simple for now (labor + mileage only) per the founder's call —
+    // equipment/material/subcontractor/other cost columns exist but aren't
+    // collected by the UI yet, so they're intentionally not factored in here.
     const trackFinancials = job.track_financials === true;
     const driveCost = trackFinancials
       ? (job.drive_distance_miles ?? 0) * (job.mileage_rate ?? 0)
       : 0;
-    const equipmentCost = trackFinancials ? (job.equipment_cost ?? 0) : 0;
-    const materialCost = trackFinancials ? (job.material_cost ?? 0) : 0;
-    const otherCost = trackFinancials ? (job.other_cost ?? 0) : 0;
-    const subcontractorCost = trackFinancials ? (job.subcontractor_cost ?? 0) : 0;
-    const totalNonLaborCost = driveCost + equipmentCost + materialCost + otherCost + subcontractorCost;
+    const totalNonLaborCost = driveCost;
 
     const grossProfit = jobQuote - totalLaborCost - totalNonLaborCost;
     const grossMarginPct = jobQuote > 0 ? parseFloat(((grossProfit / jobQuote) * 100).toFixed(1)) : null;
@@ -196,10 +195,6 @@ export async function GET(
           driveDistanceMiles: job.drive_distance_miles ?? 0,
           mileageRate: job.mileage_rate ?? 0,
           driveCost: parseFloat(driveCost.toFixed(2)),
-          equipmentCost: parseFloat(equipmentCost.toFixed(2)),
-          materialCost: parseFloat(materialCost.toFixed(2)),
-          otherCost: parseFloat(otherCost.toFixed(2)),
-          subcontractorCost: parseFloat(subcontractorCost.toFixed(2)),
           totalNonLaborCost: parseFloat(totalNonLaborCost.toFixed(2)),
         } : null,
         totals: {

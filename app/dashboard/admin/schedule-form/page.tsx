@@ -905,8 +905,6 @@ export default function ScheduleFormPage() {
         setForm(f => ({
           ...f,
           mileage_rate: f.mileage_rate || (defaults.default_mileage_rate != null ? String(defaults.default_mileage_rate) : ''),
-          equipment_cost: f.equipment_cost || (defaults.default_equipment_cost != null ? String(defaults.default_equipment_cost) : ''),
-          other_cost: f.other_cost || (defaults.default_other_cost != null ? String(defaults.default_other_cost) : ''),
         }));
         if (defaults.shop_latitude != null && defaults.shop_longitude != null) {
           setShopOverride({ latitude: defaults.shop_latitude, longitude: defaults.shop_longitude });
@@ -3286,69 +3284,20 @@ export default function ScheduleFormPage() {
               {form.track_financials && (
                 <SectionCard className="mt-3">
                   <p className="text-xs sm:text-sm text-slate-400 -mt-1">
-                    Costs pre-fill from your company's cost standards where set — adjust per job as needed.
+                    Keeping this simple for now: labor (from timecards) + mileage. Equipment/material/
+                    other cost tracking can be added later if you want it.
                   </p>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <Label>Mileage Rate ($/mile)</Label>
-                      <InputField
-                        icon={Car}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={form.mileage_rate}
-                        onChange={e => updateForm({ mileage_rate: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Equipment Cost ($)</Label>
-                      <InputField
-                        icon={HardHat}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={form.equipment_cost}
-                        onChange={e => updateForm({ equipment_cost: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Material Cost ($)</Label>
-                      <InputField
-                        icon={DollarSign}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={form.material_cost}
-                        onChange={e => updateForm({ material_cost: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Subcontractor Cost ($)</Label>
-                      <InputField
-                        icon={DollarSign}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={form.subcontractor_cost}
-                        onChange={e => updateForm({ subcontractor_cost: e.target.value })}
-                      />
-                    </div>
-                    <div>
-                      <Label>Other Cost ($)</Label>
-                      <InputField
-                        icon={DollarSign}
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        placeholder="0.00"
-                        value={form.other_cost}
-                        onChange={e => updateForm({ other_cost: e.target.value })}
-                      />
-                    </div>
+                  <div>
+                    <Label>Mileage Rate ($/mile)</Label>
+                    <InputField
+                      icon={Car}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      value={form.mileage_rate}
+                      onChange={e => updateForm({ mileage_rate: e.target.value })}
+                    />
                   </div>
                   {driveDistanceMiles != null && (
                     <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-400/30 text-sm text-violet-700 dark:text-violet-300">
