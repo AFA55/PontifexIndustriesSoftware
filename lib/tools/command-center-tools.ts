@@ -1,13 +1,17 @@
 /**
  * Artifex tool definitions (Jarvis Command Center Phase 2 — the brain).
  *
- * Each tool is READ-ONLY and tenant-scoped: `createCommandCenterTools(tenantId, role)`
- * closes over the CALLER'S already-authenticated tenant + role (resolved once in the
- * API route via requireAuth), so every query below carries an explicit
+ * Each tool is tenant-scoped: `createCommandCenterTools(tenantId, role, userId)`
+ * closes over the CALLER'S already-authenticated tenant + role + id (resolved once
+ * in the API route via requireAuth), so every query below carries an explicit
  * `.eq('tenant_id', tenantId)` — the same platform-write invariant used everywhere
  * else in this codebase. supabaseAdmin bypasses RLS, so this manual filter IS the
  * security boundary; never relax it. `get_revenue_snapshot` additionally checks the
  * caller's role before executing (financial data is admin+ only).
+ *
+ * All tools except `save_memory_note` are read-only. Memory notes are the
+ * "2nd brain" (see supabase/migrations/20260702_artifex_memory.sql) — shared
+ * tenant-wide durable knowledge, not per-user chat history.
  *
  * Return shapes are intentionally small, pre-aggregated, high-signal JSON — never
  * raw rows or SQL — so the model reasons over facts, not database internals
@@ -19,6 +23,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { toLocalYMD } from '@/lib/dates';
 
 const FIELD_ROLES = ['operator', 'apprentice'];
+const MEMORY_RECALL_DEFAULT_LIMIT = 20;
 
 /**
  * Two-step name lookup instead of a PostgREST embed — this repo has a documented
@@ -36,7 +41,7 @@ async function lookupNames(tenantId: string, ids: (string | null)[]): Promise<Ma
   return new Map((data ?? []).map((p: any) => [p.id, p.full_name]));
 }
 
-export function createCommandCenterTools(tenantId: string, role: string) {
+export function createCommandCenterTools(tenantId: string, role: string, userId: string) {
   return {
     get_clocked_in_status: tool({
       description:
@@ -235,8 +240,54 @@ export function createCommandCenterTools(tenantId: string, role: string) {
         return { monthToDateRevenue: sum(mtdRes.data), yearToDateRevenue: sum(ytdRes.data) };
       },
     }),
+
+    save_memory_note: tool({
+      description:
+        "Save a durable, non-obvious fact to the company's shared long-term memory — a preference, a recurring issue, a decision that was made, or context that will matter in a FUTURE conversation. Use this proactively whenever you learn something worth remembering across sessions. Do NOT use it for routine operational data already covered by the other tools (today's jobs, who's clocked in, etc.) — only durable knowledge.",
+      inputSchema: z.object({
+        note: z.string().describe('The fact to remember, written as a standalone sentence with enough context to make sense later.'),
+        category: z
+          .string()
+          .optional()
+          .describe("Optional short label, e.g. 'preference', 'recurring issue', 'decision'."),
+      }),
+      execute: async ({ note, category }) => {
+        const { error } = await supabaseAdmin.from('artifex_memory_notes').insert({
+          tenant_id: tenantId,
+          created_by: userId,
+          note,
+          category: category ?? null,
+        });
+        if (error) throw new Error(`save_memory_note: ${error.message}`);
+        return { saved: true };
+      },
+    }),
+
+    recall_memory_notes: tool({
+      description:
+        "Search the company's shared long-term memory for durable facts saved in past conversations. Use this when a question seems to reference something discussed before, or needs company-specific context that isn't covered by the live operational tools.",
+      inputSchema: z.object({
+        query: z.string().optional().describe('Optional substring to filter notes by.'),
+        limit: z.number().int().positive().max(50).optional().describe(`Max notes to return (default ${MEMORY_RECALL_DEFAULT_LIMIT}).`),
+      }),
+      execute: async ({ query, limit }) => {
+        let q = supabaseAdmin
+          .from('artifex_memory_notes')
+          .select('note, category, created_at')
+          .eq('tenant_id', tenantId)
+          .order('created_at', { ascending: false })
+          .limit(limit ?? MEMORY_RECALL_DEFAULT_LIMIT);
+        if (query) q = q.ilike('note', `%${query}%`);
+        const { data, error } = await q;
+        if (error) throw new Error(`recall_memory_notes: ${error.message}`);
+        return {
+          count: data?.length ?? 0,
+          notes: (data ?? []).map((n: any) => ({ note: n.note, category: n.category, createdAt: n.created_at })),
+        };
+      },
+    }),
   };
 }
 
-/** Static instance (dummy tenant/role) used ONLY for InferAgentUIMessage type export — never executed. */
-export const commandCenterToolsForTypes = createCommandCenterTools('', 'admin');
+/** Static instance (dummy tenant/role/userId) used ONLY for InferAgentUIMessage type export — never executed. */
+export const commandCenterToolsForTypes = createCommandCenterTools('', 'admin', '');
