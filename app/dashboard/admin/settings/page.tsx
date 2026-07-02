@@ -348,9 +348,9 @@ function JobCostStandardsSection({ userRole }: { userRole: string }) {
   return (
     <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
       <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white flex items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="text-lg font-bold flex items-center gap-2">
-            <DollarSign className="w-5 h-5" />
+            <DollarSign className="w-5 h-5 shrink-0" />
             Job Cost Standards
           </h2>
           <p className="text-white/80 text-sm mt-0.5">Default cost inputs used on job tickets and the P&amp;L dashboard</p>
