@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { signStoragePath } from '@/lib/signed-urls';
+import { signTimecardPhoto } from '@/lib/timecard-photos';
 import { requireAdmin } from '@/lib/api-auth';
 
 export async function POST(request: NextRequest) {
@@ -101,23 +101,16 @@ export async function GET(request: NextRequest) {
     (profiles || []).forEach(p => { nameMap[p.id] = p.full_name; });
 
     // timecard-photos is a PRIVATE bucket, so the stored *_photo_url values are
-    // storage PATHS (e.g. "<tenant>/<user>/<ts>.jpg"), not viewable URLs. Mint a
-    // short-lived (1 hr) signed URL for each real path. Legacy rows hold the
-    // 'photo-upload-failed' sentinel or a full http(s) public URL — leave those
-    // alone (the UI hardens the sentinel to a placeholder).
-    const signPath = async (val: string | null): Promise<string | null> => {
-      if (!val) return null;
-      if (val === 'photo-upload-failed') return null;
-      if (val.startsWith('http://') || val.startsWith('https://')) return null;
-      return signStoragePath('timecard-photos', val, 3600);
-    };
-
+    // storage PATHS (e.g. "<tenant>/<user>/<ts>.jpg"), not viewable URLs.
+    // signTimecardPhoto mints a short-lived (1 hr) signed URL for each real
+    // path; legacy sentinel/full-URL values are left alone (the UI hardens
+    // the sentinel to a placeholder).
     const enriched = await Promise.all((data || []).map(async t => ({
       ...t,
       employee_name: nameMap[t.user_id] || 'Unknown',
       is_gps_remote: t.clock_in_method === 'gps_remote',
-      remote_photo_signed_url: await signPath(t.remote_photo_url),
-      clock_out_photo_signed_url: await signPath(t.clock_out_photo_url),
+      remote_photo_signed_url: await signTimecardPhoto(t.remote_photo_url),
+      clock_out_photo_signed_url: await signTimecardPhoto(t.clock_out_photo_url),
       maps_url: (t.clock_in_latitude && t.clock_in_longitude)
         ? `https://maps.google.com/maps?q=${t.clock_in_latitude},${t.clock_in_longitude}`
         : null,

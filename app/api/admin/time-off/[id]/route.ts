@@ -24,6 +24,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { canDecideTimeOff, businessDaysBetween } from '@/lib/time-off';
+import { enumerateYMDRange, isWeekend } from '@/lib/dates';
 
 const PAID_TYPES = ['pto', 'vacation', 'personal_day', 'holiday', 'bereavement'];
 
@@ -145,15 +146,16 @@ export async function PATCH(
     const AUTO_MARKER = `[AUTO-TIMEOFF:${id}]`;
 
     const userId = record.operator_id;
-    // Build inclusive list of YYYY-MM-DD days in [date, end_date].
-    const days: string[] = [];
-    {
-      const start = new Date(`${record.date}T00:00:00Z`);
-      const end = new Date(`${record.end_date || record.date}T00:00:00Z`);
-      for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
-        days.push(d.toISOString().slice(0, 10));
-      }
-    }
+    // Inclusive list of every calendar day in [date, end_date] — used for the
+    // reversal delete range (harmless to include weekends there; the marker
+    // filter only ever touches rows we created).
+    const allDays: string[] = enumerateYMDRange(record.date, record.end_date || record.date);
+    // Business days only — weekends are excluded from the 8h paid-timecard
+    // insert so the paid-day count matches the PTO debit, which is also
+    // business-days-only (businessDaysBetween below). Previously this array
+    // included weekends, so a paid time-off spanning a weekend created MORE
+    // paid timecard rows than PTO days debited (the weekend-pay mismatch).
+    const days: string[] = allDays.filter((d) => !isWeekend(d));
 
     if (status === 'approved') {
       const entryType = finalIsPaid ? 'pto' : 'time_off';
@@ -210,13 +212,15 @@ export async function PATCH(
       }
     } else if (status === 'denied' || status === 'cancelled') {
       // Reversal: best-effort remove ONLY rows we created (matched by marker).
+      // Uses the FULL calendar range (not just business days) so it also
+      // cleans up any rows from a request approved before this fix.
       Promise.resolve(
         supabaseAdmin
           .from('timecards')
           .delete()
           .eq('user_id', userId)
           .eq('tenant_id', recTenant)
-          .in('date', days)
+          .in('date', allDays)
           .ilike('notes', `%${AUTO_MARKER}%`)
       )
         .then((res: any) => { if (res.error) console.error('Timecard cleanup error:', res.error); })

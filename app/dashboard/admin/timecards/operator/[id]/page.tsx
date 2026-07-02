@@ -17,6 +17,8 @@ import { getGoogleMapsLink } from '@/lib/geolocation';
 import { defaultLunchMinutes } from '@/lib/lunch';
 import UserAvatar from '@/components/UserAvatar';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import Toast from '@/components/Toast';
+import type { ToastData } from '@/components/Toast';
 
 // ── Types ─────────────────────────────────────────────────────
 interface OperatorInfo {
@@ -403,6 +405,16 @@ function OperatorTimecardDetailPageInner() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
+  // Toast notifications (replaces alert() for clock-in-adjacent error paths)
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+  const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts(prev => [...prev, { id, type, title, message }]);
+  }, []);
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
   // Night shift multiplier (fetched from settings for display)
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
 
@@ -657,12 +669,13 @@ function OperatorTimecardDetailPageInner() {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        window.alert(j.error || 'Failed to record no-show.');
+        addToast('error', 'No-Show Not Recorded', j.error || 'Failed to record no-show.');
         return;
       }
       fetchData();
     } catch (error) {
       console.error('Error recording no-show:', error);
+      addToast('error', 'No-Show Not Recorded', 'Network error occurred.');
     }
   };
 
@@ -805,7 +818,7 @@ function OperatorTimecardDetailPageInner() {
         });
         if (!legacyRes.ok) {
           const errBody = await legacyRes.json().catch(() => ({}));
-          alert(`Error: ${errBody.error || 'Failed to update'}`);
+          addToast('error', 'Update Failed', errBody.error || 'Failed to update');
           return;
         }
       }
@@ -814,6 +827,7 @@ function OperatorTimecardDetailPageInner() {
       fetchData();
     } catch (error) {
       console.error('Error updating entry:', error);
+      addToast('error', 'Update Failed', 'Network error occurred.');
     } finally {
       setEditSaving(false);
     }
@@ -833,11 +847,12 @@ function OperatorTimecardDetailPageInner() {
       if (response.ok) {
         await fetchData();
       } else {
-        const err = await response.json();
-        alert(`Recalculation failed: ${err.error}`);
+        const err = await response.json().catch(() => ({}));
+        addToast('error', 'Recalculation Failed', err.error || 'Failed to recalculate week.');
       }
     } catch (error) {
       console.error('Error recalculating week:', error);
+      addToast('error', 'Recalculation Failed', 'Network error occurred.');
     } finally {
       setActionLoading(null);
     }
@@ -2815,6 +2830,8 @@ function OperatorTimecardDetailPageInner() {
           </div>
         </div>
       )}
+
+      <Toast toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

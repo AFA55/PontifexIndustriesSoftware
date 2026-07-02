@@ -12,6 +12,8 @@ import {
   mondayOf,
   weekDatesFrom,
   weekDatesMonSun,
+  isWeekend,
+  enumerateYMDRange,
 } from './dates';
 
 describe('parseYMDLocal', () => {
@@ -78,5 +80,35 @@ describe('week ranges', () => {
     const wk = weekDatesMonSun(-1, parseYMDLocal('2026-06-03'));
     expect(wk[0]).toBe('2026-05-25');
     expect(wk[6]).toBe('2026-05-31');
+  });
+});
+
+describe('isWeekend', () => {
+  it('Monday 2026-06-01 is not a weekend', () => {
+    expect(isWeekend('2026-06-01')).toBe(false);
+  });
+  it('Friday 2026-06-05 is not a weekend', () => {
+    expect(isWeekend('2026-06-05')).toBe(false);
+  });
+  it('Saturday 2026-06-06 is a weekend', () => {
+    expect(isWeekend('2026-06-06')).toBe(true);
+  });
+  it('Sunday 2026-06-07 is a weekend', () => {
+    expect(isWeekend('2026-06-07')).toBe(true);
+  });
+});
+
+describe('enumerateYMDRange', () => {
+  it('returns a single day when no end date is given', () => {
+    expect(enumerateYMDRange('2026-06-01')).toEqual(['2026-06-01']);
+  });
+  it('returns an inclusive range spanning a full week (Mon-Sun)', () => {
+    expect(enumerateYMDRange('2026-06-01', '2026-06-07')).toEqual([
+      '2026-06-01', '2026-06-02', '2026-06-03', '2026-06-04',
+      '2026-06-05', '2026-06-06', '2026-06-07',
+    ]);
+  });
+  it('returns just the start day when start === end', () => {
+    expect(enumerateYMDRange('2026-06-03', '2026-06-03')).toEqual(['2026-06-03']);
   });
 });

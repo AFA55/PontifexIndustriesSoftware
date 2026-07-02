@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { signStoragePath } from '@/lib/signed-urls';
+import { signTimecardPhoto } from '@/lib/timecard-photos';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
@@ -296,17 +296,10 @@ export async function GET(
 
     // 7. Attach GPS logs and coworkers to each entry.
     // timecard-photos is a PRIVATE bucket, so the stored *_photo_url values are
-    // storage PATHS (e.g. "<tenant>/<user>/<ts>.jpg"), not viewable URLs. Mint a
-    // short-lived (1 hr) signed URL for each real path. Legacy rows hold the
-    // 'photo-upload-failed' sentinel or a full http(s) public URL — leave those
-    // alone (the UI hardens the sentinel/null to a "No photo" placeholder).
-    const signTimecardPhoto = async (val: string | null | undefined): Promise<string | null> => {
-      if (!val) return null;
-      if (val === 'photo-upload-failed') return null;
-      if (val.startsWith('http://') || val.startsWith('https://')) return null;
-      return signStoragePath('timecard-photos', val, 3600);
-    };
-
+    // storage PATHS (e.g. "<tenant>/<user>/<ts>.jpg"), not viewable URLs.
+    // signTimecardPhoto mints a short-lived (1 hr) signed URL for each real
+    // path; legacy sentinel/null/full-URL values are left alone (the UI
+    // hardens them to a "No photo" placeholder).
     const finalEntries = await Promise.all(enrichedEntries.map(async (entry: any) => {
       const jobKey = `${entry.job_order_id}_${entry.date}`;
       return {

@@ -16,6 +16,8 @@ import {
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import UserAvatar from '@/components/UserAvatar';
+import Toast from '@/components/Toast';
+import type { ToastData } from '@/components/Toast';
 
 // ── Types ────────────────────────────────────────────────────
 interface DayInfo {
@@ -172,6 +174,16 @@ export default function AdminTimecardsPage() {
   const [editClockInTime, setEditClockInTime] = useState('');
   const [editClockInNotes, setEditClockInNotes] = useState('');
   const [savingClockIn, setSavingClockIn] = useState(false);
+
+  // Toast notifications (replaces alert() for clock-in-adjacent error paths)
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+  const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    setToasts(prev => [...prev, { id, type, title, message }]);
+  }, []);
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
 
   const router = useRouter();
   const isRedirecting = useRef(false);
@@ -377,12 +389,13 @@ export default function AdminTimecardsPage() {
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
-        window.alert(j.error || 'Failed to record no-show.');
+        addToast('error', 'No-Show Not Recorded', j.error || 'Failed to record no-show.');
         return;
       }
       fetchTeamSummary();
     } catch (error) {
       console.error('Error recording no-show:', error);
+      addToast('error', 'No-Show Not Recorded', 'Network error occurred.');
     }
   };
 
@@ -468,11 +481,12 @@ export default function AdminTimecardsPage() {
         fetchPendingCorrectionCount();
         fetchTeamSummary();
       } else {
-        const err = await res.json();
-        alert(err.error || 'Failed to process correction');
+        const err = await res.json().catch(() => ({}));
+        addToast('error', 'Correction Not Processed', err.error || 'Failed to process correction');
       }
     } catch (err) {
       console.error('Error reviewing correction:', err);
+      addToast('error', 'Correction Not Processed', 'Network error occurred.');
     } finally {
       setReviewingCorrection(null);
     }
@@ -968,7 +982,7 @@ export default function AdminTimecardsPage() {
             <button
               className="flex items-center gap-1.5 px-3 py-2 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 rounded-lg text-sm font-semibold border border-amber-200 dark:border-amber-400/30 transition-all ml-auto"
               title="Feature placeholder - SMS integration needed"
-              onClick={() => alert(`${statusCounts.noEntries} team member(s) have no entries this week. SMS reminders require SMS integration.`)}
+              onClick={() => addToast('info', 'SMS Integration Required', `${statusCounts.noEntries} team member(s) have no entries this week. SMS reminders require SMS integration.`)}
             >
               <Bell size={14} />
               Send Reminders ({statusCounts.noEntries})
@@ -1699,6 +1713,8 @@ export default function AdminTimecardsPage() {
           }}
         />
       )}
+
+      <Toast toasts={toasts} onRemove={removeToast} />
     </div>
   );
 }

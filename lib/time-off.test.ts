@@ -7,6 +7,7 @@ import {
   MANAGEMENT_NOTIFY_ROLES,
   APPROVER_NOTIFY_ROLES,
 } from './time-off';
+import { enumerateYMDRange, isWeekend } from './dates';
 
 describe('canDecideTimeOff — rank-based approval authority', () => {
   // ── super_admin approves EVERYONE ──────────────────────────────────────
@@ -98,6 +99,29 @@ describe('businessDaysBetween', () => {
   it('returns at least 1 for a weekend-only range', () => {
     // Sat 2026-06-27 → Sun 2026-06-28 = 0 weekdays → clamps to 1
     expect(businessDaysBetween('2026-06-27', '2026-06-28')).toBe(1);
+  });
+});
+
+describe('weekend-pay mismatch regression (time-off approval timecard sync)', () => {
+  // The approval route (app/api/admin/time-off/[id]/route.ts) builds its list of
+  // paid-timecard days by filtering enumerateYMDRange() through !isWeekend(), so
+  // it inserts one 8h row per BUSINESS day — matching the PTO debit, which is
+  // also business-days-only (businessDaysBetween). This locks that the two
+  // counts agree for a range spanning a weekend.
+  it('weekday-filtered day count matches businessDaysBetween across a full week', () => {
+    const start = '2026-06-22'; // Monday
+    const end = '2026-06-28';   // Sunday (includes a weekend)
+    const paidDays = enumerateYMDRange(start, end).filter((d) => !isWeekend(d));
+    expect(paidDays.length).toBe(businessDaysBetween(start, end));
+    expect(paidDays).toEqual(['2026-06-22', '2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26']);
+  });
+
+  it('a two-week PTO request still debits/pays only 10 business days', () => {
+    const start = '2026-06-22'; // Monday
+    const end = '2026-07-03';   // Friday, two weeks later (spans 2 weekends)
+    const paidDays = enumerateYMDRange(start, end).filter((d) => !isWeekend(d));
+    expect(paidDays.length).toBe(businessDaysBetween(start, end));
+    expect(paidDays.length).toBe(10);
   });
 });
 

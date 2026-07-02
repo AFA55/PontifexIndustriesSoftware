@@ -110,3 +110,25 @@ export function formatTime(isoString: string | null): string {
     hour12: true,
   });
 }
+
+/** True when a bare 'YYYY-MM-DD' falls on a Saturday or Sunday (parsed LOCAL). */
+export function isWeekend(ymd: string): boolean {
+  const day = parseYMDLocal(ymd).getDay();
+  return day === 0 || day === 6;
+}
+
+/**
+ * Inclusive list of bare 'YYYY-MM-DD' days from `startYMD` to `endYMD` (parsed
+ * LOCAL, never UTC). Returns `[startYMD]` if `endYMD` is missing or precedes it.
+ */
+export function enumerateYMDRange(startYMD: string, endYMD?: string | null): string[] {
+  const start = parseYMDLocal(startYMD);
+  const end = endYMD ? parseYMDLocal(endYMD) : start;
+  const days: string[] = [];
+  const cur = new Date(start);
+  while (cur <= end) {
+    days.push(toLocalYMD(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return days.length > 0 ? days : [startYMD];
+}
