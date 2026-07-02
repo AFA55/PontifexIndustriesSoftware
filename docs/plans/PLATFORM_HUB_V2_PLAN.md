@@ -4,8 +4,8 @@
 > within it... a sequence almost like the form scheduler when creating company code, login page and
 > dashboard for other users... UI must look modern, functional, match brand."
 >
-> Status: PLANNED — demo-requests inbox shipped Jun 10 as phase 1. Build the rest with parallel
-> agents + `frontend-design` skill + guardian.
+> Status: Build item 1 (tenant-creation wizard) SHIPPED Jul 2 — see below. Build items 2/3
+> (hub overview upgrades, brand polish) still open.
 
 ## What exists today (don't rebuild)
 
@@ -27,15 +27,18 @@ Demo request lands (email + inbox)
   → ongoing: per-tenant health, usage, billing at a glance
 ```
 
-### Build item 1 — Tenant-creation WIZARD (the founder's "sequence")
-Replace the flat `/tenants/new` form with a schedule-form-style stepper, pre-fillable from a demo
-request (`?fromLead=<id>`):
-1. **Company** — name, company code (live availability check), from-lead prefill
-2. **Branding** — logo upload, primary color, login welcome text, live login-page PREVIEW
+### Build item 1 — Tenant-creation WIZARD (the founder's "sequence") ✅ SHIPPED Jul 2
+`app/dashboard/platform/tenants/new/page.tsx` — a 5-step stepper, pre-fillable from a demo
+request (`?fromLead=<id>`), verified live end-to-end (real tenant created + inspected in the DB,
+then cleaned up):
+1. **Company** — name, company code (live availability check against existing tenants), from-lead prefill
+2. **Branding** — primary color, live login-page PREVIEW that updates as you type. Logo upload
+   deliberately deferred to Settings → Branding post-creation (avoids pre-tenant file-upload plumbing).
 3. **Modules** — package presets (Starter / Field Ops / Full) on top of the existing switchboard
 4. **First admin** — name + email → fires the EXISTING invite flow on creation
 5. **Review & launch** — summary → create → success screen with login URL + company code to send
-On success: demo request auto-marked `converted` (link `demo_requests.tenant_id`).
+On success: demo request auto-marked `converted` + `demo_requests.tenant_id` linked (the column
+existed unused until now); the demo-requests inbox's "Convert to tenant" CTA now passes `?fromLead=`.
 
 ### Build item 2 — Hub overview as a real control center
 - KPI row: clients, active users (7d), open demo requests, open feedback, error count (links Sentry when DSN set)
