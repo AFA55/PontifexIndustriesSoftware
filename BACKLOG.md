@@ -9,15 +9,15 @@
 | | |
 |---|---|
 | **Phase** | 🚀 **LAUNCHING** — web live; both mobile apps in store review |
-| **Prod** | ✅ LIVE — pontifexindustries.com (deployed `0e8c1506` — tenant-brand redesign of Time Edit Requests + drive-time auto-suggest + smart notif auto-ack + resend acceptance email) |
-| **iOS** | ✅ **LIVE — v1.0.5 / Build 10 "Ready for Distribution"** (submitted + processed Jun 30 — App Store metadata scrub of non-compete vertical language). |
-| **Android** | v1.0.1 / versionCode 2 — **IN REVIEW** (Play production, US). **Org account → closed testing NOT required** (confirmed Jun 27); empty closed-test draft discarded. Auto-publishes on approval. See `android-release` skill. |
-| **Open** | P0: ~0 · P1: ~3 · P2: ~13 · P3: ~8 |
-| **In flight** | Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
-| **Dev engine** | ⚡ NEW (Jun 27): parallel-burndown Workflow + Playwright MCP live; ruflo/claude-flow dead weight removed. See `docs/playbooks/PARALLEL_BURNDOWN.md` + `TOOLING_EVALUATION.md` Batch 3. |
-| **Blocked on founder** | 🤖 Google Play review (auto-notifies) · Sentry DSN · (AI-Gateway greenlight for Jarvis) · (optional) expand Play beyond US |
-| **Unpushed commits** | ✅ none — pushed through `96964571` (Jun 27 dev-velocity + security batch) |
-| **Last groomed** | Jun 27, 2026 (PT2) |
+| **Prod** | ✅ LIVE — pontifexindustries.com (deployed `ff40da25` — Jul 1 live-blocker sweep: non-compete scrub, hooks bug, CI green, storage RLS) |
+| **iOS** | ✅ **LIVE — v1.0.5 / Build 10 "Ready for Distribution"** (since Jun 30 — App Store metadata scrub of non-compete vertical language). No action needed. |
+| **Android** | v1.0.1 / versionCode 2 — **STILL IN REVIEW** (Submission 4, Jun 22 — 10 days as of Jul 1). Founder filed a Play support ticket Jul 1 (case ID pending, 2-business-day reply). Separately: store-listing copy fix saved but **not yet submitted** ("Submit 2 changes for review" awaiting founder go-ahead). See `android-release` skill. |
+| **Open** | P0: ~2 (Twilio + Play submit, both founder-action) · P1: ~3 · P2: ~13 · P3: ~8 |
+| **In flight** | Twilio toll-free resubmission (founder correcting Company Type off Sole Proprietor) · Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
+| **Dev engine** | ⚡ Jul 1: worktree-builder + implementation-fidelity-reviewer team pattern proven on 4 parallel live-blocker fixes. See `docs/plans/JULY1_LAUNCH_BLOCKERS_TEAM_PLAN.md`. Prior: parallel-burndown Workflow + Playwright MCP (Jun 27), `docs/playbooks/PARALLEL_BURNDOWN.md` + `TOOLING_EVALUATION.md` Batch 3. |
+| **Blocked on founder** | 🤖 Google Play review (auto-notifies) + support ticket reply · Twilio resubmission confirm · Sentry DSN · (AI-Gateway greenlight for Jarvis) |
+| **Unpushed commits** | ✅ none — pushed through `ff40da25` (Jul 1 live-blocker sweep) |
+| **Last groomed** | Jul 1, 2026 |
 
 ## 🚀 PATRIOT LAUNCH EPIC (the path to first revenue — Jun 27 founder-defined "done")
 

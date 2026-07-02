@@ -1,8 +1,43 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jun 28, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (customer-portal gaps batch)
+**Last updated:** Jul 1, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (Jul 1 live-blocker sweep, pushed `ff40da25`)
 
-> **🛎️ Customer Portal completed (Jun 28):** the portal was ~70% pre-built (magic-link `/portal/[token]`,
+> **🛎️ Jul 1 session (Sonnet 5) — non-compete scrub + 4 live prod issues fixed + team-pattern doc:**
+> Founder ran a fresh 6-agent director-level audit (docs, codebase, DB/RLS, backlog, test/CI, mobile) —
+> full findings in the audit itself, not re-copied here. From that audit, stood up 4 worktree-isolated
+> builders + verified/merged/committed all 4 (build+tsc+jest all clean, pushed `ff40da25`):
+> 1. **Non-compete leak scrubbed from the LIVE WEBSITE + Stripe checkout** (not just store listings —
+>    9 files: homepage, pricing, request-demo, offer/case-study pages, Stripe description). Biggest
+>    catch: the platform-WIDE login page fallback tagline was literally *"Concrete Cutting Management
+>    System"*, shown to ANY tenant. See [[pontifex-positioning-noncompete]] memory.
+> 2. **Live conditional-React-hooks bug fixed** — `app/dashboard/admin/settings/page.tsx`
+>    `BillingSection` had hooks gated behind an early `return null`. Fixed, zero UX change.
+> 3. **CI green again** — those 4 hook errors WERE the entire CI failure (had been red 30+ pushes,
+>    unnoticed since Vercel deploys regardless). Plus `.eslintrc.json` needed `"root": true`.
+> 4. **5 public storage buckets locked down** (`avatars`, `job-photos`, `jobsite-area-docs`,
+>    `scope-photos`, `site-compliance-docs`) — removed anon-listable SELECT policies (advisor
+>    `public_bucket_allows_listing` was 5/5, now 0/5). Reads still work via `getPublicUrl()`.
+>
+> **New reusable systems from this session:** `docs/plans/JULY1_LAUNCH_BLOCKERS_TEAM_PLAN.md` (the
+> worktree-builders + fidelity-reviewer team pattern) · `docs/playbooks/TWILIO_TOLLFREE_RESUBMIT.md`
+> (exact fields for the 30530 rejection) · prompt-reconfiguration "lens" table added to
+> `docs/playbooks/PROMPTING_GUIDE.md` + memory (reconfigure rough/typo prompts through a
+> senior-engineer lens before acting — audit/debug/perf/refactor/architect/security/devops).
+>
+> **⚠️ STILL OPEN — needs founder action or confirmation next session:**
+> - **Twilio toll-free**: rejected (30530, Entity Misclassification — `BusinessType` was
+>   `SOLE_PROPRIETOR`, should be an LLC/private-for-profit type). Founder was mid-resubmission in the
+>   console at session end (had corrected Legal Business Name + was changing Company Type) —
+>   **verify this actually completed/was submitted next session**, don't assume it's done.
+> - **Google Play store-listing copy**: the "bridge/digital-infrastructure" positioning text is
+>   written and SAVED but sits as an unsubmitted draft ("Submit 2 changes for review" button never
+>   clicked, pending founder go-ahead — outward-publish action, intentionally not auto-clicked).
+> - **Google Play app review**: submission #4 (Jun 22) still "In review" as of Jul 1 (10 days).
+>   Founder filed a Play support ticket Jul 1 ("App publishing", Pending, case ID pending, reply
+>   window 2 business days) — check for Google's reply next session.
+> - **iOS 1.0.5 / Build 10**: confirmed "Ready for Distribution" (live) as of Jun 30 — no action needed.
+
+> **Prior — 🛎️ Customer Portal completed (Jun 28):** the portal was ~70% pre-built (magic-link `/portal/[token]`,
 > doc signing `/sign/[token]`, liability waiver, survey). Built the 3 gaps this session, all guardian +
 > rls-auditor PASS: **(1) customer notifications** (en-route + job-complete emails w/ portal link; SMS
 > dormant till Twilio toll-free verified), **(2) customer comments → management** (2-way channel: portal
@@ -42,8 +77,8 @@ The platform is **live on the web** with a paying trial customer (Patriot Concre
 | Surface | Status |
 |---|---|
 | **Web** | ✅ LIVE — `pontifexindustries.com` (latest `0e8c1506`, Jun 27). This is the product; the mobile apps are thin wrappers around it. |
-| **iOS** | ✅ **v1.0.4 APPROVED — "Ready for Distribution"** + set to **Automatically release**. Developer Agreement re-accept = DONE. Releasing v1.0.4 delivers the native Face ID plugin to users. |
-| **Android** | **v1.0.1 / versionCode 2 — IN REVIEW** (Submission 4, Jun 22), US-only, Managed publishing OFF → auto-publishes on approval. **Confirmed Jun 27: ORG account ("PontifexIndustriesLLC") → EXEMPT from the closed-testing mandate.** The dashboard "closed test track" card is optional — ignored/discarded the empty draft. Just waiting on Google. Procedure now lives in the **`android-release`** skill. |
+| **iOS** | ✅ **v1.0.5 / Build 10 — "Ready for Distribution"** (live since Jun 30 — App Store metadata non-compete scrub) + **Automatically release**. Don't cut a new build for web/bugfix changes. |
+| **Android** | **v1.0.1 / versionCode 2 — STILL IN REVIEW** (Submission 4, Jun 22 — 10 days as of Jul 1), US-only, Managed publishing OFF → auto-publishes on approval. Founder filed a Play support ticket Jul 1 asking for a status check (case ID pending, 2-business-day reply window). **Separately:** an unrelated store-listing copy edit (non-compete positioning fix) is saved as an unsubmitted draft — "Submit 2 changes for review" not yet clicked, awaiting founder go-ahead. Procedure in the **`android-release`** skill. |
 
 **The mobile apps are a remote-URL Capacitor webview that loads `pontifexindustries.com`.** This is the single most important architectural fact: **web/UI/API changes ship to BOTH apps instantly via a Vercel deploy — no App Store / Play build needed.** Only *native* changes (icon, splash, plugins, Info.plist/AndroidManifest, Capacitor config) require a store build.
 
