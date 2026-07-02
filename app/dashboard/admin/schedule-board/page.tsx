@@ -3,21 +3,12 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import {
-  Calendar, Send, Users, Clock, MapPin, Plus, ChevronLeft, ChevronRight,
-  LayoutGrid, CalendarDays, Bell, FileText, Phone, Package, AlertCircle,
-  UserCheck, UserX, FolderOpen, Timer, Loader2, Settings, Search, X,
-  Megaphone, CheckCircle2, Sparkles, Zap, Brain, RefreshCw, KeyRound, Copy,
-  MessageSquareOff, CalendarOff
-} from 'lucide-react';
+import { CalendarOff } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
 import OperatorRow from './_components/OperatorRow';
 import Toast from './_components/Toast';
-import NotificationBell from '@/components/NotificationBell';
 import type { QuickAddData } from './_components/QuickAddModal';
-import ScheduleDatePicker from './_components/ScheduleDatePicker';
 import DailyNotesSection from './_components/DailyNotesSection';
 import type { DailyNote } from './_components/DailyNotesSection';
 import type { JobCardData } from './_components/JobCard';
@@ -25,7 +16,9 @@ import type { PendingJob } from './_components/PendingQueueSidebar';
 import type { ToastData } from './_components/Toast';
 import type { NoteData } from './_components/NotesDrawer';
 import DndBoardWrapper from './_components/DndBoardWrapper';
-import ViewToggle from './_components/ViewToggle';
+import ScheduleBoardHeader from './_components/ScheduleBoardHeader';
+import ScheduleBoardStatsBar from './_components/ScheduleBoardStatsBar';
+import SmsConfigWarning from './_components/SmsConfigWarning';
 import CapacitySettingsModal from './_components/CapacitySettingsModal';
 import DispatchConfirmationModal from './_components/DispatchConfirmationModal';
 import AutoScheduleResultsModal from './_components/AutoScheduleResultsModal';
@@ -1685,225 +1678,52 @@ export default function ScheduleBoardPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-brand/5 dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0e0720]">
       {/* ═══ STICKY HEADER ════════════════════════════════════════════════ */}
-      <div className="backdrop-blur-xl bg-white/90 dark:bg-[#0e0720]/95 border-b border-gray-200 dark:border-white/10 sticky top-0 z-30 shadow-lg">
-        <div className="container mx-auto px-4 md:px-6 py-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <Link href="/dashboard/admin" className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-white/10 rounded-xl transition-all hover:scale-105">
-                <ChevronLeft className="w-5 h-5 text-gray-700 dark:text-white/70" />
-              </Link>
-              <div>
-                <h1 className="text-lg md:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                  <Calendar className="w-5 h-5 text-brand" />
-                  {canEdit ? 'Operations Schedule Board' : 'Schedule Board'}
-                </h1>
-                <p className="text-gray-500 dark:text-white/60 text-xs">
-                  {canEdit ? 'Manage assignments, approvals & dispatch' : 'View scheduled jobs • Request changes'}
-                </p>
-              </div>
-            </div>
-
-            {/* Action toolbar — labels stay visible on narrow screens and the row
-                wraps neatly instead of collapsing to icon-only buttons. */}
-            <div className="flex items-center gap-2 w-full sm:w-auto sm:justify-end flex-wrap">
-              {/* Notification bell for all users */}
-              <NotificationBell variant="light" />
-
-              {canEdit && (
-                <button onClick={() => setShowPendingQueue(true)} className="relative h-9 px-3 bg-orange-50 hover:bg-orange-100 border border-orange-200 rounded-lg text-orange-700 text-sm font-semibold transition-all flex items-center gap-1.5">
-                  <Bell className="w-4 h-4" /> <span className="whitespace-nowrap">Pending</span>
-                  {pendingJobs.length > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{pendingJobs.length}</span>
-                  )}
-                </button>
-              )}
-
-              <button onClick={() => setShowWillCall(!showWillCall)} className={`h-9 px-3 border rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${showWillCall ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700'}`}>
-                <FolderOpen className="w-4 h-4" /> <span className="whitespace-nowrap">Will Call</span>
-                <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallJobs.length}</span>
-              </button>
-
-              <button className="relative h-9 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-sm font-semibold transition-all flex items-center gap-1.5">
-                <FileText className="w-4 h-4" /> <span className="whitespace-nowrap">Changes</span>
-                {changeRequestCount > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{changeRequestCount}</span>
-                )}
-              </button>
-
-              {canEdit && (
-                <>
-                  <button
-                    onClick={handleAutoSchedule}
-                    disabled={autoScheduleLoading || unassignedJobs.length === 0}
-                    className={`relative h-9 px-3 rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md ${
-                      unassignedJobs.length > 0
-                        ? 'bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-dark text-white'
-                        : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    {autoScheduleLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-4 h-4" />
-                    )}
-                    <span className="whitespace-nowrap">{autoScheduleLoading ? 'Scheduling...' : 'AI Schedule'}</span>
-                    {unassignedJobs.length > 0 && !autoScheduleLoading && (
-                      <span className="px-1.5 py-0.5 bg-white/20 rounded-full text-xs">{unassignedJobs.length}</span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => setShowQuickAdd(true)}
-                    className="h-9 px-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
-                  >
-                    <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">Quick Add</span>
-                  </button>
-                  <button
-                    onClick={handleUpdateSchedule}
-                    disabled={updatingSchedule}
-                    className="h-9 px-3 bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                    title="Re-push schedule changes to operators"
-                  >
-                    {updatingSchedule ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> <span className="whitespace-nowrap">Updating...</span></>
-                    ) : (
-                      <><RefreshCw className="w-4 h-4" /> <span className="whitespace-nowrap">Update Schedule</span></>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => {
-                      fetchDispatchStatus(selectedDate);
-                      setShowDispatchModal(true);
-                    }}
-                    className="relative h-9 px-3 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md"
-                  >
-                    <Megaphone className="w-4 h-4" /> <span className="whitespace-nowrap">Push Tickets</span>
-                    {dispatchInfo && dispatchInfo.total > 0 && (
-                      <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchInfo.total}</span>
-                    )}
-                  </button>
-                  <button
-                    onClick={() => { setShowDailyCode(true); fetchDailyCode(); }}
-                    className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-400/30 rounded-lg text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all flex items-center gap-1.5"
-                  >
-                    <KeyRound className="w-4 h-4" /> <span className="whitespace-nowrap">Daily Code</span>
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <ScheduleBoardHeader
+        canEdit={canEdit}
+        pendingCount={pendingJobs.length}
+        willCallCount={willCallJobs.length}
+        showWillCall={showWillCall}
+        changeRequestCount={changeRequestCount}
+        autoScheduleLoading={autoScheduleLoading}
+        unassignedCount={unassignedJobs.length}
+        updatingSchedule={updatingSchedule}
+        dispatchTotal={dispatchInfo?.total || 0}
+        onOpenPendingQueue={() => setShowPendingQueue(true)}
+        onToggleWillCall={() => setShowWillCall(!showWillCall)}
+        onAutoSchedule={handleAutoSchedule}
+        onQuickAdd={() => setShowQuickAdd(true)}
+        onUpdateSchedule={handleUpdateSchedule}
+        onOpenDispatchModal={() => { fetchDispatchStatus(selectedDate); setShowDispatchModal(true); }}
+        onOpenDailyCode={() => { setShowDailyCode(true); fetchDailyCode(); }}
+      />
 
       {/* ═══ DATE NAVIGATION + STATS ═════════════════════════════════════ */}
       {/* SMS not configured warning */}
       {smsConfigured === false && !smsWarningDismissed && (
-        <div className="container mx-auto px-4 md:px-6 pt-4">
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/30">
-            <MessageSquareOff className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0" />
-            <p className="text-sm text-amber-800 dark:text-amber-200 flex-1">
-              <span className="font-semibold">SMS not configured</span> — dispatch text notifications won&apos;t reach operators.
-              Set <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">TELNYX_API_KEY</code> or{' '}
-              <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/40 px-1 py-0.5 rounded">TWILIO_AUTH_TOKEN</code> in Vercel environment variables.
-            </p>
-            <button
-              onClick={() => {
-                setSmsWarningDismissed(true);
-                try { localStorage.setItem('sms_warning_dismissed', 'true'); } catch { /* ignore */ }
-              }}
-              className="text-amber-500 hover:text-amber-700 dark:text-amber-400 dark:hover:text-amber-200 transition-colors flex-shrink-0"
-              title="Dismiss"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
+        <SmsConfigWarning
+          onDismiss={() => {
+            setSmsWarningDismissed(true);
+            try { localStorage.setItem('sms_warning_dismissed', 'true'); } catch { /* ignore */ }
+          }}
+        />
       )}
 
-      <div className="container mx-auto px-4 md:px-6 py-4">
-        <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 p-4 md:p-5">
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <ScheduleDatePicker value={selectedDate} onChange={setSelectedDate} />
-
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 p-1 rounded-xl">
-                <button
-                  onClick={() => setViewMode('day')}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                    viewMode === 'day'
-                      ? 'bg-gradient-to-r from-brand to-brand-accent text-white shadow-lg'
-                      : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-white/15'
-                  }`}
-                >
-                  <LayoutGrid className="w-4 h-4" /> Day
-                </button>
-                <button
-                  onClick={() => setViewMode('week')}
-                  className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
-                    viewMode === 'week'
-                      ? 'bg-gradient-to-r from-brand to-brand-accent text-white shadow-lg'
-                      : 'text-gray-500 dark:text-white/60 hover:text-gray-700 dark:hover:text-slate-200 hover:bg-gray-200 dark:hover:bg-white/15'
-                  }`}
-                >
-                  <CalendarDays className="w-4 h-4" /> Week
-                </button>
-              </div>
-              <ViewToggle viewMode={boardViewMode} onChange={handleBoardViewModeChange} />
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-2 px-3 py-2 bg-brand/5 dark:bg-brand/15 rounded-xl border border-brand/30 dark:border-brand/30">
-                <UserCheck className="w-4 h-4 text-brand dark:text-brand" />
-                <div>
-                  <div className="text-[10px] font-bold text-brand dark:text-brand uppercase">Active</div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white">{activeOperators}</div>
-                </div>
-              </div>
-              <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${
-                totalJobs >= capacityMaxSlots
-                  ? 'bg-red-50 border-red-200 dark:bg-red-500/15 dark:border-red-400/30'
-                  : totalJobs >= capacityWarningThreshold
-                    ? 'bg-amber-50 border-amber-200 dark:bg-amber-500/15 dark:border-amber-400/30'
-                    : 'bg-green-50 border-green-200 dark:bg-green-500/15 dark:border-green-400/30'
-              }`}>
-                <Package className={`w-4 h-4 ${
-                  totalJobs >= capacityMaxSlots ? 'text-red-600 dark:text-red-400' : totalJobs >= capacityWarningThreshold ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'
-                }`} />
-                <div>
-                  <div className={`text-[10px] font-bold uppercase ${
-                    totalJobs >= capacityMaxSlots ? 'text-red-500 dark:text-red-400' : totalJobs >= capacityWarningThreshold ? 'text-amber-500 dark:text-amber-400' : 'text-green-500 dark:text-green-400'
-                  }`}>
-                    {totalJobs >= capacityMaxSlots ? 'Full' : totalJobs >= capacityWarningThreshold ? 'Near Cap' : 'Capacity'}
-                  </div>
-                  <div className="text-lg font-bold text-gray-900 dark:text-white">{totalJobs}/{capacityMaxSlots}</div>
-                </div>
-              </div>
-
-              {/* See Next Available — for admin/salesman (non-super_admin) */}
-              {!canEdit && (
-                <button
-                  onClick={handleFindNextAvailable}
-                  disabled={findingNextAvailable}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-brand/5 hover:bg-brand/10 dark:bg-brand/15 dark:hover:bg-brand/25 border border-brand/30 dark:border-brand/30 rounded-xl text-brand dark:text-brand text-sm font-semibold transition-all"
-                >
-                  {findingNextAvailable ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  Next Available
-                </button>
-              )}
-
-              {/* Capacity Settings — super_admin only */}
-              {canEdit && (
-                <button
-                  onClick={() => setShowCapacitySettings(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-white/10 border border-gray-200 dark:border-white/10 rounded-xl text-gray-600 dark:text-white/60 text-sm font-semibold transition-all"
-                  title="Capacity Settings"
-                >
-                  <Settings className="w-4 h-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
+      <ScheduleBoardStatsBar
+        selectedDate={selectedDate}
+        onDateChange={setSelectedDate}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+        boardViewMode={boardViewMode}
+        onBoardViewModeChange={handleBoardViewModeChange}
+        activeOperators={activeOperators}
+        totalJobs={totalJobs}
+        capacityMaxSlots={capacityMaxSlots}
+        capacityWarningThreshold={capacityWarningThreshold}
+        canEdit={canEdit}
+        findingNextAvailable={findingNextAvailable}
+        onFindNextAvailable={handleFindNextAvailable}
+        onOpenCapacitySettings={() => setShowCapacitySettings(true)}
+      />
 
       {/* ═══ WILL CALL FOLDER ══════════════════════════════════════════════ */}
       {showWillCall && (
