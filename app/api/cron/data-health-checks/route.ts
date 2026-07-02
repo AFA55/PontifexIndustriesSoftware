@@ -1,7 +1,13 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * GET /api/cron/health-checks
+ * GET /api/cron/data-health-checks
+ *
+ * Distinct from /api/cron/health-check (singular) — that route is infra/DB
+ * uptime monitoring (connectivity, size, table counts -> system_health_log).
+ * This route checks business DATA health (stuck jobs, overdue invoices,
+ * inactive tenants -> platform_health_alerts). Different concern, different
+ * table — kept the name clearly distinct to avoid confusing the two.
  *
  * Vercel Cron job — runs the platform health-check suite (lib/platform-health-checks.ts)
  * daily and reconciles results into `platform_health_alerts`. Protected by
