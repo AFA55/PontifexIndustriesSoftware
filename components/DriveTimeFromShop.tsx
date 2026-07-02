@@ -28,6 +28,14 @@ interface Props {
    * accepts a free-text destination, so we still get an answer.
    */
   fallbackAddress?: string;
+  /**
+   * Tenant-specific shop origin. Defaults to the hardcoded Patriot
+   * SHOP_LOCATION so existing callers keep working unchanged. Callers should
+   * fetch this via `getTenantShopLocation()` (lib/geolocation.ts) — same
+   * fallback shape the clock-in route already uses — rather than hardcoding
+   * a tenant's coordinates here, so this component stays reusable per tenant.
+   */
+  shopOverride?: { latitude: number; longitude: number };
 }
 
 interface Result {
@@ -35,7 +43,8 @@ interface Result {
   distanceText: string;   // e.g. "18.4 mi"
 }
 
-export default function DriveTimeFromShop({ lat, lng, fallbackAddress }: Props) {
+export default function DriveTimeFromShop({ lat, lng, fallbackAddress, shopOverride }: Props) {
+  const shopOrigin = shopOverride ?? SHOP_LOCATION;
   const [data, setData] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +80,7 @@ export default function DriveTimeFromShop({ lat, lng, fallbackAddress }: Props) 
 
       service.getDistanceMatrix(
         {
-          origins: [{ lat: SHOP_LOCATION.latitude, lng: SHOP_LOCATION.longitude }],
+          origins: [{ lat: shopOrigin.latitude, lng: shopOrigin.longitude }],
           destinations: [destination],
           travelMode: 'DRIVING',
           unitSystem: w.google?.maps?.UnitSystem?.IMPERIAL ?? 1,
@@ -99,7 +108,10 @@ export default function DriveTimeFromShop({ lat, lng, fallbackAddress }: Props) 
     // Debounce a beat so we don't fire on stale renders / typing bounces
     const t = setTimeout(tryFetch, 250);
     return () => { cancelled = true; clearTimeout(t); };
-  }, [lat, lng, fallbackAddress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- shopOrigin's identity intentionally
+    // tracked via its primitive fields, not object reference, since default calls (no shopOverride)
+    // would otherwise re-fire every render off a fresh SHOP_LOCATION reference comparison miss.
+  }, [lat, lng, fallbackAddress, shopOrigin.latitude, shopOrigin.longitude]);
 
   if (loading) {
     return (

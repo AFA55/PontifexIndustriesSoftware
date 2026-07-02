@@ -11,6 +11,7 @@ import {
   Bell, Minus, Plus, Palette, ChevronRight,
   CreditCard, ExternalLink, ArrowUpRight, MessageSquareWarning,
   Building2, Shield, Wifi, Coins, CalendarDays, DatabaseBackup,
+  DollarSign, Car, Wrench, Receipt,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -258,6 +259,188 @@ function LinkOutCard({
         </div>
       </Card>
     </Link>
+  );
+}
+
+// ─── Job Cost Standards section ────────────────────────────────────────────
+const COST_STANDARDS_ROLES = ['admin', 'super_admin', 'operations_manager'];
+
+interface JobCostStandards {
+  default_mileage_rate: number;
+  default_equipment_cost: number;
+  default_other_cost: number;
+}
+
+function JobCostStandardsSection({ userRole }: { userRole: string }) {
+  const isCostRole = COST_STANDARDS_ROLES.includes(userRole);
+
+  const [standards, setStandards] = useState<JobCostStandards | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [error, setError] = useState('');
+
+  const fetchStandards = useCallback(async () => {
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+
+      const res = await fetch('/api/admin/job-cost-standards', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data) setStandards(json.data as JobCostStandards);
+      }
+    } catch {
+      // non-fatal — section just shows defaults
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isCostRole) return;
+    fetchStandards();
+  }, [isCostRole, fetchStandards]);
+
+  const handleSave = async () => {
+    if (!standards) return;
+    setSaving(true);
+    setError('');
+    setSaved(false);
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data: session } = await supabase.auth.getSession();
+      const token = session.session?.access_token || '';
+
+      const res = await fetch('/api/admin/job-cost-standards', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(standards),
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json?.data) setStandards(json.data as JobCostStandards);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
+      } else {
+        const json = await res.json().catch(() => ({}));
+        setError(json.error || 'Failed to save job cost standards');
+      }
+    } catch {
+      setError('Network error — please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!isCostRole) return null;
+  if (!standards) return null;
+
+  const update = (field: keyof JobCostStandards, value: string) => {
+    const num = value === '' ? 0 : Number(value);
+    setStandards(prev => prev ? { ...prev, [field]: Number.isFinite(num) ? num : 0 } : prev);
+  };
+
+  return (
+    <div className="bg-white dark:bg-white/5 rounded-2xl shadow-xl border border-gray-100 dark:border-white/10 overflow-hidden">
+      <div className="bg-gradient-to-r from-brand to-brand-accent px-6 py-4 text-white flex items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-bold flex items-center gap-2">
+            <DollarSign className="w-5 h-5" />
+            Job Cost Standards
+          </h2>
+          <p className="text-white/80 text-sm mt-0.5">Default cost inputs used on job tickets and the P&amp;L dashboard</p>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="px-4 py-2 bg-white/15 hover:bg-white/25 disabled:opacity-50 rounded-xl font-bold text-sm transition-all flex items-center gap-2 flex-shrink-0"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? 'Saving...' : 'Save'}
+        </button>
+      </div>
+
+      <div className="p-6 space-y-5">
+        {saved && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm font-semibold dark:bg-emerald-500/15 dark:border-emerald-400/30 dark:text-emerald-300">
+            <CheckCircle className="w-4 h-4" />
+            Job cost standards saved!
+          </div>
+        )}
+        {error && (
+          <div className="flex items-center gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-semibold dark:bg-rose-500/15 dark:border-rose-400/30 dark:text-rose-300">
+            <AlertTriangle className="w-4 h-4" />
+            {error}
+          </div>
+        )}
+
+        <p className="text-sm text-gray-600 dark:text-white/60">
+          These defaults pre-fill the cost fields on new job tickets. Dispatchers can still override
+          them per job — this just sets the starting point.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Car className="w-4 h-4 text-brand" />
+              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Mileage Rate ($/mile)</label>
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={standards.default_mileage_rate}
+                onChange={(e) => update('default_mileage_rate', e.target.value)}
+                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Wrench className="w-4 h-4 text-brand" />
+              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Default Equipment Cost ($)</label>
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={standards.default_equipment_cost}
+                onChange={(e) => update('default_equipment_cost', e.target.value)}
+                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Receipt className="w-4 h-4 text-brand" />
+              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Default Other Cost ($)</label>
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={standards.default_other_cost}
+                onChange={(e) => update('default_other_cost', e.target.value)}
+                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -695,15 +878,18 @@ export default function SettingsPage() {
               BILLING
              ══════════════════════════════════════════════ */}
           <TabPanel value="billing">
-            {canManageBilling ? (
-              <BillingSection userRole={userRole} />
-            ) : (
-              <Card>
-                <p className="text-sm text-gray-500 dark:text-white/60">
-                  You don&apos;t have permission to manage billing for this account.
-                </p>
-              </Card>
-            )}
+            <div className="space-y-4">
+              {canManageBilling ? (
+                <BillingSection userRole={userRole} />
+              ) : (
+                <Card>
+                  <p className="text-sm text-gray-500 dark:text-white/60">
+                    You don&apos;t have permission to manage billing for this account.
+                  </p>
+                </Card>
+              )}
+              <JobCostStandardsSection userRole={userRole} />
+            </div>
           </TabPanel>
 
           {/* ══════════════════════════════════════════════
