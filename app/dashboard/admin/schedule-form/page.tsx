@@ -16,7 +16,7 @@ import {
   Building2, ChevronRight, Loader2, CheckCircle, AlertTriangle,
   ChevronDown, Phone, FileText, DollarSign, Zap, Clock,
   Clipboard, Star, Droplets, Plug, Wind, Scissors, Truck, Mic, Plus, Trash2,
-  Eye, X, Users, Brain,
+  Eye, X, Users, Brain, Calculator, Car,
 } from 'lucide-react';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { CustomerAutocomplete } from '@/components/ui/CustomerAutocomplete';
@@ -416,6 +416,13 @@ interface FormData {
   description: string;
   service_types: string[];
   estimated_cost: string;
+  // Optional financial tracking (opt-in — track_financials gate)
+  track_financials: boolean;
+  mileage_rate: string;
+  equipment_cost: string;
+  material_cost: string;
+  other_cost: string;
+  subcontractor_cost: string;
   scope_details: Record<string, Record<string, string>>;
   scope_input_modes: Record<string, 'linear' | 'areas'>;
   removal_needed: boolean;
@@ -505,6 +512,12 @@ const initialFormData: FormData = {
   description: '',
   service_types: [],
   estimated_cost: '',
+  track_financials: false,
+  mileage_rate: '',
+  equipment_cost: '',
+  material_cost: '',
+  other_cost: '',
+  subcontractor_cost: '',
   scope_details: {},
   scope_input_modes: {},
   removal_needed: false,
@@ -861,6 +874,50 @@ export default function ScheduleFormPage() {
   // Site coordinates from Google Places autocomplete (used for drive-time chip)
   const [siteCoords, setSiteCoords] = useState<{ lat: number; lng: number } | null>(null);
 
+  // Numeric drive distance (miles), reported by DriveTimeFromShop once its
+  // own Distance Matrix fetch succeeds — feeds job_orders.drive_distance_miles
+  // and the live drive-cost preview in the optional financials section.
+  const [driveDistanceMiles, setDriveDistanceMiles] = useState<number | null>(null);
+  const handleDistanceCalculated = useCallback((miles: number) => {
+    setDriveDistanceMiles(miles);
+  }, []);
+
+  // Tenant's real shop coordinates, so drive distance is computed from THIS
+  // company's shop, not the hardcoded Patriot default — undefined until
+  // loaded, at which point DriveTimeFromShop falls back to the default itself.
+  const [shopOverride, setShopOverride] = useState<{ latitude: number; longitude: number } | undefined>(undefined);
+
+  // Tenant cost-standard defaults, fetched once to pre-fill the optional
+  // financial-tracking inputs. Never blocks or alters normal job creation —
+  // if the fetch fails, inputs just start blank (still editable).
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: session } = await supabase.auth.getSession();
+        if (!session.session) return;
+        const res = await fetch('/api/tenant-settings/cost-defaults', {
+          headers: { Authorization: `Bearer ${session.session.access_token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const defaults = json?.data;
+        if (!defaults) return;
+        setForm(f => ({
+          ...f,
+          mileage_rate: f.mileage_rate || (defaults.default_mileage_rate != null ? String(defaults.default_mileage_rate) : ''),
+          equipment_cost: f.equipment_cost || (defaults.default_equipment_cost != null ? String(defaults.default_equipment_cost) : ''),
+          other_cost: f.other_cost || (defaults.default_other_cost != null ? String(defaults.default_other_cost) : ''),
+        }));
+        if (defaults.shop_latitude != null && defaults.shop_longitude != null) {
+          setShopOverride({ latitude: defaults.shop_latitude, longitude: defaults.shop_longitude });
+        }
+      } catch {
+        // Non-critical — inputs stay blank and editable, drive distance falls back to the default shop
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // PO lookup state
   const [poMatch, setPoMatch] = useState<{
     customer_name: string; address: string; location: string;
@@ -964,6 +1021,12 @@ export default function ScheduleFormPage() {
             po_number: j.po_number || '',
             description: j.description || '',
             estimated_cost: j.estimated_cost ? String(j.estimated_cost) : '',
+            track_financials: !!j.track_financials,
+            mileage_rate: j.mileage_rate != null ? String(j.mileage_rate) : f.mileage_rate,
+            equipment_cost: j.equipment_cost != null ? String(j.equipment_cost) : f.equipment_cost,
+            material_cost: j.material_cost != null ? String(j.material_cost) : '',
+            other_cost: j.other_cost != null ? String(j.other_cost) : f.other_cost,
+            subcontractor_cost: j.subcontractor_cost != null ? String(j.subcontractor_cost) : '',
             service_types: serviceTypes,
             scope_details: cleanScope,
             removal_needed: !!(removalBlock as any).needed || (removalBlock as any).needed === 'true',
@@ -995,6 +1058,9 @@ export default function ScheduleFormPage() {
           // the Step-5 section expanded so the founder can see/edit them.
           if (Array.isArray(j.additional_safety_requirements) && j.additional_safety_requirements.length > 0) {
             setShowSafetyReqs(true);
+          }
+          if (typeof j.drive_distance_miles === 'number') {
+            setDriveDistanceMiles(j.drive_distance_miles);
           }
           // Jump to the scope step (3) when requested
           if (jumpToParam === 'scope') {
@@ -1666,6 +1732,15 @@ export default function ScheduleFormPage() {
         description: form.description || null,
         job_type: form.service_types.join(', '),
         estimated_cost: form.estimated_cost ? parseFloat(form.estimated_cost) : null,
+        // Optional job financials — degrades to a no-op when track_financials
+        // is off (all fields null, matching pre-feature behavior).
+        track_financials: form.track_financials,
+        drive_distance_miles: form.track_financials && driveDistanceMiles != null ? driveDistanceMiles : null,
+        mileage_rate: form.track_financials && form.mileage_rate ? parseFloat(form.mileage_rate) : null,
+        equipment_cost: form.track_financials && form.equipment_cost ? parseFloat(form.equipment_cost) : null,
+        material_cost: form.track_financials && form.material_cost ? parseFloat(form.material_cost) : null,
+        other_cost: form.track_financials && form.other_cost ? parseFloat(form.other_cost) : null,
+        subcontractor_cost: form.track_financials && form.subcontractor_cost ? parseFloat(form.subcontractor_cost) : null,
         scope_details: {
           ...(form.scope_details || {}),
           ...(form.removal_needed ? { _removal: { needed: 'true', method: form.removal_method, equipment: form.removal_equipment } } : {}),
@@ -1763,6 +1838,13 @@ export default function ScheduleFormPage() {
             ppe_required: payload.ppe_required,
             additional_safety_requirements: payload.additional_safety_requirements,
             arrival_time: form.arrival_time || form.special_arrival_time || null,
+            track_financials: payload.track_financials,
+            drive_distance_miles: payload.drive_distance_miles,
+            mileage_rate: payload.mileage_rate,
+            equipment_cost: payload.equipment_cost,
+            material_cost: payload.material_cost,
+            other_cost: payload.other_cost,
+            subcontractor_cost: payload.subcontractor_cost,
           }),
         });
         result = await res.json();
@@ -2237,6 +2319,8 @@ export default function ScheduleFormPage() {
                   lat={siteCoords?.lat}
                   lng={siteCoords?.lng}
                   fallbackAddress={!siteCoords ? form.site_address : undefined}
+                  shopOverride={shopOverride}
+                  onDistanceCalculated={handleDistanceCalculated}
                 />
               )}
             </div>
@@ -3189,6 +3273,101 @@ export default function ScheduleFormPage() {
                 value={form.estimated_cost}
                 onChange={e => updateForm({ estimated_cost: e.target.value })}
               />
+            </div>
+
+            {/* ── Optional Job Financials (opt-in, collapsed by default) ── */}
+            <div>
+              <Toggle
+                checked={form.track_financials}
+                onChange={(v) => updateForm({ track_financials: v })}
+                label="Track job financials (optional)"
+                icon={Calculator}
+              />
+              {form.track_financials && (
+                <SectionCard className="mt-3">
+                  <p className="text-xs sm:text-sm text-slate-400 -mt-1">
+                    Costs pre-fill from your company's cost standards where set — adjust per job as needed.
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label>Mileage Rate ($/mile)</Label>
+                      <InputField
+                        icon={Car}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={form.mileage_rate}
+                        onChange={e => updateForm({ mileage_rate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Equipment Cost ($)</Label>
+                      <InputField
+                        icon={HardHat}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={form.equipment_cost}
+                        onChange={e => updateForm({ equipment_cost: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Material Cost ($)</Label>
+                      <InputField
+                        icon={DollarSign}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={form.material_cost}
+                        onChange={e => updateForm({ material_cost: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Subcontractor Cost ($)</Label>
+                      <InputField
+                        icon={DollarSign}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={form.subcontractor_cost}
+                        onChange={e => updateForm({ subcontractor_cost: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <Label>Other Cost ($)</Label>
+                      <InputField
+                        icon={DollarSign}
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        value={form.other_cost}
+                        onChange={e => updateForm({ other_cost: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  {driveDistanceMiles != null && (
+                    <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-violet-50 dark:bg-violet-500/10 border border-violet-200 dark:border-violet-400/30 text-sm text-violet-700 dark:text-violet-300">
+                      <Car size={16} className="flex-shrink-0" />
+                      <span>
+                        Drive distance: <span className="font-bold">{driveDistanceMiles.toFixed(1)} mi</span>
+                        {form.mileage_rate && Number(form.mileage_rate) > 0 && (
+                          <> — drive cost: <span className="font-bold">${(driveDistanceMiles * Number(form.mileage_rate)).toFixed(2)}</span></>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {driveDistanceMiles == null && (
+                    <p className="text-xs text-slate-400">
+                      Drive distance will calculate automatically once a site address is set (Project &amp; Contact step).
+                    </p>
+                  )}
+                </SectionCard>
+              )}
             </div>
           </div>
         );

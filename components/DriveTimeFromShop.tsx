@@ -13,7 +13,7 @@
  * address can't be routed, we just don't render the chip.
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Car, Loader2 } from 'lucide-react';
 import { SHOP_LOCATION } from '@/lib/geolocation';
 
@@ -31,11 +31,19 @@ interface Props {
   /**
    * Tenant-specific shop origin. Defaults to the hardcoded Patriot
    * SHOP_LOCATION so existing callers keep working unchanged. Callers should
-   * fetch this via `getTenantShopLocation()` (lib/geolocation.ts) — same
-   * fallback shape the clock-in route already uses — rather than hardcoding
-   * a tenant's coordinates here, so this component stays reusable per tenant.
+   * fetch this via `getTenantShopLocation()` (lib/geolocation-server.ts) —
+   * same fallback shape the clock-in route already uses — rather than
+   * hardcoding a tenant's coordinates here, so this component stays
+   * reusable per tenant.
    */
   shopOverride?: { latitude: number; longitude: number };
+  /**
+   * Reports the parsed numeric distance (miles) whenever a fetch succeeds,
+   * so a parent (e.g. the schedule form) can persist it without re-deriving
+   * it from the display string. Optional — existing display-only callers
+   * are unaffected.
+   */
+  onDistanceCalculated?: (miles: number) => void;
 }
 
 interface Result {
@@ -43,10 +51,16 @@ interface Result {
   distanceText: string;   // e.g. "18.4 mi"
 }
 
-export default function DriveTimeFromShop({ lat, lng, fallbackAddress, shopOverride }: Props) {
+export default function DriveTimeFromShop({ lat, lng, fallbackAddress, shopOverride, onDistanceCalculated }: Props) {
   const shopOrigin = shopOverride ?? SHOP_LOCATION;
   const [data, setData] = useState<Result | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // Ref so the fetch effect isn't re-triggered by a new inline callback
+  // identity on every parent render — only lat/lng/fallbackAddress should
+  // re-fire the Distance Matrix call.
+  const onDistanceCalculatedRef = useRef(onDistanceCalculated);
+  onDistanceCalculatedRef.current = onDistanceCalculated;
 
   useEffect(() => {
     const hasCoords = typeof lat === 'number' && typeof lng === 'number';
@@ -101,6 +115,12 @@ export default function DriveTimeFromShop({ lat, lng, fallbackAddress, shopOverr
             durationText: elem.duration?.text || '',
             distanceText: elem.distance?.text || '',
           });
+          // Raw meters from the API, not a re-parse of the formatted string —
+          // more reliable than parsing "18.4 mi" back to a number.
+          if (typeof elem.distance?.value === 'number') {
+            const miles = elem.distance.value / 1609.344;
+            onDistanceCalculatedRef.current?.(miles);
+          }
         }
       );
     };
