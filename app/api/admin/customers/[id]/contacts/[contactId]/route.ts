@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function PATCH(
   request: NextRequest,
@@ -17,6 +18,11 @@ export async function PATCH(
   try {
     const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
+
+    const tenantId = await getTenantId(auth.userId);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    }
 
     const { id, contactId } = await params;
     const body = await request.json();
@@ -37,6 +43,7 @@ export async function PATCH(
       .update(updateData)
       .eq('id', contactId)
       .eq('customer_id', id)
+      .eq('tenant_id', tenantId)
       .select()
       .single();
 
@@ -60,13 +67,19 @@ export async function DELETE(
     const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
+    const tenantId = await getTenantId(auth.userId);
+    if (!tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    }
+
     const { id, contactId } = await params;
 
     const { error } = await supabaseAdmin
       .from('customer_contacts')
       .delete()
       .eq('id', contactId)
-      .eq('customer_id', id);
+      .eq('customer_id', id)
+      .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('Error deleting contact:', error);

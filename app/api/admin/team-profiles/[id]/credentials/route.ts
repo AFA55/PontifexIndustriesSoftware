@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 
 const EDITABLE_ROLES = ['operator', 'apprentice'];
 
@@ -49,12 +49,16 @@ export async function GET(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
       .select(
         'role, medical_card_expiry, drivers_license_expiry, drivers_license_class, osha_10_expiry, osha_30_expiry, certifications'
       )
       .eq('id', id)
+      .eq('tenant_id', scope.tenantId)
       .maybeSingle();
 
     if (error) {
@@ -97,6 +101,9 @@ export async function PUT(
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+
     // Parse body
     let body: Record<string, unknown>;
     try {
@@ -109,11 +116,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Request body must be a JSON object' }, { status: 400 });
     }
 
-    // Verify the profile exists and is an operator/apprentice
+    // Verify the profile exists, belongs to the caller's tenant, and is an operator/apprentice
     const { data: existing, error: fetchErr } = await supabaseAdmin
       .from('profiles')
       .select('role')
       .eq('id', id)
+      .eq('tenant_id', scope.tenantId)
       .maybeSingle();
 
     if (fetchErr) {
@@ -183,7 +191,8 @@ export async function PUT(
     const { error: updateErr } = await supabaseAdmin
       .from('profiles')
       .update(updatePayload)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', scope.tenantId);
 
     if (updateErr) {
       console.error('credentials PUT update error:', updateErr);

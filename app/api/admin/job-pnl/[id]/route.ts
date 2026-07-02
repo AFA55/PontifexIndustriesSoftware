@@ -27,13 +27,19 @@ export async function GET(
   }
 
   try {
-    // Fetch job details
-    const { data: job, error: jobError } = await supabaseAdmin
+    // Fetch job details (tenant-scoped — this response includes payroll/hourly-rate data)
+    let jobQuery = supabaseAdmin
       .from('job_orders')
       .select('id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to')
       .eq('id', jobId)
-      .is('deleted_at', null)
-      .single();
+      .is('deleted_at', null);
+    if (authResult.role !== 'super_admin') {
+      if (!authResult.tenantId) {
+        return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+      }
+      jobQuery = jobQuery.eq('tenant_id', authResult.tenantId);
+    }
+    const { data: job, error: jobError } = await jobQuery.single();
 
     if (jobError || !job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });

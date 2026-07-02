@@ -7,12 +7,14 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
 
     const { id } = await params;
     const body = await request.json();
@@ -33,6 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .from('operator_facility_badges')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', scope.tenantId)
       .select()
       .single();
 
@@ -52,13 +55,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
 
     const { id } = await params;
 
     const { error } = await supabaseAdmin
       .from('operator_facility_badges')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('tenant_id', scope.tenantId);
 
     if (error) {
       console.error('Error deleting badge:', error);

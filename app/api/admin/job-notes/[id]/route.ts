@@ -17,6 +17,9 @@ export async function PATCH(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    if (auth.role !== 'super_admin' && !auth.tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    }
 
     const { id } = await params;
     const body = await request.json();
@@ -28,12 +31,10 @@ export async function PATCH(
       );
     }
 
-    // Verify the note exists and belongs to this author
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('job_notes')
-      .select('author_id')
-      .eq('id', id)
-      .single();
+    // Verify the note exists, belongs to the caller's tenant, and belongs to this author
+    let existingQuery = supabaseAdmin.from('job_notes').select('author_id').eq('id', id);
+    if (auth.role !== 'super_admin') existingQuery = existingQuery.eq('tenant_id', auth.tenantId);
+    const { data: existing, error: fetchError } = await existingQuery.single();
 
     if (fetchError || !existing) {
       return NextResponse.json(
@@ -85,15 +86,16 @@ export async function DELETE(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    if (auth.role !== 'super_admin' && !auth.tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    }
 
     const { id } = await params;
 
-    // Verify the note exists and belongs to this author
-    const { data: existing, error: fetchError } = await supabaseAdmin
-      .from('job_notes')
-      .select('author_id')
-      .eq('id', id)
-      .single();
+    // Verify the note exists, belongs to the caller's tenant, and belongs to this author
+    let existingQuery = supabaseAdmin.from('job_notes').select('author_id').eq('id', id);
+    if (auth.role !== 'super_admin') existingQuery = existingQuery.eq('tenant_id', auth.tenantId);
+    const { data: existing, error: fetchError } = await existingQuery.single();
 
     if (fetchError || !existing) {
       return NextResponse.json(

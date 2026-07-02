@@ -94,6 +94,24 @@ export async function POST(
       );
     }
 
+    // Cross-tenant guard: listUsers() matches by email across ALL tenants, so verify the
+    // resolved auth user's profile actually belongs to the caller's tenant before writing
+    // role/active — otherwise an email collision with another tenant's user would let an
+    // ops_manager silently change that other tenant's user's role/active status.
+    if (tenantId) {
+      const { data: targetProfile, error: targetProfileError } = await supabaseAdmin
+        .from('profiles')
+        .select('tenant_id')
+        .eq('id', user.id)
+        .maybeSingle();
+      if (targetProfileError || !targetProfile || targetProfile.tenant_id !== tenantId) {
+        return NextResponse.json(
+          { error: 'User not found' },
+          { status: 404 }
+        );
+      }
+    }
+
     // Update the profile
     const { error: updateError } = await supabaseAdmin
       .from('profiles')

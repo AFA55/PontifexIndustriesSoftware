@@ -17,14 +17,15 @@ export async function GET(
   try {
     const auth = await requireShopUser(request);
     if (!auth.authorized) return auth.response;
+    if (auth.role !== 'super_admin' && !auth.tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    }
 
     const { id } = await params;
 
-    const { data: workOrder, error } = await supabaseAdmin
-      .from('maintenance_work_orders')
-      .select('*')
-      .eq('id', id)
-      .single();
+    let woQuery = supabaseAdmin.from('maintenance_work_orders').select('*').eq('id', id);
+    if (auth.role !== 'super_admin') woQuery = woQuery.eq('tenant_id', auth.tenantId);
+    const { data: workOrder, error } = await woQuery.single();
 
     if (error || !workOrder) {
       return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
@@ -66,16 +67,17 @@ export async function PATCH(
   try {
     const auth = await requireShopUser(request);
     if (!auth.authorized) return auth.response;
+    if (auth.role !== 'super_admin' && !auth.tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required' }, { status: 400 });
+    }
 
     const { id } = await params;
     const body = await request.json();
 
-    // Fetch current work order
-    const { data: current, error: fetchError } = await supabaseAdmin
-      .from('maintenance_work_orders')
-      .select('*')
-      .eq('id', id)
-      .single();
+    // Fetch current work order (tenant-scoped)
+    let currentQuery = supabaseAdmin.from('maintenance_work_orders').select('*').eq('id', id);
+    if (auth.role !== 'super_admin') currentQuery = currentQuery.eq('tenant_id', auth.tenantId);
+    const { data: current, error: fetchError } = await currentQuery.single();
 
     if (fetchError || !current) {
       return NextResponse.json({ error: 'Work order not found' }, { status: 404 });
@@ -132,12 +134,9 @@ export async function PATCH(
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
-    const { data: updated, error: updateError } = await supabaseAdmin
-      .from('maintenance_work_orders')
-      .update(updateFields)
-      .eq('id', id)
-      .select()
-      .single();
+    let updateQuery = supabaseAdmin.from('maintenance_work_orders').update(updateFields).eq('id', id);
+    if (auth.role !== 'super_admin') updateQuery = updateQuery.eq('tenant_id', auth.tenantId);
+    const { data: updated, error: updateError } = await updateQuery.select().single();
 
     if (updateError) {
       console.error('[shop/work-orders/[id] PATCH] Update error:', updateError);

@@ -55,11 +55,12 @@ export async function GET(
     const startDateStr = weekStart.toISOString().split('T')[0];
     const endDateStr = weekEnd.toISOString().split('T')[0];
 
-    // 1. Fetch operator profile
+    // 1. Fetch operator profile (tenant-scoped)
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, email, role, phone, avatar_url, profile_picture_url')
       .eq('id', operatorId)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (profileError || !profile) {
@@ -366,6 +367,21 @@ export async function PATCH(
     if (!auth.authorized) return auth.response;
 
     const { id: operatorId } = await params;
+    if (!auth.tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
+    }
+
+    // Verify the target operator belongs to the caller's tenant before approving/rejecting/
+    // annotating their week — otherwise any admin could act on another tenant's operator.
+    const { data: operatorProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', operatorId)
+      .maybeSingle();
+    if (!operatorProfile || operatorProfile.tenant_id !== auth.tenantId) {
+      return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
+    }
+
     const body = await request.json();
     const { weekStart, admin_notes, action, reason } = body;
 
@@ -397,6 +413,7 @@ export async function PATCH(
         .from('timecards')
         .update({ is_approved: true, approved_by: auth.userId, approved_at: new Date().toISOString() })
         .eq('user_id', operatorId)
+        .eq('tenant_id', auth.tenantId)
         .gte('date', weekStart)
         .lte('date', new Date(new Date(weekStart + 'T00:00:00').getTime() + 6 * 86400000).toISOString().split('T')[0])
         .eq('is_approved', false);

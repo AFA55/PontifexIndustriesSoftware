@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 
 export async function GET(
   request: NextRequest,
@@ -17,11 +17,14 @@ export async function GET(
     const { id } = await params;
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
 
     const { data, error } = await supabaseAdmin
       .from('form_templates')
       .select('*')
       .eq('id', id)
+      .eq('tenant_id', scope.tenantId)
       .single();
 
     if (error || !data) {
@@ -43,6 +46,8 @@ export async function PATCH(
     const { id } = await params;
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
 
     const body = await request.json();
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
@@ -58,6 +63,7 @@ export async function PATCH(
       .from('form_templates')
       .update(updates)
       .eq('id', id)
+      .eq('tenant_id', scope.tenantId)
       .select()
       .single();
 
@@ -81,12 +87,15 @@ export async function DELETE(
     const { id } = await params;
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
 
     // Soft delete — set is_active = false
     const { data, error } = await supabaseAdmin
       .from('form_templates')
       .update({ is_active: false, updated_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('tenant_id', scope.tenantId)
       .select()
       .single();
 
