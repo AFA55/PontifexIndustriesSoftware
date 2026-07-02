@@ -66,6 +66,12 @@
 	<string>Pontifex uses Face ID to securely sign you in without typing your password.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Pontifex uses the microphone for voice-based equipment checkout and job notes.</string>
+	<!-- Speech recognition: on-device transcription of spoken equipment checkout
+	     commands (e.g. "gas power pack number 4 to Zack"), so a shop worker can
+	     sign equipment out hands-free. Required in addition to the microphone
+	     key above because iOS gates SFSpeechRecognizer separately. -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Pontifex uses speech recognition to transcribe voice commands for hands-free equipment checkout.</string>
 	<!-- NFCReaderUsageDescription removed: the iOS app has no native NFC (badge
 	     scanning is Android-only via Web NFC; iOS uses a PIN fallback). -->
 	<key>NSPhotoLibraryAddUsageDescription</key>

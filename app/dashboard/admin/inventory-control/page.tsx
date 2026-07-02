@@ -15,6 +15,7 @@ import NewInventoryModal from './_components/NewInventoryModal';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { useModuleGate } from '@/components/ModuleGuard';
+import NativeVoiceCheckout from '@/components/equipment/NativeVoiceCheckout';
 
 const ALLOWED_ROLES = ['shop_manager','admin','super_admin','operations_manager','supervisor'];
 
@@ -624,6 +625,12 @@ function CheckoutTab({
           Speak many items, then hit Confirm All to submit in batch.
           Skipped silently if browser doesn't support Web Speech API. */}
       <VoiceMic onResult={(r, audioUrl) => addDraftFromVoice(r, audioUrl)} />
+
+      {/* Native voice checkout — renders nothing on web/SSR (isNativeApp() gate
+          inside the component). Multi-item, LLM-parsed, native on-device STT
+          (the Web Speech API used by VoiceMic above does not work inside the
+          iOS Capacitor WKWebView). See components/equipment/NativeVoiceCheckout.tsx. */}
+      <NativeVoiceCheckout onCommitted={onSuccess} />
 
       {/* Pending tray — appears once at least one voice draft exists. */}
       {drafts.length > 0 && (
