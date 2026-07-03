@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react';
 import { Search, Download, ChevronRight, Users, AlertTriangle } from 'lucide-react';
 import type { HiringCandidate, HiringJob, CandidateStatus } from '@/lib/hiring/types';
 import { CANDIDATE_STATUSES } from '@/lib/hiring/types';
-import { Card, EmptyState, Button } from '@/components/ui';
+import { Card, EmptyState, Button, Alert } from '@/components/ui';
 import CandidateSlideOver from './CandidateSlideOver';
 import { getAccessToken, CANDIDATE_STATUS_PILL, fmtDateTime } from './api';
 
@@ -32,6 +32,7 @@ export default function CandidatesTab({ job, candidates, onCandidateStatus }: Ca
   const [query, setQuery] = useState('');
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const counts = useMemo(() => {
     const c: Record<CandidateStatus, number> = { unreviewed: 0, shortlisted: 0, rejected: 0 };
@@ -56,13 +57,20 @@ export default function CandidatesTab({ job, candidates, onCandidateStatus }: Ca
 
   const exportCsv = async () => {
     setExporting(true);
+    setExportError(null);
     try {
       const token = await getAccessToken();
-      if (!token) return;
+      if (!token) {
+        setExportError('Your session expired — sign in again to export.');
+        return;
+      }
       const res = await fetch(`/api/hiring/jobs/${job.id}/export`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (!res.ok) return;
+      if (!res.ok) {
+        setExportError(`Export failed (${res.status}). Try again in a moment.`);
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -73,7 +81,7 @@ export default function CandidatesTab({ job, candidates, onCandidateStatus }: Ca
       a.remove();
       URL.revokeObjectURL(url);
     } catch {
-      /* export failed silently — button re-enables */
+      setExportError('Export failed — check your connection and try again.');
     } finally {
       setExporting(false);
     }
@@ -120,6 +128,12 @@ export default function CandidatesTab({ job, candidates, onCandidateStatus }: Ca
           </Button>
         </div>
       </div>
+
+      {exportError && (
+        <Alert variant="danger" title="Couldn't export candidates" onDismiss={() => setExportError(null)}>
+          {exportError}
+        </Alert>
+      )}
 
       {/* List */}
       {filtered.length === 0 ? (

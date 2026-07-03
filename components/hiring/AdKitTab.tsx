@@ -57,7 +57,7 @@ function CopyBlock({ label, text }: { label: string; text: string | null }) {
           type="button"
           onClick={copy}
           disabled={!text}
-          className="min-h-[36px] inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-600 dark:text-white/70 hover:bg-gray-200/60 dark:hover:bg-white/10 disabled:opacity-40"
+          className="min-h-[44px] min-w-[44px] inline-flex items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold text-gray-600 dark:text-white/70 hover:bg-gray-200/60 dark:hover:bg-white/10 disabled:opacity-40"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? 'Copied' : 'Copy'}

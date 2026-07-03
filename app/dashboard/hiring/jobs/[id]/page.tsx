@@ -351,7 +351,11 @@ export default function HiringJobDetailPage() {
           </TabPanel>
 
           {/* ─── Ad Kit ─── */}
-          <TabPanel value="adkit">
+          {/* keepMounted on adkit/screeners/settings: those panels hold
+              unsaved form state — the UI kit unmounts inactive panels by
+              default, which would silently destroy in-progress edits on a
+              tab switch. */}
+          <TabPanel value="adkit" keepMounted>
             <AdKitTab
               job={job}
               onJobUpdate={setJob}
@@ -360,7 +364,7 @@ export default function HiringJobDetailPage() {
           </TabPanel>
 
           {/* ─── Screeners ─── */}
-          <TabPanel value="screeners">
+          <TabPanel value="screeners" keepMounted>
             <ScreenerEditor jobId={job.id} screeners={screeners} onSaved={setScreeners} />
           </TabPanel>
 
@@ -374,7 +378,7 @@ export default function HiringJobDetailPage() {
           </TabPanel>
 
           {/* ─── Settings ─── */}
-          <TabPanel value="settings">
+          <TabPanel value="settings" keepMounted>
             <JobSettingsTab job={job} onJobUpdate={setJob} />
           </TabPanel>
         </Tabs>

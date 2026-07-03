@@ -93,6 +93,10 @@ export default function NewHiringJobPage() {
     } catch (err) {
       submittingRef.current = false;
       setPhase('form');
+      if (err instanceof HiringApiError && err.status === 401) {
+        router.push('/login');
+        return;
+      }
       if (err instanceof HiringApiError && err.status === 403) {
         setError("Hiring isn't enabled for your company. Contact Pontifex to turn it on.");
       } else {

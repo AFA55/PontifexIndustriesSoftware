@@ -203,7 +203,7 @@ export default function ScreenerEditor({ jobId, screeners, onSaved }: ScreenerEd
                     onClick={() => move(i, -1)}
                     disabled={i === 0}
                     aria-label="Move up"
-                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 dark:hover:bg-white/10 dark:hover:text-white"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 dark:hover:bg-white/10 dark:hover:text-white"
                   >
                     <ChevronUp className="w-4 h-4" />
                   </button>
@@ -213,7 +213,7 @@ export default function ScreenerEditor({ jobId, screeners, onSaved }: ScreenerEd
                     onClick={() => move(i, 1)}
                     disabled={i === drafts.length - 1}
                     aria-label="Move down"
-                    className="min-h-[32px] min-w-[32px] inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 dark:hover:bg-white/10 dark:hover:text-white"
+                    className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-30 dark:hover:bg-white/10 dark:hover:text-white"
                   >
                     <ChevronDown className="w-4 h-4" />
                   </button>
@@ -298,7 +298,7 @@ export default function ScreenerEditor({ jobId, screeners, onSaved }: ScreenerEd
                                   auto_reject_answers: d.auto_reject_answers.filter((a) => a !== opt),
                                 })
                               }
-                              className="min-h-[44px] min-w-[36px] inline-flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                              className="min-h-[44px] min-w-[44px] inline-flex items-center justify-center rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
                             >
                               <X className="w-4 h-4" />
                             </button>

@@ -18,7 +18,12 @@ import { Spinner } from '@/components/ui';
 import { hiringFetch, CANDIDATE_STATUS_PILL, fmtDateTime } from './api';
 
 interface CandidateDetail {
-  candidate: HiringCandidate;
+  /**
+   * The detail API adds `resume_signed_url` — a short-lived (~10 min)
+   * Supabase signed URL. The raw `resume_url` column is just a storage
+   * path and will NOT work as a link; never href it directly.
+   */
+  candidate: HiringCandidate & { resume_signed_url?: string | null };
   responses: HiringCandidateResponse[];
   events: HiringEvent[];
   comments: HiringComment[];
@@ -67,6 +72,7 @@ export default function CandidateSlideOver({
   const [tab, setTab] = useState<'responses' | 'resume'>('responses');
   const [commentDraft, setCommentDraft] = useState('');
   const [postingComment, setPostingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
   const [savingStatus, setSavingStatus] = useState<CandidateStatus | null>(null);
 
   const candidateId = candidate?.id ?? null;
@@ -89,6 +95,7 @@ export default function CandidateSlideOver({
     setDetail(null);
     setTab('responses');
     setCommentDraft('');
+    setCommentError(null);
     if (open && candidateId) loadDetail();
   }, [open, candidateId, loadDetail]);
 
@@ -134,6 +141,7 @@ export default function CandidateSlideOver({
     const body = commentDraft.trim();
     if (!body || postingComment) return;
     setPostingComment(true);
+    setCommentError(null);
     try {
       const data = await hiringFetch<{ comment: HiringComment }>(
         `/api/hiring/candidates/${candidate.id}/comments`,
@@ -141,8 +149,9 @@ export default function CandidateSlideOver({
       );
       setDetail((d) => (d ? { ...d, comments: [...d.comments, data.comment] } : d));
       setCommentDraft('');
-    } catch {
-      // keep the draft so nothing is lost
+    } catch (err) {
+      // Keep the draft so nothing is lost — but tell the user it didn't post.
+      setCommentError(err instanceof Error ? err.message : "Comment didn't post — try again.");
     } finally {
       setPostingComment(false);
     }
@@ -251,11 +260,17 @@ export default function CandidateSlideOver({
             </div>
           )}
 
-          {!loading && !error && tab === 'resume' && (
+          {!loading && !error && tab === 'resume' && (() => {
+            // Only the short-lived signed URL is linkable; the raw
+            // resume_url is a storage path. Defense-in-depth: require an
+            // http(s) scheme before rendering an href.
+            const signed = detail?.candidate?.resume_signed_url;
+            const resumeHref = signed && /^https?:\/\//i.test(signed) ? signed : null;
+            return (
             <div>
-              {shown.resume_url ? (
+              {resumeHref ? (
                 <a
-                  href={shown.resume_url}
+                  href={resumeHref}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="min-h-[48px] inline-flex items-center gap-2 rounded-xl border border-gray-300 dark:border-white/15 px-4 text-sm font-semibold text-gray-700 dark:text-white/90 hover:bg-gray-50 dark:hover:bg-white/5"
@@ -274,7 +289,8 @@ export default function CandidateSlideOver({
                 </div>
               )}
             </div>
-          )}
+            );
+          })()}
 
           {/* HISTORY */}
           {!loading && !error && (
@@ -324,10 +340,15 @@ export default function CandidateSlideOver({
                 {(detail?.comments ?? []).length === 0 && (
                   <p className="text-sm text-gray-500 dark:text-white/60">No comments yet — only your team can see these.</p>
                 )}
+                {commentError && (
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-red-600 dark:text-red-400">
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> {commentError}
+                  </p>
+                )}
                 <div className="flex items-end gap-2">
                   <textarea
                     value={commentDraft}
-                    onChange={(e) => setCommentDraft(e.target.value)}
+                    onChange={(e) => { setCommentDraft(e.target.value); if (commentError) setCommentError(null); }}
                     placeholder="Add an internal comment…"
                     rows={2}
                     className="flex-1 rounded-xl border border-gray-300 dark:border-white/15 bg-white dark:bg-white/5 px-3 py-2.5 text-base sm:text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-brand/40"
