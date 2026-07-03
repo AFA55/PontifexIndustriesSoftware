@@ -10,19 +10,27 @@ export const dynamic = 'force-dynamic';
  *  1. Snapshot the uninvoiced ledger row ids + the amount to charge.
  *  2. CLAIM the balance first via compare-and-set (balance_owed -> 0 only if
  *     it still equals the value we read) — a second concurrent charge gets 409.
- *  3. Create the PaymentIntent with an idempotencyKey derived from
- *     tenantId + the sorted ledger snapshot, so a network retry can't
- *     double-charge at Stripe either.
- *  4. Settle ONLY the snapshotted ledger rows; never re-zero balance_owed at
+ *  3. Record the claim ('billing_charge_claimed', AWAITED) before any money
+ *     moves — a claimed balance must never exist without an audit record.
+ *     If that insert fails, the claim is rolled back and the request 500s.
+ *  4. Create the PaymentIntent with a PER-ATTEMPT idempotencyKey
+ *     (tenantId + snapshot hash + fresh UUID). The CAS claim is the real
+ *     double-charge guard; the key only covers network retries WITHIN one
+ *     attempt. A stable key would make Stripe replay a cached decline for
+ *     ~24h, which would break the "update the card and try again" remediation.
+ *  5. Settle ONLY the snapshotted ledger rows; never re-zero balance_owed at
  *     settle time (spend recorded mid-charge stays owed for the next cycle).
- *  5. On decline/failure, restore the claimed amount atomically via the
- *     increment_hiring_balance RPC.
- *  6. Status 'processing' (S2): keep the claim, persist a
- *     'billing_charge_pending' event with the PI id for reconciliation, and
- *     tell the admin it's processing — NOT to retry.
+ *  6. Failure handling by certainty:
+ *     - DEFINITIVE failure (card declined, invalid request): restore the
+ *       claimed amount via increment_hiring_balance and return an actionable
+ *       error.
+ *     - UNKNOWN outcome (StripeConnectionError / StripeAPIError, or status
+ *       'processing'): KEEP the claim, persist 'billing_charge_pending' for
+ *       manual reconciliation, and return pending:true — never invite a retry
+ *       that could double-charge.
  */
 
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, resolveBillingTenant } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -85,6 +93,16 @@ export async function POST(request: NextRequest) {
     }
     const ledgerIds = (uninvoiced ?? []).map((r) => r.id as string).sort();
 
+    // Per-attempt idempotency key (minted BEFORE the claim so the audit
+    // record can carry it): snapshot hash ties it to this ledger set, the
+    // UUID makes every attempt fresh — a prior decline is never replayed
+    // from Stripe's idempotency cache.
+    const snapshotHash = createHash('sha256')
+      .update(ledgerIds.join(','))
+      .digest('hex')
+      .slice(0, 40);
+    const idempotencyKey = `hiring-charge-${tenantId}-${snapshotHash}-${randomUUID()}`;
+
     // ── 2. claim the balance BEFORE charging (compare-and-set) ───────────
     const { data: claimed, error: claimError } = await supabaseAdmin
       .from('hiring_billing')
@@ -112,13 +130,27 @@ export async function POST(request: NextRequest) {
       return restoreError ? restoreError.message : null;
     };
 
-    // ── 3. charge with an idempotency key tied to this exact snapshot ────
-    const snapshotHash = createHash('sha256')
-      .update(ledgerIds.join(','))
-      .digest('hex')
-      .slice(0, 40);
-    const idempotencyKey = `hiring-charge-${tenantId}-${snapshotHash}`;
+    // ── 3. record the claim BEFORE any money moves (AWAITED — this is the
+    // crash-window audit trail; a claimed balance with no record is never
+    // acceptable). If it fails, roll the claim back and bail. ──────────────
+    const { error: claimEventError } = await supabaseAdmin.from('hiring_events').insert({
+      tenant_id: tenantId,
+      event_type: 'billing_charge_claimed',
+      meta: { amount, ledger_ids: ledgerIds, idempotency_key: idempotencyKey },
+      actor_id: auth.userId,
+    });
+    if (claimEventError) {
+      const restoreFailure = await restoreBalance();
+      const restoreNote = restoreFailure
+        ? ` (Additionally, restoring the balance failed: ${restoreFailure} — contact support.)`
+        : '';
+      return NextResponse.json(
+        { error: `Could not record the charge attempt: ${claimEventError.message}. No charge was made.${restoreNote}` },
+        { status: 500 }
+      );
+    }
 
+    // ── 4. charge with the per-attempt idempotency key ───────────────────
     const stripe = getStripe();
     let paymentIntent;
     try {
@@ -136,10 +168,42 @@ export async function POST(request: NextRequest) {
         { idempotencyKey }
       );
     } catch (err) {
-      // Card declined / authentication required: give the claimed balance back
-      // and tell the customer exactly what to do next.
+      const stripeErr = err as { type?: string; name?: string; code?: string; message?: string };
+
+      // UNKNOWN outcome (network dropped mid-request / Stripe 5xx): the charge
+      // may or may not have gone through. KEEP the claim and record it for
+      // manual reconciliation — a retry here is what double-charges people.
+      const errType = stripeErr?.type || stripeErr?.name || '';
+      if (errType === 'StripeConnectionError' || errType === 'StripeAPIError') {
+        const { error: pendingError } = await supabaseAdmin.from('hiring_events').insert({
+          tenant_id: tenantId,
+          event_type: 'billing_charge_pending',
+          meta: {
+            amount,
+            ledger_ids: ledgerIds,
+            idempotency_key: idempotencyKey,
+            error_type: errType,
+            error_message: stripeErr?.message ?? null,
+          },
+          actor_id: auth.userId,
+        });
+        if (pendingError) {
+          console.error('hiring billing: failed to record billing_charge_pending', pendingError);
+        }
+        return NextResponse.json({
+          success: true,
+          data: {
+            pending: true,
+            amount,
+            message:
+              'We could not confirm whether your payment completed. Do not retry — our team will verify the payment and your balance will update automatically. Contact support if it has not updated within one business day.',
+          },
+        });
+      }
+
+      // DEFINITIVE failure (card declined, invalid request, ...): give the
+      // claimed balance back and tell the customer exactly what to do next.
       const restoreFailure = await restoreBalance();
-      const stripeErr = err as { type?: string; code?: string; message?: string };
       const restoreNote = restoreFailure
         ? ` (Additionally, restoring your balance failed: ${restoreFailure} — contact support.)`
         : '';
@@ -168,7 +232,12 @@ export async function POST(request: NextRequest) {
       const { error: pendingError } = await supabaseAdmin.from('hiring_events').insert({
         tenant_id: tenantId,
         event_type: 'billing_charge_pending',
-        meta: { payment_intent: paymentIntent.id, amount, ledger_ids: ledgerIds },
+        meta: {
+          payment_intent: paymentIntent.id,
+          amount,
+          ledger_ids: ledgerIds,
+          idempotency_key: idempotencyKey,
+        },
         actor_id: auth.userId,
       });
       if (pendingError) {
@@ -202,14 +271,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── 4. success: settle EXACTLY the snapshotted ledger rows. The balance
+    // ── 5. success: settle EXACTLY the snapshotted ledger rows. The balance
     // was already claimed to 0; spend recorded mid-charge remains owed. ────
     if (ledgerIds.length > 0) {
-      await supabaseAdmin
+      const { error: ledgerSettleError } = await supabaseAdmin
         .from('hiring_spend_ledger')
         .update({ invoiced: true })
         .eq('tenant_id', tenantId)
         .in('id', ledgerIds);
+      if (ledgerSettleError) {
+        // The charge went through — surface the bookkeeping failure loudly.
+        return NextResponse.json(
+          {
+            error: `Charge succeeded (${paymentIntent.id}) but marking ledger entries as paid failed: ${ledgerSettleError.message}`,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     const newLifetime = roundMoney(Number(billing.lifetime_billed) + amount);
