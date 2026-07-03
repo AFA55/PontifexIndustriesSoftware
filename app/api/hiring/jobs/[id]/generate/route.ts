@@ -111,6 +111,7 @@ export async function POST(
       .eq('tenant_id', guard.tenantId);
 
     let suggestions = safeScreeners;
+    let seeded = false;
     if ((existingCount ?? 0) === 0 && safeScreeners.length > 0) {
       const rows = safeScreeners.map((s, i) => ({
         tenant_id: guard.tenantId,
@@ -132,6 +133,7 @@ export async function POST(
         // Non-fatal — ad kit is saved; surface the suggestions instead.
       } else {
         suggestions = [];
+        seeded = true;
       }
     }
 
@@ -147,7 +149,7 @@ export async function POST(
       job_id: id,
       event_type: 'ad_generated',
       actor_id: guard.userId,
-      meta: { seeded_screeners: suggestions.length === 0, suggested: safeScreeners.length },
+      meta: { seeded_screeners: seeded, suggested: safeScreeners.length },
     });
 
     return NextResponse.json({

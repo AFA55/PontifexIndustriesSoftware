@@ -141,16 +141,22 @@ export async function PUT(
       });
     }
 
-    // ---- full replace: delete existing, insert new in order ----
-    const { error: deleteError } = await supabaseAdmin
+    // ---- full replace, insert-first (guardian fix Jul 3) ----
+    // Delete-then-insert could leave a LIVE job with ZERO screeners if the
+    // insert failed. Instead: snapshot the old row ids, insert the new set
+    // first (old + new briefly coexist — reads order by position and the
+    // overlap window is milliseconds), then delete the old rows by id. On
+    // insert failure nothing has been deleted.
+    const { data: oldRows, error: snapshotError } = await supabaseAdmin
       .from('hiring_screener_questions')
-      .delete()
+      .select('id')
       .eq('job_id', id)
       .eq('tenant_id', guard.tenantId);
-    if (deleteError) {
-      console.error('hiring screeners PUT: delete failed', deleteError);
+    if (snapshotError) {
+      console.error('hiring screeners PUT: snapshot failed', snapshotError);
       return NextResponse.json({ error: 'Failed to save questions' }, { status: 500 });
     }
+    const oldIds = (oldRows || []).map((r) => r.id);
 
     let screeners: any[] = [];
     if (rows.length > 0) {
@@ -160,9 +166,24 @@ export async function PUT(
         .select('*');
       if (insertError) {
         console.error('hiring screeners PUT: insert failed', insertError);
+        // Old set untouched — the job still has its previous screeners.
         return NextResponse.json({ error: 'Failed to save questions' }, { status: 500 });
       }
       screeners = (inserted || []).sort((a, b) => a.position - b.position);
+    }
+
+    if (oldIds.length > 0) {
+      const { error: deleteError } = await supabaseAdmin
+        .from('hiring_screener_questions')
+        .delete()
+        .in('id', oldIds)
+        .eq('tenant_id', guard.tenantId);
+      if (deleteError) {
+        // New set is live; old rows lingering would duplicate questions on the
+        // apply page — surface a real error so the admin retries the save.
+        console.error('hiring screeners PUT: old-row cleanup failed', deleteError);
+        return NextResponse.json({ error: 'Failed to save questions' }, { status: 500 });
+      }
     }
 
     logHiringEvent({

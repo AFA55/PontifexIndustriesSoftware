@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireHiringAdmin, logHiringEvent } from '@/lib/hiring/api-guard';
+import { signStoragePath } from '@/lib/signed-urls';
 import { CANDIDATE_STATUSES, type CandidateStatus } from '@/lib/hiring/types';
 
 async function fetchCandidate(tenantId: string, candidateId: string) {
@@ -69,9 +70,38 @@ export async function GET(
       created_at: c.created_at,
     }));
 
+    // Resume: never hand the raw storage path to the UI — mint a short-lived
+    // signed URL, and ONLY after verifying the path's slug prefix belongs to a
+    // job of THIS tenant (guards against a stored cross-tenant path becoming a
+    // confused-deputy file read; the apply route validates on write, this
+    // validates on read — defense in depth).
+    let resumeSignedUrl: string | null = null;
+    if (candidate.resume_url) {
+      const path = String(candidate.resume_url);
+      const slugPrefix = path.split('/')[0] || '';
+      const safeShape = slugPrefix.length > 0 && !path.includes('..') && !path.startsWith('/');
+      if (safeShape) {
+        const { data: ownerJob } = await supabaseAdmin
+          .from('hiring_jobs')
+          .select('id')
+          .eq('slug', slugPrefix)
+          .eq('tenant_id', guard.tenantId)
+          .maybeSingle();
+        if (ownerJob) {
+          resumeSignedUrl = await signStoragePath('hiring-resumes', path, 600);
+        }
+      }
+    }
+
     return NextResponse.json({
       success: true,
-      data: { candidate, responses: responses || [], events: events || [], comments },
+      data: {
+        candidate,
+        resume_signed_url: resumeSignedUrl,
+        responses: responses || [],
+        events: events || [],
+        comments,
+      },
     });
   } catch (err) {
     console.error('Unexpected error in hiring/candidates/[id] GET:', err);

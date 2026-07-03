@@ -19,8 +19,9 @@ import { requireHiringAdmin } from '@/lib/hiring/api-guard';
 function csvCell(value: unknown): string {
   const s = value === null || value === undefined ? '' : String(value);
   // Always quote; double any embedded quotes. Neutralize formula injection
-  // (Excel executes leading = + - @) by prefixing a single quote.
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
+  // (Excel executes leading = + - @, and tab/CR variants) by prefixing a
+  // single quote.
+  const safe = /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 

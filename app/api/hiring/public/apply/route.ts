@@ -11,14 +11,18 @@ export const dynamic = 'force-dynamic';
  *  - every required non-followup screener must be answered
  *  - auto-reject evaluation: if any auto_reject question's answer is in its
  *    auto_reject_answers, the candidate is created with status 'rejected' +
- *    auto_rejected=true. The RESPONSE NEVER reveals this — the applicant sees
- *    the same "thanks for applying" either way (data.autoRejected is consumed
- *    by the UI only for analytics-free thank-you copy; keep it out of the page).
+ *    auto_rejected=true. The applicant sees the same "thanks for applying"
+ *    either way.
  *  - responses stored with denormalized question_text
  *  - hiring_events 'submitted_application' + fire-and-forget bell
  *    notification to the tenant's hiring admins
  *
- * Response: { success, data: { candidateId, autoRejected } }
+ * Response: { success, data: { candidateId } }
+ * ⚠️ SECURITY (guardian finding, Jul 3): NEVER add autoRejected — or any other
+ * pass/fail signal — to this public response. It is an oracle: a scripted
+ * client could probe answers, enumerate every disqualifying answer, and
+ * re-apply with lies. Rejection status is admin-visible only, via the
+ * authenticated candidate routes.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -77,12 +81,15 @@ export async function POST(request: NextRequest) {
   const fullName = String(body?.full_name || '').trim().slice(0, 200);
   const phone = body?.phone ? String(body.phone).trim().slice(0, 40) : null;
   const email = body?.email ? String(body.email).trim().toLowerCase().slice(0, 200) : null;
-  const resumePath = body?.resume_path ? String(body.resume_path).trim().slice(0, 500) : null;
+  const resumePath = body?.resume_path ? String(body.resume_path).trim() : null;
   const answersInput: { question_id?: unknown; answer?: unknown }[] = Array.isArray(body?.answers)
     ? body.answers
     : [];
 
   if (!slug) return NextResponse.json({ error: 'Job link is invalid' }, { status: 400 });
+  if (answersInput.length > 200) {
+    return NextResponse.json({ error: 'Too many answers' }, { status: 400 });
+  }
   if (!fullName) return NextResponse.json({ error: 'Your name is required' }, { status: 400 });
   if (!phone && !email) {
     return NextResponse.json({ error: 'A phone number or email is required so we can contact you' }, { status: 400 });
@@ -100,6 +107,23 @@ export async function POST(request: NextRequest) {
 
     if (!job || job.status !== 'active' || job.deleted_at) {
       return NextResponse.json({ error: 'This job is not accepting applications' }, { status: 404 });
+    }
+
+    // resume_path comes from an UNAUTHENTICATED client and is later served
+    // via signed URL — an unvalidated path would be a confused-deputy
+    // cross-tenant file read. The apply page uploads to bucket
+    // 'hiring-resumes' at `${job.slug}/${uuid}-${filename}`, so enforce that
+    // shape strictly: must start with this job's slug prefix, no traversal,
+    // no absolute path, bounded length.
+    if (resumePath !== null) {
+      const valid =
+        resumePath.length <= 500 &&
+        resumePath.startsWith(`${slug}/`) &&
+        !resumePath.includes('..') &&
+        !resumePath.startsWith('/');
+      if (!valid) {
+        return NextResponse.json({ error: 'Invalid resume upload reference' }, { status: 400 });
+      }
     }
 
     const { data: screeners } = await supabaseAdmin
@@ -220,10 +244,10 @@ export async function POST(request: NextRequest) {
         .catch(() => {});
     }
 
-    // The applicant sees the same thank-you either way — the UI must NEVER
-    // surface auto-rejection to them.
+    // Identical thank-you response whether auto-rejected or not — see the
+    // SECURITY note in the file header (autoRejected must never leak here).
     return NextResponse.json(
-      { success: true, data: { candidateId: candidate.id, autoRejected } },
+      { success: true, data: { candidateId: candidate.id } },
       { status: 201 }
     );
   } catch (err) {
