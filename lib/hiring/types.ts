@@ -181,5 +181,7 @@ export interface HiringBilling {
 // POST   /api/hiring/candidates/[id]/comments -> body { body } -> { success, data: { comment } }
 // PUBLIC GET  /api/hiring/public/jobs/[slug]  -> { success, data: { job: PublicJob, screeners } } (active jobs only)
 // PUBLIC POST /api/hiring/public/apply        -> body { slug, full_name, phone, email, answers: [{question_id, answer}] }
-//                                             -> evaluates auto-reject -> { success, data: { candidateId, autoRejected } }
+//                                             -> evaluates auto-reject server-side -> { success, data: { candidateId } }
+//                                                (NEVER return autoRejected publicly - it is an oracle for the
+//                                                 disqualifying answers; guardian finding Jul 3)
 // PUBLIC POST /api/hiring/public/signup       -> body { company_name, contact_name, email } -> creates hiring-only tenant + setup email
