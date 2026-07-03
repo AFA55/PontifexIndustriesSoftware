@@ -142,9 +142,58 @@ agency-managed ad accounts (Pontifex runs ads for tenants) vs. tenant-connected 
 Interview scheduling (calendar connect), billing model (ad-spend passthrough w/ threshold, like
 Hireline, via Stripe metered billing), campaigns overview page, module gating via `features` jsonb.
 
-## 5. Open questions for the founder
-1. MVP ships without auto-publishing to Facebook (you paste the generated ad into Meta Ads
-   Manager, ~2 min/job). Confirm that's acceptable to start.
+## 5. Business model & GTM (founder decisions, Jul 3 2026)
+
+### 5.1 The product is a standalone-feeling company under Pontifex
+- Facebook page: **"Pontifex Industries Job Board"** (mirrors Hireline's page naming — see 5.3).
+- Entry point: company code **HIRE** → login page branded **"Pontifex Industries Job Board"**
+  → inside, the Hireline-style app. New customers can **self-sign-up** from that page.
+- Recommended architecture (reuses everything we have): each hiring customer that signs up gets
+  their own **tenant** with `features = { hiring: true }` only — full RLS isolation for free,
+  no new isolation model. `HIRE` is the branded front door + marketing shell, not a shared
+  bucket of customers' data. (One customer = one org, same as Hireline's Organizations.)
+- **Payments collected in-product** (Stripe): card on file at signup, metered ad-spend billing
+  with an escalating threshold exactly like Hireline ($25 → $50 → $250), charged on the 1st /
+  at threshold / when all jobs pause. Stripe customer + saved payment method per hiring tenant;
+  invoices retrievable in-app.
+
+### 5.2 Revenue = the ad-spend spread (how Hireline actually makes money)
+Hireline charges no subscription — their margin is the spread between what Meta charges them
+and what they bill the customer. From Patriot's real account:
+- Billed to Patriot: ~$345 lifetime for ~15.5k impressions / ~435 clicks across 3 jobs
+  → implied **$22 CPM / $0.79 CPC billed**.
+- US Meta benchmarks for blue-collar recruitment ads run roughly **$10–18 CPM / $0.40–0.90 CPC**
+  actual auction cost (2025–26 ranges; exact spend is only visible in their ad account).
+- Implied gross margin on ad spend: **roughly 20–100%, most plausibly ~40–60%** — consistent
+  with typical programmatic-recruitment reseller take rates (30–50%).
+- Our pricing: match their headline economics (~$8–12/candidate effective for trades roles),
+  bill ad-spend passthrough at a configurable markup (default ~1.5×), show the customer only
+  the billed number (like Hireline). Software COGS ≈ $0 (existing Vercel/Supabase/Claude stack),
+  so the spread is nearly all margin. A per-tenant `ad_spend_markup` column keeps this tunable.
+
+### 5.3 Meta architecture — validated from the Ads Library (Jul 3)
+The founder pulled Hireline's live ads in the Facebook Ad Library. Confirmed:
+- ALL customer ads run from **Hireline-owned pages** ("Hireline Construction Jobs", "Hireline",
+  "Hireline for Business") — customers' brands appear only INSIDE the creative (verified across
+  South Jersey Heating and Cooling, Whitacre Rebar, Wagner Mechanical, etc.).
+- So: **one Meta Business + one page + one ad account, agency-style, run by us** — customers
+  never touch Meta. This kills the hardest Phase-2 problem (per-tenant Meta onboarding).
+  Pontifex equivalent: page "Pontifex Industries Job Board", one ad account, all client
+  campaigns under it, client branding in the creative.
+- Their ads run across FB/IG/Messenger/Audience Network; format matches the generated creative
+  we captured (HIRING headline / ✔ bullets / pay banner / benefits / Apply Now).
+- They also run their own B2B acquisition ads ("Still relying on job boards to hire?").
+
+### 5.4 Sequencing note
+Phase 1 (build now): product + pipeline + translation + Stripe billing rails + the HIRE-branded
+signup/login funnel. Ads run manually from the "Pontifex Industries Job Board" page via Ads
+Manager (founder creates the page — 10 min, free). Phase 2: Meta Marketing API automation under
+that same single ad account (business verification + app review, founder-action heavy).
+
+## 6. Open questions for the founder
+1. ~~MVP without Meta auto-publish OK?~~ → Confirmed by the agency model: manual Ads Manager
+   under the ONE Pontifex ad account to start.
 2. Do you want the apply page on pontifexindustries.com (`/apply/...`) or a per-tenant
    subdomain later?
 3. Interview scheduling: worth it in Phase 1, or wait? (Hireline gates it behind calendar connect.)
+4. Default markup on ad spend (plan assumes 1.5×) — your call, tunable per tenant.
