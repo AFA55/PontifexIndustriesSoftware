@@ -1,6 +1,23 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 1, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (Jul 1 live-blocker sweep, pushed `ff40da25`)
+**Last updated:** Jul 3, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (last pushed `30f89682` Jul 2 — P&L simplification) | **⚠️ ~15 commits UNPUSHED**
+
+> **🛎️ Jul 2–3 session (Sonnet 5) — HIRING MODULE PHASE 1 BUILT ("Pontifex Industries Job Board"):**
+> Founder-directed Hireline clone (his real recruiting tool, analyzed live in his account + FB Ads
+> Library recon). Full loop VERIFIED LIVE in browser: create job (title+description only) → Claude
+> generates the ad kit (FB post text, IG, TikTok caption, creative bullets) + 6 ADEA-safe screeners
+> → activate → mobile /apply/[slug] (ES support, resume upload) → candidate lands in pipeline →
+> shortlist. Built by 4 worktree builders + 5 adversarial guardian reviews (every BLOCKING finding
+> fixed + re-verified: double-charge race, margin-leak RLS, auto-reject enumeration oracle,
+> idempotency-key retry trap). Key facts: HIRE tenant = branded front door (self-signup creates
+> hiring-only tenants); revenue = ad-spend markup (default 1.5×, hiring_billing.ad_spend_markup,
+> raw cost NEVER exposed to customers); ADEA guardrail in lib/hiring/types.ts blocklists age/DOB
+> screeners at generate + save. Schema: migrations 20260703 + 20260703b (applied). Plan + Phase 2
+> ad-API playbook: docs/plans/HIRELINE_MODULE_PLAN.md. **Founder critical path: create the
+> "Pontifex Industries Job Board" Facebook page + start Meta business verification (weeks of wait).**
+> Also this session: Artifex tile on Platform Hub (b7bb8edd), homepage non-compete scrub (7374bc2c),
+> P&L simplification pushed+live (30f89682). Follow-ups in BACKLOG (billing crons, durable rate
+> limits, Stripe publishable key for live card entry). **PUSH PENDING — founder to say "push it."**
 
 > **🛎️ Jul 1 session (Sonnet 5) — non-compete scrub + 4 live prod issues fixed + team-pattern doc:**
 > Founder ran a fresh 6-agent director-level audit (docs, codebase, DB/RLS, backlog, test/CI, mobile) —

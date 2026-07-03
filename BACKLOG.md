@@ -35,15 +35,28 @@
 - [x] ~~**Job-detail page 500: office-documents**~~ — ✅ FIXED + verified live (`acc52b38`, prod 200). `GET /api/admin/jobs/[id]/office-documents` returned 500 ("Failed to fetch office documents") on the job-detail page. Root cause: PostgREST embed `uploader:uploaded_by(full_name)` with no FK to resolve. Fix: migration adds FK `uploaded_by→profiles(id)` (applied) + route hardened to not depend on the embed (plain select + separate best-effort uploader lookup). Panel now renders clean. **Still unverified-by-Claude:** schedule-board duplicate→reassign live click-through (code+guardian verified; 30-sec founder manual check).
 
 **Tier 2 — smart-data UIs (new builds; founder wants "clean UI to input + see analysis"):**
-- [ ] **🆕 Hireline-style hiring module (founder-directed Jul 2)** — full plan in
-  `docs/plans/HIRELINE_MODULE_PLAN.md` (built from a live walkthrough of Patriot's real Hireline
-  account). Phase 1 MVP: job builder (title+description → Claude generates ad + screeners) →
-  screener editor (auto-reject, legal guardrail: capability/18+ questions, NEVER age — ADEA) →
-  public mobile apply page → candidate pipeline (Unreviewed/Shortlisted/Rejected, comments,
-  export) → paste-ready branded ad kit for Meta Ads Manager. Includes the founder's #1 ask
-  Hireline lacks: one-click TRANSLATION of finalized ad+screeners as a linked language variant.
-  Phase 2 (later): Meta Marketing API auto-publish. Hireline's model = ad-spend passthrough,
-  ~$8/candidate for Patriot — our MVP costs tenants $0 platform-side.
+- [x] ~~**🆕 Hireline-style hiring module Phase 1 (founder-directed Jul 2)**~~ — ✅ **BUILT Jul 3**
+  (4 worktree builders + 5 guardian reviews, all BLOCKING findings fixed + re-verified; merged,
+  build+tsc+jest green, full loop verified live: create job → Claude generates FB/IG/TikTok ad
+  kit + 6 ADEA-safe screeners → activate → mobile apply → candidate in pipeline → shortlist).
+  Shipped: /dashboard/hiring workspace (jobs, 2-field wizard, Ad Kit w/ FB/IG/TikTok previews +
+  per-channel copy, translate + duplicate, screener editor w/ auto-reject + ADEA blocklist,
+  candidate slide-over, CSV export), /apply/[slug] (mobile-first, ES support, resume upload),
+  /jobs front door + self-serve signup (creates hiring-only tenant, HIRE code reserved),
+  billing rails (Stripe card-on-file, threshold model, race-hardened charge, margin never
+  exposed to customers). Plan: `docs/plans/HIRELINE_MODULE_PLAN.md`. **NOT yet pushed.**
+- [ ] **Hiring module follow-ups (from guardian reviews, non-blocking):** billing crons
+  (monthly charge on the 1st + charge-on-all-jobs-paused + dunning retry — wire in vercel.json
+  w/ CRON_SECRET); durable rate limiting for public signup/apply/resume (in-memory Map resets
+  per instance — fine at launch scale); resume MIME magic-byte sniffing if ever rendered inline;
+  Spanish ADEA regex patterns; features.hiring gate on PUBLIC job pages (disabled tenant still
+  serves active jobs); grouped candidate counts on jobs list (N+1 at scale); Stripe publishable
+  key in Vercel env for live card entry (billing page shows placeholder without it).
+- [ ] **Hiring Phase 2 — ad platform APIs** (playbook in plan §6): FOUNDER critical path = create
+  FB page "Pontifex Industries Job Board" + start Meta business verification NOW (weeks of wait);
+  then dev app + App Review (Claude drafts) → System User token → lib/ads/meta.ts publish/sync
+  (special_ad_categories=EMPLOYMENT enforced). TikTok after: Business Center + Marketing API app
+  → lib/ads/tiktok.ts (video-first caveat, $20/day ad-group minimums — Meta is the default).
 - [ ] **Operator production-input form** — linear ft / holes per operator per job → writes the EXISTING `equipment_usage` table (linear_feet_cut, operator_id, feet_per_hour auto-calc). Add explicit "holes" modeling (currently only `num_cuts` in scope JSON). No real-time input UI exists today.
 - [ ] **Cost input + Project P&L / production dashboard** — surface the EXISTING `job_pnl_summary` view (revenue/labor cost/gross profit/margin) + per-operator production from `equipment_usage`. Operator rates already in `profiles.hourly_rate`; per-job `labor_cost` auto-calcs on clock-out. Build the read dashboard + a clean rate-input screen. OPTIONAL per tenant (works without rates). This is the data foundation Artifex reads.
 
