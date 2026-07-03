@@ -312,7 +312,7 @@ export default function HomePage() {
                 Real modules we&apos;ve already built
               </h3>
               <p className="text-zinc-400 max-w-2xl mx-auto">
-                Not a wish list — these run in production today for a real concrete-cutting company.
+                Not a wish list — these run in production today for a real field-services company.
               </p>
             </div>
             <ul className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
