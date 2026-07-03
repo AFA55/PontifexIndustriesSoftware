@@ -190,7 +190,44 @@ signup/login funnel. Ads run manually from the "Pontifex Industries Job Board" p
 Manager (founder creates the page — 10 min, free). Phase 2: Meta Marketing API automation under
 that same single ad account (business verification + app review, founder-action heavy).
 
-## 6. Open questions for the founder
+## 6. Phase 2 — connecting the ad platforms (step-by-step, agreed Jul 3)
+
+FB + IG = ONE integration (Meta Marketing API; Instagram is a placement). TikTok = second.
+
+### 6.1 Meta (Facebook + Instagram) — ~2–4 wks, mostly verification/review wait
+1. FOUNDER (~30 min): create FB Page "Pontifex Industries Job Board"; in Business Manager add it
+   to the PontifexIndustriesLLC portfolio; create+link IG account (@pontifexjobboard).
+2. FOUNDER (starts the long pole): Business verification in Business Manager → Security Center
+   (LLC docs, domain, domain email). Days–2 weeks.
+3. FOUNDER+CLAUDE: Meta developer app (type Business); App Review for ads_management, ads_read,
+   business_management @ Advanced Access (Claude drafts use-case + screencast script). 1–4 wks.
+4. FOUNDER (~15 min): create the ONE agency ad account in the portfolio + payment method;
+   create System User; long-lived token → Vercel env (META_SYSTEM_USER_TOKEN, META_AD_ACCOUNT_ID,
+   META_PAGE_ID). Founder pastes values; never in code.
+5. CLAUDE (1 session): lib/ads/meta.ts + POST /api/hiring/jobs/[id]/publish (creative render →
+   Campaign → Ad Set → Ad → link /apply/[slug]?utm_source=...), pause/resume tied to job status,
+   daily insights cron → impressions/clicks + spend ledger (raw_cost×markup). NON-NEGOTIABLE:
+   special_ad_categories=["EMPLOYMENT"] on every campaign (US law; limits targeting to ~15mi+
+   radius, no age/gender — aligns with our ADEA guardrail).
+6. First live test: Patriot laborer job @ $5–10/day, verify end-to-end, then real budgets.
+
+### 6.2 TikTok — ~1–2 wks
+1. FOUNDER (~20 min): TikTok Business Center + Ads Manager account + payment.
+2. FOUNDER+CLAUDE: developer app on TikTok for Business → Marketing API access (~1–2 wks;
+   Claude drafts the application).
+3. CLAUDE: lib/ads/tiktok.ts + same publish/sync plumbing (TIKTOK_ACCESS_TOKEN,
+   TIKTOK_ADVERTISER_ID env).
+CAVEATS (tell customers honestly): TikTok is video-first — start with Smart Creative /
+image-to-video templates fed by our ad kit; and TikTok minimums (~$50/day campaign, ~$20/day
+ad group) far exceed Meta's (~$1/day) — FB+IG is the default recommendation for small shops,
+TikTok for volume/younger-workforce hiring.
+
+### 6.3 Already future-proofed in Phase 1 (no rework when tokens land)
+Per-channel copy on every job (FB text / IG placement / TikTok caption), channels[] selection,
+per-channel spend ledger, funnel fields the insights cron will fill. Publishing goes from
+copy-paste to one click the day the env vars exist.
+
+## 7. Open questions for the founder
 1. ~~MVP without Meta auto-publish OK?~~ → Confirmed by the agency model: manual Ads Manager
    under the ONE Pontifex ad account to start.
 2. Do you want the apply page on pontifexindustries.com (`/apply/...`) or a per-tenant
