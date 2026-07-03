@@ -244,6 +244,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     features: ['Pre-use checklists', 'Delegate to shop help', 'Status tracking', 'Critical-fail flagging'],
   },
   {
+    key: 'hiring',
+    title: 'Hiring',
+    description: 'Run social-media hiring ads and manage your candidate pipeline',
+    icon: '📣',
+    href: '/dashboard/hiring',
+    bgColor: 'from-pink-500 to-rose-600',
+    iconBg: 'bg-pink-500',
+    features: ['AI-generated job ads', 'Screener questions', 'Candidate pipeline', 'One-click translation'],
+  },
+  {
     key: 'peer_ratings',
     title: 'Peer Ratings',
     description: 'Manage team performance reviews and rating forms',
@@ -385,6 +395,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     customer_profiles: 'full',
     site_visits: 'view',
     peer_ratings: 'full',
+    hiring: 'full',
   }),
   supervisor: preset({
     schedule_form: 'submit',
