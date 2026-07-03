@@ -207,7 +207,14 @@ export default function HiringBillingPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.success) throw new Error(json.error || 'Payment failed');
-      setPaySuccess(`Paid ${money(json.data.charged)} — thank you!`);
+      if (json.data?.pending) {
+        setPaySuccess(
+          json.data.message ||
+            'Your payment is processing. No action needed — it will show as paid once it completes.'
+        );
+      } else {
+        setPaySuccess(`Paid ${money(json.data.charged)} — thank you!`);
+      }
       await load();
     } catch (e) {
       setPayError(e instanceof Error ? e.message : 'Payment failed');

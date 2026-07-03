@@ -49,11 +49,21 @@ export async function POST(request: NextRequest) {
     if (!Number.isFinite(rawCost) || rawCost <= 0) {
       return NextResponse.json({ error: 'raw_cost must be a number greater than 0' }, { status: 400 });
     }
+    if (rawCost > 10000) {
+      return NextResponse.json(
+        { error: 'raw_cost cannot exceed $10,000 per entry — split unusually large spend into multiple entries.' },
+        { status: 400 }
+      );
+    }
 
     let spendDate: string | undefined;
     if (body.spend_date !== undefined && body.spend_date !== null && body.spend_date !== '') {
       if (typeof body.spend_date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.spend_date)) {
         return NextResponse.json({ error: 'spend_date must be YYYY-MM-DD' }, { status: 400 });
+      }
+      // Reject well-formed but impossible dates (e.g. 2026-02-31 parses to Invalid Date).
+      if (Number.isNaN(new Date(body.spend_date + 'T00:00:00').getTime())) {
+        return NextResponse.json({ error: 'spend_date is not a valid calendar date' }, { status: 400 });
       }
       spendDate = body.spend_date;
     }
@@ -68,7 +78,6 @@ export async function POST(request: NextRequest) {
     interface JobRow {
       id: string;
       tenant_id: string;
-      total_spend: number;
     }
     let tenantId = bodyTenantId;
     let job: JobRow | null = null;
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
     if (jobId) {
       const { data: jobRow, error: jobError } = await supabaseAdmin
         .from('hiring_jobs')
-        .select('id, tenant_id, total_spend')
+        .select('id, tenant_id')
         .eq('id', jobId)
         .is('deleted_at', null)
         .maybeSingle();
@@ -124,21 +133,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ── roll up: job total_spend + tenant balance_owed ───────────────────
-    if (job) {
-      await supabaseAdmin
-        .from('hiring_jobs')
-        .update({ total_spend: roundMoney(Number(job.total_spend) + billedAmount) })
-        .eq('id', job.id);
-    }
-
-    const newBalance = roundMoney(Number(billing.balance_owed) + billedAmount);
-    const { error: balanceError } = await supabaseAdmin
-      .from('hiring_billing')
-      .update({ balance_owed: newBalance })
-      .eq('tenant_id', tenantId);
+    // ── roll up atomically via service-role RPCs (guardian S1) — no
+    // read-modify-write races between concurrent spend entries. ───────────
+    const { data: rpcBalance, error: balanceError } = await supabaseAdmin.rpc(
+      'increment_hiring_balance',
+      { p_tenant_id: tenantId, p_amount: billedAmount }
+    );
     if (balanceError) {
-      return NextResponse.json({ error: balanceError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: `Spend recorded (${entry.id}) but balance update failed: ${balanceError.message}` },
+        { status: 500 }
+      );
+    }
+    const newBalance = roundMoney(Number(rpcBalance));
+
+    if (job) {
+      const { error: jobSpendError } = await supabaseAdmin.rpc('increment_hiring_job_spend', {
+        p_job_id: job.id,
+        p_amount: billedAmount,
+      });
+      if (jobSpendError) {
+        return NextResponse.json(
+          {
+            error: `Spend and balance recorded (${entry.id}) but job total_spend update failed: ${jobSpendError.message}`,
+          },
+          { status: 500 }
+        );
+      }
     }
 
     // Fire-and-forget history event.

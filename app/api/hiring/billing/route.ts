@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
       const { data: jobs } = await supabaseAdmin
         .from('hiring_jobs')
         .select('id, title')
+        .eq('tenant_id', tenantId)
         .in('id', jobIds);
       for (const j of jobs ?? []) jobTitles[j.id as string] = j.title as string;
     }
