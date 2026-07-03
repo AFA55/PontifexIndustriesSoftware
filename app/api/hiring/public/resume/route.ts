@@ -53,18 +53,27 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-/** Keep the original filename readable but storage-safe. */
+/** Keep the original filename readable but storage-safe. Leading dots are
+ * stripped so a name like ".." can't survive into the stored path (the apply
+ * route rejects any path containing '..', which would orphan the upload). */
 function sanitizeFilename(name: string): string {
   const base = name.split(/[\\/]/).pop() || 'resume';
-  const cleaned = base.replace(/[^a-zA-Z0-9._-]+/g, '_').replace(/_+/g, '_').slice(0, 80);
+  const cleaned = base
+    .replace(/[^a-zA-Z0-9._-]+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^[._-]+/, '')
+    .slice(0, 80);
   return cleaned || 'resume';
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // x-real-ip is platform-set on Vercel (single value); the LEFTMOST
+    // x-forwarded-for entry is client-spoofable, so fall back to the
+    // rightmost (appended by the edge) — guardian finding Jul 3.
     const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
+      request.headers.get('x-real-ip')?.trim() ||
+      request.headers.get('x-forwarded-for')?.split(',').pop()?.trim() ||
       'unknown';
     if (isRateLimited(ip)) {
       return NextResponse.json({ error: 'Too many uploads. Please try again later.' }, { status: 429 });

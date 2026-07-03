@@ -123,9 +123,12 @@ async function sendSignupInviteEmail(opts: {
 
 export async function POST(request: NextRequest) {
   try {
+    // x-real-ip is platform-set on Vercel (single value); the LEFTMOST
+    // x-forwarded-for entry is client-spoofable, so fall back to the
+    // rightmost (appended by the edge) — guardian finding Jul 3.
     const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
+      request.headers.get('x-real-ip')?.trim() ||
+      request.headers.get('x-forwarded-for')?.split(',').pop()?.trim() ||
       'unknown';
 
     let body: { company_name?: string; contact_name?: string; email?: string; phone?: string };
@@ -153,7 +156,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please enter a valid work email.' }, { status: 400 });
     }
 
-    if (isRateLimited(ip)) {
+    // Throttle by IP AND by target email — the email key bounds invite
+    // resends to a victim inbox even if the caller rotates IPs
+    // (guardian finding Jul 3).
+    if (isRateLimited(ip) || (email && isRateLimited(`email:${email}`))) {
       return NextResponse.json(
         { error: 'Too many signups from this address. Please try again later.' },
         { status: 429 }
