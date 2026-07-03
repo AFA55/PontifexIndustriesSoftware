@@ -14,6 +14,7 @@ import {
   type Tenant, getHeaders, statusColors, planIcons,
   moduleSummary, userCount, isProtectedTenant,
 } from '@/components/platform/shared';
+import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
 /** The Pontifex parent (owner) org — excluded from the client-companies list. */
 const OWNER_TENANT_ID = 'b27d9ca5-1352-42f2-b7e1-25254c09fa6f';
@@ -265,6 +266,17 @@ export default function PlatformHubPage() {
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Artifex — the founder's 2nd brain for Pontifex itself.           */}
+      {/* Chat + memory notes are tenant-scoped, so under the PONTIFEX org  */}
+      {/* this manages Pontifex Industries, separate from any client brain. */}
+      {/* ---------------------------------------------------------------- */}
+      <CommandCenterLaunch
+        title="Artifex"
+        badge="2nd Brain"
+        description="Your Pontifex Industries second brain — ask, plan, and save durable notes about the business itself."
+      />
 
       {/* ---------------------------------------------------------------- */}
       {/* KPI tiles */}

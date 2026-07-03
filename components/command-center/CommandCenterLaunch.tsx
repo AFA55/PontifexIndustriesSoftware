@@ -12,8 +12,20 @@ import { ChevronRight } from 'lucide-react';
  * this component carries no role logic of its own.
  * It is an intentional dark tile that does NOT invert for light mode (it teases the
  * dark HUD it links to).
+ *
+ * The Platform Hub reuses this tile with owner-facing copy (Artifex as the
+ * founder's 2nd brain for Pontifex itself) — the chat + memory notes are
+ * tenant-scoped, so opened under the PONTIFEX org it manages Pontifex, not a client.
  */
-export default function CommandCenterLaunch() {
+export default function CommandCenterLaunch({
+  title = 'Command Center',
+  description = "Your live operations HUD — clocked-in crew, today's jobs, approvals at a glance.",
+  badge = 'New',
+}: {
+  title?: string;
+  description?: string;
+  badge?: string;
+}) {
   return (
     <Link
       href="/dashboard/command-center"
@@ -32,14 +44,14 @@ export default function CommandCenterLaunch() {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold tracking-tight text-white sm:text-lg">
-              Command Center
+              {title}
             </h2>
             <span className="rounded-full border border-[#DB2777]/40 bg-[#DB2777]/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-pink-200">
-              New
+              {badge}
             </span>
           </div>
           <p className="mt-0.5 text-sm text-white/55">
-            Your live operations HUD — clocked-in crew, today&apos;s jobs, approvals at a glance.
+            {description}
           </p>
         </div>
         <ChevronRight className="h-5 w-5 shrink-0 text-white/40 transition-transform group-hover:translate-x-1 group-hover:text-white/80" />
