@@ -35,6 +35,15 @@
 - [x] ~~**Job-detail page 500: office-documents**~~ — ✅ FIXED + verified live (`acc52b38`, prod 200). `GET /api/admin/jobs/[id]/office-documents` returned 500 ("Failed to fetch office documents") on the job-detail page. Root cause: PostgREST embed `uploader:uploaded_by(full_name)` with no FK to resolve. Fix: migration adds FK `uploaded_by→profiles(id)` (applied) + route hardened to not depend on the embed (plain select + separate best-effort uploader lookup). Panel now renders clean. **Still unverified-by-Claude:** schedule-board duplicate→reassign live click-through (code+guardian verified; 30-sec founder manual check).
 
 **Tier 2 — smart-data UIs (new builds; founder wants "clean UI to input + see analysis"):**
+- [ ] **🆕 Hireline-style hiring module (founder-directed Jul 2)** — full plan in
+  `docs/plans/HIRELINE_MODULE_PLAN.md` (built from a live walkthrough of Patriot's real Hireline
+  account). Phase 1 MVP: job builder (title+description → Claude generates ad + screeners) →
+  screener editor (auto-reject, legal guardrail: capability/18+ questions, NEVER age — ADEA) →
+  public mobile apply page → candidate pipeline (Unreviewed/Shortlisted/Rejected, comments,
+  export) → paste-ready branded ad kit for Meta Ads Manager. Includes the founder's #1 ask
+  Hireline lacks: one-click TRANSLATION of finalized ad+screeners as a linked language variant.
+  Phase 2 (later): Meta Marketing API auto-publish. Hireline's model = ad-spend passthrough,
+  ~$8/candidate for Patriot — our MVP costs tenants $0 platform-side.
 - [ ] **Operator production-input form** — linear ft / holes per operator per job → writes the EXISTING `equipment_usage` table (linear_feet_cut, operator_id, feet_per_hour auto-calc). Add explicit "holes" modeling (currently only `num_cuts` in scope JSON). No real-time input UI exists today.
 - [ ] **Cost input + Project P&L / production dashboard** — surface the EXISTING `job_pnl_summary` view (revenue/labor cost/gross profit/margin) + per-operator production from `equipment_usage`. Operator rates already in `profiles.hourly_rate`; per-job `labor_cost` auto-calcs on clock-out. Build the read dashboard + a clean rate-input screen. OPTIONAL per tenant (works without rates). This is the data foundation Artifex reads.
 
