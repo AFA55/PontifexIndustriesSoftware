@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
   try {
     const { data, error } = await supabaseAdmin
       .from('hiring_publish_requests')
-      .select('*')
+      .select('id, job_id, status, review_note, reviewed_at, channels, daily_budget, created_at, updated_at')
       .eq('tenant_id', guard.tenantId)
       .eq('job_id', jobId)
       .order('created_at', { ascending: false })

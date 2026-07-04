@@ -206,7 +206,7 @@ export async function PATCH(
     // blocked by the partial unique index (23505 tolerated as a no-op).
     if (
       updates.status === 'active' &&
-      (existing.status === 'draft' || existing.status === 'paused')
+      existing.status !== 'active' // any non-active -> active transition files a request (incl. closed)
     ) {
       const { error: pubReqError } = await supabaseAdmin
         .from('hiring_publish_requests')
