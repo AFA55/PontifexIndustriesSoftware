@@ -12,10 +12,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import {
   Eye, MousePointerClick, Users, Play, Pause, ChevronRight, Lock,
+  Clock, Megaphone, XCircle,
 } from 'lucide-react';
 import { getCurrentUser, type User } from '@/lib/auth';
 import type {
   HiringJob, HiringScreenerQuestion, HiringCandidate, CandidateStatus,
+  HiringPublishRequest,
 } from '@/lib/hiring/types';
 import { HIRING_ADMIN_ROLES } from '@/lib/hiring/types';
 import {
@@ -65,6 +67,7 @@ export default function HiringJobDetailPage() {
   const [job, setJob] = useState<HiringJob | null>(null);
   const [screeners, setScreeners] = useState<HiringScreenerQuestion[]>([]);
   const [candidates, setCandidates] = useState<HiringCandidate[]>([]);
+  const [publishReq, setPublishReq] = useState<HiringPublishRequest | null>(null);
   const [loading, setLoading] = useState(true);
   const [notEnabled, setNotEnabled] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +90,19 @@ export default function HiringJobDetailPage() {
     setUser(currentUser);
   }, [router]);
 
+  /** Latest publish request — drives the "Ad review" status line (fail-soft). */
+  const loadPublishReq = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const data = await hiringFetch<{ request: HiringPublishRequest | null }>(
+        `/api/hiring/publish-requests/mine?jobId=${jobId}`,
+      );
+      setPublishReq(data.request);
+    } catch {
+      setPublishReq(null);
+    }
+  }, [jobId]);
+
   const fetchAll = useCallback(async () => {
     if (!jobId) return;
     setLoading(true);
@@ -95,6 +111,7 @@ export default function HiringJobDetailPage() {
       const detail = await hiringFetch<JobDetailPayload>(`/api/hiring/jobs/${jobId}`);
       setJob(detail.job);
       setScreeners(detail.screeners || []);
+      loadPublishReq();
       try {
         const cand = await hiringFetch<{ candidates: HiringCandidate[] }>(
           `/api/hiring/jobs/${jobId}/candidates`,
@@ -114,7 +131,7 @@ export default function HiringJobDetailPage() {
     } finally {
       setLoading(false);
     }
-  }, [jobId, router]);
+  }, [jobId, router, loadPublishReq]);
 
   useEffect(() => {
     if (user) fetchAll();
@@ -129,6 +146,8 @@ export default function HiringJobDetailPage() {
         body: JSON.stringify({ status }),
       });
       setJob(data.job);
+      // Activation files a publish request server-side — refresh the status line.
+      loadPublishReq();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update status');
     } finally {
@@ -274,6 +293,33 @@ export default function HiringJobDetailPage() {
 
           {/* ─── Overview ─── */}
           <TabPanel value="overview">
+            {/* Ad review status line (latest publish request) */}
+            {job.status === 'active' && publishReq?.status === 'pending' && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 px-4 py-2.5">
+                <Clock className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
+                  Ad review: in progress with Pontifex
+                </p>
+              </div>
+            )}
+            {job.status === 'active' && (publishReq?.status === 'approved' || publishReq?.status === 'published') && (
+              <div className="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 px-4 py-2.5">
+                <Megaphone className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                  {publishReq.status === 'published' ? 'Ad approved — running' : 'Ad approved — running soon'}
+                </p>
+              </div>
+            )}
+            {publishReq?.status === 'rejected' && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-200 dark:border-rose-500/30 bg-rose-50 dark:bg-rose-500/10 px-4 py-2.5">
+                <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600 dark:text-rose-400" />
+                <p className="text-sm font-medium text-rose-800 dark:text-rose-300">
+                  Ad not approved{publishReq.review_note ? `: ${publishReq.review_note}` : '.'}
+                  {' '}Update the job and reactivate to request another review.
+                </p>
+              </div>
+            )}
+
             <div className="grid gap-4 sm:grid-cols-3">
               <FunnelStat
                 icon={Eye}
