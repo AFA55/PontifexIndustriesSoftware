@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireHiringAdmin } from '@/lib/hiring/api-guard';
+import { settleHiringBalance } from '@/lib/hiring/settle';
 import {
   AD_CHANNELS,
   HIRING_JOB_STATUSES,
@@ -197,6 +198,32 @@ export async function PATCH(
       console.error('hiring/jobs/[id] PATCH error:', error);
       return NextResponse.json({ error: 'Failed to update job' }, { status: 500 });
     }
+
+    // ── Billing settle hook (active → paused/closed only) ─────────────────
+    // Plan §5.1: when the tenant's LAST active job pauses/closes, collect the
+    // outstanding balance regardless of threshold. Fire-and-forget — must
+    // never delay or fail the PATCH response. All money semantics live in
+    // settleHiringBalance (lib/hiring/settle.ts).
+    if (existing.status === 'active' && (job.status === 'paused' || job.status === 'closed')) {
+      Promise.resolve(
+        supabaseAdmin
+          .from('hiring_jobs')
+          .select('id')
+          .eq('tenant_id', guard.tenantId)
+          .eq('status', 'active')
+          .is('deleted_at', null)
+          .limit(1)
+      )
+        .then(({ data: stillActive }) => {
+          if (stillActive && stillActive.length > 0) return; // other jobs still running
+          return settleHiringBalance(guard.tenantId, {
+            trigger: 'jobs_paused',
+            actorId: guard.userId,
+          }).then(() => undefined);
+        })
+        .catch(() => {});
+    }
+    // ── end billing settle hook ────────────────────────────────────────────
 
     return NextResponse.json({ success: true, data: { job } });
   } catch (err) {
