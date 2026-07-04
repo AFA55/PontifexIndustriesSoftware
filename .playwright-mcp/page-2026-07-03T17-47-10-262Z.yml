@@ -1,0 +1,81 @@
+- main [ref=e2]:
+  - navigation [ref=e3]:
+    - generic [ref=e4]:
+      - img "Pontifex Industries" [ref=e5]
+      - generic [ref=e6]: Pontifex Industries Job Board
+    - link "Sign in" [ref=e7] [cursor=pointer]:
+      - /url: /company-login
+  - generic [ref=e9]:
+    - paragraph [ref=e10]:
+      - img [ref=e11]
+      - text: Reach the workers who aren't on job boards
+    - heading "Hire from Facebook, Instagram & TikTok — not job boards." [level=1] [ref=e13]
+    - paragraph [ref=e14]: AI writes your job ad. Candidates apply on their phones in under two minutes. You pay only for ad spend — no subscription, no per-seat fees.
+    - generic [ref=e15]:
+      - link "Get started" [ref=e16] [cursor=pointer]:
+        - /url: "#signup"
+        - text: Get started
+        - img [ref=e17]
+      - link "Sign in with company code HIRE" [ref=e19] [cursor=pointer]:
+        - /url: /company-login
+        - text: Sign in with company code
+        - generic [ref=e20]: HIRE
+  - generic [ref=e22]:
+    - generic [ref=e23]:
+      - img [ref=e25]
+      - heading "AI writes your ad" [level=2] [ref=e28]
+      - paragraph [ref=e29]: Give us a job title and a description. We generate the ad creative, headline variants, and screener questions — branded to your company.
+    - generic [ref=e30]:
+      - img [ref=e32]
+      - heading "Auto-screening built in" [level=2] [ref=e33]
+      - paragraph [ref=e34]: Capability questions filter out applicants who can’t do the work before you ever pick up the phone. Auto-reject rules run instantly.
+    - generic [ref=e35]:
+      - img [ref=e37]
+      - heading "One pipeline" [level=2] [ref=e42]
+      - paragraph [ref=e43]: Every candidate lands in one place — review, shortlist, comment with your team, and export. No more digging through Messenger.
+    - generic [ref=e44]:
+      - img [ref=e46]
+      - heading "Spanish translation built in" [level=2] [ref=e50]
+      - paragraph [ref=e51]: One click translates your ad and application into Spanish as a linked variant of the same job — one pipeline, twice the reach.
+  - generic [ref=e53]:
+    - heading "No subscription. Pay only for ad spend." [level=2] [ref=e54]
+    - paragraph [ref=e55]: Set a daily budget per job — your ads run until it's spent, and your bill is just the ad spend. Pause anytime. Most trades roles see qualified candidates for a few dollars each.
+    - list [ref=e56]:
+      - listitem [ref=e57]:
+        - img [ref=e58]
+        - text: No monthly fee
+      - listitem [ref=e61]:
+        - img [ref=e62]
+        - text: No per-seat pricing
+      - listitem [ref=e65]:
+        - img [ref=e66]
+        - text: Pause or close jobs anytime
+  - generic [ref=e70]:
+    - heading "Get started" [level=2] [ref=e71]
+    - paragraph [ref=e72]: Create your account — your first job ad is minutes away.
+    - generic [ref=e74]:
+      - generic [ref=e75]:
+        - generic [ref=e76]: Company name
+        - textbox "Company name" [ref=e77]:
+          - /placeholder: Acme Mechanical
+      - generic [ref=e78]:
+        - generic [ref=e79]: Your name
+        - textbox "Your name" [ref=e80]:
+          - /placeholder: First and last name
+      - generic [ref=e81]:
+        - generic [ref=e82]: Work email
+        - textbox "Work email" [ref=e83]:
+          - /placeholder: you@company.com
+      - generic [ref=e84]:
+        - generic [ref=e85]: Phone (optional)
+        - textbox "Phone (optional)" [ref=e86]:
+          - /placeholder: (555) 555-1234
+      - button "Create my account" [ref=e87] [cursor=pointer]
+      - paragraph [ref=e88]:
+        - text: Already have an account?
+        - link "Sign in" [ref=e89] [cursor=pointer]:
+          - /url: /company-login
+        - text: with company code HIRE.
+  - generic [ref=e91]:
+    - generic [ref=e93]: Pontifex Industries Job Board
+    - generic [ref=e94]: © 2026 Pontifex Industries
