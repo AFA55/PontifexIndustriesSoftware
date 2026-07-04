@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireHiringAdmin } from '@/lib/hiring/api-guard';
+import { requireHiringAdmin, logHiringEvent } from '@/lib/hiring/api-guard';
 import {
   AD_CHANNELS,
   HIRING_JOB_STATUSES,
@@ -197,6 +197,85 @@ export async function PATCH(
       console.error('hiring/jobs/[id] PATCH error:', error);
       return NextResponse.json({ error: 'Failed to update job' }, { status: 500 });
     }
+
+    // ── Publish-request hook (draft/paused → active) — publish-queue builder ──
+    // Activating a job files a PENDING publish request for the Pontifex
+    // platform owner to review in /dashboard/platform/publish-queue. The job
+    // STILL goes active immediately — the queue governs when WE run the ad,
+    // not the customer's pipeline. A second pending request per job is
+    // blocked by the partial unique index (23505 tolerated as a no-op).
+    if (
+      updates.status === 'active' &&
+      existing.status !== 'active' // any non-active -> active transition files a request (incl. closed)
+    ) {
+      const { error: pubReqError } = await supabaseAdmin
+        .from('hiring_publish_requests')
+        .insert({
+          tenant_id: guard.tenantId,
+          job_id: job.id,
+          requested_by: guard.userId,
+          // Snapshot the ad parameters as requested (post-update values).
+          channels: job.channels || [],
+          daily_budget: job.daily_budget ?? null,
+        });
+
+      if (pubReqError) {
+        if (pubReqError.code !== '23505') {
+          console.error('hiring publish-request insert failed:', pubReqError);
+        }
+        // 23505 → a pending request already exists for this job; nothing to do.
+      } else {
+        logHiringEvent({
+          tenant_id: guard.tenantId,
+          job_id: job.id,
+          event_type: 'publish_requested',
+          actor_id: guard.userId,
+          meta: { channels: job.channels || [], daily_budget: job.daily_budget ?? null },
+        });
+
+        // Fire-and-forget bell notification to the platform owners:
+        // super_admin profiles in the PONTIFEX owner org.
+        Promise.resolve(
+          (async () => {
+            const { data: ownerTenants } = await supabaseAdmin
+              .from('tenants')
+              .select('id')
+              .eq('company_code', 'PONTIFEX');
+            const ownerTenantIds = (ownerTenants || []).map((t: { id: string }) => t.id);
+            if (ownerTenantIds.length === 0) return;
+
+            const [{ data: owners }, { data: requestingTenant }] = await Promise.all([
+              supabaseAdmin
+                .from('profiles')
+                .select('id, tenant_id')
+                .eq('role', 'super_admin')
+                .in('tenant_id', ownerTenantIds),
+              supabaseAdmin
+                .from('tenants')
+                .select('name')
+                .eq('id', guard.tenantId)
+                .maybeSingle(),
+            ]);
+            if (!owners || owners.length === 0) return;
+
+            const rows = owners.map((p: { id: string; tenant_id: string }) => ({
+              user_id: p.id,
+              type: 'hiring_publish_request',
+              notification_type: 'general',
+              title: 'New ad publish request',
+              message: `${requestingTenant?.name || 'A client'} activated "${job.title}" — review it in the publish queue.`,
+              tenant_id: p.tenant_id,
+              read: false,
+              is_read: false,
+              action_url: '/dashboard/platform/publish-queue',
+              metadata: { job_id: job.id, requesting_tenant_id: guard.tenantId },
+            }));
+            await supabaseAdmin.from('notifications').insert(rows);
+          })()
+        ).catch(() => {});
+      }
+    }
+    // ── end publish-request hook ──────────────────────────────────────────
 
     return NextResponse.json({ success: true, data: { job } });
   } catch (err) {

@@ -8,7 +8,7 @@ import {
   Building2, Plus, ChevronRight, Users as UsersIcon, ToggleRight,
   RefreshCw, ShieldCheck, Globe, Activity, AlertTriangle, Bug,
   CheckCircle2, ArrowRight, ServerCog, MessageSquareWarning, Inbox,
-  HeartPulse, Info, OctagonAlert, ShieldAlert,
+  HeartPulse, Info, OctagonAlert, ShieldAlert, Megaphone,
 } from 'lucide-react';
 import {
   type Tenant, getHeaders, statusColors, planIcons,
@@ -142,6 +142,7 @@ export default function PlatformHubPage() {
   const [feedbackAvailable, setFeedbackAvailable] = useState(true);
   const [healthAlerts, setHealthAlerts] = useState<HealthAlert[] | null>(null);
   const [healthAlertsAvailable, setHealthAlertsAvailable] = useState(true);
+  const [pendingPublish, setPendingPublish] = useState(0);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -149,11 +150,12 @@ export default function PlatformHubPage() {
 
     // All sources load in parallel; each fails soft so one missing
     // data source never blanks the whole cockpit.
-    const [tenantsRes, healthRes, feedbackRes, healthAlertsRes] = await Promise.allSettled([
+    const [tenantsRes, healthRes, feedbackRes, healthAlertsRes, publishRes] = await Promise.allSettled([
       fetch('/api/admin/tenants', { headers }),
       fetch('/api/admin/platform/health?limit=6', { headers }),
       fetch('/api/admin/feedback', { headers }),
       fetch('/api/admin/platform/health-alerts', { headers }),
+      fetch('/api/hiring/publish-requests?status=pending', { headers }),
     ]);
 
     // Tenants
@@ -208,6 +210,18 @@ export default function PlatformHubPage() {
     } else {
       setHealthAlertsAvailable(false);
       setHealthAlerts([]);
+    }
+
+    // Pending ad publish requests (hiring approval-queue badge — fail soft)
+    if (publishRes.status === 'fulfilled' && publishRes.value.ok) {
+      try {
+        const json = await publishRes.value.json();
+        setPendingPublish(json.success ? (json.data.requests || []).length : 0);
+      } catch {
+        setPendingPublish(0);
+      }
+    } else {
+      setPendingPublish(0);
     }
 
     setLoading(false);
@@ -343,6 +357,17 @@ export default function PlatformHubPage() {
               className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
             >
               <Inbox className="w-3.5 h-3.5" /> Demo requests
+            </Link>
+            <Link
+              href="/dashboard/platform/publish-queue"
+              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
+            >
+              <Megaphone className="w-3.5 h-3.5" /> Publish queue
+              {pendingPublish > 0 && (
+                <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full bg-amber-500 text-white leading-none">
+                  {pendingPublish}
+                </span>
+              )}
             </Link>
             <Link
               href="/dashboard/platform/tenants"

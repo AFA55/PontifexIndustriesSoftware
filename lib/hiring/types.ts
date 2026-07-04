@@ -153,6 +153,25 @@ export interface HiringEvent {
   created_at: string;
 }
 
+export const PUBLISH_REQUEST_STATUSES = ['pending', 'approved', 'rejected', 'published'] as const;
+export type PublishRequestStatus = (typeof PUBLISH_REQUEST_STATUSES)[number];
+
+/** Row shape for hiring_publish_requests (20260703c migration). */
+export interface HiringPublishRequest {
+  id: string;
+  tenant_id: string;
+  job_id: string;
+  status: PublishRequestStatus;
+  requested_by: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string | null;
+  channels: AdChannel[];
+  daily_budget: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface HiringBilling {
   tenant_id: string;
   stripe_customer_id: string | null;
@@ -185,3 +204,7 @@ export interface HiringBilling {
 //                                                (NEVER return autoRejected publicly - it is an oracle for the
 //                                                 disqualifying answers; guardian finding Jul 3)
 // PUBLIC POST /api/hiring/public/signup       -> body { company_name, contact_name, email } -> creates hiring-only tenant + setup email
+// GET    /api/hiring/publish-requests          -> SUPER_ADMIN. ?status= filter. { success, data: { requests: [{ ...req, tenant_name, job }] } }
+// GET    /api/hiring/publish-requests/mine     -> ?jobId= (tenant-scoped) -> { success, data: { request: HiringPublishRequest | null } }
+// PATCH  /api/hiring/publish-requests/[id]     -> SUPER_ADMIN. body { action: 'approve'|'reject'|'mark_published', note? }
+//                                              -> reject requires note + pauses the job; { success, data: { request } }
