@@ -122,13 +122,20 @@ const BrandingContext = createContext<BrandingContextType>({
   refreshBranding: async () => {},
 });
 
-function getCachedBranding(): TenantBranding | null {
+// Cache is scoped per auth user — a tenant-blind cache leaked the PREVIOUS
+// company's branding + feature flags after switching companies in the same
+// browser (journey-testing finding, Jul 5).
+function scopedCacheKey(userId: string | null): string {
+  return `${CACHE_KEY}:${userId ?? 'anon'}`;
+}
+
+function getCachedBranding(userId: string | null): TenantBranding | null {
   try {
-    const cached = localStorage.getItem(CACHE_KEY);
+    const cached = localStorage.getItem(scopedCacheKey(userId));
     if (!cached) return null;
     const parsed: CachedBranding = JSON.parse(cached);
     if (Date.now() - parsed.timestamp > CACHE_TTL) {
-      localStorage.removeItem(CACHE_KEY);
+      localStorage.removeItem(scopedCacheKey(userId));
       return null;
     }
     return parsed.data;
@@ -137,10 +144,10 @@ function getCachedBranding(): TenantBranding | null {
   }
 }
 
-function setCachedBranding(data: TenantBranding) {
+function setCachedBranding(userId: string | null, data: TenantBranding) {
   try {
     const cached: CachedBranding = { data, timestamp: Date.now() };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cached));
+    localStorage.setItem(scopedCacheKey(userId), JSON.stringify(cached));
   } catch {
     // localStorage may be unavailable
   }
@@ -151,9 +158,24 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const fetchBranding = useCallback(async (skipCache = false) => {
-    // Check cache first
+    // Resolve the session FIRST: the bearer token lets the API pin branding +
+    // feature flags to the CALLER's tenant. Without it the API falls back to
+    // "first active branding row" — which is whichever tenant the DB returns
+    // first, i.e. wrong for everyone but one tenant (journey-testing finding).
+    let accessToken: string | null = null;
+    let userId: string | null = null;
+    try {
+      const { supabase } = await import('@/lib/supabase');
+      const { data } = await supabase.auth.getSession();
+      accessToken = data.session?.access_token ?? null;
+      userId = data.session?.user?.id ?? null;
+    } catch {
+      // No session (public pages) — the API serves param/default branding.
+    }
+
+    // Check cache (scoped per user so company switches never leak branding)
     if (!skipCache) {
-      const cached = getCachedBranding();
+      const cached = getCachedBranding(userId);
       if (cached) {
         setBranding(cached);
         setLoading(false);
@@ -162,13 +184,16 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      const res = await fetch('/api/admin/branding', { cache: 'no-store' });
+      const res = await fetch('/api/admin/branding', {
+        cache: 'no-store',
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
       if (res.ok) {
         const json = await res.json();
         if (json.success && json.data) {
           const merged = { ...DEFAULT_BRANDING, ...json.data };
           setBranding(merged);
-          setCachedBranding(merged);
+          setCachedBranding(userId, merged);
         }
       }
     } catch {
@@ -181,7 +206,11 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
   const refreshBranding = useCallback(async () => {
     setLoading(true);
     try {
-      localStorage.removeItem(CACHE_KEY);
+      // Purge every scoped cache entry (legacy unscoped key included).
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith(CACHE_KEY)) localStorage.removeItem(k);
+      }
     } catch {
       // ignore
     }

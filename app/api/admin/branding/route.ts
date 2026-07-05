@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const ALLOWED_FIELDS = [
@@ -40,7 +40,25 @@ function withTimeout<T>(thenable: PromiseLike<T>, ms: number): Promise<T> {
  */
 export async function GET(request: NextRequest) {
   try {
-    const tenantId = request.nextUrl.searchParams.get('tenant_id');
+    let tenantId = request.nextUrl.searchParams.get('tenant_id');
+
+    // AUTHENTICATED callers get THEIR tenant's branding + features. Without
+    // this, the dashboard provider got "first active branding row" — an
+    // arbitrary tenant's identity (journey-testing finding, Jul 5). The
+    // bearer path fails soft: an invalid/expired token just falls back to
+    // the public param/default behavior.
+    let authedTenantId: string | null = null;
+    if (request.headers.get('authorization')?.startsWith('Bearer ')) {
+      try {
+        const auth = await requireAuth(request);
+        if (auth.authorized && auth.tenantId) {
+          authedTenantId = auth.tenantId;
+          tenantId = auth.tenantId;
+        }
+      } catch {
+        // fall through to public behavior
+      }
+    }
 
     let query = supabaseAdmin
       .from('tenant_branding')
@@ -54,7 +72,25 @@ export async function GET(request: NextRequest) {
     const { data, error } = await withTimeout(query.limit(1).maybeSingle(), 20_000);
 
     if (error || !data) {
-      // Return defaults if no branding row exists or on any error
+      // No branding row (or error). For AUTHENTICATED callers the features
+      // map still matters (module gating) even with default visual branding —
+      // fetch it for their tenant rather than returning nothing.
+      if (authedTenantId) {
+        let features: Record<string, unknown> = {};
+        try {
+          const { data: tenantRow } = await withTimeout(
+            supabaseAdmin.from('tenants').select('features').eq('id', authedTenantId).maybeSingle(),
+            10_000
+          );
+          if (tenantRow?.features && typeof tenantRow.features === 'object') {
+            features = tenantRow.features as Record<string, unknown>;
+          }
+        } catch { /* fail-soft */ }
+        return NextResponse.json(
+          { success: true, data: { features } },
+          { status: 200, headers: { 'Cache-Control': 'private, max-age=60' } }
+        );
+      }
       return NextResponse.json(
         { success: true, data: null },
         {
