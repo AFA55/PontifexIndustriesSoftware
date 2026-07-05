@@ -39,6 +39,7 @@ import {
   Home,
   MessageSquareWarning,
   UserPlus,
+  Megaphone,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { getRoleLabel } from '@/lib/rbac';
@@ -95,6 +96,8 @@ const NAV_SECTIONS: NavSection[] = [
       // Active Jobs is CORE (operator/job spine) — never gated.
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
       { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms', moduleKey: 'scheduling' },
+      // Opifex job board — shows only for tenants with features.hiring = true.
+      { label: 'Job Board', href: '/dashboard/hiring', icon: Megaphone, roles: ['admin', 'super_admin', 'operations_manager'], moduleKey: 'hiring' },
     ],
   },
   {

@@ -436,6 +436,15 @@ export default function AdminDashboard() {
       return;
     }
 
+    // Hiring-only tenants (Opifex signups: features.hiring on, ops modules
+    // explicitly off) live in the Job Board — the ops dashboard is not their
+    // home. Explicit `scheduling === false` check so ops tenants with absent
+    // keys (default-on) are never redirected.
+    if (branding.features?.['hiring'] === true && branding.features?.['scheduling'] === false) {
+      router.replace('/dashboard/hiring');
+      return;
+    }
+
     setUser(currentUser);
 
     const isDemo =
@@ -449,7 +458,7 @@ export default function AdminDashboard() {
     }
 
     setLoading(false);
-  }, [router]);
+  }, [router, branding.features]); // branding loads async — re-check the hiring-only redirect when it lands
 
   // ── dashboard data (full admins) ──────────────────────────────────────────
   useEffect(() => {

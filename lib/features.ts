@@ -58,6 +58,9 @@ export const FEATURE_MODULES: readonly FeatureModule[] = [
   { key: 'team_management', label: 'Team Management', description: 'Team directory, access requests, role + permission editor.', core: true, defaultOn: true },
   { key: 'daily_reports', label: 'Daily Reports', description: 'Operator daily report flow.', core: true, defaultOn: true },
   { key: 'silica_jha', label: 'Silica & JHA', description: 'Silica exposure plans + job hazard analysis + agreements.', defaultOn: true },
+  // Opifex job board — OFF by default: ops tenants opt in (Patriot has it);
+  // hiring-only tenants (Opifex signups) get it as their sole module.
+  { key: 'hiring', label: 'Job Board (Hiring)', description: 'AI job ads (FB/IG/TikTok), screeners, candidate pipeline, public apply pages.', defaultOn: false },
 ] as const;
 
 /** The canonical module-key union. */
