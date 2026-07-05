@@ -1,0 +1,13 @@
+# Automated dependency update PRs (security patches surface without manual npm audit runs).
+# PRs land on a branch -> free Vercel preview -> merge to main only via the normal gate.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: ["minor", "patch"]
