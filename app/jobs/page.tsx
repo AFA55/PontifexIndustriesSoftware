@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * /jobs — the "Pontifex Industries Job Board" product front door.
+ * /jobs — the "Opifex" job-board product front door (a Pontifex Industries company).
  *
  * Pontifex-OWNED surface (brand rules apply — this is NOT a tenant page):
  * deep-indigo dark hero (#120A24), the journey gradient (#7C3AED→#DB2777→#EF4444)
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
  * on their phones, you pay only for ad spend.
  *
  * Two CTAs:
- *   "Sign in"     → /company-login (company code HIRE)
+ *   "Sign in"     → /company-login (company code OPIFEX)
  *   "Get started" → the signup form below → POST /api/hiring/public/signup
  */
 
@@ -156,7 +156,7 @@ export default function JobBoardLandingPage() {
               href="/company-login"
               className="inline-flex min-h-[52px] items-center justify-center rounded-xl px-6 text-base font-medium text-slate-200 ring-1 ring-white/15 transition hover:bg-white/5"
             >
-              Sign in with company code <span className="ml-1.5 font-semibold text-white">HIRE</span>
+              Sign in with company code <span className="ml-1.5 font-semibold text-white">OPIFEX</span>
             </Link>
           </div>
         </div>
@@ -303,7 +303,7 @@ export default function JobBoardLandingPage() {
                   <Link href="/company-login" className="text-slate-300 underline underline-offset-2">
                     Sign in
                   </Link>{' '}
-                  with company code <span className="font-semibold text-slate-300">HIRE</span>.
+                  with company code <span className="font-semibold text-slate-300">OPIFEX</span>.
                 </p>
               </form>
             )}
@@ -316,7 +316,7 @@ export default function JobBoardLandingPage() {
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-4 py-8 text-sm text-slate-500 sm:flex-row sm:px-6">
           <div className="flex items-center gap-2">
             <Image src="/logo.svg" alt="" width={20} height={20} />
-            <span>Pontifex Industries Job Board</span>
+            <span>Opifex — the Pontifex Industries job board</span>
           </div>
           <span>&copy; {new Date().getFullYear()} Pontifex Industries</span>
         </div>

@@ -35,8 +35,8 @@ export const COMPANY_CODE_RE = /^[A-Z0-9_]{3,20}$/; // matches DB CHECK constrai
 export const SLUG_RE = /^[a-z0-9-]+$/;
 
 /** Tenants the platform must never recreate/overwrite/destabilize. */
-export const PROTECTED_COMPANY_CODES = ['PATRIOT', 'PONTIFEX', 'HIRE'];
-export const PROTECTED_SLUGS = ['patriot', 'pontifex', 'hire', 'pontifex-job-board'];
+export const PROTECTED_COMPANY_CODES = ['PATRIOT', 'PONTIFEX', 'HIRE', 'OPIFEX'];
+export const PROTECTED_SLUGS = ['patriot', 'pontifex', 'hire', 'opifex', 'pontifex-job-board'];
 export const PROTECTED_TENANT_IDS = ['ee3d8081-cec2-47f3-ac23-bdc0bb2d142d']; // Patriot (verified live)
 
 export interface TenantOnboardingConfig {

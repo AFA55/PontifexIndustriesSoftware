@@ -23,9 +23,9 @@ export type ScreenerType = (typeof SCREENER_TYPES)[number];
 /** Roles allowed to manage hiring (mirrors RLS policies in the migration). */
 export const HIRING_ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'];
 
-/** The front-door tenant for the job-board product (company code HIRE). */
+/** The front-door tenant for the job-board product Opifex (company code OPIFEX). */
 export const HIRE_TENANT_ID = '32d26561-0b88-4b4f-b879-ec0b33b033ea';
-export const HIRE_COMPANY_CODE = 'HIRE';
+export const HIRE_COMPANY_CODE = 'OPIFEX'; // Opifex — the Latin -fex family: Pontifex, Artifex, Opifex
 
 /**
  * ⚖️ ADEA LEGAL GUARDRAIL — age-based screening is prohibited.
