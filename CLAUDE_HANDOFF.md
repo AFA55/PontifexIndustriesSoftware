@@ -1,6 +1,6 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 3, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE (last pushed `30f89682` Jul 2 — P&L simplification) | **⚠️ ~15 commits UNPUSHED**
+**Last updated:** Jul 4, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`bdd639db` — hiring module, publish-approval queue, billing crons, Opifex rename). CREDIT-SAVER MODE: build inline, no agent fan-outs; adversarial reviews only for money/auth code. Next build: Artifex Phase A (docs/plans/ARTIFEX_2ND_BRAIN_ROADMAP.md). Founder critical path: FB page + Meta business verification, Twilio resubmit, Stripe publishable key, Play listing submit.
 
 > **🛎️ Jul 2–3 session (Sonnet 5) — HIRING MODULE PHASE 1 BUILT ("Pontifex Industries Job Board"):**
 > Founder-directed Hireline clone (his real recruiting tool, analyzed live in his account + FB Ads
