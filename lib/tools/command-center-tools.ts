@@ -21,6 +21,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { toLocalYMD } from '@/lib/dates';
+import { embedText, embedAndStoreNote } from '@/lib/artifex-embeddings';
 
 const FIELD_ROLES = ['operator', 'apprentice'];
 const MEMORY_RECALL_DEFAULT_LIMIT = 20;
@@ -252,13 +253,23 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
           .describe("Optional short label, e.g. 'preference', 'recurring issue', 'decision'."),
       }),
       execute: async ({ note, category }) => {
-        const { error } = await supabaseAdmin.from('artifex_memory_notes').insert({
-          tenant_id: tenantId,
-          created_by: userId,
-          note,
-          category: category ?? null,
-        });
+        const { data: inserted, error } = await supabaseAdmin
+          .from('artifex_memory_notes')
+          .insert({
+            tenant_id: tenantId,
+            created_by: userId,
+            note,
+            category: category ?? null,
+          })
+          .select('id')
+          .single();
         if (error) throw new Error(`save_memory_note: ${error.message}`);
+        // Semantic index (Phase A1) — awaited so recall works immediately in the
+        // same conversation, but embedAndStoreNote never throws: a failed
+        // embedding degrades to keyword-only recall, never a failed save.
+        if (inserted?.id) {
+          await embedAndStoreNote(inserted.id, `${note} ${category ?? ''}`.trim());
+        }
         return { saved: true };
       },
     }),
@@ -280,6 +291,36 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
             .order('created_at', { ascending: false })
             .limit(cap);
 
+        // Phase A1: HYBRID recall — keyword (tsvector) + semantic (pgvector)
+        // merged with Reciprocal Rank Fusion inside artifex_hybrid_recall().
+        // "shop equipment" now finds "the forklift needs a hydraulic hose"
+        // even though no words overlap. Fail-soft chain: hybrid → keyword
+        // ilike → recent notes.
+        if (query && query.trim().length > 0) {
+          const queryEmbedding = await embedText(query);
+          if (queryEmbedding) {
+            const { data: hybrid, error: hybridError } = await supabaseAdmin.rpc(
+              'artifex_hybrid_recall',
+              {
+                p_tenant_id: tenantId,
+                p_query: query,
+                p_query_embedding: JSON.stringify(queryEmbedding),
+                p_match_count: cap,
+              }
+            );
+            if (!hybridError && hybrid && hybrid.length > 0) {
+              return {
+                count: hybrid.length,
+                mode: 'hybrid_semantic',
+                notes: hybrid.map((n: any) => ({ note: n.note, category: n.category, createdAt: n.created_at })),
+              };
+            }
+            if (hybridError) {
+              console.error('[artifex] hybrid recall failed (falling back):', hybridError.message);
+            }
+          }
+        }
+
         let usedRecentFallback = false;
         let { data, error } = query ? await baseQuery().ilike('note', `%${query}%`) : await baseQuery();
         if (error) throw new Error(`recall_memory_notes: ${error.message}`);
@@ -299,6 +340,7 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
         return {
           count: data?.length ?? 0,
           usedRecentFallback,
+          mode: query ? 'keyword_fallback' : 'recent',
           notes: (data ?? []).map((n: any) => ({ note: n.note, category: n.category, createdAt: n.created_at })),
         };
       },
