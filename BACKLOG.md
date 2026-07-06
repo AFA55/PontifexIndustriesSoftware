@@ -335,3 +335,17 @@
   BACKLOG.md + DEVELOPMENT_PLAYBOOK.md + project skills.
 - **Jun 8:** Invite system (guardian-hardened), editable team emails, light-mode invite/setup pages,
   branding flash fix, verified-domain email fix, iOS Build 8 (Face ID) → TestFlight.
+
+## 🔬 QA loop findings (Jul 6 — Opifex/public tester)
+- [x] **D2 Opifex nav trap** — hiring-only tenants had NO sidebar (no sign-out/profile/billing). FIXED: app/dashboard/hiring/layout.tsx + Job Board Billing sidebar item.
+- [x] **D5 title stomp** — BrandingProvider overwrote per-page <title> everywhere. FIXED: only on /dashboard paths.
+- [x] **D6 legal-page vertical leak** — /privacy + /terms said "concrete cutting". FIXED → field-services.
+- [x] **D7 hiring wizard placeholder** — "Concrete Cutting Operator". FIXED → "Field Technician".
+- [ ] **D1 [P1] Pricing "Start Free Trial" dead-ends** — CTAs → /dashboard/admin/subscription → bounce to company-login demanding a code the anon visitor lacks; ?plan= lost. No self-serve trial signup. Decide: point pricing CTAs at /request-demo, or build a real trial-signup flow.
+- [ ] **D3 [P1] Logged-out shell leak** — expired/no-session renders the full admin shell from stale localStorage cache on some routes (equipment/fleet/inventory/maintenance/active-jobs/etc.) showing fake-empty "0 items"; other routes correctly bounce to /company-login. Data is safe (APIs 401) but UX reads as data loss + inconsistent guards. Fix: unify the client auth guard (redirect to login when no live session, don't render shell from cache).
+- [ ] **D4 [P1] Pricing page washed out** — light radial gradient over dark theme makes Professional/Enterprise feature lists + trust copy near-illegible (desktop + mobile). The money page. Restyle.
+- [ ] **D8 [P2] Pricing copy contradiction** — "Up to 5 team members" listed as included in EVERY plan under plans advertising 20/unlimited.
+- [ ] **D9 [P3] Sub-44px tap targets at 375px** — homepage footer/nav ~17px, /jobs "Sign in" 38×15, pricing Monthly/Annual toggle 36px, my-profile 28px icon button.
+- [ ] **D10 [P3] /dashboard/admin/active-jobs renders for hiring-only tenant** (marked CORE, not module-gated) — inconsistent with schedule-board/equipment gating.
+- [ ] **D11 [P3] /dashboard/settings is a bare 404** (real page is /dashboard/admin/settings).
+- [ ] **D12 [P3] scroll-behavior:smooth deprecation warning** — add data-scroll-behavior="smooth" to <html>.

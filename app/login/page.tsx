@@ -11,6 +11,7 @@ import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, Sca
 import { motion } from 'framer-motion';
 import { BIOMETRIC_DECLINED_KEY, biometricAvailable, biometryLabel, disableBiometric, enrolledBiometricEmail, enrollBiometric, hasEnrolledBiometric, verifyAndGetSession } from '@/lib/biometric';
 import { isNativeApp } from '@/lib/is-native';
+import PasskeySignInButton from '@/components/auth/PasskeySignInButton';
 
 /**
  * Keep `pontifex.lastCompany` (the one-tap fast path on /company-login) up to date.
@@ -458,6 +459,38 @@ function LoginPageInner() {
     }
   };
 
+  // WEB passkey (Face ID / Touch ID via Supabase WebAuthn). The PasskeySignInButton
+  // has already created the session; here we resolve the profile blob the dashboard
+  // guards read, then route by role — the same tail the biometric/password paths use.
+  const handlePasskeySignedIn = async () => {
+    setLoading(true);
+    try {
+      const { data } = await supabase.auth.getSession();
+      const session = data.session;
+      if (!session) { setLoading(false); return; }
+      let role = '';
+      try {
+        const res = await fetch('/api/my-profile', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const json = await res.json();
+        role = json?.data?.role || '';
+        if (json?.data) {
+          localStorage.setItem('supabase-user', JSON.stringify({
+            id: json.data.id, name: json.data.full_name, email: json.data.email, role: json.data.role,
+          }));
+        }
+      } catch { /* non-fatal — dashboard re-guards by role */ }
+      let target = '/dashboard';
+      if (role === 'super_admin') target = '/dashboard/platform';
+      else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(role)) target = '/dashboard/admin';
+      navigateAfterLogin(target);
+    } catch {
+      setError('Passkey sign-in failed. Please sign in with your password.');
+      setLoading(false);
+    }
+  };
+
   // Enrollment prompt handlers (native-only). On Enable → grab the CURRENT session's
   // refresh token and store it behind biometrics. On Skip → remember the decline.
   const handleEnableBiometric = async () => {
@@ -698,6 +731,11 @@ function LoginPageInner() {
               <ScanFace size={20} /> Sign in{bioEmail ? ` as ${bioEmail.split('@')[0]}` : ''} with {bioLabel}
             </motion.button>
           )}
+
+          {/* WEB passkey sign-in (Face ID / Touch ID / security key via WebAuthn).
+              Self-hides when unsupported or in the native app (which uses its own
+              Face ID above). */}
+          <PasskeySignInButton onSignedIn={handlePasskeySignedIn} className="pt-1" />
 
           <motion.div
             initial={{ opacity: 0 }}

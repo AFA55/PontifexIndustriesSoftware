@@ -87,5 +87,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     // Custom adapter so the "Remember me" choice controls whether the session
     // survives a full browser/app restart. Defaults to localStorage behaviour.
     storage: typeof window !== 'undefined' ? rememberAwareStorage : undefined,
+    // Passkeys / WebAuthn (Face ID, Touch ID, security keys). Experimental in
+    // supabase-js — must be opted into explicitly. Enables auth.registerPasskey
+    // / auth.signInWithPasskey used by the biometric sign-in components.
+    experimental: { passkey: true },
   },
-});
+} as Parameters<typeof createClient>[2]);

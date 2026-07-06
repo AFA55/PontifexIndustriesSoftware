@@ -246,8 +246,11 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.style.setProperty('--color-sidebar-bg', branding.sidebar_bg_color);
     }
 
-    // Document title
-    if (branding.company_name) {
+    // Document title — ONLY on authenticated dashboard pages. Public/marketing
+    // and applicant (/apply) pages set their own per-page <title> for SEO +
+    // tab identity; stomping them with the generic "Company - tagline" broke
+    // bookmarks and crawler titles (QA loop finding, Jul 6).
+    if (branding.company_name && typeof window !== 'undefined' && window.location.pathname.startsWith('/dashboard')) {
       document.title = `${branding.company_name} - ${branding.tagline}`;
     }
 

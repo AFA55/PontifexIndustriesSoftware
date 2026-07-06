@@ -10,7 +10,7 @@ export const PRIVACY_POLICY_FULL = `
 **Effective Date:** May 25, 2026
 **Version:** ${PRIVACY_POLICY_VERSION}
 
-Pontifex Industries ("Company," "we," "us," or "our") operates a multi-tenant field operations management platform (the "Platform") used by construction and concrete cutting companies. This Privacy Policy explains how we collect, use, store, and protect personal information across our web application and iOS mobile app.
+Pontifex Industries ("Company," "we," "us," or "our") operates a multi-tenant field operations management platform (the "Platform") used by field-services and construction companies. This Privacy Policy explains how we collect, use, store, and protect personal information across our web application and iOS mobile app.
 
 ---
 

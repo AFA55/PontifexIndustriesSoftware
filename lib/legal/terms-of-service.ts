@@ -16,7 +16,7 @@ These Terms of Service ("Terms") govern your use of the Pontifex Industries oper
 
 ## 1. Service Description
 
-The Platform is a web-based operations management system designed for concrete cutting contractors. It provides job scheduling, dispatch, time tracking, invoicing, safety compliance, and related business management tools.
+The Platform is a web-based operations management system designed for field-services and construction businesses. It provides job scheduling, dispatch, time tracking, invoicing, safety compliance, and related business management tools.
 
 ---
 

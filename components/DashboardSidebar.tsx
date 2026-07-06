@@ -98,6 +98,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms', moduleKey: 'scheduling' },
       // Opifex job board — shows only for tenants with features.hiring = true.
       { label: 'Job Board', href: '/dashboard/hiring', icon: Megaphone, roles: ['admin', 'super_admin', 'operations_manager'], moduleKey: 'hiring' },
+      { label: 'Job Board Billing', href: '/dashboard/hiring/billing', icon: CreditCard, roles: ['admin', 'super_admin', 'operations_manager'], moduleKey: 'hiring' },
     ],
   },
   {

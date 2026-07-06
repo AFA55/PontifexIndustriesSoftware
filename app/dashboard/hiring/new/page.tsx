@@ -151,7 +151,7 @@ export default function NewHiringJobPage() {
                 id="job-title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Concrete Cutting Operator"
+                placeholder="e.g. Field Technician"
                 className={INPUT_CLS}
               />
             </div>

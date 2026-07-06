@@ -14,6 +14,7 @@ import { getCurrentUser, logout } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { isNativeApp } from '@/lib/is-native';
 import { BIOMETRIC_DECLINED_KEY, biometricDiagnostics, biometryLabel, disableBiometric, enrollBiometric, type BiometricDiagnostics } from '@/lib/biometric';
+import PasskeySettings from '@/components/auth/PasskeySettings';
 import Avatar from '@/components/Avatar';
 
 interface MyProfile {
@@ -492,6 +493,10 @@ export default function MyProfilePage() {
                 />
               </div>
             </div>
+
+            {/* Web passkeys (Face ID / Touch ID / security key). Self-hides in the
+                native app (which uses its own native Face ID card below). */}
+            <PasskeySettings />
 
             {/* Security — biometric sign-in (native app only). Always rendered in the
                 app: if biometrics aren't available it explains why + offers Check again,
