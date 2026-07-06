@@ -349,3 +349,20 @@
 - [ ] **D10 [P3] /dashboard/admin/active-jobs renders for hiring-only tenant** (marked CORE, not module-gated) — inconsistent with schedule-board/equipment gating.
 - [ ] **D11 [P3] /dashboard/settings is a bare 404** (real page is /dashboard/admin/settings).
 - [ ] **D12 [P3] scroll-behavior:smooth deprecation warning** — add data-scroll-behavior="smooth" to <html>.
+
+## 🔬 QA loop findings (Jul 6 — ops-platform tester)
+- [x] **#2 owner-cockpit user counts 0** — tenants API counted legacy tenant_users; now counts profiles. FIXED.
+- [x] **#5 375px Platform Hub action row unreachable** — stack + overflow-x-auto. FIXED.
+- [x] **#6 375px Schedule Board view toggles unreachable** — overflow-x-auto on the toggle row. FIXED.
+- [x] **#8 avatar initials "S("** — getInitials strips parentheticals. FIXED.
+- [x] **#10 Active Jobs raw ISO date** — formatDay(). FIXED.
+- [x] **#11 scroll-behavior deprecation** — data-scroll-behavior on <html>. FIXED.
+- [x] **#15 .playwright-mcp not gitignored** (119 files) — added + untracked. FIXED.
+- [ ] **#3 [P1] "Late" metrics contradict across 3 surfaces** — timecards says 5 late/week w/ chips; time-off Attendance says 0; operator-detail says 4× vs weekly-grid 2. Attendance drives bonus decisions. Pick ONE definition of "late this week" and make all three read it. INVESTIGATE which query is right.
+- [ ] **#4 [P1] Overdue invoice double-counted** — admin dashboard + Hub alert flag INV-2026-463087 (33d overdue, DRAFT, $3,200) but /dashboard/admin/billing shows Overdue 0 / Outstanding $0. Likely: dashboard counts draft-past-due as overdue, billing page excludes drafts. Decide: is a DRAFT invoice past its due date "overdue"? Align all three.
+- [ ] **#7 [P1-mobile] admin dashboard H1 overlaps My View/Team View toggle at 375px** — stack the header.
+- [ ] **#9 [P2] tab-title churn + wrong-audience** — dashboard pages flip marketing title → Patriot branding; the PONTIFEX owner console (/dashboard/platform*) shows PATRIOT branding (wrong audience — should be Pontifex). Consider: platform pages set their own title/branding, not the super_admin's home tenant.
+- [ ] **#12 [P2] Customers phone unformatted/unvalidated** — "4705550001", an 11-digit "86491402778" stored raw. Add format-on-display + input validation.
+- [ ] **#13 [P2] head-count disagreement, unlabeled** — roster 7 vs Team Profiles 13 vs Time Off 14 vs tenants-list 24 vs security 20. Each may be a different definition (clocked-in-eligible / all members / operators / active). Label each or unify.
+- [ ] **#14 [P2] Settings Billing "6-Month Plan/Free Trial" vs Platform tenants "enterprise/ACTIVE"** — one is stale; reconcile source of truth.
+- [ ] **#16 [P3] /favicon.ico 404 once** on command-center (favicon served from favicon.svg) — add a favicon.ico or a rel-icon fallback.

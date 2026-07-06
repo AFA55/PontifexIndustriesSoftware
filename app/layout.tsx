@@ -87,7 +87,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning data-scroll-behavior="smooth">
       <head>
         {/* Blocking pre-paint theme sync to prevent flash-of-wrong-theme (FOUC).
             Only ADDS the `dark` class when an explicit 'dark' preference is saved.

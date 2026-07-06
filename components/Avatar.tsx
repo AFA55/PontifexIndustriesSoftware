@@ -25,8 +25,12 @@ export interface AvatarProps {
  */
 export function getInitials(name?: string | null): string {
   if (!name) return '?';
-  const tokens = name.trim().split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return '?';
+  // Strip parenthetical/bracketed qualifiers ("(Demo)", "(All Skills)") so
+  // "Super Admin (Demo)" yields "SA", not "S(" (QA loop #8), then keep only
+  // tokens that start with a letter or digit.
+  const cleaned = name.replace(/[([{].*?[)\]}]/g, ' ');
+  const tokens = cleaned.trim().split(/\s+/).filter((t) => /^[a-z0-9]/i.test(t));
+  if (tokens.length === 0) return (name.match(/[a-z0-9]/i)?.[0] ?? '?').toUpperCase();
   if (tokens.length === 1) {
     return tokens[0].charAt(0).toUpperCase();
   }

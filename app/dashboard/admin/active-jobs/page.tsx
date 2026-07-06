@@ -6,6 +6,7 @@ import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { formatDay } from '@/lib/dates';
 import {
   Briefcase,
   Calendar,
@@ -918,7 +919,7 @@ export default function ActiveJobsPage() {
                         )}
                         <span className="flex items-center gap-1">
                           <Calendar className="w-3 h-3" />
-                          {job.scheduled_date}
+                          {job.scheduled_date ? formatDay(job.scheduled_date) : '—'}
                         </span>
                       </div>
                     </div>

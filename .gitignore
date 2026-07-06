@@ -30,3 +30,4 @@ tsconfig.tsbuildinfo
 
 # Stray generated icon set — the real served PWA icons live in public/
 /icons/
+.playwright-mcp/

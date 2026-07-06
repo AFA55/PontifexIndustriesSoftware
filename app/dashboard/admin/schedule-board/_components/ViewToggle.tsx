@@ -15,7 +15,7 @@ const VIEWS = [
 
 export default function ViewToggle({ viewMode, onChange }: ViewToggleProps) {
   return (
-    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+    <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl flex-shrink-0">
       {VIEWS.map(v => (
         <button
           key={v.key}

@@ -29,9 +29,13 @@ export async function GET(request: NextRequest) {
   if (!auth.authorized) return auth.response;
 
   try {
+    // Count members from `profiles` (the real membership table) — the legacy
+    // `tenant_users` join is mostly empty, which made the owner cockpit show 0
+    // users for every tenant but Patriot (QA loop #2). Keep tenant_users(count)
+    // too so the shared userCount() helper's fallback still works.
     const { data, error } = await supabaseAdmin
       .from('tenants')
-      .select('*, tenant_users(count)')
+      .select('*, profiles(count), tenant_users(count)')
       .order('created_at', { ascending: false });
 
     if (error) {

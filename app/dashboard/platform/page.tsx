@@ -341,11 +341,13 @@ export default function PlatformHubPage() {
       {/* Client companies */}
       {/* ---------------------------------------------------------------- */}
       <section>
-        <div className="flex items-center justify-between mb-3">
+        {/* Stack on mobile + scroll the action row so New Client / View all stay
+            reachable at 375px (QA loop #5). */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
           <h2 className="text-sm font-bold uppercase tracking-wide text-amber-500 flex items-center gap-1.5">
             <Building2 className="w-4 h-4" /> Client Companies
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
             <Link
               href="/dashboard/platform/security"
               className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"

@@ -46,8 +46,10 @@ export default function ScheduleBoardStatsBar({
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <ScheduleDatePicker value={selectedDate} onChange={onDateChange} />
 
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 p-1 rounded-xl">
+          {/* Scrolls on narrow phones so Operators / Crew Grid stay reachable
+              (QA loop #6). min-w-0 lets it shrink inside the flex row. */}
+          <div className="flex items-center gap-2 overflow-x-auto max-w-full min-w-0 -mx-1 px-1 pb-1">
+            <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 p-1 rounded-xl flex-shrink-0">
               <button
                 onClick={() => onViewModeChange('day')}
                 className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
