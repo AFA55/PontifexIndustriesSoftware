@@ -33,6 +33,7 @@ import { requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import { createArtifexAgent, type ArtifexUIMessage } from '@/lib/agents/artifex-agent';
+import { extractAndStoreMemories } from '@/lib/artifex-auto-memory';
 
 // Rough Haiku 4.5 gateway pricing for the usage log (USD per token). Approximate —
 // this is for internal cost visibility, not billing; adjust if Vercel's gateway
@@ -167,6 +168,24 @@ export async function POST(request: NextRequest) {
             update.title = titleFromMessage(lastUserMessage);
           }
           await supabaseAdmin.from('artifex_conversations').update(update).eq('id', conversationId);
+
+          // Phase A2 — automatic memory: a cheap extraction pass decides if this
+          // exchange contained anything durable (usually not). Runs last in the
+          // same fire-and-forget chain; all failures are swallowed inside.
+          const userText = ((lastUserMessage?.parts as any[] | undefined) ?? [])
+            .filter((p) => p.type === 'text')
+            .map((p) => p.text)
+            .join('\n');
+          const assistantText = ((responseMessage.parts as any[] | undefined) ?? [])
+            .filter((p) => p.type === 'text')
+            .map((p) => p.text)
+            .join('\n');
+          await extractAndStoreMemories({
+            tenantId,
+            userId: auth.userId,
+            userText,
+            assistantText,
+          });
         })()
       ).catch(() => {});
     },
