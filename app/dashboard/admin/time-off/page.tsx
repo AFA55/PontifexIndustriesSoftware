@@ -518,7 +518,11 @@ function ScorecardsTab({ token }: { token: string }) {
           total++;
           const idx = dayNames.indexOf(day);
           if (idx >= 5) weekends++; // Sat or Sun
-          if ((info as any).status === 'late') late++;
+          // The team-summary API marks late days via `isLate` (a boolean),
+          // NOT status === 'late' (status holds approval state — that value
+          // never exists). The old check made every late count read 0 while
+          // the payroll page showed real lates (QA loop #3).
+          if ((info as any).isLate) late++;
         }
       }
       lateMap[m.userId] = late;
@@ -553,7 +557,8 @@ function ScorecardsTab({ token }: { token: string }) {
   const totalOperators = scorecards.length;
   const pendingReqs = stats.reduce((acc) => acc, 0); // not available here; just show operator count
   const lateThisWeek = teamSummary.reduce((acc, m) => {
-    const late = Object.values(m.dailyHours).filter((d) => (d as any).status === 'late').length;
+    // Same isLate fix as the per-operator scorecards (QA loop #3).
+    const late = Object.values(m.dailyHours).filter((d) => (d as any).isLate).length;
     return acc + late;
   }, 0);
   const weekendShifts = teamSummary.reduce((acc, m) => {
@@ -659,7 +664,7 @@ function ScorecardsTab({ token }: { token: string }) {
 
                     {/* Late This Month */}
                     <div className="bg-gray-50 dark:bg-white/[0.03] rounded-xl p-3 text-center">
-                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Late (mo)</p>
+                      <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Late (wk)</p>
                       <p className={`text-lg font-bold ${card.lateCount === 0 ? 'text-emerald-600' : card.lateCount <= 2 ? 'text-amber-600' : 'text-rose-600'}`}>
                         {card.lateCount}
                       </p>

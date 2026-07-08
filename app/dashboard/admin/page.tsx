@@ -857,8 +857,10 @@ export default function AdminDashboard() {
     <div className="p-6 space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
 
       {/* ── Scope toggle header ───────────────────────────────────────────── */}
-      <div className="flex items-center justify-between mb-2">
-        <div>
+      {/* Stacks below sm so the H1 and the My/Team toggle never overlap at 375px
+          (QA loop #7); shrink-safe with min-w-0. */}
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             {scope === 'personal' ? 'Your Dashboard' : 'Team Dashboard'}
           </h1>
@@ -872,7 +874,7 @@ export default function AdminDashboard() {
 
         {/* Toggle — senior roles only */}
         {isSeniorRole && (
-          <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-xl p-1">
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-slate-700 rounded-xl p-1 self-start sm:self-auto flex-shrink-0">
             <button
               onClick={() => handleScopeChange('personal')}
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${

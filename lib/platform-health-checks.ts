@@ -98,8 +98,12 @@ export async function checkStuckJobs(): Promise<CheckResult> {
 }
 
 /**
- * Overdue invoices: any invoice not paid/cancelled with a due_date in the
- * past. Warning under OVERDUE_INVOICE_CRITICAL_DAYS, critical beyond it.
+ * Overdue invoices — ONE definition platform-wide (QA loop #4): an invoice is
+ * "overdue" only if it was actually SENT to the customer (status sent/overdue)
+ * and its due_date has passed. A DRAFT past its due date was never sent — it
+ * can't be overdue — but it IS a valuable signal (someone forgot to send it),
+ * so it gets its own honestly-worded alert instead of a misleading one.
+ * Warning under OVERDUE_INVOICE_CRITICAL_DAYS, critical beyond it.
  */
 export async function checkOverdueInvoices(): Promise<CheckResult> {
   const checkType = 'overdue_invoice';
@@ -108,7 +112,7 @@ export async function checkOverdueInvoices(): Promise<CheckResult> {
   const { data, error } = await supabaseAdmin
     .from('invoices')
     .select('id, invoice_number, tenant_id, status, due_date')
-    .not('status', 'in', `(${TERMINAL_INVOICE_STATUSES.join(',')})`)
+    .in('status', ['sent', 'overdue', 'draft'])
     .lt('due_date', today)
     .not('due_date', 'is', null)
     .not('tenant_id', 'is', null);
@@ -120,13 +124,16 @@ export async function checkOverdueInvoices(): Promise<CheckResult> {
   const rows = data ?? [];
   const candidates: AlertCandidate[] = rows.map((row) => {
     const daysOverdue = daysBetweenYMD(row.due_date as string, today);
+    const isDraft = row.status === 'draft';
     const severity: Severity = daysOverdue > OVERDUE_INVOICE_CRITICAL_DAYS ? 'critical' : 'warning';
     return {
       tenantId: row.tenant_id,
       checkType,
       severity,
-      message: `Invoice ${row.invoice_number || row.id} is ${daysOverdue} days overdue (status: ${row.status})`,
-      details: { invoiceId: row.id, status: row.status, dueDate: row.due_date, daysOverdue },
+      message: isDraft
+        ? `Invoice ${row.invoice_number || row.id} is still a DRAFT ${daysOverdue} days past its due date — send it or void it`
+        : `Invoice ${row.invoice_number || row.id} is ${daysOverdue} days overdue (status: ${row.status})`,
+      details: { invoiceId: row.id, status: row.status, dueDate: row.due_date, daysOverdue, stale_draft: isDraft },
       key: row.id,
     };
   });

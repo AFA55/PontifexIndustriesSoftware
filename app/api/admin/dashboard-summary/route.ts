@@ -204,13 +204,16 @@ async function getOpenItems(
           .eq('status', 'scheduled')
           .is('deleted_at', null),
 
+        // Overdue = SENT-tier invoices past due. Drafts are excluded — an
+        // invoice never sent to a customer can't be overdue (QA loop #4; the
+        // billing page has always used this definition).
         supabaseAdmin
           .from('invoices')
           .select('id', { count: 'exact', head: true })
           .eq('tenant_id', tenantId)
           .eq('created_by', opts.targetUserId)
           .lt('due_date', today)
-          .not('status', 'in', '("paid","void","cancelled")'),
+          .in('status', ['sent', 'overdue']),
       ]);
 
       return {
@@ -241,12 +244,14 @@ async function getOpenItems(
         .eq('status', 'scheduled')
         .is('deleted_at', null),
 
+      // Overdue = SENT-tier past due; drafts excluded (QA loop #4, matches
+      // the billing page's definition).
       supabaseAdmin
         .from('invoices')
         .select('id', { count: 'exact', head: true })
         .eq('tenant_id', tenantId)
         .lt('due_date', today)
-        .not('status', 'in', '("paid","void","cancelled")'),
+        .in('status', ['sent', 'overdue']),
     ]);
 
     return {

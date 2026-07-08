@@ -1383,7 +1383,7 @@ function OperatorTimecardDetailPageInner() {
                     {lateCount === 0 ? '0' : `${lateCount}×`}
                   </p>
                   <p className={`text-[10px] mt-0.5 ${lateCount === 0 ? 'text-gray-400 dark:text-slate-500' : color.sub}`}>
-                    {lateCount === 0 ? 'On time (30 days)' : `${p?.avgMinutesLate ?? 0}m avg late`}
+                    {lateCount === 0 ? 'On time (30 days)' : `${p?.avgMinutesLate ?? 0}m avg late (30 days)`}
                   </p>
                   {lateCount > 0 && p?.lastLateDate && (
                     <p className="text-[9px] text-gray-400 dark:text-slate-500 mt-0.5 truncate">
