@@ -996,6 +996,8 @@ export default function DayCompletePage() {
             maxPhotos={10}
             label="Add Completion Photos"
             lightMode={true}
+            captureLocation
+            jobId={jobId}
           />
         </div>
 
