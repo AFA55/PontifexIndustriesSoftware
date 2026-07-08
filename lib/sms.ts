@@ -45,6 +45,7 @@ export async function sendSMSAny(options: SMSOptions): Promise<{
       });
       if (res.ok) {
         const data = await res.json();
+        void meterSms(options, 'telnyx');
         return {
           success: true,
           messageId: data?.data?.id,
@@ -102,6 +103,39 @@ export interface SMSOptions {
   to: string; // Phone number to send to (E.164 format: +1234567890)
   message: string; // Message content
   jobId?: string; // Optional job ID for tracking
+  /** Usage metering (messaging-margin billing): who to bill + which feature sent it. */
+  tenantId?: string;
+  source?: string;
+}
+
+// ── Usage metering (docs/plans/MESSAGING_BILLING_PLAN.md) ────────────────────
+// Raw cost estimate per SMS segment (Twilio US toll-free ~$0.0079; Telnyx
+// similar). billed = raw x tenants.messaging_markup (default 2.5x). Fire-and-
+// forget: metering must never fail a send.
+const SMS_RAW_COST_PER_SEGMENT = 0.0079;
+const SMS_SEGMENT_CHARS = 153;
+
+async function meterSms(opts: SMSOptions, provider: string): Promise<void> {
+  if (!opts.tenantId) return; // unmetered send (system/test) — adopt per call site
+  try {
+    const { supabaseAdmin } = await import('@/lib/supabase-admin');
+    const segments = Math.max(1, Math.ceil(opts.message.length / SMS_SEGMENT_CHARS));
+    const rawCost = segments * SMS_RAW_COST_PER_SEGMENT;
+    const { data: tenant } = await supabaseAdmin
+      .from('tenants').select('messaging_markup').eq('id', opts.tenantId).maybeSingle();
+    const markup = Number(tenant?.messaging_markup) || 2.5;
+    await supabaseAdmin.from('message_usage').insert({
+      tenant_id: opts.tenantId,
+      channel: 'sms',
+      provider,
+      segments,
+      raw_cost: rawCost,
+      billed_amount: Math.round(rawCost * markup * 10000) / 10000,
+      source: opts.source || 'unknown',
+    });
+  } catch (err) {
+    console.warn('[sms] metering failed (send unaffected):', err instanceof Error ? err.message : err);
+  }
 }
 
 /**
@@ -149,6 +183,7 @@ export async function sendSMS(options: SMSOptions): Promise<{
     });
 
     console.log(`✅ SMS sent! Message ID: ${message.sid}`);
+    void meterSms(options, 'twilio');
 
     return {
       success: true,

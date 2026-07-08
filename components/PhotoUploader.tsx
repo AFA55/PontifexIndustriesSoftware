@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import { Camera, X, Loader2, ImageIcon } from 'lucide-react';
+import { Camera, X, Loader2, ImageIcon, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 interface PhotoUploaderProps {
@@ -13,6 +13,29 @@ interface PhotoUploaderProps {
   label?: string;
   compact?: boolean;
   lightMode?: boolean;
+  /**
+   * GPS-stamp mode (founder ask Jul 8): photos must be taken ON THE SPOT.
+   * - Forces the device CAMERA on mobile (no gallery picking) via capture attr.
+   * - Requires location permission: the device position is captured BEFORE the
+   *   upload starts and recorded against each uploaded photo URL
+   *   (photo_locations table via /api/photo-locations). Upload is BLOCKED if
+   *   location is unavailable/denied — the stamp is the point.
+   */
+  captureLocation?: boolean;
+  /** Job to associate the GPS stamps with (work-performed flow). */
+  jobId?: string;
+}
+
+/** Get the current device position; null when denied/unavailable. */
+function getPosition(): Promise<GeolocationPosition | null> {
+  return new Promise((resolve) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => resolve(pos),
+      () => resolve(null),
+      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 }
+    );
+  });
 }
 
 /**
@@ -28,9 +51,12 @@ export default function PhotoUploader({
   label = 'Add Photos',
   compact = false,
   lightMode = false,
+  captureLocation = false,
+  jobId,
 }: PhotoUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [lastStamp, setLastStamp] = useState<{ lat: number; lng: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -42,6 +68,20 @@ export default function PhotoUploader({
     if (files.length > remaining) {
       setError(`Max ${maxPhotos} photos. You can add ${remaining} more.`);
       return;
+    }
+
+    // GPS-stamp mode: grab the position FIRST — no location, no upload.
+    let position: GeolocationPosition | null = null;
+    if (captureLocation) {
+      setUploading(true);
+      position = await getPosition();
+      if (!position) {
+        setUploading(false);
+        setError('Location is required for jobsite photos. Enable location access and try again.');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
+      setLastStamp({ lat: position.coords.latitude, lng: position.coords.longitude });
     }
 
     setUploading(true);
@@ -92,6 +132,29 @@ export default function PhotoUploader({
 
       if (newUrls.length > 0) {
         onPhotosChange([...photos, ...newUrls]);
+
+        // Record the GPS stamp for each uploaded photo. Best-effort: a failed
+        // stamp write never removes the photo, but we surface a soft warning.
+        if (captureLocation && position) {
+          const { latitude, longitude, accuracy } = position.coords;
+          supabase.auth.getSession().then(({ data }) => {
+            const token = data.session?.access_token;
+            if (!token) return;
+            for (const url of newUrls) {
+              fetch('/api/photo-locations', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+                body: JSON.stringify({
+                  photo_url: url,
+                  lat: latitude,
+                  lng: longitude,
+                  accuracy_m: accuracy ?? null,
+                  job_id: jobId ?? null,
+                }),
+              }).catch(() => console.warn('[PhotoUploader] GPS stamp write failed for', url));
+            }
+          });
+        }
       }
     } catch (err) {
       console.error('Photo upload error:', err);
@@ -139,7 +202,10 @@ export default function PhotoUploader({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*,application/pdf"
+            // GPS-stamp mode: images only + force the CAMERA on mobile so
+            // photos are taken on the spot (no gallery uploads).
+            accept={captureLocation ? 'image/*' : 'image/*,application/pdf'}
+            {...(captureLocation ? { capture: 'environment' as const } : {})}
             multiple
             onChange={handleFileSelect}
             className="hidden"
@@ -174,6 +240,14 @@ export default function PhotoUploader({
             )}
           </button>
         </div>
+      )}
+
+      {/* GPS stamp confirmation — the demo-visible proof photos are on-the-spot */}
+      {captureLocation && lastStamp && !error && (
+        <p className={`flex items-center gap-1 text-xs font-medium ${lightMode ? 'text-emerald-600' : 'text-emerald-400'}`}>
+          <MapPin className="w-3.5 h-3.5" />
+          GPS-stamped: {lastStamp.lat.toFixed(5)}, {lastStamp.lng.toFixed(5)}
+        </p>
       )}
 
       {/* Error message */}

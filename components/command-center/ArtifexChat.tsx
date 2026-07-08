@@ -32,7 +32,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart } from 'ai';
 import { supabase } from '@/lib/supabase';
-import { Send, Search, CheckCircle2, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, MessageSquare } from 'lucide-react';
+import { Send, Search, CheckCircle2, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, MessageSquare, Mic, Volume2, VolumeX } from 'lucide-react';
+import { useArtifexVoice } from '@/lib/use-artifex-voice';
 import type { ArtifexUIMessage } from '@/lib/agents/artifex-agent';
 import type { ArcReactorState } from './ArcReactor';
 
@@ -80,6 +81,19 @@ export default function ArtifexChat({
   onConversationStarted,
 }: ArtifexChatProps) {
   const [input, setInput] = useState('');
+  // Voice (Phase C): ElevenLabs TTS out + browser speech-recognition in.
+  const voice = useArtifexVoice();
+  const [voiceOn, setVoiceOn] = useState(() => {
+    try { return localStorage.getItem('artifex.voice') === 'on'; } catch { return false; }
+  });
+  const toggleVoice = () => {
+    setVoiceOn((v) => {
+      const next = !v;
+      try { localStorage.setItem('artifex.voice', next ? 'on' : 'off'); } catch { /* ignore */ }
+      if (!next) voice.stopSpeaking();
+      return next;
+    });
+  };
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(!!activeConversationId);
 
@@ -163,11 +177,21 @@ export default function ArtifexChat({
   const wasStreamingRef = useRef(false);
   useEffect(() => {
     const isActive = status === 'submitted' || status === 'streaming';
-    if (wasStreamingRef.current && !isActive && conversationIdRef.current) {
-      onConversationStarted?.(conversationIdRef.current);
+    if (wasStreamingRef.current && !isActive) {
+      if (conversationIdRef.current) onConversationStarted?.(conversationIdRef.current);
+      // Voice: speak the reply that just finished streaming.
+      if (voiceOn) {
+        const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+        const text = (lastAssistant?.parts ?? [])
+          .filter((pt): pt is { type: 'text'; text: string } => (pt as any).type === 'text')
+          .map((pt) => pt.text)
+          .join(' ');
+        if (text) voice.speak(text);
+      }
     }
     wasStreamingRef.current = isActive;
-  }, [status, onConversationStarted]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, onConversationStarted, voiceOn, messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -204,6 +228,19 @@ export default function ArtifexChat({
               </button>
             )}
             <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">Artifex</span>
+            {voice.ttsAvailable !== false && (
+              <button
+                type="button"
+                onClick={toggleVoice}
+                aria-label={voiceOn ? 'Turn voice off' : 'Turn voice on'}
+                title={voiceOn ? 'Voice on (ElevenLabs)' : 'Voice off'}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
+                  voiceOn ? 'text-violet-300 bg-violet-500/10' : 'text-white/35 hover:bg-white/[0.06] hover:text-white/70'
+                } ${voice.speaking ? 'animate-pulse' : ''}`}
+              >
+                {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+              </button>
+            )}
           </div>
           {hasHistory && onNewConversation && (
             <button
@@ -278,6 +315,26 @@ export default function ArtifexChat({
             placeholder="Ask Artifex…"
             className="min-h-[44px] flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none"
           />
+          {voice.micSupported && (
+            <button
+              type="button"
+              onClick={() => {
+                if (voice.listening) { voice.stopListening(); return; }
+                voice.startListening((transcript) => {
+                  if (status === 'submitted' || status === 'streaming' || historyLoading) return;
+                  sendMessage({ text: transcript });
+                });
+              }}
+              aria-label={voice.listening ? 'Stop listening' : 'Speak to Artifex'}
+              className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                voice.listening
+                  ? 'border-rose-400/50 bg-rose-500/15 text-rose-300 animate-pulse'
+                  : 'border-white/[0.08] bg-white/[0.04] text-white/50 hover:text-white/85'
+              }`}
+            >
+              <Mic className="h-4 w-4" />
+            </button>
+          )}
           <button
             type="submit"
             disabled={!input.trim() || status === 'submitted' || status === 'streaming' || historyLoading}

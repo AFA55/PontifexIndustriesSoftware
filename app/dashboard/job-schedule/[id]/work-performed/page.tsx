@@ -2233,6 +2233,8 @@ export default function WorkPerformed() {
                 maxPhotos={10}
                 label="Add Job Photos"
                 lightMode={true}
+                captureLocation
+                jobId={params.id as string}
               />
               <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
                 <span className="text-blue-500 text-lg flex-shrink-0">📸</span>

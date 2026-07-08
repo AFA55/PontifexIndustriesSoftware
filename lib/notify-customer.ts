@@ -148,7 +148,7 @@ export async function notifyCustomer(args: NotifyCustomerArgs): Promise<void> {
                 jobNumber ? ` ${jobNumber}` : ''
               } is complete. View documents & sign: ${portalUrl}`;
 
-        await sendSMSAny({ to: customerPhone, message, jobId: job.id });
+        await sendSMSAny({ to: customerPhone, message, jobId: job.id, tenantId, source: 'customer_status_sms' });
       } catch (err) {
         // SMS is best-effort — log, never block.
         console.warn('[notify-customer] sms failed:', err);
