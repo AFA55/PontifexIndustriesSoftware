@@ -242,6 +242,144 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
       },
     }),
 
+    search_job_history: tool({
+      description:
+        "Search the FULL job schedule history (past, today, and future) without scrolling the schedule board. Find every job a specific operator or helper was on, who worked a given customer or day, or jobs by status. Filters combine (AND). Use for questions like 'what jobs has Marcus done', 'who was at the hospital job in May', or 'show me everything scheduled last week'.",
+      inputSchema: z.object({
+        personName: z
+          .string()
+          .optional()
+          .describe('Match jobs where this person was the OPERATOR or the HELPER (partial name ok)'),
+        customerName: z.string().optional().describe('Partial customer name'),
+        startDate: z.string().optional().describe('YYYY-MM-DD inclusive lower bound on scheduled date'),
+        endDate: z.string().optional().describe('YYYY-MM-DD inclusive upper bound on scheduled date'),
+        status: z.string().optional().describe("e.g. 'completed', 'scheduled', 'in_progress', 'cancelled'"),
+        limit: z.number().int().positive().max(100).optional().describe('Max jobs to return (default 50, newest first)'),
+      }),
+      execute: async ({ personName, customerName, startDate, endDate, status, limit }) => {
+        const cap = limit ?? 50;
+        let q = supabaseAdmin
+          .from('schedule_board_view')
+          .select('job_number, title, customer_name, status, scheduled_date, operator_name, helper_name, location, job_type')
+          .eq('tenant_id', tenantId)
+          .order('scheduled_date', { ascending: false })
+          .limit(cap);
+        if (personName) {
+          // Strip PostgREST or() syntax characters so a name can't break the filter.
+          const p = personName.replace(/[,()]/g, '').trim();
+          if (p) q = q.or(`operator_name.ilike.%${p}%,helper_name.ilike.%${p}%`);
+        }
+        if (customerName) q = q.ilike('customer_name', `%${customerName}%`);
+        if (startDate) q = q.gte('scheduled_date', startDate);
+        if (endDate) q = q.lte('scheduled_date', endDate);
+        if (status) q = q.eq('status', status);
+        const { data, error } = await q;
+        if (error) throw new Error(`search_job_history: ${error.message}`);
+        const jobs = (data ?? []).map((j: any) => ({
+          date: j.scheduled_date,
+          jobNumber: j.job_number,
+          title: j.title,
+          customer: j.customer_name,
+          operator: j.operator_name,
+          helper: j.helper_name,
+          status: j.status,
+          location: j.location,
+          jobType: j.job_type,
+        }));
+        return {
+          count: jobs.length,
+          truncated: jobs.length === cap,
+          jobs,
+        };
+      },
+    }),
+
+    get_hours_summary: tool({
+      description:
+        "Payroll-style hours breakdown per employee over a date range — regular, overtime, double-time, shop, night-shift premium, total hours, late days, and out-of-town (subsistence) nights, with a per-week split. Mirrors the columns of the company's payroll worksheet. Use for 'show me hours for this pay period', 'how many OT hours did Devin have last week', or 'who has subsistence nights this period'. MANAGEMENT-ONLY: returns a permission-denied result for field roles.",
+      inputSchema: z.object({
+        startDate: z.string().describe('YYYY-MM-DD pay-period start (inclusive)'),
+        endDate: z.string().describe('YYYY-MM-DD pay-period end (inclusive)'),
+        personName: z.string().optional().describe('Optional: limit to employees whose name contains this'),
+      }),
+      execute: async ({ startDate, endDate, personName }) => {
+        if (role === 'operator' || role === 'apprentice') {
+          return { error: 'Hours/payroll data is restricted to management roles.' };
+        }
+        let profileQ = supabaseAdmin
+          .from('profiles')
+          .select('id, full_name')
+          .eq('tenant_id', tenantId)
+          .is('deleted_at', null);
+        if (personName) profileQ = profileQ.ilike('full_name', `%${personName}%`);
+        const { data: people, error: peopleError } = await profileQ;
+        if (peopleError) throw new Error(`get_hours_summary (roster): ${peopleError.message}`);
+        if (!people || people.length === 0) return { count: 0, employees: [] };
+
+        const { data: cards, error } = await supabaseAdmin
+          .from('timecards')
+          .select(
+            'user_id, date, week_start, net_hours, total_hours, regular_hours, overtime_hours, double_time_hours, night_shift_premium_hours, is_shop_hours, is_late, out_of_town'
+          )
+          .eq('tenant_id', tenantId)
+          .gte('date', startDate)
+          .lte('date', endDate)
+          .in('user_id', people.map((p: any) => p.id));
+        if (error) throw new Error(`get_hours_summary: ${error.message}`);
+
+        const nameById = new Map(people.map((p: any) => [p.id, p.full_name]));
+        const byUser = new Map<string, any>();
+        for (const c of cards ?? []) {
+          const key = c.user_id;
+          if (!byUser.has(key)) {
+            byUser.set(key, {
+              name: nameById.get(key) ?? 'Unknown',
+              regularHours: 0, overtimeHours: 0, doubleTimeHours: 0,
+              shopHours: 0, nightPremiumHours: 0, totalHours: 0,
+              lateDays: 0, outOfTownNights: 0, daysWorked: 0,
+              weeks: new Map<string, number>(),
+            });
+          }
+          const s = byUser.get(key);
+          const net = Number(c.net_hours ?? c.total_hours ?? 0);
+          const ot = Number(c.overtime_hours ?? 0);
+          const dt = Number(c.double_time_hours ?? 0);
+          const reg = c.regular_hours != null ? Number(c.regular_hours) : Math.max(0, net - ot - dt);
+          if (c.is_shop_hours) s.shopHours += net; else s.regularHours += reg;
+          s.overtimeHours += ot;
+          s.doubleTimeHours += dt;
+          s.nightPremiumHours += Number(c.night_shift_premium_hours ?? 0);
+          s.totalHours += net;
+          if (c.is_late) s.lateDays += 1;
+          if (c.out_of_town) s.outOfTownNights += 1;
+          s.daysWorked += 1;
+          const wk = c.week_start ?? c.date;
+          s.weeks.set(wk, (s.weeks.get(wk) ?? 0) + net);
+        }
+
+        const round = (n: number) => Math.round(n * 100) / 100;
+        const employees = [...byUser.values()]
+          .map((s: any) => ({
+            name: s.name,
+            regularHours: round(s.regularHours),
+            overtimeHours: round(s.overtimeHours),
+            doubleTimeHours: round(s.doubleTimeHours),
+            shopHours: round(s.shopHours),
+            nightPremiumHours: round(s.nightPremiumHours),
+            totalHours: round(s.totalHours),
+            lateDays: s.lateDays,
+            outOfTownNights: s.outOfTownNights,
+            daysWorked: s.daysWorked,
+            weeklyTotals: [...s.weeks.entries()]
+              .sort()
+              .map(([weekStart, hours]: [string, number]) => ({ weekStart, hours: round(hours) })),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        return { periodStart: startDate, periodEnd: endDate, count: employees.length, employees };
+      },
+    }),
+
     save_memory_note: tool({
       description:
         "Save a durable, non-obvious fact to the company's shared long-term memory — a preference, a recurring issue, a decision that was made, or context that will matter in a FUTURE conversation. Use this proactively whenever you learn something worth remembering across sessions. Do NOT use it for routine operational data already covered by the other tools (today's jobs, who's clocked in, etc.) — only durable knowledge.",

@@ -117,6 +117,19 @@
 
 ## 🟠 P1 — This week
 
+### Jul 8 — Patriot owner/admin report requests (source photos analyzed → `docs/plans/PATRIOT_REPORTS_PLAN.md`)
+- [x] ~~**Artifex schedule history + quick job search**~~ — ✅ SHIPPED Jul 8: `search_job_history`
+      tool (person/customer/date-range/status over schedule_board_view — "what jobs has X done"
+      without scrolling the board).
+- [x] ~~**Artifex payroll-style hours summary**~~ — ✅ SHIPPED Jul 8: `get_hours_summary` tool
+      (reg/OT/DT/shop/night-premium/total + late days + subsistence nights per employee per
+      pay period, weekly split; management-only).
+- [ ] **Attendance tracker (Patriot codes: EA/UA/NCNS/STO/ML/FL/S/LE/T/V/W/NW/H/GD/WH)** —
+      `attendance_events` + `attendance_codes` migration, month-grid per-employee UI mirroring
+      their paper sheet, monthly/quarterly/yearly rollups, auto-derive T/V/STO/H, Artifex
+      `get_attendance_summary` tool. Full spec in the plan doc.
+- [ ] **Payroll Worksheet page** — pay-period picker (tenant pay_schedule weekly|biweekly +
+      anchor), exact Patriot column set, subsistence side table, CSV export for QuickBooks.
 - [ ] **iOS Build 8 (Face ID)** — founder: install from TestFlight, test Face ID on device →
       submit v1.0.3 for App Store review (`.claude/skills/ios-release/SKILL.md`).
 - [ ] **Exercise remaining email routes live** (invoices send/remind/payment, demo-request,
