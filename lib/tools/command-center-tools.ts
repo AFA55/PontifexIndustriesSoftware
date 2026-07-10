@@ -380,6 +380,83 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
       },
     }),
 
+    create_job_ticket: tool({
+      description:
+        "CREATE a new job ticket (quick-add) on the schedule. WRITE ACTION — only call this after you have collected the required details AND the user has explicitly confirmed a read-back summary in this conversation. Required: customer/contractor name, job type, start date. Optional: scope description, address, site contact name/phone, end date, priority. The job lands as a quick-add (same as the schedule board's Quick Add) and office staff complete the full form afterward.",
+      inputSchema: z.object({
+        customerName: z.string().min(1).describe('Customer / contractor name'),
+        jobType: z.string().min(1).describe("Job type, e.g. 'Core Drilling', 'Wall Sawing', 'Slab Sawing'"),
+        startDate: z.string().describe('Scheduled start date, YYYY-MM-DD'),
+        endDate: z.string().optional().describe('End date YYYY-MM-DD (defaults to start date)'),
+        scope: z.string().optional().describe('Scope / work description'),
+        address: z.string().optional().describe('Jobsite address'),
+        contactName: z.string().optional().describe('Site contact name'),
+        contactPhone: z.string().optional().describe('Site contact phone'),
+        priority: z.enum(['low', 'medium', 'high']).optional(),
+      }),
+      execute: async ({ customerName, jobType, startDate, endDate, scope, address, contactName, contactPhone, priority }) => {
+        // Write access mirrors the schedule board's own quick-add population.
+        const CAN_CREATE = ['admin', 'super_admin', 'operations_manager', 'salesman'];
+        if (!CAN_CREATE.includes(role)) {
+          return { error: 'Creating job tickets is restricted to admin, operations, and sales roles.' };
+        }
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) {
+          return { error: 'startDate must be YYYY-MM-DD.' };
+        }
+        if (endDate && endDate < startDate) {
+          return { error: 'endDate must be on or after startDate.' };
+        }
+
+        const jobNumber = `QA-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+        const { data: job, error } = await supabaseAdmin
+          .from('job_orders')
+          .insert({
+            job_number: jobNumber,
+            title: `${customerName.trim()} — ${jobType.trim()}`,
+            customer_name: customerName.trim(),
+            customer_contact: contactPhone || null,
+            status: role === 'super_admin' ? 'scheduled' : 'pending_approval',
+            priority: priority || 'medium',
+            scheduled_date: startDate,
+            end_date: endDate || startDate,
+            description: scope || null,
+            job_type: jobType.trim(),
+            address: address || null,
+            location: address || null,
+            foreman_name: contactName || null,
+            foreman_phone: contactPhone || null,
+            created_by: userId,
+            created_via: 'artifex',
+            missing_info_items: ['equipment_needed', 'jobsite_conditions', 'permits', 'full_scope'],
+            missing_info_note: 'Created by Artifex (voice/chat) — please complete the full Schedule Form.',
+            tenant_id: tenantId,
+          })
+          .select('id, job_number, status')
+          .single();
+        if (error) throw new Error(`create_job_ticket: ${error.message}`);
+
+        Promise.resolve(
+          supabaseAdmin.from('audit_logs').insert({
+            user_id: userId,
+            action: 'artifex_job_created',
+            entity_type: 'job_order',
+            entity_id: job.id,
+            details: { job_number: jobNumber, customer: customerName.trim(), job_type: jobType.trim(), scheduled_date: startDate },
+          })
+        ).then(() => {}).catch(() => {});
+
+        return {
+          created: true,
+          jobNumber: job.job_number,
+          status: job.status,
+          note:
+            job.status === 'pending_approval'
+              ? 'Created as pending approval — an admin approves it on the schedule board.'
+              : 'Created directly on the schedule.',
+        };
+      },
+    }),
+
     save_memory_note: tool({
       description:
         "Save a durable, non-obvious fact to the company's shared long-term memory — a preference, a recurring issue, a decision that was made, or context that will matter in a FUTURE conversation. Use this proactively whenever you learn something worth remembering across sessions. Do NOT use it for routine operational data already covered by the other tools (today's jobs, who's clocked in, etc.) — only durable knowledge.",

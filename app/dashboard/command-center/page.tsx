@@ -15,7 +15,6 @@ import {
   Briefcase,
   ClipboardCheck,
   ChevronLeft,
-  Mic,
   Maximize2,
   Minimize2,
   type LucideIcon,
@@ -24,6 +23,7 @@ import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { formatTime } from '@/lib/dates';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
+import { useArtifexVoice } from '@/lib/use-artifex-voice';
 import NeuralBrain, { type NeuralBrainState } from '@/components/command-center/NeuralBrain';
 import ArtifexChat, { type ArtifexConversationSummary } from '@/components/command-center/ArtifexChat';
 
@@ -64,8 +64,11 @@ export default function CommandCenterPage() {
   // Reactor size, responsive (SSR-safe: starts at a sane default, set on mount).
   const [reactorSize, setReactorSize] = useState(360);
 
-  // Artifex chat: open/closed, and the reactor state it drives while active.
-  const [chatOpen, setChatOpen] = useState(false);
+  // Voice-first (Jul 9): the orb IS the interface. Voice lives here so the
+  // orb can read the live ElevenLabs amplitude; the transcript panel is the
+  // background surface, toggled on demand.
+  const voice = useArtifexVoice();
+  const [transcriptOpen, setTranscriptOpen] = useState(false);
   const [chatReactorState, setChatReactorState] = useState<NeuralBrainState>('idle');
 
   // Conversation history — the "2nd brain" sidebar's list + selection state.
@@ -137,12 +140,12 @@ export default function CommandCenterPage() {
     return () => window.removeEventListener('resize', apply);
   }, []);
 
-  // ── conversation history: load once the chat is first opened ──────────────
+  // ── conversation history: load once the transcript is first opened ────────
   useEffect(() => {
-    if (!authChecked || !user || !chatOpen) return;
+    if (!authChecked || !user || !transcriptOpen) return;
     loadConversations();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [authChecked, user, chatOpen]);
+  }, [authChecked, user, transcriptOpen]);
 
   // ── overview data: fetch + poll every 30s, fail-soft ───────────────────────
   const overviewRef = useRef<OverviewData | null>(null);
@@ -227,7 +230,7 @@ export default function CommandCenterPage() {
           >
             {focusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
-          <Clock className="hidden h-4 w-4 text-violet-300/70 sm:block" />
+          <Clock className="hidden h-4 w-4 text-sky-300/70 sm:block" />
           <div className="leading-tight">
             <div className="font-mono text-sm font-semibold tabular-nums text-white sm:text-base">
               {clockTime}
@@ -240,57 +243,52 @@ export default function CommandCenterPage() {
       {/* ── Body: tabs · reactor · rail ───────────────────────────────────── */}
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* CENTER — reactor first in DOM so it stacks on TOP on mobile */}
-        <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-0">
+        <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-6">
           <div className="relative flex items-center justify-center">
             <NeuralBrain
-              state={chatOpen ? chatReactorState : 'idle'}
+              state={chatReactorState}
               size={reactorSize}
-              className="drop-shadow-[0_0_40px_rgba(124,58,237,0.35)]"
+              getAmplitude={() => voice.amplitudeRef.current}
+              className="drop-shadow-[0_0_44px_rgba(56,189,248,0.25)]"
             />
           </div>
 
-          {!chatOpen && (
-            <>
-              <p className="mt-6 max-w-sm text-center text-sm text-white/55">
-                Systems nominal. Standing by.
-              </p>
-              <p className="mt-1 text-center text-xs uppercase tracking-[0.25em] text-white/30">
-                {asOfLabel}
-              </p>
-
+          <div className="mt-5 flex w-full flex-col items-center px-2">
+            <ArtifexChat
+              key={chatInstanceKey}
+              voice={voice}
+              variant={transcriptOpen ? 'panel' : 'hud'}
+              onOpenTranscript={() => setTranscriptOpen(true)}
+              onStateChange={setChatReactorState}
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onSelectConversation={(id) => {
+                setActiveConversationId(id);
+                setChatInstanceKey((k) => k + 1);
+              }}
+              onNewConversation={() => {
+                setActiveConversationId(null);
+                setChatInstanceKey((k) => k + 1);
+              }}
+              onConversationStarted={(id) => {
+                setActiveConversationId(id);
+                loadConversations();
+              }}
+            />
+            {transcriptOpen ? (
               <button
                 type="button"
-                onClick={() => setChatOpen(true)}
-                className="mt-8 flex h-12 min-w-[200px] items-center justify-center gap-2 rounded-full border border-white/10 bg-gradient-to-r from-[#7C3AED] via-[#DB2777] to-[#EF4444] px-6 text-sm font-medium text-white shadow-[0_0_25px_rgba(219,39,119,0.3)] transition-transform hover:scale-[1.02]"
+                onClick={() => setTranscriptOpen(false)}
+                className="mt-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400/70 transition-colors hover:text-sky-200"
               >
-                <Mic className="h-4 w-4" />
-                Talk to Artifex
+                Back to voice
               </button>
-            </>
-          )}
-
-          {chatOpen && (
-            <div className="mt-6 w-full px-2">
-              <ArtifexChat
-                key={chatInstanceKey}
-                onStateChange={setChatReactorState}
-                conversations={conversations}
-                activeConversationId={activeConversationId}
-                onSelectConversation={(id) => {
-                  setActiveConversationId(id);
-                  setChatInstanceKey((k) => k + 1);
-                }}
-                onNewConversation={() => {
-                  setActiveConversationId(null);
-                  setChatInstanceKey((k) => k + 1);
-                }}
-                onConversationStarted={(id) => {
-                  setActiveConversationId(id);
-                  loadConversations();
-                }}
-              />
-            </div>
-          )}
+            ) : (
+              <p className="mt-4 text-center text-[10px] uppercase tracking-[0.25em] text-slate-500/60">
+                {asOfLabel}
+              </p>
+            )}
+          </div>
         </main>
 
         {/* LEFT — management tabs (hidden in focus mode) */}
@@ -307,9 +305,9 @@ export default function CommandCenterPage() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="group flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm text-white/75 transition-all hover:border-violet-400/40 hover:bg-white/[0.07] hover:text-white"
+                    className="group flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm text-white/75 transition-all hover:border-sky-400/40 hover:bg-white/[0.07] hover:text-white"
                   >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#7C3AED]/25 to-[#EF4444]/25 text-violet-200 transition-colors group-hover:from-[#7C3AED]/45 group-hover:to-[#EF4444]/45">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#0EA5E9]/20 to-[#DC2626]/25 text-sky-200 transition-colors group-hover:from-[#0EA5E9]/40 group-hover:to-[#DC2626]/45">
                       <Icon className="h-4 w-4" />
                     </span>
                     <span className="truncate font-medium">{label}</span>
@@ -333,7 +331,7 @@ export default function CommandCenterPage() {
               <MetricCard
                 icon={Users}
                 label="Clocked in"
-                accent="from-[#7C3AED] to-[#DB2777]"
+                accent="from-[#0284C7] to-[#38BDF8]"
                 loading={overviewLoading}
                 value={
                   overview ? `${overview.clockedIn} / ${overview.rosterCount}` : null
@@ -342,21 +340,21 @@ export default function CommandCenterPage() {
               <MetricCard
                 icon={Bell}
                 label="Notifications"
-                accent="from-[#DB2777] to-[#EF4444]"
+                accent="from-[#DC2626] to-[#7F1D1D]"
                 loading={overviewLoading}
                 value={overview ? `${overview.unreadAlerts}` : null}
               />
               <MetricCard
                 icon={Briefcase}
                 label="Jobs today"
-                accent="from-[#7C3AED] to-[#EF4444]"
+                accent="from-[#0EA5E9] to-[#DC2626]"
                 loading={overviewLoading}
                 value={overview ? `${overview.todaysJobs}` : null}
               />
               <MetricCard
                 icon={ClipboardCheck}
                 label="Pending approvals"
-                accent="from-[#DB2777] to-[#7C3AED]"
+                accent="from-[#B91C1C] to-[#0284C7]"
                 loading={overviewLoading}
                 value={overview ? `${overview.pendingApprovals}` : null}
               />

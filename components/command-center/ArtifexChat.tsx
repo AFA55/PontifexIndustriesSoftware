@@ -1,41 +1,47 @@
 'use client';
 
 /**
- * ArtifexChat — the Command Center's chat surface (Jarvis Command Center Phase 2).
+ * ArtifexChat — the Command Center's conversation engine + two skins.
  *
- * Talks to POST /api/command-center/assistant via @ai-sdk/react's useChat, typed
- * end-to-end against ArtifexUIMessage (see lib/agents/artifex-agent.ts) so every
- * tool's input/output is fully typed in the renderer below — no `any`.
+ * Voice-first redesign (Jul 9, founder-directed): the ORB is the interface —
+ * "it should look like the center is talking" — so this component now renders
+ * one of two variants while keeping a single useChat instance alive:
  *
- * Auth: this repo's convention is bearer-token auth (requireAuth reads the
- * Authorization header, not cookies), so the transport's `fetch` override reads
- * a FRESH Supabase session on every request rather than capturing one token at
- * mount (tokens rotate).
+ *   variant="hud"   (default surface) — no chat card. Just a caption of the
+ *                   latest exchange under the orb, a status line, and a big
+ *                   round mic. The full transcript stays in the background.
+ *   variant="panel" — the full transcript panel (history sidebar, input row),
+ *                   for reading back or typing instead of talking.
  *
- * Reactor wiring: `onStateChange` reports a derived ArcReactorState so the
- * parent page can drive the HUD's centerpiece from real chat activity —
- * 'submitted'/'streaming' -> thinking/speaking, tool-call in flight -> thinking
- * (with a labeled chip), 'ready'/'error' -> idle. See ArcReactor.tsx's own
- * state-wiring notes for the idle/listening/thinking/speaking contract.
+ * The VOICE lives in the parent (useArtifexVoice) and is passed down, so the
+ * page can feed the orb the live ElevenLabs amplitude. Conversation mode:
+ * when a turn was started by mic and voice is on, the reply is spoken and,
+ * when playback ends, the mic re-opens automatically — you talk THROUGH a
+ * process (e.g. creating a job ticket) hands-free.
  *
- * Conversation list: `conversations`/`activeConversationId`/`onSelectConversation`/
- * `onNewConversation` are optional so this component still works standing alone —
- * omit them and the sidebar just doesn't render. When `activeConversationId` is
- * set, prior turns are fetched from GET .../conversations/[id] and seeded before
- * the transport ever fires; `onConversationStarted` reports the id the backend
- * assigns a brand-new conversation (read off the streamed 'start' metadata) so
- * the parent can track it for the next turn + refresh the sidebar. The parent
- * should key this component by `activeConversationId` so switching conversations
- * remounts it with a fresh `useChat` instance instead of blending message state.
+ * Auth: bearer-token fetch (requireAuth reads the Authorization header);
+ * fresh session read per request (tokens rotate).
  */
 import { useEffect, useRef, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, isToolUIPart } from 'ai';
 import { supabase } from '@/lib/supabase';
-import { Send, Search, CheckCircle2, MessageSquarePlus, PanelLeftClose, PanelLeftOpen, MessageSquare, Mic, Volume2, VolumeX } from 'lucide-react';
-import { useArtifexVoice } from '@/lib/use-artifex-voice';
+import {
+  Send,
+  Search,
+  CheckCircle2,
+  MessageSquarePlus,
+  PanelLeftClose,
+  PanelLeftOpen,
+  MessageSquare,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+} from 'lucide-react';
+import type { ArtifexVoice } from '@/lib/use-artifex-voice';
 import type { ArtifexUIMessage } from '@/lib/agents/artifex-agent';
-import type { ArcReactorState } from './ArcReactor';
+import type { NeuralBrainState } from './NeuralBrain';
 
 const TOOL_LABELS: Record<string, string> = {
   'tool-get_clocked_in_status': 'Checking who’s clocked in',
@@ -44,6 +50,11 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-get_team_roster': 'Looking up the team roster',
   'tool-get_recent_activity': 'Checking recent activity',
   'tool-get_revenue_snapshot': 'Pulling revenue numbers',
+  'tool-search_job_history': 'Searching schedule history',
+  'tool-get_hours_summary': 'Crunching hours',
+  'tool-create_job_ticket': 'Creating the job ticket',
+  'tool-save_memory_note': 'Saving to memory',
+  'tool-recall_memory_notes': 'Recalling memory',
 };
 
 async function authedFetch(input: RequestInfo | URL, init?: RequestInit) {
@@ -62,8 +73,11 @@ export interface ArtifexConversationSummary {
 }
 
 interface ArtifexChatProps {
-  onStateChange?: (state: ArcReactorState) => void;
-  /** Past conversations for the sidebar. Omit to render the standalone chat with no sidebar. */
+  voice: ArtifexVoice;
+  variant?: 'hud' | 'panel';
+  onStateChange?: (state: NeuralBrainState) => void;
+  onOpenTranscript?: () => void;
+  /** Past conversations for the sidebar (panel variant). */
   conversations?: ArtifexConversationSummary[];
   activeConversationId?: string | null;
   onSelectConversation?: (id: string) => void;
@@ -73,7 +87,10 @@ interface ArtifexChatProps {
 }
 
 export default function ArtifexChat({
+  voice,
+  variant = 'panel',
   onStateChange,
+  onOpenTranscript,
   conversations,
   activeConversationId,
   onSelectConversation,
@@ -81,10 +98,8 @@ export default function ArtifexChat({
   onConversationStarted,
 }: ArtifexChatProps) {
   const [input, setInput] = useState('');
-  // Voice (Phase C): ElevenLabs TTS out + browser speech-recognition in.
-  const voice = useArtifexVoice();
   const [voiceOn, setVoiceOn] = useState(() => {
-    try { return localStorage.getItem('artifex.voice') === 'on'; } catch { return false; }
+    try { return localStorage.getItem('artifex.voice') !== 'off'; } catch { return true; }
   });
   const toggleVoice = () => {
     setVoiceOn((v) => {
@@ -97,8 +112,11 @@ export default function ArtifexChat({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(!!activeConversationId);
 
-  // Read at send-time (not at transport-construction time) so switching
-  // conversations doesn't require rebuilding the transport.
+  // Conversation mode: the last turn came from the mic → after the spoken
+  // reply finishes, re-open the mic automatically so the user talks through
+  // multi-step flows (job-ticket creation) hands-free.
+  const lastTurnWasVoiceRef = useRef(false);
+
   const conversationIdRef = useRef<string | null>(activeConversationId ?? null);
   useEffect(() => {
     conversationIdRef.current = activeConversationId ?? null;
@@ -117,7 +135,18 @@ export default function ArtifexChat({
   const { messages, sendMessage, setMessages, status, error } = useChat<ArtifexUIMessage>({ transport });
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const busy = status === 'submitted' || status === 'streaming';
   const hasHistory = Array.isArray(conversations);
+
+  const startMic = () => {
+    if (voice.listening) { voice.stopListening(); return; }
+    voice.stopSpeaking();
+    voice.startListening((transcript) => {
+      if (busy || historyLoading) return;
+      lastTurnWasVoiceRef.current = true;
+      sendMessage({ text: transcript });
+    });
+  };
 
   // Resume a past conversation: fetch its prior turns and seed them before
   // the transport ever fires. Runs once per mount — the parent keys this
@@ -164,45 +193,172 @@ export default function ArtifexChat({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, status]);
 
+  // Drive the orb: listening > speaking > thinking > idle.
   useEffect(() => {
     if (!onStateChange) return;
-    if (status === 'submitted' || status === 'streaming') onStateChange('thinking');
+    if (voice.listening) onStateChange('listening');
+    else if (voice.speaking) onStateChange('speaking');
+    else if (busy) onStateChange('thinking');
     else onStateChange('idle');
-  }, [status, onStateChange]);
+  }, [busy, voice.listening, voice.speaking, onStateChange]);
 
-  // The backend sets a conversation's title (fire-and-forget) only once the
-  // full turn finishes, after onConversationStarted already fired on 'start' —
-  // re-notify once the turn completes so the parent can refresh the sidebar
-  // and pick up the real title instead of the "New chat" placeholder.
+  // Turn completion: refresh the sidebar title + speak the reply. If the turn
+  // came in by voice, re-open the mic when playback ends (conversation mode).
   const wasStreamingRef = useRef(false);
   useEffect(() => {
-    const isActive = status === 'submitted' || status === 'streaming';
-    if (wasStreamingRef.current && !isActive) {
+    if (wasStreamingRef.current && !busy) {
       if (conversationIdRef.current) onConversationStarted?.(conversationIdRef.current);
-      // Voice: speak the reply that just finished streaming.
-      if (voiceOn) {
-        const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
-        const text = (lastAssistant?.parts ?? [])
-          .filter((pt): pt is { type: 'text'; text: string } => (pt as any).type === 'text')
-          .map((pt) => pt.text)
-          .join(' ');
-        if (text) voice.speak(text);
+      const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+      const text = (lastAssistant?.parts ?? [])
+        .filter((pt): pt is { type: 'text'; text: string } => (pt as any).type === 'text')
+        .map((pt) => pt.text)
+        .join(' ');
+      if (voiceOn && text) {
+        const cameFromVoice = lastTurnWasVoiceRef.current;
+        voice.speak(text, {
+          onEnd: () => {
+            if (cameFromVoice && document.visibilityState === 'visible') startMic();
+          },
+        });
       }
     }
-    wasStreamingRef.current = isActive;
+    wasStreamingRef.current = busy;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, onConversationStarted, voiceOn, messages]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const text = input.trim();
-    if (!text || status === 'submitted' || status === 'streaming' || historyLoading) return;
+    if (!text || busy || historyLoading) return;
+    lastTurnWasVoiceRef.current = false;
     sendMessage({ text });
     setInput('');
   };
 
+  // ── HUD variant — the orb talks; this is just caption + status + mic ─────
+  if (variant === 'hud') {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    const lastUser = [...messages].reverse().find((m) => m.role === 'user');
+    const assistantText = (lastAssistant?.parts ?? [])
+      .filter((pt): pt is { type: 'text'; text: string } => (pt as any).type === 'text')
+      .map((pt) => pt.text)
+      .join(' ')
+      .replace(/[*_#`]+/g, '') // captions are plain speech — strip markdown
+      .trim();
+    const userText = (lastUser?.parts ?? [])
+      .filter((pt): pt is { type: 'text'; text: string } => (pt as any).type === 'text')
+      .map((pt) => pt.text)
+      .join(' ')
+      .trim();
+    const runningTool = busy
+      ? messages
+          .flatMap((m) => m.parts as any[])
+          .filter((p) => isToolUIPart(p) && p.state !== 'output-available' && p.state !== 'output-error')
+          .map((p) => TOOL_LABELS[p.type] ?? 'Working')
+          .pop()
+      : null;
+
+    const statusLine = voice.listening
+      ? 'LISTENING'
+      : voice.speaking
+        ? 'SPEAKING'
+        : busy
+          ? (runningTool ?? 'THINKING').toUpperCase()
+          : 'STANDING BY';
+
+    return (
+      <div className="flex w-full max-w-xl flex-col items-center gap-4">
+        {/* Status line — the HUD readout under the orb */}
+        <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-sky-300/60" aria-live="polite">
+          {statusLine}
+          {(voice.listening || busy) && <span className="animate-pulse">…</span>}
+        </p>
+
+        {/* Caption — what was said / the spoken reply, so the orb "talks" visibly */}
+        <div className="min-h-[3.5rem] w-full text-center">
+          {error ? (
+            <p className="text-sm text-red-300/90">Artifex hit an error. Try again in a moment.</p>
+          ) : assistantText ? (
+            <>
+              {userText && (
+                <p className="mb-1 truncate text-xs text-slate-400/80">“{userText}”</p>
+              )}
+              <p className="mx-auto max-w-lg text-[15px] leading-relaxed text-slate-100/95 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">
+                {assistantText}
+              </p>
+            </>
+          ) : (
+            <p className="text-sm text-slate-400/70">
+              {voice.micSupported ? 'Tap the mic and talk to Artifex.' : 'Open the transcript to type to Artifex.'}
+            </p>
+          )}
+        </div>
+
+        {/* Controls: transcript · MIC (hero) · voice toggle */}
+        <div className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={onOpenTranscript}
+            aria-label="Open transcript"
+            title="Transcript & typing"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/25 bg-slate-500/[0.08] text-slate-300/70 transition-colors hover:border-sky-400/40 hover:text-sky-200"
+          >
+            <MessageSquare className="h-4 w-4" />
+          </button>
+
+          {voice.micSupported ? (
+            <button
+              type="button"
+              onClick={startMic}
+              disabled={busy || historyLoading}
+              aria-label={voice.listening ? 'Stop listening' : 'Talk to Artifex'}
+              className={`relative flex h-16 w-16 items-center justify-center rounded-full border transition-all disabled:opacity-40 ${
+                voice.listening
+                  ? 'border-sky-300/70 bg-sky-400/15 text-sky-200 shadow-[0_0_35px_rgba(56,189,248,0.45)]'
+                  : 'border-red-500/50 bg-gradient-to-br from-red-600/25 to-red-900/30 text-red-100 shadow-[0_0_30px_rgba(220,38,38,0.35)] hover:shadow-[0_0_40px_rgba(220,38,38,0.55)]'
+              }`}
+            >
+              {voice.listening && (
+                <span className="absolute inset-0 animate-ping rounded-full border border-sky-300/40" />
+              )}
+              <Mic className="h-6 w-6" />
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenTranscript}
+              aria-label="Type to Artifex"
+              className="flex h-16 w-16 items-center justify-center rounded-full border border-red-500/50 bg-gradient-to-br from-red-600/25 to-red-900/30 text-red-100 shadow-[0_0_30px_rgba(220,38,38,0.35)]"
+            >
+              <MicOff className="h-6 w-6" />
+            </button>
+          )}
+
+          {voice.ttsAvailable !== false ? (
+            <button
+              type="button"
+              onClick={toggleVoice}
+              aria-label={voiceOn ? 'Turn voice off' : 'Turn voice on'}
+              title={voiceOn ? 'Voice on (ElevenLabs)' : 'Voice off'}
+              className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
+                voiceOn
+                  ? 'border-red-400/40 bg-red-500/10 text-red-300'
+                  : 'border-slate-500/25 bg-slate-500/[0.08] text-slate-400/70 hover:text-slate-200'
+              } ${voice.speaking ? 'animate-pulse' : ''}`}
+            >
+              {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+            </button>
+          ) : (
+            <span className="h-11 w-11" aria-hidden />
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── PANEL variant — full transcript ──────────────────────────────────────
   return (
-    <div className="flex w-full max-w-3xl overflow-hidden rounded-2xl border border-violet-400/15 bg-black/50 shadow-[0_0_60px_-15px_rgba(124,58,237,0.35)] backdrop-blur-xl">
+    <div className="flex w-full max-w-3xl overflow-hidden rounded-2xl border border-sky-400/15 bg-[#050B16]/80 shadow-[0_0_60px_-15px_rgba(56,189,248,0.25)] backdrop-blur-xl">
       {hasHistory && (
         <ConversationSidebar
           open={historyOpen}
@@ -227,7 +383,7 @@ export default function ArtifexChat({
                 {historyOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
               </button>
             )}
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">Artifex</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-200/40">Artifex Transcript</span>
             {voice.ttsAvailable !== false && (
               <button
                 type="button"
@@ -235,7 +391,7 @@ export default function ArtifexChat({
                 aria-label={voiceOn ? 'Turn voice off' : 'Turn voice on'}
                 title={voiceOn ? 'Voice on (ElevenLabs)' : 'Voice off'}
                 className={`flex h-9 w-9 items-center justify-center rounded-lg transition-colors ${
-                  voiceOn ? 'text-violet-300 bg-violet-500/10' : 'text-white/35 hover:bg-white/[0.06] hover:text-white/70'
+                  voiceOn ? 'text-red-300 bg-red-500/10' : 'text-white/35 hover:bg-white/[0.06] hover:text-white/70'
                 } ${voice.speaking ? 'animate-pulse' : ''}`}
               >
                 {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
@@ -260,7 +416,7 @@ export default function ArtifexChat({
           )}
           {!historyLoading && messages.length === 0 && (
             <p className="text-center text-sm text-white/35">
-              Ask Artifex about jobs, the team, approvals, or activity.
+              Ask Artifex about jobs, the team, hours, approvals — or have it create a job ticket.
             </p>
           )}
           {messages.map((message) => (
@@ -268,7 +424,7 @@ export default function ArtifexChat({
               <div
                 className={
                   message.role === 'user'
-                    ? 'max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-br from-[#7C3AED] to-[#DB2777] px-4 py-2.5 text-sm text-white shadow-[0_2px_20px_-4px_rgba(219,39,119,0.5)]'
+                    ? 'max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-br from-[#DC2626] to-[#7F1D1D] px-4 py-2.5 text-sm text-white shadow-[0_2px_20px_-4px_rgba(220,38,38,0.5)]'
                     : 'max-w-[85%] rounded-2xl rounded-bl-sm border border-white/[0.08] bg-white/[0.035] px-4 py-2.5 text-sm text-white/90'
                 }
               >
@@ -286,7 +442,7 @@ export default function ArtifexChat({
                   return (
                     <div
                       key={i}
-                      className="my-1 flex items-center gap-1.5 text-xs text-violet-200/70 first:mt-0"
+                      className="my-1 flex items-center gap-1.5 text-xs text-sky-200/70 first:mt-0"
                     >
                       {done ? (
                         <CheckCircle2 className="h-3 w-3 text-emerald-400/80" />
@@ -313,22 +469,16 @@ export default function ArtifexChat({
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask Artifex…"
-            className="min-h-[44px] flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 text-sm text-white placeholder:text-white/30 focus:border-violet-400/50 focus:outline-none"
+            className="min-h-[44px] flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 text-sm text-white placeholder:text-white/30 focus:border-sky-400/50 focus:outline-none"
           />
           {voice.micSupported && (
             <button
               type="button"
-              onClick={() => {
-                if (voice.listening) { voice.stopListening(); return; }
-                voice.startListening((transcript) => {
-                  if (status === 'submitted' || status === 'streaming' || historyLoading) return;
-                  sendMessage({ text: transcript });
-                });
-              }}
+              onClick={startMic}
               aria-label={voice.listening ? 'Stop listening' : 'Speak to Artifex'}
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                 voice.listening
-                  ? 'border-rose-400/50 bg-rose-500/15 text-rose-300 animate-pulse'
+                  ? 'border-sky-400/50 bg-sky-500/15 text-sky-300 animate-pulse'
                   : 'border-white/[0.08] bg-white/[0.04] text-white/50 hover:text-white/85'
               }`}
             >
@@ -337,8 +487,8 @@ export default function ArtifexChat({
           )}
           <button
             type="submit"
-            disabled={!input.trim() || status === 'submitted' || status === 'streaming' || historyLoading}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#7C3AED] to-[#DB2777] text-white transition-opacity disabled:opacity-30"
+            disabled={!input.trim() || busy || historyLoading}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#DC2626] to-[#991B1B] text-white transition-opacity disabled:opacity-30"
             aria-label="Send"
           >
             <Send className="h-4 w-4" />
@@ -389,7 +539,7 @@ function ConversationSidebar({
                 onClick={() => onSelectConversation?.(c.id)}
                 className={`flex min-h-[40px] w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
                   active
-                    ? 'bg-gradient-to-r from-[#7C3AED]/25 to-[#DB2777]/15 text-white'
+                    ? 'bg-gradient-to-r from-[#DC2626]/25 to-[#38BDF8]/10 text-white'
                     : 'text-white/55 hover:bg-white/[0.05] hover:text-white/85'
                 }`}
               >
