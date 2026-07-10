@@ -116,7 +116,9 @@ export function formatDistanceUS(distanceMeters: number): string {
  */
 export function estimateDriveMinutes(distanceMeters: number): number | null {
   const miles = distanceMeters / 1609.344;
-  if (miles < 0.2) return null;
+  // Only suppress genuinely-at-the-shop readings (<0.05 mi ≈ 80 m). The old
+  // 0.2-mi cutoff hid real cases (founder's 0.17-mi flag showed no time).
+  if (miles < 0.05) return null;
   const ASSUMED_LOCAL_MPH = 30;
   return Math.max(1, Math.round((miles / ASSUMED_LOCAL_MPH) * 60));
 }

@@ -39,12 +39,21 @@ export async function GET(
       return NextResponse.json({ error: 'This job is not accepting applications' }, { status: 404 });
     }
 
-    // Company display name for the apply page header (branding, not a secret)
-    const { data: tenant } = await supabaseAdmin
-      .from('tenants')
-      .select('name')
-      .eq('id', job.tenant_id)
-      .maybeSingle();
+    // Company display name + brand color/logo for the apply page (branding,
+    // not a secret). tenant_branding is the richer source (same as the login
+    // page + emails); tenants.primary_color is the sparse fallback.
+    const [{ data: tenant }, { data: tb }] = await Promise.all([
+      supabaseAdmin
+        .from('tenants')
+        .select('name, primary_color')
+        .eq('id', job.tenant_id)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('tenant_branding')
+        .select('primary_color, logo_url, company_name')
+        .eq('tenant_id', job.tenant_id)
+        .maybeSingle(),
+    ]);
 
     const { data: screenerRows } = await supabaseAdmin
       .from('hiring_screener_questions')
@@ -68,7 +77,9 @@ export async function GET(
       ad_headline: job.ad_headline,
       ad_bullets: job.ad_bullets,
       language: job.language,
-      company_name: tenant?.name || null,
+      company_name: tb?.company_name || tenant?.name || null,
+      brand_color: tb?.primary_color || tenant?.primary_color || null,
+      logo_url: tb?.logo_url || null,
     };
 
     const screeners = (screenerRows || []).map((s) => ({

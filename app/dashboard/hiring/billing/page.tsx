@@ -226,7 +226,7 @@ export default function HiringBillingPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-purple-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-brand animate-spin" />
       </div>
     );
   }
@@ -265,7 +265,7 @@ export default function HiringBillingPage() {
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
-                <DollarSign className="w-4 h-4 text-purple-600" />
+                <DollarSign className="w-4 h-4 text-brand" />
                 Current balance
               </div>
               <div className="text-4xl font-bold text-gray-900 mt-2">{money(balance)}</div>
@@ -278,7 +278,7 @@ export default function HiringBillingPage() {
               <button
                 onClick={payNow}
                 disabled={paying}
-                className="inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-60 transition-colors"
+                className="inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-xl bg-brand text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 transition-colors"
               >
                 {paying ? <Loader2 className="w-4 h-4 animate-spin" /> : <CreditCard className="w-4 h-4" />}
                 Pay {money(balance)} now
@@ -300,15 +300,15 @@ export default function HiringBillingPage() {
           )}
 
           {/* Threshold explainer (Hireline-style FAQ copy) */}
-          <div className="mt-5 bg-purple-50 border border-purple-100 rounded-xl p-4 flex items-start gap-3">
-            <Info className="w-4 h-4 text-purple-600 shrink-0 mt-0.5" />
-            <div className="text-sm text-purple-900">
+          <div className="mt-5 bg-brand/5 border border-brand/15 rounded-xl p-4 flex items-start gap-3">
+            <Info className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+            <div className="text-sm text-gray-800 dark:text-white/85">
               <p>
                 You&apos;ll be charged what you owe on the 1st of each month, when the amount you
                 owe reaches <span className="font-semibold">{money(threshold)}</span>, or after you
                 pause all your jobs — whichever comes first.
               </p>
-              <p className="text-xs text-purple-700 mt-1.5">
+              <p className="text-xs text-gray-600 dark:text-white/60 mt-1.5">
                 As your lifetime spend grows, this threshold increases automatically ($25 → $50 →
                 $250), so you see fewer, larger charges.
               </p>
@@ -319,7 +319,7 @@ export default function HiringBillingPage() {
         {/* Payment method card */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
-            <CreditCard className="w-4 h-4 text-purple-600" />
+            <CreditCard className="w-4 h-4 text-brand" />
             <h2 className="text-base font-semibold text-gray-900">Payment method</h2>
           </div>
 
@@ -346,7 +346,7 @@ export default function HiringBillingPage() {
               {cardFlow === 'idle' && (
                 <button
                   onClick={startCardEntry}
-                  className="inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-xl border border-purple-200 bg-purple-50 text-purple-700 text-sm font-semibold hover:bg-purple-100 transition-colors"
+                  className="inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-xl border border-brand/25 bg-brand/5 text-brand text-sm font-semibold hover:bg-brand/10 transition-colors"
                 >
                   <CreditCard className="w-4 h-4" />
                   {data?.hasPaymentMethod ? 'Replace card' : 'Add card'}
@@ -365,7 +365,7 @@ export default function HiringBillingPage() {
                     <button
                       onClick={saveCard}
                       disabled={cardFlow === 'saving'}
-                      className="inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-60 transition-colors"
+                      className="inline-flex items-center justify-center gap-2 px-5 min-h-[44px] rounded-xl bg-brand text-white text-sm font-semibold hover:opacity-90 disabled:opacity-60 transition-colors"
                     >
                       {cardFlow === 'saving' && <Loader2 className="w-4 h-4 animate-spin" />}
                       Save card
@@ -409,7 +409,7 @@ export default function HiringBillingPage() {
         {/* Spend history */}
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-6 pt-6 pb-4">
-            <Receipt className="w-4 h-4 text-purple-600" />
+            <Receipt className="w-4 h-4 text-brand" />
             <h2 className="text-base font-semibold text-gray-900">Spend history</h2>
           </div>
           {data && data.recentLedger.length > 0 ? (

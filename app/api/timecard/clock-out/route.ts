@@ -17,6 +17,7 @@ import {
   ALLOWED_RADIUS_CLOCKOUT_METERS,
   ShopOverride,
 } from '@/lib/geolocation';
+import { estimateDrive } from '@/lib/drive-time';
 
 export async function POST(request: NextRequest) {
   try {
@@ -376,8 +377,37 @@ export async function POST(request: NextRequest) {
     if (needsClockOutReview && auth.tenantId) {
       Promise.resolve((async () => {
         const who = profileForName?.full_name || auth.userEmail || 'An employee';
+
+        // Real drive-time from the shop (Google Routes; falls back to a road
+        // estimate). Computed HERE in the background so the worker's clock-out
+        // response is never delayed, then stored on the timecard so review
+        // screens read it for free.
+        let driveLabel = '';
+        if (
+          clockedOutOutsideRadius &&
+          hasLocation &&
+          shopOverride?.latitude != null &&
+          shopOverride?.longitude != null
+        ) {
+          try {
+            const drive = await estimateDrive(latitude, longitude, shopOverride.latitude, shopOverride.longitude);
+            driveLabel = ` (${drive.source === 'google' ? '' : '~'}${drive.minutes} min drive away)`;
+            await supabaseAdmin
+              .from('timecards')
+              .update({
+                clock_out_drive_minutes: drive.minutes,
+                clock_out_drive_miles: drive.miles,
+                clock_out_drive_source: drive.source,
+              })
+              .eq('id', updatedTimecard.id)
+              .eq('tenant_id', auth.tenantId);
+          } catch {
+            // fail-soft: review flow proceeds without a drive figure
+          }
+        }
+
         const reason = clockedOutOutsideRadius
-          ? `clocked out ${locationCheck.distanceFormatted} from ${shopName} — outside the allowed radius`
+          ? `clocked out ${locationCheck.distanceFormatted} from ${shopName}${driveLabel} — outside the allowed radius`
           : 'submitted a remote clock-out (photo)';
 
         // Auto-create a correction request ONLY for the out-of-radius case
@@ -405,7 +435,7 @@ export async function POST(request: NextRequest) {
                 timecard_id: updatedTimecard.id,
                 requested_by: auth.userId,
                 requested_clock_out: now.toISOString(),
-                reason: `Auto-flagged: clocked out ${locationCheck.distanceFormatted} from ${shopName} (outside radius)`,
+                reason: `Auto-flagged: clocked out ${locationCheck.distanceFormatted} from ${shopName}${driveLabel} (outside radius)`,
                 status: 'pending',
                 metadata: { source: 'auto_out_of_radius' },
               })

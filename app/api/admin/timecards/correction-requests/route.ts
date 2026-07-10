@@ -76,6 +76,8 @@ export async function GET(request: NextRequest) {
           clock_out_latitude,
           clock_out_longitude,
           clock_out_outside_radius,
+          clock_out_drive_minutes,
+          clock_out_drive_source,
           remote_photo_url
         ),
         profiles!requested_by (
@@ -111,9 +113,15 @@ export async function GET(request: NextRequest) {
       if (shopLat != null && shopLon != null && coLat != null && coLon != null) {
         clockOutDistanceMeters = calculateDistance(coLat, coLon, shopLat, shopLon);
         clockOutDistanceFormatted = formatDistanceUS(clockOutDistanceMeters);
-        // Rough drive-time estimate (free, no Routes API) so the office sees how
-        // far the clock-out was in TIME, not just distance.
-        clockOutDriveFormatted = formatDriveTimeUS(clockOutDistanceMeters);
+        // Prefer the REAL drive time stored at clock-out (Google Routes,
+        // lib/drive-time.ts); '~' marks the road-estimate fallback. Old rows
+        // without a stored value fall back to the free straight-line estimate.
+        const storedMin = tc?.clock_out_drive_minutes != null ? Number(tc.clock_out_drive_minutes) : null;
+        if (storedMin != null && Number.isFinite(storedMin)) {
+          clockOutDriveFormatted = `${tc?.clock_out_drive_source === 'google' ? '' : '~'}${Math.round(storedMin)} min`;
+        } else {
+          clockOutDriveFormatted = formatDriveTimeUS(clockOutDistanceMeters);
+        }
       }
 
       return {

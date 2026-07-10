@@ -46,6 +46,8 @@ interface PublicJob {
   language?: string;
   slug?: string;
   company_name?: string | null;
+  brand_color?: string | null;
+  logo_url?: string | null;
   tenant_name?: string | null;
   company_logo_url?: string | null;
 }
@@ -204,6 +206,10 @@ export default function ApplyPage() {
   const L: Dict = job?.language === 'es' ? (STRINGS.es as unknown as Dict) : STRINGS.en;
 
   const companyName: string | null = job?.company_name || job?.tenant_name || null;
+  // White-label: the apply page carries the POSTING company's brand color
+  // (tenant_branding / tenants.primary_color via the public API). Falls back
+  // to the Opifex violet when a tenant has no color set.
+  const accent = job?.brand_color || '#7C3AED';
 
   const visibleScreeners = useMemo(
     () =>
@@ -409,17 +415,17 @@ export default function ApplyPage() {
   const stepNumber = step === 0 ? 1 : step === 1 ? 2 : totalSteps;
 
   const inputClass = (hasError: boolean) =>
-    `w-full rounded-xl border px-4 py-3 text-base text-slate-900 placeholder-slate-400 bg-white outline-none transition focus:ring-2 focus:ring-violet-500 focus:border-violet-500 ${
+    `w-full rounded-xl border px-4 py-3 text-base text-slate-900 placeholder-slate-400 bg-white outline-none transition focus:ring-2 focus:ring-[var(--apply-accent)] focus:border-[var(--apply-accent)] ${
       hasError ? 'border-rose-400' : 'border-slate-300'
     }`;
 
   return (
-    <main className="min-h-screen bg-slate-50">
+    <main className="min-h-screen bg-slate-50" style={{ ['--apply-accent' as string]: accent }}>
       <div ref={topRef} className="mx-auto w-full max-w-lg px-4 py-6 sm:py-10">
         {/* ── Job header ── */}
         <header className="rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6">
           {companyName && (
-            <p className="text-sm font-medium text-violet-700">{companyName}</p>
+            <p className="text-sm font-medium" style={{ color: accent }}>{companyName}</p>
           )}
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-slate-900">{job.title}</h1>
           <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-slate-600">
@@ -456,7 +462,7 @@ export default function ApplyPage() {
 
           {job.description && (
             <details className="mt-4 group">
-              <summary className="cursor-pointer select-none text-sm font-medium text-violet-700">
+              <summary className="cursor-pointer select-none text-sm font-medium" style={{ color: accent }}>
                 {L.aboutRole}
               </summary>
               <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">
@@ -485,7 +491,7 @@ export default function ApplyPage() {
             {Array.from({ length: totalSteps }).map((_, i) => (
               <span
                 key={i}
-                className={`h-1.5 w-6 rounded-full ${i < stepNumber ? 'bg-violet-600' : 'bg-slate-200'}`}
+                className={`h-1.5 w-6 rounded-full ${i < stepNumber ? 'bg-[var(--apply-accent)]' : 'bg-slate-200'}`}
               />
             ))}
           </div>
@@ -573,12 +579,12 @@ export default function ApplyPage() {
                             }}
                             className={`flex w-full min-h-[52px] items-center justify-between rounded-xl border px-4 py-3 text-left text-base transition ${
                               selected
-                                ? 'border-violet-600 bg-violet-50 text-violet-900 ring-1 ring-violet-600'
+                                ? 'border-[var(--apply-accent)] bg-[color-mix(in_srgb,var(--apply-accent)_8%,white)] text-slate-900 ring-1 ring-[var(--apply-accent)]'
                                 : 'border-slate-300 bg-white text-slate-800 active:bg-slate-50'
                             }`}
                           >
                             <span>{opt}</span>
-                            {selected && <Check className="h-5 w-5 shrink-0 text-violet-600" aria-hidden />}
+                            {selected && <Check className="h-5 w-5 shrink-0 text-[var(--apply-accent)]" aria-hidden />}
                           </button>
                         );
                       })}
@@ -667,7 +673,7 @@ export default function ApplyPage() {
               <button
                 type="button"
                 onClick={goNext}
-                className="flex-1 min-h-[48px] rounded-xl bg-violet-600 px-4 text-base font-semibold text-white transition active:bg-violet-700"
+                className="flex-1 min-h-[48px] rounded-xl bg-[var(--apply-accent)] px-4 text-base font-semibold text-white transition active:brightness-90"
               >
                 {L.next}
               </button>
@@ -676,7 +682,7 @@ export default function ApplyPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="flex-1 inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-violet-600 px-4 text-base font-semibold text-white transition active:bg-violet-700 disabled:opacity-60"
+                className="flex-1 inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-[var(--apply-accent)] px-4 text-base font-semibold text-white transition active:brightness-90 disabled:opacity-60"
               >
                 {submitting && <Loader2 className="h-5 w-5 animate-spin" aria-hidden />}
                 {submitting ? L.submitting : L.submit}

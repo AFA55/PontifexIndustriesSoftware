@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Bell, X, AlertCircle, CheckCircle, Clock, MessageSquare, Send, ChevronRight, BellOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
@@ -30,7 +31,42 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  // The panel renders through a PORTAL with fixed positioning, anchored to the
+  // bell's rect. Reason: this bell lives inside sticky headers (z-30); pages
+  // like the schedule board stack a SECOND sticky z-30 toolbar later in the
+  // DOM, which paints OVER anything inside the first header no matter how high
+  // the dropdown's own z-index is (stacking contexts don't cross). A body-level
+  // portal escapes the header's stacking context entirely.
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const router = useRouter();
+
+  const toggleOpen = () => {
+    setOpen((v) => {
+      if (!v) {
+        const rect = dropdownRef.current?.getBoundingClientRect();
+        if (rect) setAnchor({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
+      }
+      return !v;
+    });
+  };
+
+  // Keep the panel pinned to the bell across resizes; close on scroll (the
+  // anchor would drift — closing matches native dropdown behavior).
+  useEffect(() => {
+    if (!open) return;
+    const reposition = () => {
+      const rect = dropdownRef.current?.getBoundingClientRect();
+      if (rect) setAnchor({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
+    };
+    const onScroll = () => setOpen(false);
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [open]);
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -59,12 +95,14 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
   useEffect(() => { fetchNotifications(); }, [fetchNotifications]);
   useVisiblePoll(fetchNotifications, { intervalMs: 120_000 });
 
-  // Close dropdown on outside click
+  // Close dropdown on outside click (the panel is portaled, so check both the
+  // bell wrapper AND the panel itself).
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const t = e.target as Node;
+      if (dropdownRef.current?.contains(t)) return;
+      if (panelRef.current?.contains(t)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
@@ -157,7 +195,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={toggleOpen}
         className={`relative p-2.5 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-all duration-200 ${
           unreadCount > 0
             ? 'bg-brand/10 text-brand hover:bg-brand/20 dark:bg-white/20 dark:text-white dark:hover:bg-white/30'
@@ -172,8 +210,12 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
         )}
       </button>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-2 w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-white/10 shadow-2xl z-50 overflow-hidden">
+      {open && anchor && typeof document !== 'undefined' && createPortal(
+        <div
+          ref={panelRef}
+          style={{ position: 'fixed', top: anchor.top, right: anchor.right }}
+          className="w-80 sm:w-96 bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-white/10 shadow-2xl z-[90] overflow-hidden"
+        >
           {/* Header */}
           <div className="px-4 py-3 border-b border-gray-100 dark:border-white/10 flex items-center justify-between bg-gray-50 dark:bg-slate-800/50">
             <h3 className="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
@@ -263,7 +305,8 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
               </button>
             </div>
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
