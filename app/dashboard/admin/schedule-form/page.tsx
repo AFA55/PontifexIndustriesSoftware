@@ -820,6 +820,12 @@ export default function ScheduleFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [createdJobNumber, setCreatedJobNumber] = useState('');
+  // Optional contract-for-signature on submit (founder Jul 11): off by default —
+  // many jobs already have a signed contract or don't need one.
+  const [sendContractOpt, setSendContractOpt] = useState(false);
+  const [contractEmail, setContractEmail] = useState('');
+  const [contractAmount, setContractAmount] = useState('');
+  const [contractResult, setContractResult] = useState<string | null>(null);
   const [error, setError] = useState('');
 
   // ── Edit-existing-job mode ────────────────────────────────────
@@ -1871,6 +1877,46 @@ export default function ScheduleFormPage() {
       }
 
       setCreatedJobNumber(result.data.job_number);
+
+      // Optional: create + email the contract, linked to the new job. A
+      // contract failure NEVER un-creates the job — it surfaces on the
+      // success screen with a pointer to the Contracts page.
+      if (sendContractOpt) {
+        const email = contractEmail.trim().toLowerCase();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          setContractResult('Contract NOT sent — the email address was invalid. Send it from the Contracts page.');
+        } else {
+          try {
+            const scopeText = [result.data.description, result.data.scope_of_work]
+              .filter(Boolean).join('\n\n') || `${result.data.job_type ?? ''} at ${result.data.address ?? result.data.location ?? ''}`.trim();
+            const createRes = await fetch('/api/admin/contracts', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${sessionData.session.access_token}` },
+              body: JSON.stringify({
+                title: `${form.contractor_name.trim()} — ${result.data.job_number}`,
+                customerName: form.contractor_name.trim(),
+                customerEmail: email,
+                workDescription: scopeText,
+                amount: contractAmount || form.estimated_cost || null,
+                jobId: result.data.id,
+              }),
+            });
+            const created = await createRes.json();
+            if (!createRes.ok) throw new Error(created?.error || 'create failed');
+            const sendRes = await fetch(`/api/admin/contracts/${created.data.contract.id}/send`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${sessionData.session.access_token}` },
+            });
+            if (!sendRes.ok) throw new Error((await sendRes.json())?.error || 'send failed');
+            setContractResult(`Contract emailed to ${email} for signature.`);
+          } catch (contractErr: any) {
+            setContractResult(`Contract could not be sent (${contractErr?.message ?? 'error'}) — the job is fine; send it from the Contracts page.`);
+          }
+        }
+      } else {
+        setContractResult(null);
+      }
+
       setSubmitted(true);
 
       // Clean up draft on successful submit
@@ -1984,9 +2030,15 @@ export default function ScheduleFormPage() {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Job Created!</h2>
           <p className="text-sm text-slate-500 dark:text-white/40 mb-1">Job Number</p>
           <p className="text-xl font-bold text-blue-600 dark:text-blue-400 mb-1">{createdJobNumber}</p>
-          <p className="text-sm text-slate-500 dark:text-white/40 mb-8">
+          <p className="text-sm text-slate-500 dark:text-white/40 mb-4">
             Customer: <span className="font-semibold text-slate-700 dark:text-white/80">{form.contractor_name}</span>
           </p>
+          {contractResult && (
+            <p className={`text-xs font-medium rounded-xl px-4 py-3 mb-6 ${contractResult.startsWith('Contract emailed') ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' : 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300'}`}>
+              {contractResult}
+            </p>
+          )}
+          {!contractResult && <div className="mb-4" />}
           <div className="flex gap-3">
             <Link
               href="/dashboard/admin/schedule-board"
@@ -1995,7 +2047,7 @@ export default function ScheduleFormPage() {
               View Schedule Board
             </Link>
             <button
-              onClick={() => { setForm({ ...initialFormData }); setSubmitted(false); setCurrentStep(1); }}
+              onClick={() => { setForm({ ...initialFormData }); setSubmitted(false); setCurrentStep(1); setSendContractOpt(false); setContractEmail(''); setContractAmount(''); setContractResult(null); }}
               className="flex-1 px-5 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-white/80 rounded-xl text-sm font-semibold transition-all"
             >
               Create Another
@@ -4561,6 +4613,62 @@ export default function ScheduleFormPage() {
                 />
               </div>
             </div>
+
+            {/* ── Contract for e-signature (OPTIONAL — founder Jul 11: skip when
+                one was already sent or none is needed) ─────────────────────── */}
+            {!isEditMode && (
+              <div className="bg-white dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10 p-5">
+                <label className="flex items-center justify-between gap-3 cursor-pointer">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-white/10 flex items-center justify-center flex-shrink-0">
+                      <FileText size={18} className="text-brand" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-slate-800 dark:text-white">Send contract for e-signature</p>
+                      <p className="text-xs text-slate-500 dark:text-white/40">
+                        Optional — skip if a contract was already signed or isn&apos;t needed
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSendContractOpt(v => !v)}
+                    aria-label="Toggle contract sending"
+                    className={`relative w-11 h-6 rounded-full transition-colors flex-shrink-0 ${sendContractOpt ? 'bg-brand' : 'bg-slate-300 dark:bg-white/20'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${sendContractOpt ? 'translate-x-5' : ''}`} />
+                  </button>
+                </label>
+                {sendContractOpt && (
+                  <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="sm:col-span-2">
+                      <label className="block text-sm font-medium text-slate-700 dark:text-white/60 mb-1">Customer email *</label>
+                      <input
+                        type="email"
+                        value={contractEmail}
+                        onChange={e => setContractEmail(e.target.value)}
+                        placeholder="who signs the contract"
+                        className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 dark:text-white/60 mb-1">Contract amount ($)</label>
+                      <input
+                        type="number" step="0.01" min="0"
+                        value={contractAmount}
+                        onChange={e => setContractAmount(e.target.value)}
+                        placeholder={form.estimated_cost || 'optional'}
+                        className="w-full px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand focus:border-transparent text-sm text-slate-900 dark:text-white"
+                      />
+                    </div>
+                    <p className="sm:col-span-2 text-xs text-slate-400 dark:text-white/35">
+                      The contract is created from this job&apos;s scope and emailed the moment the job is submitted.
+                      The signed PDF saves automatically — track it on the Contracts page.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         );
 
