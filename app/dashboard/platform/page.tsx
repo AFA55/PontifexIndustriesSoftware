@@ -8,7 +8,7 @@ import {
   Building2, Plus, ChevronRight, Users as UsersIcon, ToggleRight,
   RefreshCw, ShieldCheck, Globe, Activity, AlertTriangle, Bug,
   CheckCircle2, ArrowRight, ServerCog, MessageSquareWarning, Inbox,
-  HeartPulse, Info, OctagonAlert, ShieldAlert, Megaphone,
+  HeartPulse, Info, OctagonAlert, ShieldAlert, Megaphone, CircuitBoard,
 } from 'lucide-react';
 import {
   type Tenant, getHeaders, statusColors, planIcons,
@@ -348,6 +348,12 @@ export default function PlatformHubPage() {
             <Building2 className="w-4 h-4" /> Client Companies
           </h2>
           <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
+            <Link
+              href="/dashboard/platform/usage"
+              className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"
+            >
+              <CircuitBoard className="w-3.5 h-3.5" /> AI & Usage
+            </Link>
             <Link
               href="/dashboard/platform/security"
               className="text-xs font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors flex items-center gap-1"

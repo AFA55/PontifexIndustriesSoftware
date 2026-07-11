@@ -390,7 +390,7 @@ export async function POST(request: NextRequest) {
           shopOverride?.longitude != null
         ) {
           try {
-            const drive = await estimateDrive(latitude, longitude, shopOverride.latitude, shopOverride.longitude);
+            const drive = await estimateDrive(latitude, longitude, shopOverride.latitude, shopOverride.longitude, { tenantId: auth.tenantId, userId: auth.userId });
             driveLabel = ` (${drive.source === 'google' ? '' : '~'}${drive.minutes} min drive away)`;
             await supabaseAdmin
               .from('timecards')

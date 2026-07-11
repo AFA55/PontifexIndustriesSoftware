@@ -49,11 +49,14 @@ function fallbackEstimate(fromLat: number, fromLng: number, toLat: number, toLng
 }
 
 /** Drive time between two points. Never throws; always returns SOMETHING usable. */
+const ROUTES_COST_PER_CALL = 0.005; // Routes API Essentials ≈ $5/1000
+
 export async function estimateDrive(
   fromLat: number,
   fromLng: number,
   toLat: number,
-  toLng: number
+  toLng: number,
+  meta?: { tenantId?: string | null; userId?: string | null }
 ): Promise<DriveEstimate> {
   const key =
     process.env.GOOGLE_MAPS_SERVER_KEY ||
@@ -92,6 +95,23 @@ export async function estimateDrive(
     const meters = Number(route?.distanceMeters);
     if (!Number.isFinite(seconds) || !Number.isFinite(meters)) {
       return fallbackEstimate(fromLat, fromLng, toLat, toLng);
+    }
+    if (meta?.tenantId && meta?.userId) {
+      // Fire-and-forget usage meter for the Platform Hub cost dashboard.
+      import('@/lib/supabase-admin')
+        .then(({ supabaseAdmin }) =>
+          supabaseAdmin.from('ai_usage').insert({
+            tenant_id: meta.tenantId,
+            user_id: meta.userId,
+            model: 'google/routes-api',
+            input_tokens: 0,
+            output_tokens: 0,
+            cached_tokens: 0,
+            cost_usd: ROUTES_COST_PER_CALL,
+          })
+        )
+        .then(() => {})
+        .catch(() => {});
     }
     return {
       minutes: Math.max(1, Math.round(seconds / 60)),

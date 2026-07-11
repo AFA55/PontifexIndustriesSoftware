@@ -16,6 +16,10 @@ export const maxDuration = 30;
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
+import { supabaseAdmin } from '@/lib/supabase-admin';
+
+// ElevenLabs Creator plan ≈ $22 / 200k chars (turbo 0.5 credits/char).
+const TTS_COST_PER_CHAR = 0.00011;
 
 // "Adam" — a clear, deep stock voice; good Jarvis-adjacent default.
 const DEFAULT_VOICE_ID = 'pNInz6obpgDQGcFmaJgB';
@@ -70,6 +74,20 @@ export async function POST(request: NextRequest) {
       console.error('[tts] ElevenLabs error', res.status, detail.slice(0, 200));
       return NextResponse.json({ error: 'Voice generation failed' }, { status: 502 });
     }
+
+    // Usage meter (fire-and-forget) — feeds the Platform Hub AI & Usage
+    // dashboard; chars ride in output_tokens (one meter table for all AI ops).
+    Promise.resolve(
+      supabaseAdmin.from('ai_usage').insert({
+        tenant_id: auth.tenantId,
+        user_id: auth.userId,
+        model: 'elevenlabs/turbo-v2.5',
+        input_tokens: 0,
+        output_tokens: speakable.length,
+        cached_tokens: 0,
+        cost_usd: speakable.length * TTS_COST_PER_CHAR,
+      })
+    ).then(() => {}).catch(() => {});
 
     return new Response(res.body, {
       status: 200,
