@@ -113,6 +113,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     features: ['Auto-generate invoices', 'Track payments', 'PDF export', 'QuickBooks ready'],
   },
   {
+    key: 'contracts',
+    title: 'Contracts',
+    description: 'Send contracts & change orders for e-signature, signed PDFs saved automatically',
+    icon: '✍️',
+    href: '/dashboard/admin/contracts',
+    bgColor: 'from-slate-600 to-slate-800',
+    iconBg: 'bg-slate-600',
+    features: ['E-signature by email', 'Change orders', 'Signed PDF archive', 'Customer portal link'],
+  },
+  {
     key: 'customer_profiles',
     title: 'Customer Profiles',
     description: 'Manage customer contacts, job history, and billing info',
@@ -396,6 +406,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     site_visits: 'view',
     peer_ratings: 'full',
     hiring: 'full',
+    contracts: 'full',
   }),
   supervisor: preset({
     schedule_form: 'submit',
@@ -433,6 +444,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     schedule_board: 'view',
     customer_profiles: 'view',
     completed_jobs: 'view',
+    contracts: 'submit',
   }),
   inventory_manager: preset({
     schedule_board: 'view',
