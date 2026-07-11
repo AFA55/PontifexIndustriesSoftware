@@ -1,6 +1,30 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 4, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`bdd639db` — hiring module, publish-approval queue, billing crons, Opifex rename). CREDIT-SAVER MODE: build inline, no agent fan-outs; adversarial reviews only for money/auth code. Next build: Artifex Phase A (docs/plans/ARTIFEX_2ND_BRAIN_ROADMAP.md). Founder critical path: FB page + Meta business verification, Twilio resubmit, Stripe publishable key, Play listing submit.
+**Last updated:** Jul 11, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`571dea39`). CREDIT-SAVER MODE: build inline; adversarial reviews for money/auth code. **Roadmap: docs/plans/FINISH_LINE_PHASES.md** (keys → live-fire test → AI/usage cost dashboard → Stripe flat+usage → FB/IG/TikTok ads).
+
+> **🛎️ Jul 8–11 sprint (demo week, all pushed through `571dea39`):**
+> - **CONTRACTS + E-SIGNATURE (Jul 11, `571dea39`)**: contracts table + /dashboard/admin/contracts
+>   (create contract/change order → tenant-branded email → public /contract/[token] sign page,
+>   white-labeled per tenant → signed PDF to 'contracts' bucket → signed-copy email + customer
+>   portal magic link). Verified live E2E. Change orders link parent + pre-fill customer.
+> - **Artifex voice-first Command Center (`22c4915c`)**: orb = the interface (amplitude-reactive
+>   via WebAudio analyser), midnight-steel+crimson redesign, chat demoted to transcript panel,
+>   auto re-listen conversation mode, **create_job_ticket tool** (dispatcher flow, confirm-before-
+>   create, verified live). TTS = ElevenLabs behind /api/command-center/tts (503s until
+>   ELEVENLABS_API_KEY lands in Vercel).
+> - **Artifex tools (`a7d59ac8`)**: search_job_history (schedule history by person/customer/date),
+>   get_hours_summary (payroll-worksheet columns per pay period), TODAY'S DATE grounding fix.
+>   Patriot report formats decoded in docs/plans/PATRIOT_REPORTS_PLAN.md (attendance codes EA/UA/
+>   NCNS/... + payroll worksheet); attendance tracker + payroll worksheet page = next builds (P1).
+> - **GPS-stamped photos (`667ec6cc`+`21d4c05b`)**: BOTH ticket photo steps (work-performed +
+>   day-complete) force camera + require GPS; photo_locations table.
+> - **Fixes (`cf00e540`, `07ddf804`)**: NotificationBell portaled (was clipped under schedule-board
+>   toolbar), Opifex apply page white-labeled to posting tenant's color, real Google drive-time on
+>   geofence flags (lib/drive-time.ts, GOOGLE_MAPS_SERVER_KEY added Jul 11 ✅ — activates with the
+>   `571dea39` deploy), remote clock-in selfie lightbox, message_usage meter live
+>   (docs/plans/MESSAGING_BILLING_PLAN.md).
+> - **Founder still owed**: ELEVENLABS_API_KEY paste → voice on · live SMS test on (833) 695-4288 ·
+>   Meta business verification + FB page (ads Phase 4).
 
 > **🛎️ Jul 2–3 session (Sonnet 5) — HIRING MODULE PHASE 1 BUILT ("Pontifex Industries Job Board"):**
 > Founder-directed Hireline clone (his real recruiting tool, analyzed live in his account + FB Ads
