@@ -163,6 +163,9 @@ export default function TimecardCorrectionsPage() {
   const [remoteLoadError, setRemoteLoadError] = useState(false);
   const [remoteCount, setRemoteCount] = useState(0);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
+  // Full-size viewer for remote clock-in selfies (founder ask Jul 11: the
+  // thumbnail must be clickable so the office can actually SEE the person).
+  const [photoLightbox, setPhotoLightbox] = useState<{ url: string; label: string } | null>(null);
 
   // Per-request action state
   const [submittingId, setSubmittingId] = useState<string | null>(null);
@@ -599,11 +602,26 @@ export default function TimecardCorrectionsPage() {
                         "No photo" placeholder instead of a broken <img>. */}
                     <div className="mb-4">
                       {(entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) ? (
-                        <img
-                          src={(entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) as string}
-                          alt={`${entry.employee_name} clock-in selfie`}
-                          className="w-28 h-28 object-cover rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5"
-                        />
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPhotoLightbox({
+                              url: (entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) as string,
+                              label: `${entry.employee_name} — clock-in selfie`,
+                            })
+                          }
+                          className="group relative block rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          aria-label="View photo full size"
+                        >
+                          <img
+                            src={(entry.remote_photo_signed_url || entry.clock_out_photo_signed_url) as string}
+                            alt={`${entry.employee_name} clock-in selfie`}
+                            className="w-28 h-28 object-cover rounded-xl border border-gray-200 dark:border-white/10 bg-gray-100 dark:bg-white/5 transition-transform group-hover:scale-[1.03] cursor-zoom-in"
+                          />
+                          <span className="absolute bottom-1 right-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-semibold text-white opacity-0 transition-opacity group-hover:opacity-100">
+                            Tap to enlarge
+                          </span>
+                        </button>
                       ) : (
                         <div className="w-28 h-28 rounded-xl border border-dashed border-gray-200 dark:border-white/15 bg-gray-50 dark:bg-white/[0.03] flex flex-col items-center justify-center gap-1.5">
                           <Camera size={22} className="text-gray-300 dark:text-white/20" />
@@ -1086,6 +1104,35 @@ export default function TimecardCorrectionsPage() {
           >
             {toast.kind === 'ok' ? <CheckCircle size={16} /> : <AlertTriangle size={16} />}
             {toast.msg}
+          </div>
+        </div>
+      )}
+
+      {/* ── Photo lightbox (remote clock-in selfies) ─────────────── */}
+      {photoLightbox && (
+        <div
+          className="fixed inset-0 z-[95] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={photoLightbox.label}
+          onClick={() => setPhotoLightbox(null)}
+        >
+          <div className="relative max-h-full max-w-3xl" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={photoLightbox.url}
+              alt={photoLightbox.label}
+              className="max-h-[82vh] w-auto rounded-2xl object-contain shadow-2xl"
+            />
+            <p className="mt-2 text-center text-sm font-medium text-white/85">{photoLightbox.label}</p>
+            <button
+              type="button"
+              onClick={() => setPhotoLightbox(null)}
+              aria-label="Close photo"
+              className="absolute -top-3 -right-3 flex h-11 w-11 items-center justify-center rounded-full bg-white text-gray-700 shadow-lg hover:bg-gray-100"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
       )}
