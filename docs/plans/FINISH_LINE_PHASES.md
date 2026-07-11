@@ -52,6 +52,17 @@ The metering already exists: `ai_usage` (Artifex tokens+cost per tenant), `messa
       per job on Meta; managed-ads resellers keep 20–40%). Sets our default markup + minimums.
 - [ ] Funding model decision: tenant pre-funds ad wallet vs. we front + threshold-charge
       (hiring_billing already does threshold charging — likely winner).
+- [ ] **Smart budget allocator (founder spec, Jul 11)**: start every job's ad budget SPLIT
+      EQUALLY across FB/IG/TikTok → attribute leads per channel (hiring_candidates.source
+      already records this) → compute cost-per-candidate per channel → daily cron shifts
+      budget toward the best-returning channel (bounded steps ~20%/day, per-channel floor
+      so a channel can recover, log every reallocation for the owner to see). The channel
+      mix becomes a visible per-job report: spend, leads, cost/lead, current split.
+- [ ] Identity/asset setup (founder): Meta Business portfolio = "Pontifex Industries"
+      (matches legal entity for verification); the PAGE that publishes job ads = "Opifex"
+      (candidates see the job-board brand, not the vertical). TikTok: Business Center +
+      Ads Manager account at business.tiktok.com (same Pontifex email), payment method on
+      file; our Marketing-API app connects to it in the Phase 4 build.
 
 ## Standing guardrails
 One phase in flight at a time · full gate before any push · money/auth diffs get guardian
