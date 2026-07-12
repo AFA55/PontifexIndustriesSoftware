@@ -1,6 +1,25 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 12, 2026 (PM) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`6eeb7395`).
+**Last updated:** Jul 12, 2026 (evening) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`9109a606`, deploy READY).
+
+> **🛎️ Jul 12 evening batch (`9109a606` — ALL live):** AUTH GUARDS (founder: "no one should
+> automatically get into Pontifex"): tenant login pages no longer hijacked by a remembered
+> other-org session (tenant-match required for auto-resume); company-login shows explicit
+> "Continue to Pontifex Platform Hub" for owner/super_admin sessions instead of silent forward —
+> tenant staff keep silent remember-me. MULTI-DAY solid for 3-operator rollout tomorrow: week
+> view renders every spanned day ("Day N of M"), approval preserves duration, operator Artifex
+> span-aware (day-2 visibility), My Jobs "Multi-Day In Progress / Up next: Day N", crew-safe
+> total_days_worked (distinct dates, was 2× on crews — caught by a 60-day REAL-DB stress test,
+> all test rows deleted). EN-ROUTE SMS day-2+ confirmed already suppressed (in_route_at claim
+> never cleared by day reset — verified, no change needed). PLATFORM HUB: AI & Usage tile on the
+> cockpit ($1.04 Jul: AI $0.40/Voice $0.64), in-hub tenant Billing tab (plan/status/usage costs/
+> SMS margin, no more bounce to tenant surface), usage-card-on-file indicator reads
+> hiring_billing. STRIPE AUDIT: SetupIntent+Elements card flow verified correct + LIVE mode
+> (pk_live in bundle), webhook endpoint confirmed active in founder's Stripe dashboard
+> (/api/stripe/webhook), all unbilled balances $0 → founder adding real card via Job Board
+> Billing. Attendance: Artifex get_attendance_summary (codes + calendar's auto overlays,
+> live-verified vs timecards: Lucas 4/Zack 2/David 1). NEXT: founder card test + 3-operator
+> live-fire; then Opifex block + content strategy (both queued in BACKLOG P1).
 
 > **🛎️ Jul 12 PM batch 2 (`6eeb7395`, verified live pre-push):** Artifex CONVERSATIONAL persona
 > (coworker-on-the-phone, never numbered lists, batches up to 3 missing slots into ONE natural
