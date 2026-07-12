@@ -54,6 +54,9 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-get_revenue_snapshot': 'Pulling revenue numbers',
   'tool-search_job_history': 'Searching schedule history',
   'tool-get_hours_summary': 'Crunching hours',
+  'tool-get_attendance_summary': 'Pulling attendance',
+  'tool-update_ticket_draft': 'Drafting the ticket',
+  'tool-invite_team_member': 'Sending the invitation',
   'tool-create_job_ticket': 'Creating the job ticket',
   'tool-save_memory_note': 'Saving to memory',
   'tool-recall_memory_notes': 'Recalling memory',
@@ -125,6 +128,10 @@ export default function ArtifexChat({
   // reply finishes, re-open the mic automatically so the user talks through
   // multi-step flows (job-ticket creation) hands-free.
   const lastTurnWasVoiceRef = useRef(false);
+  // Canvas gate: only live turns drive the workspace panel. Without this,
+  // resuming a past conversation (setMessages seeding) replays its last tool
+  // call and pops a stale canvas the user never asked for.
+  const hasSentThisMountRef = useRef(false);
 
   const conversationIdRef = useRef<string | null>(activeConversationId ?? null);
   useEffect(() => {
@@ -154,6 +161,7 @@ export default function ArtifexChat({
     voice.startListening((transcript) => {
       if (busy || historyLoading) return;
       lastTurnWasVoiceRef.current = true;
+      hasSentThisMountRef.current = true;
       sendMessage({ text: transcript });
     });
   };
@@ -206,7 +214,7 @@ export default function ArtifexChat({
   // Live canvas feed: surface the LATEST tool call of the LAST assistant turn
   // (input streams in while Artifex fills the form; output stamps it done).
   useEffect(() => {
-    if (!onToolActivity) return;
+    if (!onToolActivity || !hasSentThisMountRef.current) return;
     const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
     if (!lastAssistant) return;
     const toolParts = (lastAssistant.parts as any[]).filter((pt) => isToolUIPart(pt));
@@ -260,6 +268,7 @@ export default function ArtifexChat({
     if (!text || busy || historyLoading) return;
     voice.unlockAudio(); // typing+send is a gesture too — arm audio for the reply
     lastTurnWasVoiceRef.current = false;
+    hasSentThisMountRef.current = true;
     sendMessage({ text });
     setInput('');
   };

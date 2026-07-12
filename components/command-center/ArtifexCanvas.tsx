@@ -17,6 +17,7 @@
  */
 import Link from 'next/link';
 import { CheckCircle2, ExternalLink, FileText, Loader2, Mail, Table2, X } from 'lucide-react';
+import { attendanceCodeColor } from '@/lib/attendance-codes';
 
 export interface CanvasActivity {
   toolType: string; // e.g. 'tool-create_job_ticket'
@@ -29,6 +30,7 @@ const PANEL_META: Record<string, { title: string; href: string; icon: any }> = {
   'tool-update_ticket_draft': { title: 'Job Ticket — Drafting', href: '/dashboard/admin/schedule-board', icon: FileText },
   'tool-create_job_ticket': { title: 'Job Ticket — Quick Add', href: '/dashboard/admin/schedule-board', icon: FileText },
   'tool-get_hours_summary': { title: 'Hours Report', href: '/dashboard/admin/timecards', icon: Table2 },
+  'tool-get_attendance_summary': { title: 'Attendance Report', href: '/dashboard/admin/time-off', icon: Table2 },
   'tool-search_job_history': { title: 'Schedule History', href: '/dashboard/admin/schedule-board', icon: Table2 },
   'tool-invite_team_member': { title: 'Team Invitation', href: '/dashboard/admin/team/invite', icon: Mail },
 };
@@ -118,6 +120,37 @@ export default function ArtifexCanvas({ activity, onClose }: { activity: CanvasA
               ))}
             </tbody>
           </table>
+        ) : activity.toolType === 'tool-get_attendance_summary' && Array.isArray(output?.employees) ? (
+          <div className="space-y-3">
+            {output.employees.map((e: any, i: number) => (
+              <div key={i} className="rounded-lg border border-slate-100 px-3 py-2 dark:border-white/5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-slate-800 dark:text-white/90">{e.name}</span>
+                  <span className="text-[10px] font-semibold uppercase text-slate-400">
+                    {Object.values(e.codeCounts ?? {}).reduce((a: number, b: any) => a + Number(b), 0) +
+                      Number(e.autoLateDays ?? 0) + Number(e.autoTimeOffDays ?? 0)} events
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {Object.entries(e.codeCounts ?? {}).map(([code, n]) => (
+                    <span key={code} className="rounded-full px-2 py-0.5 text-[10px] font-bold text-white" style={{ backgroundColor: attendanceCodeColor(code) }}>
+                      {code} × {String(n)}
+                    </span>
+                  ))}
+                  {e.autoLateDays > 0 && (
+                    <span className="rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-bold text-white">
+                      Late × {e.autoLateDays}
+                    </span>
+                  )}
+                  {e.autoTimeOffDays > 0 && (
+                    <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-bold text-white">
+                      Time off × {e.autoTimeOffDays}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : activity.toolType === 'tool-search_job_history' && Array.isArray(output?.jobs) ? (
           <ul className="space-y-2">
             {output.jobs.slice(0, 12).map((j: any, i: number) => (

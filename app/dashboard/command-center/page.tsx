@@ -322,10 +322,12 @@ export default function CommandCenterPage() {
               onSelectConversation={(id) => {
                 setActiveConversationId(id);
                 setChatInstanceKey((k) => k + 1);
+                setCanvas(null); // stale workspace belongs to the old conversation
               }}
               onNewConversation={() => {
                 setActiveConversationId(null);
                 setChatInstanceKey((k) => k + 1);
+                setCanvas(null);
               }}
               onConversationStarted={(id) => {
                 setActiveConversationId(id);

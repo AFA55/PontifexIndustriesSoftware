@@ -61,7 +61,8 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
     // Sales: operational reads + ticket creation. No payroll, revenue, or invites.
     salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'update_ticket_draft', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
     // Supervisors: operational reads + approvals visibility. No writes.
-    supervisor: ['get_clocked_in_status', 'get_todays_jobs', 'get_pending_approvals', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'save_memory_note', 'recall_memory_notes'],
+    // (get_attendance_summary matches the attendance_events RLS read grant.)
+    supervisor: ['get_clocked_in_status', 'get_todays_jobs', 'get_pending_approvals', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'get_attendance_summary', 'save_memory_note', 'recall_memory_notes'],
     // Shop + inventory: who/what is running today. No money, no writes.
     shop_manager: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'recall_memory_notes'],
     shop_help: ['get_clocked_in_status', 'get_todays_jobs', 'search_job_history', 'recall_memory_notes'],
@@ -406,6 +407,110 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
           .sort((a, b) => a.name.localeCompare(b.name));
 
         return { periodStart: startDate, periodEnd: endDate, count: employees.length, employees };
+      },
+    }),
+
+    get_attendance_summary: tool({
+      description:
+        "Attendance summary per employee over a date range — manually marked tracker codes (T=Tardy, EA/UA=excused/unexcused absence, NCNS=no call no show, V=Vacation, STO=scheduled time off, W=Weather, H=Holiday, etc.) PLUS auto-derived lates from clock-in records and approved time-off days (the same overlays the Attendance Calendar shows). Use for 'how many times was Devin tardy this year', 'who had unexcused absences last month', or 'show me attendance for June'.",
+      inputSchema: z.object({
+        startDate: z.string().describe('YYYY-MM-DD range start (inclusive)'),
+        endDate: z.string().describe('YYYY-MM-DD range end (inclusive)'),
+        personName: z.string().optional().describe('Optional: limit to employees whose name contains this'),
+      }),
+      execute: async ({ startDate, endDate, personName }) => {
+        // Read path matches the Attendance Calendar exactly (manual codes +
+        // the same auto overlays), so Artifex's numbers always agree with the
+        // grid the office is looking at: lates derive from timecards, time
+        // off from approved requests — a manual code on the same day wins.
+        const [eventsRes, cardsRes, timeOffRes] = await Promise.all([
+          supabaseAdmin
+            .from('attendance_events')
+            .select('user_id, date, code, note')
+            .eq('tenant_id', tenantId)
+            .gte('date', startDate)
+            .lte('date', endDate),
+          supabaseAdmin
+            .from('timecards')
+            .select('user_id, date, is_late, late_minutes')
+            .eq('tenant_id', tenantId)
+            .eq('is_late', true)
+            .gte('date', startDate)
+            .lte('date', endDate)
+            .limit(5000),
+          supabaseAdmin
+            .from('operator_time_off')
+            .select('operator_id, date, end_date, type')
+            .eq('tenant_id', tenantId)
+            .eq('status', 'approved')
+            .lte('date', endDate)
+            .gte('end_date', startDate),
+        ]);
+        if (eventsRes.error) throw new Error(`get_attendance_summary: ${eventsRes.error.message}`);
+
+        const events = eventsRes.data ?? [];
+        const lateCards = cardsRes.data ?? [];
+        const timeOff = timeOffRes.data ?? [];
+        const manualByUserDate = new Set(events.map((e: any) => `${e.user_id}|${e.date}`));
+
+        const allIds = [
+          ...events.map((e: any) => e.user_id),
+          ...lateCards.map((c: any) => c.user_id),
+          ...timeOff.map((t: any) => t.operator_id),
+        ];
+        if (allIds.length === 0) return { periodStart: startDate, periodEnd: endDate, count: 0, employees: [] };
+        const namesById = await lookupNames(tenantId, allIds);
+
+        const byUser = new Map<string, any>();
+        const bucket = (uid: string) => {
+          if (!byUser.has(uid)) {
+            byUser.set(uid, {
+              name: namesById.get(uid) ?? 'Unknown',
+              codeCounts: {} as Record<string, number>,
+              autoLateDays: 0,
+              autoLateMinutes: 0,
+              autoTimeOffDays: 0,
+              days: [] as any[],
+            });
+          }
+          return byUser.get(uid);
+        };
+        for (const e of events) {
+          const s = bucket(e.user_id);
+          s.codeCounts[e.code] = (s.codeCounts[e.code] ?? 0) + 1;
+          s.days.push({ date: e.date, code: e.code, ...(e.note ? { note: e.note } : {}) });
+        }
+        for (const c of lateCards) {
+          if (manualByUserDate.has(`${c.user_id}|${c.date}`)) continue; // manual code wins that day
+          const s = bucket(c.user_id);
+          s.autoLateDays += 1;
+          s.autoLateMinutes += Number(c.late_minutes ?? 0);
+        }
+        for (const t of timeOff) {
+          const from = new Date(`${t.date}T00:00:00`);
+          const to = new Date(`${t.end_date ?? t.date}T00:00:00`);
+          for (let d = new Date(from); d <= to; d.setDate(d.getDate() + 1)) {
+            const y = d.getFullYear(), mm = String(d.getMonth() + 1).padStart(2, '0'), dd = String(d.getDate()).padStart(2, '0');
+            const iso = `${y}-${mm}-${dd}`;
+            if (iso < startDate || iso > endDate) continue;
+            if (manualByUserDate.has(`${t.operator_id}|${iso}`)) continue;
+            bucket(t.operator_id).autoTimeOffDays += 1;
+          }
+        }
+
+        let employees = [...byUser.values()];
+        if (personName) {
+          const needle = personName.toLowerCase();
+          employees = employees.filter((s: any) => s.name.toLowerCase().includes(needle));
+        }
+        employees.sort((a, b) => a.name.localeCompare(b.name));
+        return {
+          periodStart: startDate,
+          periodEnd: endDate,
+          note: 'codeCounts = manually marked tracker codes; autoLateDays/autoTimeOffDays are derived from clock-ins and approved time off (same overlays the Attendance Calendar shows). For "how many times late/tardy", use T count + autoLateDays.',
+          count: employees.length,
+          employees,
+        };
       },
     }),
 
