@@ -1,6 +1,17 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 12, 2026 (PM) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`bf27177d`).
+**Last updated:** Jul 12, 2026 (PM) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`6eeb7395`).
+
+> **🛎️ Jul 12 PM batch 2 (`6eeb7395`, verified live pre-push):** Artifex CONVERSATIONAL persona
+> (coworker-on-the-phone, never numbered lists, batches up to 3 missing slots into ONE natural
+> question) + **update_ticket_draft live draft pad** — the "Job Ticket — Drafting" canvas slides
+> out and fills from the user's FIRST sentence (no-op tool, paints the form only; Done reserved
+> for real create) + **X button on the transcript panel header** closes the chat back to orb+mic
+> (founder: "a spot where I can x out of the chat"). Live test: "new ticket for ACME, wall sawing
+> at 500 Main St" → orb slid left, panel filled Customer/Job type (snapped Wall/Track Sawing)/
+> Address, reply asked start date + site contact in one sentence. KNOWN: lib/email(.links).test.ts
+> suites fail to RUN (jsdom TextEncoder missing — pre-existing env gap, 163/163 tests still pass);
+> spawn-task chip filed to polyfill.
 
 > **🛎️ Jul 12 marathon (voice day — ALL pushed through `bf27177d`):** Felix voice LIVE +
 > founder-confirmed audible (final fix: pure-WebAudio buffer playback — HTMLMediaElement play()
