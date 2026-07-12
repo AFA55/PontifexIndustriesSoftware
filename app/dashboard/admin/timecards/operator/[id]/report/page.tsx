@@ -25,6 +25,7 @@ interface MonthRow {
   month: number; daysWorked: number; totalHours: number; regularHours: number;
   overtimeHours: number; lateDays: number; lateMinutes: number; shopDays: number;
   subsistenceNights: number; timeOffDays: Record<string, number>;
+  attendanceCodes?: Record<string, number>;
 }
 interface ReportData {
   year: number;
@@ -85,6 +86,9 @@ export default function OperatorAnnualReportPage() {
 
   const allTimeOffTypes = data
     ? [...new Set(data.months.flatMap((m) => Object.keys(m.timeOffDays)))]
+    : [];
+  const allCodes = data
+    ? [...new Set(data.months.flatMap((m) => Object.keys(m.attendanceCodes ?? {})))]
     : [];
 
   return (
@@ -160,6 +164,9 @@ export default function OperatorAnnualReportPage() {
                   {allTimeOffTypes.map((t) => (
                     <th key={t} className="px-3 py-3 text-right">{TIME_OFF_LABELS[t] ?? t}</th>
                   ))}
+                  {allCodes.map((c) => (
+                    <th key={c} className="px-3 py-3 text-right">{c}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -176,6 +183,9 @@ export default function OperatorAnnualReportPage() {
                     {allTimeOffTypes.map((t) => (
                       <td key={t} className="px-3 py-2.5 text-right tabular-nums text-slate-500 dark:text-white/50">{m.timeOffDays[t] || '—'}</td>
                     ))}
+                    {allCodes.map((c) => (
+                      <td key={c} className="px-3 py-2.5 text-right tabular-nums text-slate-500 dark:text-white/50">{m.attendanceCodes?.[c] || '—'}</td>
+                    ))}
                   </tr>
                 ))}
                 <tr className="bg-slate-50 font-bold dark:bg-white/[0.04]">
@@ -189,6 +199,9 @@ export default function OperatorAnnualReportPage() {
                   <td className="px-3 py-3 text-right tabular-nums text-slate-700 dark:text-white/80">{data.totals.subsistenceNights}</td>
                   {allTimeOffTypes.map((t) => (
                     <td key={t} className="px-3 py-3 text-right tabular-nums text-slate-700 dark:text-white/80">{data.totals.timeOffDays[t] ?? 0}</td>
+                  ))}
+                  {allCodes.map((c) => (
+                    <td key={c} className="px-3 py-3 text-right tabular-nums text-slate-700 dark:text-white/80">{(data.totals as any).attendanceCodes?.[c] ?? 0}</td>
                   ))}
                 </tr>
               </tbody>

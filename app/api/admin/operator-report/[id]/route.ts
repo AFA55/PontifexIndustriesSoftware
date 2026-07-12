@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .maybeSingle();
   if (!person) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
 
-  const [cardsRes, timeOffRes, surveysRes] = await Promise.all([
+  const [cardsRes, timeOffRes, surveysRes, attendanceRes] = await Promise.all([
     supabaseAdmin
       .from('timecards')
       .select('date, net_hours, total_hours, regular_hours, overtime_hours, is_late, late_minutes, out_of_town, is_shop_hours')
@@ -57,6 +57,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .gte('submitted_at', `${year}-01-01T00:00:00Z`)
       .lt('submitted_at', `${year + 1}-01-01T00:00:00Z`)
       .order('submitted_at', { ascending: false }),
+    supabaseAdmin
+      .from('attendance_events')
+      .select('date, code')
+      .eq('tenant_id', auth.tenantId)
+      .eq('user_id', id)
+      .gte('date', start)
+      .lte('date', end),
   ]);
   if (cardsRes.error) return NextResponse.json({ error: cardsRes.error.message }, { status: 500 });
 
@@ -64,6 +71,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     daysWorked: 0, totalHours: 0, regularHours: 0, overtimeHours: 0,
     lateDays: 0, lateMinutes: 0, shopDays: 0, subsistenceNights: 0,
     timeOffDays: {} as Record<string, number>,
+    attendanceCodes: {} as Record<string, number>,
   });
   const months = Array.from({ length: 12 }, blankMonth);
 
@@ -80,6 +88,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (c.is_late) { b.lateDays += 1; b.lateMinutes += Number(c.late_minutes ?? 0); }
     if (c.is_shop_hours) b.shopDays += 1;
     if (c.out_of_town) b.subsistenceNights += 1;
+  }
+
+  // Manual attendance codes (EA/UA/NCNS/... — the paper tracker's judgment calls).
+  for (const a of attendanceRes.data ?? []) {
+    const m = Number(String(a.date).slice(5, 7)) - 1;
+    if (m < 0 || m > 11) continue;
+    const b = months[m];
+    b.attendanceCodes[a.code] = (b.attendanceCodes[a.code] ?? 0) + 1;
   }
 
   // Approved time off: expand each request across its days, bucketed by month.
@@ -106,6 +122,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     shopDays: b.shopDays,
     subsistenceNights: b.subsistenceNights,
     timeOffDays: b.timeOffDays,
+    attendanceCodes: b.attendanceCodes,
   }));
 
   const totals = monthsOut.reduce(
@@ -118,8 +135,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       lateMinutes: acc.lateMinutes + m.lateMinutes,
       subsistenceNights: acc.subsistenceNights + m.subsistenceNights,
       timeOffDays: Object.entries(m.timeOffDays).reduce((t, [k, v]) => ({ ...t, [k]: (t[k] ?? 0) + v }), acc.timeOffDays),
+      attendanceCodes: Object.entries(m.attendanceCodes).reduce((t, [k, v]) => ({ ...t, [k]: (t[k] ?? 0) + v }), acc.attendanceCodes),
     }),
-    { daysWorked: 0, totalHours: 0, regularHours: 0, overtimeHours: 0, lateDays: 0, lateMinutes: 0, subsistenceNights: 0, timeOffDays: {} as Record<string, number> }
+    { daysWorked: 0, totalHours: 0, regularHours: 0, overtimeHours: 0, lateDays: 0, lateMinutes: 0, subsistenceNights: 0, timeOffDays: {} as Record<string, number>, attendanceCodes: {} as Record<string, number> }
   );
 
   // Survey job numbers for context.

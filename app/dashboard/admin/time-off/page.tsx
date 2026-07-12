@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import AttendanceCalendar from '@/components/admin/AttendanceCalendar';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { MANAGEMENT_REQUESTER_ROLES } from '@/lib/time-off';
 import LogTimeOffModal from './_components/LogTimeOffModal';
@@ -740,15 +741,7 @@ function ScorecardsTab({ token }: { token: string }) {
 // ---------------------------------------------------------------------------
 
 function CalendarTab() {
-  return (
-    <div className="flex flex-col items-center justify-center py-32 text-gray-400">
-      <div className="w-16 h-16 rounded-2xl bg-gray-100 dark:bg-white/[0.05] flex items-center justify-center mb-4">
-        <Calendar className="w-8 h-8 opacity-40" />
-      </div>
-      <p className="text-lg font-semibold text-gray-600 dark:text-white/40 mb-1">Attendance Calendar</p>
-      <p className="text-sm text-gray-400 dark:text-white/25">Visual calendar view coming soon</p>
-    </div>
-  );
+  return <AttendanceCalendar />;
 }
 
 // ---------------------------------------------------------------------------
