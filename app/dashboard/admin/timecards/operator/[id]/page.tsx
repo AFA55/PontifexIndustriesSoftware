@@ -9,8 +9,7 @@ import {
   Briefcase, AlertTriangle, TrendingUp, Loader2, MapPin,
   ExternalLink, Users, Shield, MessageSquare, Send, Coffee,
   Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
-  RefreshCw, DollarSign, Zap, Timer, Camera, Plus, Minus
-} from 'lucide-react';
+  RefreshCw, DollarSign, Zap, Timer, Camera, Plus, Minus, FileBarChart } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
@@ -1229,6 +1228,14 @@ function OperatorTimecardDetailPageInner() {
               <FileText size={13} />
               <span className="hidden sm:inline">Export PDF</span>
             </button>
+            <Link
+              href={`/dashboard/admin/timecards/operator/${operatorId}/report`}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-brand text-white hover:opacity-90 rounded-lg transition-all text-xs font-bold"
+            >
+              <FileBarChart size={13} />
+              <span className="hidden sm:inline">Pull Report</span>
+              <span className="sm:hidden">Report</span>
+            </Link>
           </div>
         </div>
       </header>
