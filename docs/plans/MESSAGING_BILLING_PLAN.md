@@ -23,11 +23,13 @@ Add `tenantId` + `source` at: send-completion-sms, customer-survey, portal-links
 signature routes, sms-opt-in(-request), send-reminder email paths, `lib/email.ts` sendEmail
 (email metering mirror of meterSms).
 
-## Phase 3 — the billing pipeline (reuse hiring machinery)
-1. Monthly cron (`/api/cron/messaging-billing`, 1st of month): per tenant, sum uninvoiced
-   `billed_amount` from message_usage → if ≥ $1: create a Stripe **invoice item** on the
-   tenant's existing Stripe customer (subscription tenants get it on their next invoice;
-   card-on-file tenants get an off-session charge via the settle pattern) → mark rows invoiced.
+## Phase 3 — the billing pipeline (reuse hiring machinery) — cron SHIPPED Jul 11
+1. ✅ Monthly cron (`/api/cron/messaging-billing`, 1st @ 12:00 UTC, vercel.json): per tenant,
+   sums uninvoiced pre-month `billed_amount` → ≥$1 → off-session PaymentIntent on the
+   hiring_billing card-on-file, settle-pattern invariants (snapshot → CAS-claim → audit-before-
+   charge → per-attempt idempotency → decline releases rows / unknown keeps claim for manual
+   reconcile). No card → skipped + audited, usage carries forward. SAFE ROLLOUT: no-ops until
+   a tenant has a card on file.
 2. Tenant-facing: "Messaging usage" card in Settings→Billing (counts + billed total, NEVER raw
    cost — same margin-privacy rule as hiring, enforced by service-role-only reads on the table).
 3. Guardrails: monthly per-tenant cap alert (e.g. >$200 → platform alert, not silent charge);

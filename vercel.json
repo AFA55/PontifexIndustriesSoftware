@@ -4,30 +4,70 @@
   "outputDirectory": ".next",
   "installCommand": "npm install --legacy-peer-deps",
   "ignoreCommand": "[ \"$VERCEL_GIT_COMMIT_REF\" != \"main\" ]",
-  "regions": ["iad1"],
+  "regions": [
+    "iad1"
+  ],
   "functions": {
     "app/api/**/*.ts": {
       "maxDuration": 25
     },
-    "app/api/public/tenant-by-code/route.ts": { "maxDuration": 30 },
-    "app/api/auth/lookup-company/route.ts": { "maxDuration": 30 },
-    "app/api/admin/branding/route.ts": { "maxDuration": 30 },
-    "app/api/auth/login/route.ts": { "maxDuration": 30 },
-    "app/api/liability-release/pdf/route.ts": { "maxDuration": 60 },
-    "app/api/work-order-agreement/pdf/route.ts": { "maxDuration": 60 },
-    "app/api/timecard/pdf/route.ts": { "maxDuration": 60 },
-    "app/api/job-orders/[id]/generate-completion-pdf/route.ts": { "maxDuration": 60 },
-    "app/api/admin/invoices/[id]/pdf/route.ts": { "maxDuration": 60 },
-    "app/api/admin/timecards/[id]/pdf/route.ts": { "maxDuration": 60 },
-    "app/api/admin/timecards/export/route.ts": { "maxDuration": 60 },
-    "app/api/admin/dashboard-summary/route.ts": { "maxDuration": 30 },
-    "app/api/cron/health-check/route.ts": { "maxDuration": 60 },
-    "app/api/cron/data-health-checks/route.ts": { "maxDuration": 60 },
-    "app/api/cron/invoice-30d-reminders/route.ts": { "maxDuration": 60 },
-    "app/api/cron/auto-clockout/route.ts": { "maxDuration": 60 },
-    "app/api/cron/clock-in-reminders/route.ts": { "maxDuration": 60 },
-    "app/api/cron/work-performed-reminders/route.ts": { "maxDuration": 60 },
-    "app/api/cron/clock-out-reminders/route.ts": { "maxDuration": 60 }
+    "app/api/public/tenant-by-code/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/auth/lookup-company/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/admin/branding/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/auth/login/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/liability-release/pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/work-order-agreement/pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/timecard/pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/job-orders/[id]/generate-completion-pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/admin/invoices/[id]/pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/admin/timecards/[id]/pdf/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/admin/timecards/export/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/admin/dashboard-summary/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/cron/health-check/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/data-health-checks/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/invoice-30d-reminders/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/auto-clockout/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/clock-in-reminders/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/work-performed-reminders/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/cron/clock-out-reminders/route.ts": {
+      "maxDuration": 60
+    }
   },
   "crons": [
     {
@@ -65,6 +105,10 @@
     {
       "path": "/api/cron/hiring-billing",
       "schedule": "0 12 * * *"
+    },
+    {
+      "path": "/api/cron/messaging-billing",
+      "schedule": "0 12 1 * *"
     }
   ],
   "git": {
