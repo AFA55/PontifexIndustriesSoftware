@@ -117,6 +117,16 @@
 
 ## 🟠 P1 — This week
 
+### Jul 12 — founder-queued next blocks
+- [ ] **Opifex build-out** (founder Jul 12: "now we can work on Opifex") — scope TBD with founder;
+      existing Opifex tenant = hiring/job-board front door.
+- [ ] **Content strategy — deliver & showcase the software** (founder Jul 12: AFTER the finish-line
+      phases). Positioning constraint is NON-NEGOTIABLE: never market as "concrete cutting
+      software" (non-compete) — position as the bridge for companies to build custom digital
+      infrastructure, industry-agnostic. Deliverables when picked up: channel plan (TikTok/FB/IG/
+      LinkedIn), demo-video scripts (Artifex voice ticket = the hero moment), landing-page
+      showcase sections, case-study format for tenant #1 (anonymized/white-labeled).
+
 ### Jul 8 — Patriot owner/admin report requests (source photos analyzed → `docs/plans/PATRIOT_REPORTS_PLAN.md`)
 - [x] ~~**Artifex schedule history + quick job search**~~ — ✅ SHIPPED Jul 8: `search_job_history`
       tool (person/customer/date-range/status over schedule_board_view — "what jobs has X done"
