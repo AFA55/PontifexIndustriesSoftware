@@ -72,6 +72,23 @@ export function useArtifexVoice() {
     };
   }, []);
 
+  // Chrome's autoplay policy can leave the AudioContext 'suspended' until a
+  // user gesture. CRITICAL: audio routed through a suspended context plays
+  // into a dead end — the orb animates but NO SOUND comes out (founder bug
+  // Jul 12: "I didn't hear him"). Call this from gesture handlers (mic tap,
+  // voice toggle, send) so the context is running before playback.
+  const unlockAudio = useCallback(() => {
+    try {
+      if (!audioCtxRef.current) {
+        const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+        if (Ctx) audioCtxRef.current = new Ctx();
+      }
+      if (audioCtxRef.current?.state === 'suspended') {
+        audioCtxRef.current.resume().catch(() => {});
+      }
+    } catch { /* WebAudio unavailable — speak() plays directly */ }
+  }, []);
+
   const stopAmplitudeLoop = useCallback(() => {
     if (ampRafRef.current) cancelAnimationFrame(ampRafRef.current);
     ampRafRef.current = 0;
@@ -139,7 +156,11 @@ export function useArtifexVoice() {
         const audio = new Audio(url);
         audioRef.current = audio;
 
-        // Route through an analyser so the orb can breathe with the words.
+        // Route through an analyser so the orb can breathe with the words —
+        // but ONLY when the context is actually RUNNING. Routing through a
+        // suspended context silences playback entirely (the Jul 12 bug), so
+        // sound always wins over the visual: not running -> play directly.
+        analyserRef.current = null;
         try {
           if (!audioCtxRef.current) {
             const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
@@ -147,12 +168,14 @@ export function useArtifexVoice() {
           }
           const ctx = audioCtxRef.current!;
           if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
-          const source = ctx.createMediaElementSource(audio);
-          const analyser = ctx.createAnalyser();
-          analyser.fftSize = 512;
-          source.connect(analyser);
-          analyser.connect(ctx.destination);
-          analyserRef.current = analyser;
+          if (ctx.state === 'running') {
+            const source = ctx.createMediaElementSource(audio);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 512;
+            source.connect(analyser);
+            analyser.connect(ctx.destination);
+            analyserRef.current = analyser;
+          }
         } catch {
           analyserRef.current = null; // fallback: orb uses its internal sine
         }
@@ -216,6 +239,7 @@ export function useArtifexVoice() {
     stopSpeaking,
     startListening,
     stopListening,
+    unlockAudio,
   };
 }
 

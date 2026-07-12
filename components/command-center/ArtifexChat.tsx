@@ -102,6 +102,7 @@ export default function ArtifexChat({
     try { return localStorage.getItem('artifex.voice') !== 'off'; } catch { return true; }
   });
   const toggleVoice = () => {
+    voice.unlockAudio(); // gesture moment — arm the audio pipeline
     setVoiceOn((v) => {
       const next = !v;
       try { localStorage.setItem('artifex.voice', next ? 'on' : 'off'); } catch { /* ignore */ }
@@ -139,6 +140,7 @@ export default function ArtifexChat({
   const hasHistory = Array.isArray(conversations);
 
   const startMic = () => {
+    voice.unlockAudio(); // gesture moment — arm the audio pipeline
     if (voice.listening) { voice.stopListening(); return; }
     voice.stopSpeaking();
     voice.startListening((transcript) => {
@@ -230,6 +232,7 @@ export default function ArtifexChat({
     e.preventDefault();
     const text = input.trim();
     if (!text || busy || historyLoading) return;
+    voice.unlockAudio(); // typing+send is a gesture too — arm audio for the reply
     lastTurnWasVoiceRef.current = false;
     sendMessage({ text });
     setInput('');
