@@ -125,7 +125,9 @@ export default function CommandCenterPage() {
 
   // Focus mode — hides the management tabs + live rail for a clean recording
   // (just the reactor + chat), toggled by the founder before a demo/reveal.
-  const [focusMode, setFocusMode] = useState(false);
+  // Full-screen by default (founder Jul 12): the orb IS the room; management
+  // shortcuts + LIVE rail are an opt-in layer via the expand toggle.
+  const [focusMode, setFocusMode] = useState(true);
 
   // ── auth guard (client-side, same pattern as other dashboard pages) ────────
   useEffect(() => {

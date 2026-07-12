@@ -124,6 +124,11 @@
 - [x] ~~**Artifex payroll-style hours summary**~~ — ✅ SHIPPED Jul 8: `get_hours_summary` tool
       (reg/OT/DT/shop/night-premium/total + late days + subsistence nights per employee per
       pay period, weekly split; management-only).
+- [ ] **Artifex co-pilot canvas (founder Jul 12)** — when Artifex works, it slides LEFT and a
+      live workspace panel opens on the right: the actual quick-add form filling field-by-field
+      as it collects slots, reports/schedules rendering as it pulls them, click panel → full page.
+      Design: a `canvas` message-part contract from the agent (panel type + payload), right-side
+      panel renderer in the room, slide-over animation. THE next Artifex UX block.
 - [ ] **Artifex room: enterprise reskin Phase 2 (founder Jul 11)** — light+dark theme parity
       with the tenant app (currently dark-only), richer HUD chrome (Jarvis-reference sweep done),
       data-panel motion ("opening files" cards), voice picker. Phase 1 shipped: ambient 2nd-brain

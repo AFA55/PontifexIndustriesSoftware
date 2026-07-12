@@ -22,6 +22,8 @@ import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { toLocalYMD } from '@/lib/dates';
 import { embedText, embedAndStoreNote } from '@/lib/artifex-embeddings';
+import { canInviteRole, getRoleLabel } from '@/lib/rbac';
+import { sendEmail, generateInviteEmail, getTenantEmailBranding, isEmailConfigured } from '@/lib/email';
 
 const FIELD_ROLES = ['operator', 'apprentice'];
 const MEMORY_RECALL_DEFAULT_LIMIT = 20;
@@ -43,6 +45,32 @@ async function lookupNames(tenantId: string, ids: (string | null)[]): Promise<Ma
 }
 
 export function createCommandCenterTools(tenantId: string, role: string, userId: string) {
+  const all = buildAllTools(tenantId, role, userId);
+
+  // ── STRUCTURAL PERMISSION MATRIX (founder Jul 12: "certain people should
+  // have access to certain things — make sure this is solid"). A role's agent
+  // runtime only CONTAINS the tools that role may use; there is nothing to
+  // talk the model into. Mirrors the UI's own access rules (quick-add roles,
+  // management-only payroll, admin-only revenue, rank-guarded invites).
+  const MATRIX: Record<string, (keyof typeof all)[]> = {
+    // Full command: everything.
+    super_admin: Object.keys(all) as (keyof typeof all)[],
+    operations_manager: Object.keys(all) as (keyof typeof all)[],
+    admin: Object.keys(all) as (keyof typeof all)[],
+    // Sales: operational reads + ticket creation. No payroll, revenue, or invites.
+    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
+    // Supervisors: operational reads + approvals visibility. No writes.
+    supervisor: ['get_clocked_in_status', 'get_todays_jobs', 'get_pending_approvals', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'save_memory_note', 'recall_memory_notes'],
+    // Shop + inventory: who/what is running today. No money, no writes.
+    shop_manager: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'recall_memory_notes'],
+    shop_help: ['get_clocked_in_status', 'get_todays_jobs', 'search_job_history', 'recall_memory_notes'],
+    inventory_manager: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'recall_memory_notes'],
+  };
+  const allowed = MATRIX[role] ?? ['get_todays_jobs'];
+  return Object.fromEntries(Object.entries(all).filter(([k]) => (allowed as string[]).includes(k))) as typeof all;
+}
+
+function buildAllTools(tenantId: string, role: string, userId: string) {
   return {
     get_clocked_in_status: tool({
       description:
@@ -464,6 +492,72 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
               ? 'Created as pending approval — an admin approves it on the schedule board.'
               : 'Created directly on the schedule.',
         };
+      },
+    }),
+
+    invite_team_member: tool({
+      description:
+        "SEND A PLATFORM INVITATION to a new team member by email (they get a branded setup link to create their own password). WRITE ACTION — only call after the user confirms name + email + role in a read-back. The role must be BELOW the caller's own rank (you can never invite a super_admin). Roles: admin, operations_manager, salesman, supervisor, shop_manager, shop_help, inventory_manager, operator, apprentice.",
+      inputSchema: z.object({
+        fullName: z.string().min(1).describe('New team member full name'),
+        email: z.string().email().describe('Their email — the invite goes here'),
+        role: z.enum(['admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager', 'operator', 'apprentice']),
+      }),
+      execute: async ({ fullName, email, role: targetRole }) => {
+        // Same rank guard as the invite screen: strictly below the inviter.
+        if (!canInviteRole(role, targetRole)) {
+          return { error: `Your role (${getRoleLabel(role)}) cannot invite a ${getRoleLabel(targetRole)}.` };
+        }
+        if (!isEmailConfigured()) return { error: 'Email is not configured on the platform.' };
+        const cleanEmail = email.trim().toLowerCase();
+
+        // Cross-tenant takeover guard (same rule as the invite screen): an
+        // email that exists ANYWHERE on the platform cannot be re-invited.
+        const { data: existing } = await supabaseAdmin
+          .from('profiles')
+          .select('id')
+          .ilike('email', cleanEmail)
+          .maybeSingle();
+        if (existing) return { error: 'That email already has an account on the platform.' };
+
+        const { data: inviter } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', userId)
+          .maybeSingle();
+        const { data: tenant } = await supabaseAdmin
+          .from('tenants')
+          .select('name, company_code')
+          .eq('id', tenantId)
+          .maybeSingle();
+
+        const { data: invite, error } = await supabaseAdmin
+          .from('user_invitations')
+          .insert({ tenant_id: tenantId, email: cleanEmail, role: targetRole, invited_name: fullName.trim(), invited_by: userId })
+          .select('token')
+          .single();
+        if (error || !invite?.token) return { error: 'Could not create the invitation (they may already be invited).' };
+
+        const branding = await getTenantEmailBranding(tenantId);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://www.pontifexindustries.com';
+        const html = await generateInviteEmail({
+          inviteeName: fullName.trim(),
+          inviterName: inviter?.full_name || 'Your team',
+          tenantName: tenant?.name || branding.companyName,
+          roleLabel: getRoleLabel(targetRole),
+          companyCode: tenant?.company_code ?? undefined,
+          setupUrl: `${baseUrl}/setup-account?token=${invite.token}`,
+          brandColor: branding.brandColor,
+          accentColor: branding.accentColor,
+          logoUrl: branding.logoUrl,
+        });
+        const sent = await sendEmail({
+          to: cleanEmail,
+          subject: `You're invited to join ${tenant?.name || branding.companyName}`,
+          html,
+        });
+        if (!sent) return { error: 'Invitation created but the email failed to send — resend it from Team Management.' };
+        return { invited: true, email: cleanEmail, role: getRoleLabel(targetRole), note: 'They have 7 days to accept the setup link.' };
       },
     }),
 
