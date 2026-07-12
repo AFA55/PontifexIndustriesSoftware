@@ -237,11 +237,14 @@ async function updateJobStatus(
             (sum: number, log: any) => sum + (Number(log.hours_worked) || 0),
             0
           );
+          // DISTINCT calendar dates, NOT row count: on a crew job the operator
+          // AND the helper each log the same day (one row apiece), so
+          // logs.length is ~2× the real day count (caught by the 60-day
+          // stress test, Jul 12). Matches the DB trigger's own definition.
+          const distinctDays = new Set(logsAgg.map((l: any) => String(l.log_date))).size;
           updateData.total_hours_worked = Number(totalHours.toFixed(2));
-          // total_days_worked is incremented per day in daily-log route, but
-          // ensure it reflects the actual log count if it ever drifted
-          updateData.total_days_worked = logsAgg.length;
-          updateData.is_multi_day = logsAgg.length > 1;
+          updateData.total_days_worked = distinctDays;
+          updateData.is_multi_day = distinctDays > 1;
         }
       } catch (aggErr) {
         // Non-fatal — aggregation is best-effort

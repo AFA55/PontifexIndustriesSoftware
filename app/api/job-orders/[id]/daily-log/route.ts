@@ -368,7 +368,10 @@ export async function POST(
             (sum: number, l: any) => sum + (Number(l.hours_worked) || 0),
             0
           );
-          const totalDays = (allLogs || []).length;
+          // DISTINCT calendar dates, not row count — operator + helper each
+          // log the same day, so length double-counts crew days (60-day
+          // stress test, Jul 12). Matches the DB trigger's definition.
+          const totalDays = new Set((allLogs || []).map((l: any) => String(l.log_date))).size;
 
           // Fire-and-forget — don't block the response
           Promise.resolve(
