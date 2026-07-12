@@ -26,6 +26,7 @@ export interface CanvasActivity {
 }
 
 const PANEL_META: Record<string, { title: string; href: string; icon: any }> = {
+  'tool-update_ticket_draft': { title: 'Job Ticket — Drafting', href: '/dashboard/admin/schedule-board', icon: FileText },
   'tool-create_job_ticket': { title: 'Job Ticket — Quick Add', href: '/dashboard/admin/schedule-board', icon: FileText },
   'tool-get_hours_summary': { title: 'Hours Report', href: '/dashboard/admin/timecards', icon: Table2 },
   'tool-search_job_history': { title: 'Schedule History', href: '/dashboard/admin/schedule-board', icon: Table2 },
@@ -59,8 +60,13 @@ export default function ArtifexCanvas({ activity, onClose }: { activity: CanvasA
     icon: FileText,
   };
   const Icon = meta.icon;
-  const working = activity.state === 'input-streaming' || activity.state === 'input-available';
-  const done = activity.state === 'output-available';
+  // The draft pad is ALWAYS 'working' — it's the form filling in live while
+  // the conversation runs; Done belongs to the real create call that follows.
+  const isDraft = activity.toolType === 'tool-update_ticket_draft';
+  const working = isDraft
+    ? activity.state !== 'output-error'
+    : activity.state === 'input-streaming' || activity.state === 'input-available';
+  const done = !isDraft && activity.state === 'output-available';
   const input = activity.input ?? {};
   const output = activity.output ?? {};
 

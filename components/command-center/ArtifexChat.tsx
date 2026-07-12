@@ -38,6 +38,7 @@ import {
   MicOff,
   Volume2,
   VolumeX,
+  X,
 } from 'lucide-react';
 import type { ArtifexVoice } from '@/lib/use-artifex-voice';
 import type { ArtifexUIMessage } from '@/lib/agents/artifex-agent';
@@ -78,6 +79,8 @@ interface ArtifexChatProps {
   variant?: 'hud' | 'panel';
   onStateChange?: (state: NeuralBrainState) => void;
   onOpenTranscript?: () => void;
+  /** Panel variant: the X in the header — closes the transcript back to the orb (voice) view. */
+  onCloseTranscript?: () => void;
   /** Past conversations for the sidebar (panel variant). */
   conversations?: ArtifexConversationSummary[];
   activeConversationId?: string | null;
@@ -94,6 +97,7 @@ export default function ArtifexChat({
   variant = 'panel',
   onStateChange,
   onOpenTranscript,
+  onCloseTranscript,
   conversations,
   activeConversationId,
   onSelectConversation,
@@ -433,16 +437,29 @@ export default function ArtifexChat({
               </button>
             )}
           </div>
-          {hasHistory && onNewConversation && (
-            <button
-              type="button"
-              onClick={onNewConversation}
-              className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-white/50 dark:hover:bg-white/[0.06] dark:hover:text-white/90"
-            >
-              <MessageSquarePlus className="h-3.5 w-3.5" />
-              New chat
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            {hasHistory && onNewConversation && (
+              <button
+                type="button"
+                onClick={onNewConversation}
+                className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-white/50 dark:hover:bg-white/[0.06] dark:hover:text-white/90"
+              >
+                <MessageSquarePlus className="h-3.5 w-3.5" />
+                New chat
+              </button>
+            )}
+            {onCloseTranscript && (
+              <button
+                type="button"
+                onClick={onCloseTranscript}
+                aria-label="Close transcript — back to voice"
+                title="Close transcript — back to voice"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/45 dark:hover:bg-white/[0.08] dark:hover:text-white/90"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div ref={scrollRef} className="flex max-h-[42vh] min-h-[160px] flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-5">

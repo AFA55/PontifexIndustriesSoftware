@@ -59,7 +59,7 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
     operations_manager: Object.keys(all) as (keyof typeof all)[],
     admin: Object.keys(all) as (keyof typeof all)[],
     // Sales: operational reads + ticket creation. No payroll, revenue, or invites.
-    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
+    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'update_ticket_draft', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
     // Supervisors: operational reads + approvals visibility. No writes.
     supervisor: ['get_clocked_in_status', 'get_todays_jobs', 'get_pending_approvals', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'save_memory_note', 'recall_memory_notes'],
     // Shop + inventory: who/what is running today. No money, no writes.
@@ -407,6 +407,22 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
 
         return { periodStart: startDate, periodEnd: endDate, count: employees.length, employees };
       },
+    }),
+
+    update_ticket_draft: tool({
+      description:
+        "LIVE DRAFT PAD — saves NOTHING. While collecting job-ticket details in conversation, call this after EVERY user message with ALL slots gathered so far (even partial). It renders the ticket form on the user's screen filling in live, so they can watch and correct you as you go. Always call it during ticket building, before you have enough to create.",
+      inputSchema: z.object({
+        customerName: z.string().optional(),
+        jobType: z.string().optional().describe('Snap to the closest real service type before drafting'),
+        startDate: z.string().optional(),
+        endDate: z.string().optional(),
+        scope: z.string().optional(),
+        address: z.string().optional(),
+        contactName: z.string().optional(),
+        contactPhone: z.string().optional(),
+      }),
+      execute: async (slots) => ({ ok: true, drafted: Object.keys(slots).filter((k) => (slots as any)[k]) }),
     }),
 
     create_job_ticket: tool({

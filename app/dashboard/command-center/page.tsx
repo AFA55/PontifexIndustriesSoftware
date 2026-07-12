@@ -315,6 +315,7 @@ export default function CommandCenterPage() {
               voice={voice}
               variant={transcriptOpen ? 'panel' : 'hud'}
               onOpenTranscript={() => setTranscriptOpen(true)}
+              onCloseTranscript={() => setTranscriptOpen(false)}
               onStateChange={setChatReactorState}
               conversations={conversations}
               activeConversationId={activeConversationId}
