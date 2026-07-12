@@ -55,7 +55,8 @@ export function useArtifexVoice() {
   const [micSupported, setMicSupported] = useState(false);
   // Set when the browser BLOCKED autoplay of a finished reply — the UI shows
   // a "tap to hear" button; tapping plays inside a fresh gesture (always allowed).
-  const [pendingAudio, setPendingAudio] = useState<HTMLAudioElement | null>(null);
+  const [pendingBuffer, setPendingBuffer] = useState<AudioBuffer | null>(null);
+  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
 
@@ -121,6 +122,8 @@ export function useArtifexVoice() {
       audioRef.current.pause();
       audioRef.current = null;
     }
+    try { sourceRef.current?.stop(); } catch { /* already stopped */ }
+    sourceRef.current = null;
     stopAmplitudeLoop();
     setSpeaking(false);
   }, [stopAmplitudeLoop]);
@@ -132,7 +135,7 @@ export function useArtifexVoice() {
         return;
       }
       stopSpeaking();
-      setPendingAudio(null);
+      setPendingBuffer(null);
       try {
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;
@@ -155,56 +158,49 @@ export function useArtifexVoice() {
           return;
         }
         setTtsAvailable(true);
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
-        audioRef.current = audio;
 
-        // Route through an analyser so the orb can breathe with the words —
-        // but ONLY when the context is actually RUNNING. Routing through a
-        // suspended context silences playback entirely (the Jul 12 bug), so
-        // sound always wins over the visual: not running -> play directly.
-        analyserRef.current = null;
-        try {
-          if (!audioCtxRef.current) {
-            const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
-            audioCtxRef.current = new Ctx();
-          }
-          const ctx = audioCtxRef.current!;
-          if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
-          if (ctx.state === 'running') {
-            const source = ctx.createMediaElementSource(audio);
-            const analyser = ctx.createAnalyser();
-            analyser.fftSize = 512;
-            source.connect(analyser);
-            analyser.connect(ctx.destination);
-            analyserRef.current = analyser;
-          }
-        } catch {
-          analyserRef.current = null; // fallback: orb uses its internal sine
+        // PURE WebAudio playback (Jul 12 definitive fix): HTMLMediaElement's
+        // play() is gated PER CALL by Chrome's transient-activation rule —
+        // which expires (~5s) while Artifex is still thinking/generating, so
+        // even mic-started turns got blocked. A running AudioContext has no
+        // per-play gate: unlock once on any tap, every later reply just plays.
+        const arrayBuf = await res.arrayBuffer();
+        if (!audioCtxRef.current) {
+          const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+          if (Ctx) audioCtxRef.current = new Ctx();
+        }
+        const ctx = audioCtxRef.current;
+        if (!ctx) { opts?.onEnd?.(); return; }
+        if (ctx.state === 'suspended') await ctx.resume().catch(() => {});
+
+        const buffer = await ctx.decodeAudioData(arrayBuf.slice(0));
+        if (ctx.state !== 'running') {
+          // Engine never got a user gesture — park the decoded reply; the UI
+          // shows "Tap to hear" and the tap (a gesture) plays it instantly.
+          console.warn('[artifex-voice] audio engine locked — offering tap-to-play');
+          setPendingBuffer(buffer);
+          opts?.onEnd?.();
+          return;
         }
 
         const finish = () => {
+          sourceRef.current = null;
           stopAmplitudeLoop();
           setSpeaking(false);
-          URL.revokeObjectURL(url);
           opts?.onEnd?.();
         };
+        const source = ctx.createBufferSource();
+        source.buffer = buffer;
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        analyser.connect(ctx.destination);
+        analyserRef.current = analyser;
+        sourceRef.current = source;
         setSpeaking(true);
         startAmplitudeLoop();
-        audio.onended = finish;
-        audio.onerror = finish;
-        try {
-          await audio.play();
-        } catch (playErr) {
-          // Autoplay blocked (Chrome gesture/engagement policy). Don't fail
-          // silently — park the audio and let the UI offer a tap-to-play.
-          console.warn('[artifex-voice] autoplay blocked — offering tap-to-play:', playErr);
-          stopAmplitudeLoop();
-          setSpeaking(false);
-          setPendingAudio(audio);
-          return; // finish() runs when the user taps play (or next turn clears it)
-        }
+        source.onended = finish;
+        try { source.start(); } catch { finish(); }
       } catch {
         stopAmplitudeLoop();
         setSpeaking(false);
@@ -215,13 +211,25 @@ export function useArtifexVoice() {
   );
 
   const playPendingAudio = useCallback(() => {
-    const audio = pendingAudio;
-    if (!audio) return;
-    setPendingAudio(null);
+    const buffer = pendingBuffer;
+    const ctx = audioCtxRef.current;
+    if (!buffer || !ctx) return;
+    setPendingBuffer(null);
+    // We're inside a user gesture — resume is guaranteed to succeed.
+    ctx.resume().catch(() => {});
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    source.connect(analyser);
+    analyser.connect(ctx.destination);
+    analyserRef.current = analyser;
+    sourceRef.current = source;
     setSpeaking(true);
     startAmplitudeLoop();
-    audio.play().catch(() => setSpeaking(false));
-  }, [pendingAudio, startAmplitudeLoop]);
+    source.onended = () => { sourceRef.current = null; stopAmplitudeLoop(); setSpeaking(false); };
+    try { source.start(); } catch { setSpeaking(false); }
+  }, [pendingBuffer, startAmplitudeLoop, stopAmplitudeLoop]);
 
   const startListening = useCallback(
     (onTranscript: (text: string) => void) => {
@@ -263,7 +271,7 @@ export function useArtifexVoice() {
     startListening,
     stopListening,
     unlockAudio,
-    pendingAudio: pendingAudio != null,
+    pendingAudio: pendingBuffer != null,
     playPendingAudio,
   };
 }
