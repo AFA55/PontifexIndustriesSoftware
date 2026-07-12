@@ -25,6 +25,7 @@ import { formatTime } from '@/lib/dates';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import { useArtifexVoice } from '@/lib/use-artifex-voice';
 import NeuralBrain, { type NeuralBrainState } from '@/components/command-center/NeuralBrain';
+import ArtifexAmbient from '@/components/command-center/ArtifexAmbient';
 import ArtifexChat, { type ArtifexConversationSummary } from '@/components/command-center/ArtifexChat';
 
 interface OverviewData {
@@ -69,6 +70,25 @@ export default function CommandCenterPage() {
   // background surface, toggled on demand.
   const voice = useArtifexVoice();
   const [transcriptOpen, setTranscriptOpen] = useState(false);
+  // The orb BREATHES with the voice (founder: "move and size up and down when
+  // speaking") — a rAF loop scales the wrapper from the live amplitude ref.
+  // Direct style writes, zero React re-renders per frame.
+  const orbWrapRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    let raf = 0;
+    let smooth = 0;
+    const tick = () => {
+      const amp = voice.amplitudeRef.current;
+      smooth += (amp - smooth) * 0.3;
+      if (orbWrapRef.current) {
+        orbWrapRef.current.style.transform = `scale(${1 + smooth * 0.09})`;
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [chatReactorState, setChatReactorState] = useState<NeuralBrainState>('idle');
 
   // Conversation history — the "2nd brain" sidebar's list + selection state.
@@ -202,9 +222,11 @@ export default function CommandCenterPage() {
   const asOfLabel = overview?.asOf ? `as of ${formatTime(overview.asOf)}` : 'live';
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="relative flex h-full w-full flex-col">
+      {/* 2nd-brain ambience — connecting dots behind the whole room */}
+      <ArtifexAmbient className="z-0" />
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
-      <header className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/admin"
@@ -216,7 +238,7 @@ export default function CommandCenterPage() {
           <div className="flex items-center gap-2.5">
             <NeuralBrain state="idle" size={28} />
             <h1 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/90 sm:text-base">
-              Pontifex <span className="text-white/50">Command Center</span>
+              Artifex <span className="text-white/40 normal-case tracking-normal text-xs sm:text-sm">by Pontifex</span>
             </h1>
           </div>
         </div>
@@ -241,10 +263,10 @@ export default function CommandCenterPage() {
       </header>
 
       {/* ── Body: tabs · reactor · rail ───────────────────────────────────── */}
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
+      <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* CENTER — reactor first in DOM so it stacks on TOP on mobile */}
         <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-6">
-          <div className="relative flex items-center justify-center">
+          <div ref={orbWrapRef} className="relative flex items-center justify-center will-change-transform">
             <NeuralBrain
               state={chatReactorState}
               size={reactorSize}

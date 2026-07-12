@@ -124,6 +124,10 @@
 - [x] ~~**Artifex payroll-style hours summary**~~ — ✅ SHIPPED Jul 8: `get_hours_summary` tool
       (reg/OT/DT/shop/night-premium/total + late days + subsistence nights per employee per
       pay period, weekly split; management-only).
+- [ ] **Artifex room: enterprise reskin Phase 2 (founder Jul 11)** — light+dark theme parity
+      with the tenant app (currently dark-only), richer HUD chrome (Jarvis-reference sweep done),
+      data-panel motion ("opening files" cards), voice picker. Phase 1 shipped: ambient 2nd-brain
+      backdrop, speech-breathing orb, slot-filling brain, ARTIFEX identity + tile.
 - [ ] **Attendance tracker (Patriot codes: EA/UA/NCNS/STO/ML/FL/S/LE/T/V/W/NW/H/GD/WH)** —
       `attendance_events` + `attendance_codes` migration, month-grid per-employee UI mirroring
       their paper sheet, monthly/quarterly/yearly rollups, auto-derive T/V/STO/H, Artifex
