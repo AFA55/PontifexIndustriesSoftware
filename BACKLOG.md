@@ -135,8 +135,9 @@
       backdrop, speech-breathing orb, slot-filling brain, ARTIFEX identity + tile.
 - [x] ~~**Attendance tracker (Patriot codes)**~~ — ✅ SHIPPED Jul 12 (`db978d6c`): attendance_events
       + 15-code set, Attendance Calendar tab (month grid, click-to-mark, auto worked/late/time-off
-      overlays), codes roll into the annual Pull Report. Remaining follow-ups: Artifex
-      `get_attendance_summary` tool + tenant-custom codes + holiday auto-derive (H).
+      overlays), codes roll into the annual Pull Report. Artifex `get_attendance_summary`
+      tool ✅ SHIPPED Jul 12 PM (`e95bf2bd` — reads codes + the calendar's auto overlays,
+      canvas panel). Remaining follow-ups: tenant-custom codes + holiday auto-derive (H).
 - [ ] **Payroll Worksheet page** — pay-period picker (tenant pay_schedule weekly|biweekly +
       anchor), exact Patriot column set, subsistence side table, CSV export for QuickBooks.
 - [ ] **iOS Build 8 (Face ID)** — founder: install from TestFlight, test Face ID on device →
