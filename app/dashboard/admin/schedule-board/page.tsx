@@ -564,12 +564,16 @@ export default function ScheduleBoardPage() {
 
       const allJobs = [...(json.data?.assigned || []), ...(json.data?.unassigned || [])];
       for (const rawJob of allJobs) {
-        const jobDate = rawJob.scheduled_date;
-        if (byDate[jobDate]) {
-          byDate[jobDate].push(toJobCard(rawJob));
-        } else {
-          // Multi-day job might span the week
-          byDate[jobDate] = [toJobCard(rawJob)];
+        // Multi-day jobs render on EVERY day they span within this week — not
+        // just scheduled_date (which can even fall in a previous week, in
+        // which case the old bucketing dropped the job from the grid
+        // entirely). Each day's card gets its own "Day N of M" label.
+        const jobStart = rawJob.scheduled_date;
+        const jobEnd = rawJob.end_date || rawJob.scheduled_date;
+        for (const dayKey of Object.keys(byDate)) {
+          if (dayKey >= jobStart && dayKey <= jobEnd) {
+            byDate[dayKey].push(toJobCard(rawJob, dayKey));
+          }
         }
       }
 
@@ -934,13 +938,26 @@ export default function ScheduleBoardPage() {
     }
 
     try {
+      // Multi-day job approved onto a different start date: shift end_date by
+      // the same number of days (preserve duration). Leaving the original
+      // end_date can invert the range (end before start), and the board's
+      // span query would then never show the job on ANY day.
+      const patch: Record<string, unknown> = {
+        status: 'scheduled',
+        scheduled_date: data.scheduledDate,
+        is_will_call: job.is_will_call,
+      };
+      if (job.end_date && job.scheduled_date && data.scheduledDate !== job.scheduled_date) {
+        const deltaDays = Math.round(
+          (parseLocalDate(data.scheduledDate).getTime() - parseLocalDate(job.scheduled_date).getTime()) / 86_400_000
+        );
+        const newEnd = parseLocalDate(job.end_date);
+        newEnd.setDate(newEnd.getDate() + deltaDays);
+        patch.end_date = toDateString(newEnd);
+      }
       const res = await apiFetch(`/api/admin/job-orders/${job.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({
-          status: 'scheduled',
-          scheduled_date: data.scheduledDate,
-          is_will_call: job.is_will_call,
-        }),
+        body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error('Failed to approve');
     } catch {
