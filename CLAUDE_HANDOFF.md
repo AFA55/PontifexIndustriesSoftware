@@ -1,6 +1,28 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 11, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`571dea39`). CREDIT-SAVER MODE: build inline; adversarial reviews for money/auth code. **Roadmap: docs/plans/FINISH_LINE_PHASES.md** (keys → live-fire test → AI/usage cost dashboard → Stripe flat+usage → FB/IG/TikTok ads).
+**Last updated:** Jul 12, 2026 (PM) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`bf27177d`).
+
+> **🛎️ Jul 12 marathon (voice day — ALL pushed through `bf27177d`):** Felix voice LIVE +
+> founder-confirmed audible (final fix: pure-WebAudio buffer playback — HTMLMediaElement play()
+> is gated per-call by Chrome transient activation which EXPIRES during generation; running
+> AudioContext has no per-play gate). Artifex: slot-filling brain, job-type ENUM (13 real
+> services — no more 'Wall Sign'), review-after-create nudge, submitted-by stamps creator,
+> knows it has a voice. OPERATOR ARTIFEX: separate field agent, structural wall = operator-only
+> toolset (own jobs/hours, directions link, tap-to-call site contact); room slim for field roles;
+> entry button on operator home. PERMISSION MATRIX: per-role toolsets (sales=reads+create,
+> supervisor=reads+approvals, shop=reads; admins=all+invite). invite_team_member tool (rank
+> guard) + SMS invitations from (833) via invite screen + tool (metered team_invite_sms).
+> CO-PILOT CANVAS v1: orb slides left, live panel renders the tool call in real time (ticket
+> form filling, hours table, history list, invite card) — verified live. Room: light/dark parity
+> (reactor bezel), full-screen default, ambient 2nd-brain, ARTIFEX identity. Also: annual
+> employee report (Pull Report on operator page; codes integrated), ATTENDANCE SYSTEM
+> (attendance_events + 15 Patriot codes + calendar tab in Time Off, click-to-mark, auto
+> late/time-off overlays), inbox notification deletes, remember-me sticky fix, platform-org
+> redirect guard, Stripe messaging-billing cron (settle-pattern, no-ops until cards on file),
+> Platform Hub AI & Usage dashboard. NEXT: canvas layout polish + reskin Phase 2 (light/dark
+> chrome), Phase-1 live-fire SMS test, Phase 4 ads (Meta verification pending founder).
+
+**Prior state (Jul 11):** CREDIT-SAVER MODE: build inline; adversarial reviews for money/auth code. **Roadmap: docs/plans/FINISH_LINE_PHASES.md** (keys → live-fire test → AI/usage cost dashboard → Stripe flat+usage → FB/IG/TikTok ads).
 
 > **🛎️ Jul 8–11 sprint (demo week, all pushed through `571dea39`):**
 > - **CONTRACTS + E-SIGNATURE (Jul 11, `571dea39`)**: contracts table + /dashboard/admin/contracts
