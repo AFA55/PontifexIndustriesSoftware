@@ -24,9 +24,20 @@ const telUrl = (phone: string) => `tel:${phone.replace(/[^+\d]/g, '')}`;
 function myJobsQuery(tenantId: string, userId: string) {
   return supabaseAdmin
     .from('schedule_board_view')
-    .select('job_number, customer_name, status, scheduled_date, arrival_time, address, location, job_type, scope_details, description, site_contact_phone, operator_name, helper_name, assigned_to, helper_assigned_to')
+    .select('job_number, customer_name, status, scheduled_date, end_date, arrival_time, address, location, job_type, scope_details, description, site_contact_phone, operator_name, helper_name, assigned_to, helper_assigned_to')
     .eq('tenant_id', tenantId)
     .or(`assigned_to.eq.${userId},helper_assigned_to.eq.${userId}`);
+}
+
+/** "Day 2 of 3" for a multi-day job on a given date; undefined for single-day. */
+function dayOfLabel(j: any, date: string): string | undefined {
+  if (!j.end_date || j.end_date === j.scheduled_date) return undefined;
+  const days = (a: string, b: string) =>
+    Math.round((new Date(`${b}T00:00:00`).getTime() - new Date(`${a}T00:00:00`).getTime()) / 86_400_000);
+  const total = days(j.scheduled_date, j.end_date) + 1;
+  const current = days(j.scheduled_date, date) + 1;
+  if (current < 1 || current > total) return undefined;
+  return `Day ${current} of ${total}`;
 }
 
 export function createOperatorArtifexTools(tenantId: string, userId: string) {
@@ -36,8 +47,16 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
         "The caller's OWN jobs for today (as operator or helper): job number, customer, address, arrival time, status. Use for 'what do I have today' or 'where am I going'.",
       inputSchema: z.object({}),
       execute: async () => {
+        const today = toLocalYMD();
+        // Span-aware: a multi-day job counts as "today" every day it runs,
+        // not just its start date (day 2+ was invisible with a plain eq).
+        // Matches: single-day jobs starting today, OR a multi-day span that
+        // covers today. Deliberately NOT `end_date.is.null` — that would pull
+        // in stale never-completed jobs from past dates.
         const { data, error } = await myJobsQuery(tenantId, userId)
-          .eq('scheduled_date', toLocalYMD())
+          .lte('scheduled_date', today)
+          .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
+          .not('status', 'in', '("completed","cancelled")')
           .order('arrival_time', { ascending: true });
         if (error) throw new Error(`get_my_jobs_today: ${error.message}`);
         return {
@@ -49,6 +68,7 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
             arrivalTime: j.arrival_time,
             address: j.address ?? j.location,
             jobType: j.job_type,
+            ...(dayOfLabel(j, today) ? { multiDay: dayOfLabel(j, today) } : {}),
           })),
         };
       },
@@ -61,15 +81,19 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
         const today = toLocalYMD();
         const week = new Date();
         week.setDate(week.getDate() + 7);
+        // Include a multi-day job still running today even though it STARTED
+        // before today (otherwise day 2+ vanishes from "my week").
         const { data, error } = await myJobsQuery(tenantId, userId)
-          .gte('scheduled_date', today)
           .lte('scheduled_date', toLocalYMD(week))
+          .or(`scheduled_date.gte.${today},end_date.gte.${today}`)
+          .not('status', 'in', '("completed","cancelled")')
           .order('scheduled_date');
         if (error) throw new Error(`get_my_upcoming_jobs: ${error.message}`);
         return {
           count: data?.length ?? 0,
           jobs: (data ?? []).map((j: any) => ({
             date: j.scheduled_date,
+            ...(j.end_date && j.end_date !== j.scheduled_date ? { endDate: j.end_date } : {}),
             jobNumber: j.job_number,
             customer: j.customer_name,
             address: j.address ?? j.location,
@@ -86,8 +110,14 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
         jobNumber: z.string().optional().describe("Job number like QA-2026-123456; omit to use today's first job"),
       }),
       execute: async ({ jobNumber }) => {
+        const today = toLocalYMD();
         let q = myJobsQuery(tenantId, userId);
-        q = jobNumber ? q.eq('job_number', jobNumber) : q.eq('scheduled_date', toLocalYMD());
+        q = jobNumber
+          ? q.eq('job_number', jobNumber)
+          : q
+              .lte('scheduled_date', today)
+              .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
+              .not('status', 'in', '("completed","cancelled")');
         const { data, error } = await q.order('arrival_time').limit(1);
         if (error) throw new Error(`get_my_job_details: ${error.message}`);
         const j: any = data?.[0];

@@ -482,13 +482,16 @@ export default function MyJobsPage() {
           </div>
         )}
 
-        {/* Multi-Day Jobs Continuing Tomorrow (scheduled + is_multi_day) */}
+        {/* Multi-Day Jobs in progress (scheduled + is_multi_day). Neutral
+            wording on purpose: the same card is seen the evening after "Done
+            for Today" AND the next morning — "tomorrow"/"today" would each be
+            wrong half the time, "in progress / up next" is always true. */}
         {multiDayScheduled.length > 0 && (
           <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden shadow-md">
             <div className="flex items-center gap-3 px-4 py-3 bg-amber-500">
               <Clock className="w-5 h-5 text-white" />
               <h3 className="text-sm font-bold text-white">
-                Continuing Tomorrow ({multiDayScheduled.length})
+                Multi-Day In Progress ({multiDayScheduled.length})
               </h3>
             </div>
             <div className="divide-y divide-amber-100">
@@ -499,7 +502,7 @@ export default function MyJobsPage() {
                     <p className="text-sm font-semibold text-slate-800 truncate">{job.customer_name}</p>
                     <p className="text-xs text-slate-500 truncate">{job.job_number} &bull; {job.address || job.location || 'No address'}</p>
                     {job.total_days_worked != null && (
-                      <p className="text-xs text-amber-600 mt-0.5">Day {job.total_days_worked + 1} tomorrow</p>
+                      <p className="text-xs text-amber-600 mt-0.5">Up next: Day {job.total_days_worked + 1}</p>
                     )}
                   </div>
                   <div className="flex flex-col items-end gap-1 flex-shrink-0">
