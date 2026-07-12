@@ -134,7 +134,7 @@ export default function CommandCenterPage() {
       router.push('/login');
       return;
     }
-    if (!COMMAND_CENTER_ROLES.includes(current.role)) {
+    if (![...COMMAND_CENTER_ROLES, 'operator', 'apprentice'].includes(current.role)) {
       router.push('/dashboard');
       return;
     }
@@ -176,6 +176,7 @@ export default function CommandCenterPage() {
 
   useEffect(() => {
     if (!authChecked || !user) return;
+    if (['operator', 'apprentice'].includes(user.role)) { setOverviewLoading(false); return; }
 
     let cancelled = false;
 
@@ -223,6 +224,9 @@ export default function CommandCenterPage() {
     : '';
 
   const asOfLabel = overview?.asOf ? `as of ${formatTime(overview.asOf)}` : 'live';
+  // Field roles get the orb + chat ONLY — management nav and the LIVE rail
+  // (admin data) never render for them; the overview API stays admin-gated.
+  const isFieldUser = ['operator', 'apprentice'].includes(user.role);
 
   return (
     <div className="relative flex h-full w-full flex-col">
@@ -325,7 +329,7 @@ export default function CommandCenterPage() {
         </main>
 
         {/* LEFT — management tabs (hidden in focus mode) */}
-        {!focusMode && (
+        {!focusMode && !isFieldUser && (
           <nav
             aria-label="Management"
             className="order-2 shrink-0 border-t border-slate-200 dark:border-white/10 px-4 py-5 lg:order-1 lg:w-64 lg:border-r lg:border-t-0 lg:px-4 lg:py-6"
@@ -352,7 +356,7 @@ export default function CommandCenterPage() {
         )}
 
         {/* RIGHT — live metric rail (hidden in focus mode) */}
-        {!focusMode && (
+        {!focusMode && !isFieldUser && (
           <aside
             aria-label="Live metrics"
             className="order-3 shrink-0 border-t border-slate-200 dark:border-white/10 px-4 py-5 lg:w-72 lg:border-l lg:border-t-0 lg:px-4 lg:py-6"

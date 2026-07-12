@@ -28,7 +28,7 @@ const MAX_TTS_CHARS = 2_500;
 export async function POST(request: NextRequest) {
   const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
-  if (!COMMAND_CENTER_ROLES.includes(auth.role ?? '')) {
+  if (![...COMMAND_CENTER_ROLES, 'operator', 'apprentice'].includes(auth.role ?? '')) {
     return NextResponse.json({ error: 'Not authorized' }, { status: 403 });
   }
 

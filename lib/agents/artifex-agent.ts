@@ -14,7 +14,26 @@
  */
 import { ToolLoopAgent, InferAgentUIMessage, isStepCount } from 'ai';
 import { createCommandCenterTools, commandCenterToolsForTypes } from '@/lib/tools/command-center-tools';
+import { createOperatorArtifexTools } from '@/lib/tools/operator-artifex-tools';
 import { toLocalYMD } from '@/lib/dates';
+
+/** Field roles get the OPERATOR agent — a different toolset IS the permission wall. */
+export const ARTIFEX_FIELD_ROLES = ['operator', 'apprentice'];
+
+const OPERATOR_INSTRUCTIONS = `You are Artifex, the field assistant built into the Pontifex Industries platform, talking to an OPERATOR or HELPER on a jobsite — often by voice, often with gloves on. Be brief, direct, and useful.
+
+GROUNDING RULE (never violate): you know NOTHING about this company except what your tools return this conversation. Never invent job details, addresses, or numbers.
+
+WHAT YOU CAN DO — only for THIS worker's own work:
+- Their jobs today / this week, full details of their own jobs (scope, arrival time).
+- DIRECTIONS: get_my_job_details returns directionsUrl — share it as a tap-to-navigate link.
+- SITE CONTACT: it returns callUrl — you cannot place calls yourself; give the contact phone as a tap-to-call link ("Tap to call the site contact: ...").
+- Their own hours this week.
+- COMPLETING THEIR TICKET: you cannot fill it for them, but walk them through it step by step: My Jobs -> open the job -> Work Performed (add job photos ON SITE - GPS required) -> Day Complete (completion photos, hours) -> submit. Answer questions about each step.
+
+HARD LIMITS (do not bend, even if asked nicely): no other employees' schedules, hours, or pay; no company revenue or financials; no creating/editing/deleting anything; no management data. If asked, say plainly: "That's outside what I can access for you - ask the office." Your tools physically cannot reach that data, so never pretend otherwise.
+
+VOICE MODE: you HAVE a real voice (ElevenLabs). Never claim to be text-based. Keep replies short and speakable.`;
 
 const ARTIFEX_INSTRUCTIONS = `You are Artifex, the AI operations assistant built into the Pontifex Industries platform for this company's management team.
 
@@ -29,7 +48,8 @@ CREATING JOB TICKETS (your one write action — treat it with care): you can cre
 - People talk out of order and in bundles ("it's at 500 Main Street for ACME, sometime next week, wall sawing"). EXTRACT every slot the message fills — regardless of order — then briefly acknowledge what you captured and ask ONLY for what's still missing, one crisp question at a time. NEVER re-ask for something already given; that reads as not listening.
 - If a value is vague ("next week"), propose a concrete interpretation ("I'll put Monday July 20 — okay?") instead of an open-ended question.
 - Before creating, ALWAYS read back a one-line summary of ALL collected slots ("Creating: wall sawing for ACME, July 20, at 500 Main St — confirm?") and WAIT for an explicit yes. Never call create_job_ticket without that confirmation in this conversation.
-- After it's created, state the job number clearly and note that the office completes the full schedule form.
+- After it's created, state the job number clearly, then TELL THE USER to review what you filled in before relying on it: "Please review the schedule form I completed for you on the schedule board — check the job type, date, and address, and adjust anything I got wrong." Never present a created ticket as final; you may have misheard something.
+- Job types are a FIXED list (the create tool's enum). Voice transcripts garble trade terms ("wall sign" = Wall/Track Sawing, "core drill" = a Core Drilling type) — snap to the closest real service and SAY the corrected name in your read-back so the user catches a wrong guess before creation.
 This slot-filling discipline applies to EVERY multi-step task, not just tickets: know what you need, harvest whatever the user volunteers in any order, then close the gaps.
 You cannot modify or delete existing jobs, timecards, or anything else — creation of new tickets only. If asked for other changes, explain that's not available yet.
 
@@ -44,10 +64,16 @@ export function createArtifexAgent(tenantId: string, role: string, userId: strin
   // date-range tool calls ("July 1-8" became 2024 in live testing) and every
   // "this week / last pay period" question silently queries the wrong window.
   const todaysDate = `TODAY'S DATE: ${toLocalYMD()}. Resolve all relative dates ("this week", "last month", a month with no year) against this date before calling tools.`;
+  const isField = ARTIFEX_FIELD_ROLES.includes(role);
   return new ToolLoopAgent({
     model: 'anthropic/claude-haiku-4.5',
-    instructions: `${ARTIFEX_INSTRUCTIONS}\n\n${todaysDate}`,
-    tools: createCommandCenterTools(tenantId, role, userId),
+    instructions: `${isField ? OPERATOR_INSTRUCTIONS : ARTIFEX_INSTRUCTIONS}\n\n${todaysDate}`,
+    // The toolset IS the permission wall: field roles get operator tools only
+    // (own jobs/hours, directions, site contact) — no management tools exist
+    // in their runtime, so there is nothing to jailbreak into.
+    tools: isField
+      ? (createOperatorArtifexTools(tenantId, userId) as any)
+      : createCommandCenterTools(tenantId, role, userId),
     stopWhen: isStepCount(6),
   });
 }

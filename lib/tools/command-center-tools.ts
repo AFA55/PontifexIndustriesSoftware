@@ -382,10 +382,12 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
 
     create_job_ticket: tool({
       description:
-        "CREATE a new job ticket (quick-add) on the schedule. WRITE ACTION — only call this after you have collected the required details AND the user has explicitly confirmed a read-back summary in this conversation. Required: customer/contractor name, job type, start date. Optional: scope description, address, site contact name/phone, end date, priority. The job lands as a quick-add (same as the schedule board's Quick Add) and office staff complete the full form afterward.",
+        "CREATE a new job ticket (quick-add) on the schedule. WRITE ACTION — only call this after you have collected the required details AND the user has explicitly confirmed a read-back summary in this conversation. Required: customer/contractor name, job type (MUST be one of the company's service types — see the enum; map what the user SAID to the closest one, e.g. 'wall saw' -> 'Wall/Track Sawing', and include your mapping in the read-back), start date. Optional: scope description, address, site contact name/phone, end date, priority. The job lands pending review and office staff complete the full form afterward.",
       inputSchema: z.object({
         customerName: z.string().min(1).describe('Customer / contractor name'),
-        jobType: z.string().min(1).describe("Job type, e.g. 'Core Drilling', 'Wall Sawing', 'Slab Sawing'"),
+        jobType: z
+          .enum(['Electric Core Drilling', 'High Frequency Core Drilling', 'Hydraulic Core Drilling', 'Diesel Floor Sawing', 'Electric Floor Sawing', 'Wall/Track Sawing', 'Chain Sawing', 'Handheld / Push Sawing', 'Wire Sawing', 'GPR Scanning', 'Selective Demo', 'Brokk', 'Other'])
+          .describe("The company's service types — voice transcripts are noisy ('wall sign' means 'Wall/Track Sawing'); ALWAYS snap to the closest real service and confirm it in the read-back"),
         startDate: z.string().describe('Scheduled start date, YYYY-MM-DD'),
         endDate: z.string().optional().describe('End date YYYY-MM-DD (defaults to start date)'),
         scope: z.string().optional().describe('Scope / work description'),
@@ -408,6 +410,13 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
         }
 
         const jobNumber = `QA-${new Date().getFullYear()}-${Math.floor(100000 + Math.random() * 900000)}`;
+        // The pending queue shows "Submitted by {salesman_name}" — stamp the
+        // logged-in creator so voice tickets never read "Unknown".
+        const { data: creator } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', userId)
+          .maybeSingle();
         const { data: job, error } = await supabaseAdmin
           .from('job_orders')
           .insert({
@@ -425,6 +434,7 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
             location: address || null,
             foreman_name: contactName || null,
             foreman_phone: contactPhone || null,
+            salesman_name: creator?.full_name || null,
             created_by: userId,
             created_via: 'artifex',
             missing_info_items: ['equipment_needed', 'jobsite_conditions', 'permits', 'full_scope'],

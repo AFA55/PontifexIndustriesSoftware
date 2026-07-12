@@ -867,6 +867,20 @@ export default function Dashboard() {
               <p className="text-sm text-white/90 font-semibold mt-1">Hours Today</p>
             </div>
           </div>
+
+          {/* Artifex for the field — voice assistant scoped to THEIR jobs only */}
+          <div className="flex justify-center mt-4">
+            <Link
+              href="/dashboard/command-center"
+              className="flex min-h-[48px] items-center gap-2.5 rounded-full border border-sky-400/30 bg-gradient-to-r from-[#0EA5E9]/15 to-[#DC2626]/15 px-6 text-sm font-bold text-sky-700 dark:text-sky-200 shadow-md transition-transform hover:scale-[1.03]"
+            >
+              <span className="relative flex h-3 w-3">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-60" />
+                <span className="relative inline-flex h-3 w-3 rounded-full bg-gradient-to-br from-sky-400 to-red-500" />
+              </span>
+              Talk to Artifex
+            </Link>
+          </div>
         </div>
 
         {/* Clock Message */}

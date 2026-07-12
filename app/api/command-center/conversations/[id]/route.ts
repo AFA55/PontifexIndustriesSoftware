@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
 
-  if (!COMMAND_CENTER_ROLES.includes(auth.role)) {
+  if (![...COMMAND_CENTER_ROLES, 'operator', 'apprentice'].includes(auth.role)) {
     return NextResponse.json(
       { error: 'Forbidden. Command Center access required.' },
       { status: 403 }
@@ -68,7 +68,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   const auth = await requireAuth(request);
   if (!auth.authorized) return auth.response;
 
-  if (!COMMAND_CENTER_ROLES.includes(auth.role)) {
+  if (![...COMMAND_CENTER_ROLES, 'operator', 'apprentice'].includes(auth.role)) {
     return NextResponse.json(
       { error: 'Forbidden. Command Center access required.' },
       { status: 403 }
