@@ -297,6 +297,16 @@ export default function ArtifexChat({
           )}
         </div>
 
+        {voice.pendingAudio && (
+          <button
+            type="button"
+            onClick={voice.playPendingAudio}
+            className="flex min-h-[44px] items-center gap-2 rounded-full border border-sky-400/50 bg-sky-500/10 px-5 text-sm font-semibold text-sky-700 shadow-sm transition-colors hover:bg-sky-500/20 dark:text-sky-200 animate-pulse"
+          >
+            <Volume2 className="h-4 w-4" /> Tap to hear the reply
+          </button>
+        )}
+
         {/* Controls: transcript · MIC (hero) · voice toggle */}
         <div className="flex items-center gap-5">
           <button

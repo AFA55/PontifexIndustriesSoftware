@@ -53,6 +53,9 @@ export function useArtifexVoice() {
   const [speaking, setSpeaking] = useState(false);
   const [listening, setListening] = useState(false);
   const [micSupported, setMicSupported] = useState(false);
+  // Set when the browser BLOCKED autoplay of a finished reply — the UI shows
+  // a "tap to hear" button; tapping plays inside a fresh gesture (always allowed).
+  const [pendingAudio, setPendingAudio] = useState<HTMLAudioElement | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
 
@@ -129,6 +132,7 @@ export function useArtifexVoice() {
         return;
       }
       stopSpeaking();
+      setPendingAudio(null);
       try {
         const { data } = await supabase.auth.getSession();
         const token = data.session?.access_token;
@@ -190,7 +194,17 @@ export function useArtifexVoice() {
         startAmplitudeLoop();
         audio.onended = finish;
         audio.onerror = finish;
-        await audio.play().catch(() => finish());
+        try {
+          await audio.play();
+        } catch (playErr) {
+          // Autoplay blocked (Chrome gesture/engagement policy). Don't fail
+          // silently — park the audio and let the UI offer a tap-to-play.
+          console.warn('[artifex-voice] autoplay blocked — offering tap-to-play:', playErr);
+          stopAmplitudeLoop();
+          setSpeaking(false);
+          setPendingAudio(audio);
+          return; // finish() runs when the user taps play (or next turn clears it)
+        }
       } catch {
         stopAmplitudeLoop();
         setSpeaking(false);
@@ -199,6 +213,15 @@ export function useArtifexVoice() {
     },
     [stopSpeaking, stopAmplitudeLoop, startAmplitudeLoop, ttsAvailable]
   );
+
+  const playPendingAudio = useCallback(() => {
+    const audio = pendingAudio;
+    if (!audio) return;
+    setPendingAudio(null);
+    setSpeaking(true);
+    startAmplitudeLoop();
+    audio.play().catch(() => setSpeaking(false));
+  }, [pendingAudio, startAmplitudeLoop]);
 
   const startListening = useCallback(
     (onTranscript: (text: string) => void) => {
@@ -240,6 +263,8 @@ export function useArtifexVoice() {
     startListening,
     stopListening,
     unlockAudio,
+    pendingAudio: pendingAudio != null,
+    playPendingAudio,
   };
 }
 

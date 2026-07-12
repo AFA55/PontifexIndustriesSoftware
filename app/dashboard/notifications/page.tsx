@@ -11,7 +11,7 @@ import {
   ArrowLeft, Bell, BellOff, CheckCircle, AlertCircle, Clock,
   MessageSquare, Send, ChevronRight, CheckCheck, Loader2,
   CalendarDays, FileSignature, Receipt, Wrench, Truck,
-  AlertTriangle, RefreshCw,
+  AlertTriangle, RefreshCw, Trash2,
 } from 'lucide-react';
 
 interface Notification {
@@ -143,6 +143,33 @@ export default function NotificationsPage() {
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  const deleteOne = async (id: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ ids: [id] }),
+      });
+      setNotifications(prev => prev.filter(n => n.id !== id));
+    } catch { /* fail-soft */ }
+  };
+
+  const clearRead = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch('/api/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+        body: JSON.stringify({ clear_read: true }),
+      });
+      setNotifications(prev => prev.filter(n => !n.is_read));
+    } catch { /* fail-soft */ }
+  };
+
+  const readCount = notifications.filter(n => n.is_read).length;
   const unreadCount = notifications.filter(n => !n.is_read).length;
   const visible = filter === 'unread' ? notifications.filter(n => !n.is_read) : notifications;
 
@@ -177,6 +204,16 @@ export default function NotificationsPage() {
                 )}
               </h1>
             </div>
+            <div className="flex items-center gap-2">
+            {readCount > 0 && (
+              <button
+                onClick={clearRead}
+                className="flex items-center gap-2 px-3 py-2 min-h-[44px] bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/15 text-gray-600 dark:text-white/70 rounded-xl text-sm font-semibold transition-colors"
+              >
+                <Trash2 className="w-4 h-4" />
+                Clear read
+              </button>
+            )}
             {unreadCount > 0 && (
               <button
                 onClick={markAllRead}
@@ -187,6 +224,7 @@ export default function NotificationsPage() {
                 Mark all read
               </button>
             )}
+            </div>
           </div>
 
           {/* Filter toggle */}
@@ -256,6 +294,16 @@ export default function NotificationsPage() {
                     )}
                     <div className="flex items-center gap-3 mt-2">
                       <p className="text-xs text-gray-400 dark:text-white/40">{formatDate(notif.created_at)}</p>
+                      {notif.is_read && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); deleteOne(notif.id); }}
+                          aria-label="Delete notification"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-gray-400 hover:text-rose-600 dark:text-white/40 dark:hover:text-rose-400 transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" /> Delete
+                        </button>
+                      )}
                       {notif.action_url && (
                         <span className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-semibold">
                           Take action <ChevronRight className="w-3 h-3" />

@@ -58,3 +58,43 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE /api/notifications — delete the caller's OWN notifications.
+ * Body: { ids: string[] } to delete specific ones, or { clear_read: true }
+ * to sweep everything already read (founder ask Jul 12). Scoped to
+ * auth.userId — you can never delete another user's notifications.
+ */
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requireAuth(request);
+    if (!auth.authorized) return auth.response;
+
+    let body: any = {};
+    try { body = await request.json(); } catch { /* empty body ok for clear_read via ids check */ }
+
+    if (body?.clear_read === true) {
+      const { error } = await supabaseAdmin
+        .from('notifications')
+        .delete()
+        .eq('user_id', auth.userId)
+        .eq('is_read', true);
+      if (error) return NextResponse.json({ error: 'Failed to clear notifications' }, { status: 500 });
+      return NextResponse.json({ success: true });
+    }
+
+    const ids = Array.isArray(body?.ids) ? body.ids.filter((x: unknown) => typeof x === 'string').slice(0, 100) : [];
+    if (ids.length === 0) {
+      return NextResponse.json({ error: 'Provide ids[] or clear_read: true' }, { status: 400 });
+    }
+    const { error } = await supabaseAdmin
+      .from('notifications')
+      .delete()
+      .in('id', ids)
+      .eq('user_id', auth.userId);
+    if (error) return NextResponse.json({ error: 'Failed to delete notifications' }, { status: 500 });
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
