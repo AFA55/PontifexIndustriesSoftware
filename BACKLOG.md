@@ -128,10 +128,10 @@
       with the tenant app (currently dark-only), richer HUD chrome (Jarvis-reference sweep done),
       data-panel motion ("opening files" cards), voice picker. Phase 1 shipped: ambient 2nd-brain
       backdrop, speech-breathing orb, slot-filling brain, ARTIFEX identity + tile.
-- [ ] **Attendance tracker (Patriot codes: EA/UA/NCNS/STO/ML/FL/S/LE/T/V/W/NW/H/GD/WH)** —
-      `attendance_events` + `attendance_codes` migration, month-grid per-employee UI mirroring
-      their paper sheet, monthly/quarterly/yearly rollups, auto-derive T/V/STO/H, Artifex
-      `get_attendance_summary` tool. Full spec in the plan doc.
+- [x] ~~**Attendance tracker (Patriot codes)**~~ — ✅ SHIPPED Jul 12 (`db978d6c`): attendance_events
+      + 15-code set, Attendance Calendar tab (month grid, click-to-mark, auto worked/late/time-off
+      overlays), codes roll into the annual Pull Report. Remaining follow-ups: Artifex
+      `get_attendance_summary` tool + tenant-custom codes + holiday auto-derive (H).
 - [ ] **Payroll Worksheet page** — pay-period picker (tenant pay_schedule weekly|biweekly +
       anchor), exact Patriot column set, subsistence side table, CSV export for QuickBooks.
 - [ ] **iOS Build 8 (Face ID)** — founder: install from TestFlight, test Face ID on device →
