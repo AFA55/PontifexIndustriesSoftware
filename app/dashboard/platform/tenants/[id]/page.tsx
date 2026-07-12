@@ -377,25 +377,139 @@ function EditTenantModal({ tenant, onClose, onSaved, success, showError }: {
 }
 
 // ---------------------------------------------------------------------------
-// Billing tab — v1: deep-link to the subscription surface
+// Billing tab — v2: the tenant's billing state IN the hub (founder Jul 12:
+// "billing takes me to Patriot's page — I should be able to view and manage
+// that through the Pontifex dashboard"). Reads the same APIs the tenant
+// surface uses (super_admin passes ?tenantId=), no redirect required; the
+// tenant-side subscription page stays as a secondary deep link.
 // ---------------------------------------------------------------------------
 
 function BillingTab({ tenant }: { tenant: Tenant }) {
-  return (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-8 text-center">
-      <div className="w-12 h-12 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center mx-auto mb-4">
-        <CreditCard className="w-6 h-6 text-brand" />
+  const [sub, setSub] = useState<{
+    status: string; plan: string; periodEnd: string | null;
+    trialEndsAt: string | null; hasStripeCustomer: boolean; operatorCount: number;
+  } | null>(null);
+  const [usage, setUsage] = useState<{
+    aiCost: number; voiceCost: number; voiceChars: number; smsRawCost: number;
+    smsBilled: number; smsMargin: number; totalCost: number; month: string;
+  } | null>(null);
+  const [billingLoading, setBillingLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const headers = await getHeaders();
+        const [subRes, usageRes] = await Promise.allSettled([
+          fetch(`/api/billing/subscription?tenantId=${tenant.id}`, { headers }),
+          fetch('/api/admin/platform/usage', { headers }),
+        ]);
+        if (!cancelled && subRes.status === 'fulfilled' && subRes.value.ok) {
+          const json = await subRes.value.json();
+          if (json.success) setSub(json.data);
+        }
+        if (!cancelled && usageRes.status === 'fulfilled' && usageRes.value.ok) {
+          const json = await usageRes.value.json();
+          const row = (json.data?.tenants || []).find((t: any) => t.tenantId === tenant.id);
+          if (json.success && row) {
+            setUsage({
+              aiCost: row.aiCost, voiceCost: row.voiceCost, voiceChars: row.voiceChars,
+              smsRawCost: row.smsRawCost, smsBilled: row.smsBilled, smsMargin: row.smsMargin,
+              totalCost: row.totalCost, month: json.data.month,
+            });
+          }
+        }
+      } catch { /* cards render dashes */ } finally {
+        if (!cancelled) setBillingLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [tenant.id]);
+
+  const usd = (n: number | undefined, d = 2) => (n == null ? '—' : `$${n.toFixed(d)}`);
+  const dateStr = (iso: string | null | undefined) =>
+    iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
+  const statusChipCls =
+    sub?.status === 'active'
+      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+      : sub?.status === 'past_due' || sub?.status === 'canceled'
+        ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'
+        : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300';
+
+  if (billingLoading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <RefreshCw className="w-6 h-6 text-amber-500 animate-spin" />
       </div>
-      <h3 className="font-bold text-gray-900 dark:text-white mb-1">Subscription &amp; Billing</h3>
-      <p className="text-sm text-gray-500 dark:text-slate-400 mb-5 max-w-sm mx-auto">
-        Manage this tenant&rsquo;s plan, payment method, and invoices on the subscription surface.
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Subscription */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-brand" /> Subscription
+          </h3>
+          {sub && (
+            <span className={`px-2.5 py-1 text-[11px] font-bold uppercase rounded-full ${statusChipCls}`}>
+              {sub.status}
+            </span>
+          )}
+        </div>
+        {sub ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <BillingStat label="Plan" value={sub.plan} />
+            <BillingStat label="Period ends" value={dateStr(sub.periodEnd)} />
+            <BillingStat label="Trial ends" value={dateStr(sub.trialEndsAt)} />
+            <BillingStat label="Card on file" value={sub.hasStripeCustomer ? 'Yes' : 'No'} warn={!sub.hasStripeCustomer} />
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">No subscription data for this tenant yet.</p>
+        )}
+      </div>
+
+      {/* This month's usage — what we'd bill against */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
+        <h3 className="font-bold text-gray-900 dark:text-white mb-4">
+          Usage — {usage?.month ?? 'this month'}
+        </h3>
+        {usage ? (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+            <BillingStat label="AI (Artifex)" value={usd(usage.aiCost, 3)} />
+            <BillingStat label={`Voice · ${(usage.voiceChars / 1000).toFixed(1)}k chars`} value={usd(usage.voiceCost, 3)} />
+            <BillingStat label="SMS cost" value={usd(usage.smsRawCost, 3)} />
+            <BillingStat label="SMS billed / margin" value={`${usd(usage.smsBilled)} / ${usd(usage.smsMargin)}`} />
+            <BillingStat label="Total operating cost" value={usd(usage.totalCost, 3)} strong />
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400">No usage recorded for this tenant this month.</p>
+        )}
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs text-gray-400">
+          Payment methods and invoices live on Stripe via the tenant surface.
+        </p>
+        <Link
+          href={`/dashboard/admin/subscription?tenantId=${tenant.id}`}
+          className="inline-flex items-center gap-1.5 px-4 py-2 min-h-[40px] rounded-xl border border-gray-200 dark:border-slate-700 text-sm font-semibold text-gray-600 dark:text-slate-300 hover:border-brand hover:text-brand transition-colors"
+        >
+          Open tenant billing surface <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function BillingStat({ label, value, strong, warn }: { label: string; value: string; strong?: boolean; warn?: boolean }) {
+  return (
+    <div className="rounded-xl border border-gray-100 dark:border-slate-800 px-3 py-2.5">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">{label}</p>
+      <p className={`mt-1 text-sm capitalize ${strong ? 'font-black text-gray-900 dark:text-white' : warn ? 'font-bold text-rose-600 dark:text-rose-400' : 'font-bold text-gray-800 dark:text-slate-200'}`}>
+        {value}
       </p>
-      <Link
-        href={`/dashboard/admin/subscription?tenantId=${tenant.id}`}
-        className="inline-flex items-center gap-1.5 px-5 py-2.5 min-h-[44px] bg-brand hover:bg-brand-dark text-white rounded-xl text-sm font-semibold transition-colors"
-      >
-        Open Billing <ExternalLink className="w-4 h-4" />
-      </Link>
     </div>
   );
 }

@@ -143,6 +143,10 @@ export default function PlatformHubPage() {
   const [healthAlerts, setHealthAlerts] = useState<HealthAlert[] | null>(null);
   const [healthAlertsAvailable, setHealthAlertsAvailable] = useState(true);
   const [pendingPublish, setPendingPublish] = useState(0);
+  // This month's operating cost across all tenants (AI + voice + maps + SMS).
+  const [usageSummary, setUsageSummary] = useState<{
+    total: number; ai: number; voice: number; sms: number;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -150,12 +154,13 @@ export default function PlatformHubPage() {
 
     // All sources load in parallel; each fails soft so one missing
     // data source never blanks the whole cockpit.
-    const [tenantsRes, healthRes, feedbackRes, healthAlertsRes, publishRes] = await Promise.allSettled([
+    const [tenantsRes, healthRes, feedbackRes, healthAlertsRes, publishRes, usageRes] = await Promise.allSettled([
       fetch('/api/admin/tenants', { headers }),
       fetch('/api/admin/platform/health?limit=6', { headers }),
       fetch('/api/admin/feedback', { headers }),
       fetch('/api/admin/platform/health-alerts', { headers }),
       fetch('/api/hiring/publish-requests?status=pending', { headers }),
+      fetch('/api/admin/platform/usage', { headers }),
     ]);
 
     // Tenants
@@ -210,6 +215,23 @@ export default function PlatformHubPage() {
     } else {
       setHealthAlertsAvailable(false);
       setHealthAlerts([]);
+    }
+
+    // This-month usage rollup (founder: "still haven't seen usage" — surface
+    // it ON the cockpit, not only behind the AI & Usage link). Fail soft.
+    if (usageRes.status === 'fulfilled' && usageRes.value.ok) {
+      try {
+        const json = await usageRes.value.json();
+        if (json.success && json.data) {
+          const rows: any[] = json.data.tenants || [];
+          setUsageSummary({
+            total: Number(json.data.totals?.cost ?? 0),
+            ai: rows.reduce((s, t) => s + Number(t.aiCost || 0), 0),
+            voice: rows.reduce((s, t) => s + Number(t.voiceCost || 0), 0),
+            sms: rows.reduce((s, t) => s + Number(t.smsRawCost || 0), 0),
+          });
+        }
+      } catch { /* tile just hides */ }
     }
 
     // Pending ad publish requests (hiring approval-queue badge — fail soft)
@@ -335,6 +357,22 @@ export default function PlatformHubPage() {
               : 'health-checks offline'
           }
         />
+        {/* Founder: "still haven't seen usage" — the month's AI/voice/SMS cost
+            lives on the cockpit itself now; click through for the per-tenant
+            breakdown. */}
+        <Link href="/dashboard/platform/usage" className="block">
+          <KpiTile
+            icon={CircuitBoard}
+            label="AI & Usage (This Month)"
+            value={usageSummary ? `$${usageSummary.total.toFixed(2)}` : '—'}
+            accent="bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"
+            sub={
+              usageSummary
+                ? `AI $${usageSummary.ai.toFixed(2)} · Voice $${usageSummary.voice.toFixed(2)} · SMS $${usageSummary.sms.toFixed(2)}`
+                : 'tap for breakdown'
+            }
+          />
+        </Link>
       </div>
 
       {/* ---------------------------------------------------------------- */}
