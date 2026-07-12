@@ -387,7 +387,7 @@ function EditTenantModal({ tenant, onClose, onSaved, success, showError }: {
 function BillingTab({ tenant }: { tenant: Tenant }) {
   const [sub, setSub] = useState<{
     status: string; plan: string; periodEnd: string | null;
-    trialEndsAt: string | null; hasStripeCustomer: boolean; operatorCount: number;
+    trialEndsAt: string | null; hasStripeCustomer: boolean; hasUsageCard?: boolean; operatorCount: number;
   } | null>(null);
   const [usage, setUsage] = useState<{
     aiCost: number; voiceCost: number; voiceChars: number; smsRawCost: number;
@@ -463,7 +463,11 @@ function BillingTab({ tenant }: { tenant: Tenant }) {
             <BillingStat label="Plan" value={sub.plan} />
             <BillingStat label="Period ends" value={dateStr(sub.periodEnd)} />
             <BillingStat label="Trial ends" value={dateStr(sub.trialEndsAt)} />
-            <BillingStat label="Card on file" value={sub.hasStripeCustomer ? 'Yes' : 'No'} warn={!sub.hasStripeCustomer} />
+            <BillingStat
+              label="Usage card on file"
+              value={sub.hasUsageCard ? 'Yes' : 'No'}
+              warn={!sub.hasUsageCard}
+            />
           </div>
         ) : (
           <p className="text-sm text-gray-400">No subscription data for this tenant yet.</p>

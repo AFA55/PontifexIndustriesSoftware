@@ -26,12 +26,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
     }
 
-    // Count operators for this tenant
-    const { count: operatorCount } = await supabaseAdmin
-      .from('profiles')
-      .select('id', { count: 'exact', head: true })
-      .eq('tenant_id', tenantId)
-      .in('role', ['operator', 'apprentice']);
+    // Count operators + the USAGE card (hiring_billing is where the
+    // card-on-file for ad/SMS/usage charges actually lives — the tenants
+    // stripe_customer_id is only the SaaS-subscription customer, so checking
+    // it alone reports "no card" even after one was saved).
+    const [{ count: operatorCount }, { data: usageBilling }] = await Promise.all([
+      supabaseAdmin
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', tenantId)
+        .in('role', ['operator', 'apprentice']),
+      supabaseAdmin
+        .from('hiring_billing')
+        .select('stripe_customer_id, default_payment_method')
+        .eq('tenant_id', tenantId)
+        .maybeSingle(),
+    ]);
 
     return NextResponse.json({
       success: true,
@@ -40,7 +50,9 @@ export async function GET(request: NextRequest) {
         plan: (tenant.subscription_plan as string) ?? 'starter',
         periodEnd: tenant.subscription_period_end as string | null,
         trialEndsAt: tenant.trial_ends_at as string | null,
-        hasStripeCustomer: !!(tenant.stripe_customer_id as string | null),
+        hasStripeCustomer:
+          !!(tenant.stripe_customer_id as string | null) || !!usageBilling?.stripe_customer_id,
+        hasUsageCard: !!usageBilling?.default_payment_method,
         operatorCount: operatorCount ?? 0,
       },
     });
