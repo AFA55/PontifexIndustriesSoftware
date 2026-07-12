@@ -136,6 +136,19 @@ function LoginPageInner() {
     return () => { cancelled = true; };
   }, [router]);
 
+  // STICKY "Remember me" (founder bug Jul 11): the checkbox used to reset to
+  // unchecked on every visit, so the NEXT login silently overwrote the flag to
+  // 'false' and the session stopped surviving restarts. Restore the user's
+  // last choice on mount — desktop office staff check it once, it stays.
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('pontifex.rememberMe') === 'true') {
+        setValue('remember', true);
+      }
+    } catch { /* storage unavailable — leave unchecked */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Fetch branding for the specific tenant from the URL param
   useEffect(() => {
     if (!tenantId) return;
@@ -188,7 +201,7 @@ function LoginPageInner() {
 
   const { register, handleSubmit, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { remember: false }, // "Remember me" unchecked by default — user opts in
+    defaultValues: { remember: false }, // overwritten on mount from the stored preference (sticky)
   });
 
   // Remember the last username on this device so the email field is pre-filled
@@ -271,6 +284,7 @@ function LoginPageInner() {
         name: result.user.full_name,
         email: result.user.email,
         role: result.user.role,
+        tenant_id: result.user.tenant_id ?? null,
       }));
       // Remember the username so the login form pre-fills it next time.
       try { localStorage.setItem('pontifex.lastEmail', data.email); } catch { /* non-fatal */ }

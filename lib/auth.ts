@@ -3,6 +3,8 @@ export interface User {
   name: string;
   email: string;
   role: string;
+  /** Set at login (Jul 11+). Used to keep platform-org users in the Platform Hub. */
+  tenant_id?: string | null;
 }
 
 export const getCurrentUser = (): User | null => {

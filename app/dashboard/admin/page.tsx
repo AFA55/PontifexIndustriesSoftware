@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
-import { ADMIN_DASHBOARD_ROLES, COMMAND_CENTER_ROLES } from '@/lib/rbac';
+import { ADMIN_DASHBOARD_ROLES, COMMAND_CENTER_ROLES, PLATFORM_TENANT_ID } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
 import CommissionsCard from '@/components/CommissionsCard';
 import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
@@ -433,6 +433,14 @@ export default function AdminDashboard() {
 
     if (!ADMIN_DASHBOARD_ROLES.includes(currentUser.role)) {
       router.push('/dashboard');
+      return;
+    }
+
+    // Platform-org users (Pontifex Industries itself) run the business from
+    // the Platform Hub — the tenant ops dashboard is meaningless for them and
+    // showing it reads as a bug (founder, Jul 11: back button landed here).
+    if (currentUser.tenant_id === PLATFORM_TENANT_ID) {
+      router.replace('/dashboard/platform');
       return;
     }
 

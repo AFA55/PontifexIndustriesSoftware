@@ -311,6 +311,11 @@ export const ADMIN_DASHBOARD_ROLES = ['admin', 'super_admin', 'salesman', 'opera
 // guard, and the overview API gate so UI visibility and data access agree.
 export const COMMAND_CENTER_ROLES = [...ADMIN_DASHBOARD_ROLES];
 
+// The Pontifex Industries PLATFORM org (company code PONTIFEX). Its users run
+// the business from the Platform Hub — the tenant ops dashboard (schedule
+// board, timecards, ...) is meaningless for it and redirects away.
+export const PLATFORM_TENANT_ID = 'b27d9ca5-1352-42f2-b7e1-25254c09fa6f';
+
 // ============================================================
 // Role rank (privilege order) — used to gate invitations so an inviter
 // can never create a user with a role >= their own. Higher number = more
