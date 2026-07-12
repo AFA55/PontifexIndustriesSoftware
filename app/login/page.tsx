@@ -127,6 +127,15 @@ function LoginPageInner() {
         const remember = localStorage.getItem('pontifex.rememberMe') === 'true';
         const storedUser = localStorage.getItem('supabase-user');
         if (!remember || !storedUser) return;
+        // TENANT-CONTEXT GUARD (founder Jul 12): this is COMPANY X's login
+        // page — a remembered session from a DIFFERENT org must not hijack
+        // the visit into its own dashboard (his Pontifex-owner session was
+        // warping "log into Patriot" straight to the Platform Hub). On a
+        // mismatch (or an old blob with no tenant_id to verify) show the
+        // form: the user is here to sign in as someone else.
+        let storedTenant: string | null = null;
+        try { storedTenant = JSON.parse(storedUser)?.tenant_id ?? null; } catch { /* treat as unverifiable */ }
+        if (!storedTenant || storedTenant !== tenantId) return;
         const { data: { session } } = await supabase.auth.getSession();
         if (!cancelled && session) router.replace('/dashboard');
       } catch {

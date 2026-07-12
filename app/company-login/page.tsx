@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import { Building2, ArrowRight, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { PLATFORM_TENANT_ID } from '@/lib/rbac';
 import SplashIntro from '@/components/SplashIntro';
 
 /**
@@ -37,6 +38,14 @@ function readLastCompany(): LastCompany | null {
   return null;
 }
 
+function PontifexLogoMark() {
+  return (
+    <svg viewBox="0 0 200 200" className="w-5 h-5 shrink-0" fill="none" stroke="#ffffff" strokeWidth="18" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path transform="translate(-5,-2)" d="M70,160 L70,44 L108,44 A32 32 0 0 1 108,108 L70,108" />
+    </svg>
+  );
+}
+
 function PontifexLogo() {
   return (
     <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-sm">
@@ -64,6 +73,9 @@ function CompanyLoginContent() {
   const [lastCompany, setLastCompany] = useState<LastCompany | null>(null);
   const [view, setView] = useState<'pending' | 'resuming' | 'fast' | 'form'>('pending');
   const [continuing, setContinuing] = useState(false);
+  // A remembered PLATFORM-ORG (Pontifex owner) session: entry into the owner
+  // console requires an explicit click, never a silent forward.
+  const [platformSession, setPlatformSession] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +109,24 @@ function CompanyLoginContent() {
         const { data: { session } } = await supabase.auth.getSession();
         if (cancelled) return;
         if (session) {
+          // PLATFORM-ORG sessions never silently forward (founder Jul 12:
+          // "no one should just automatically get into Pontifex"). The owner
+          // console is entered by an explicit click; tenant users keep the
+          // silent remember-me resume their office staff rely on.
+          let storedTenant: string | null = null;
+          let storedRole: string | null = null;
+          try {
+            const blob = JSON.parse(storedUser);
+            storedTenant = blob?.tenant_id ?? null;
+            storedRole = blob?.role ?? null;
+          } catch { /* unverifiable */ }
+          // Platform org OR any super_admin (super_admins role-route to the
+          // hub) — both doors into the owner console stay click-to-enter.
+          if (storedTenant === PLATFORM_TENANT_ID || storedRole === 'super_admin') {
+            setPlatformSession(true);
+            showEntry();
+            return;
+          }
           setView('resuming');
           router.replace('/dashboard');
           return;
@@ -237,6 +267,21 @@ function CompanyLoginContent() {
               <Loader2 className="w-7 h-7 text-violet-400 animate-spin" />
               <p className="text-slate-300 text-sm font-medium">Signing you back in…</p>
             </div>
+          )}
+
+          {/* Remembered PLATFORM-OWNER session: explicit, labeled entry into
+              the owner console — never a silent forward. Rendered above the
+              company fast-path so the founder can still pick either door. */}
+          {platformSession && view !== 'resuming' && (
+            <button
+              type="button"
+              onClick={() => { setView('resuming'); router.replace('/dashboard/platform'); }}
+              className="mb-3 w-full min-h-[56px] py-4 px-5 rounded-xl border border-white/25 bg-white/10 hover:bg-white/15 text-white font-bold text-sm tracking-wide flex items-center justify-center gap-3 transition-all"
+            >
+              <PontifexLogoMark />
+              <span className="leading-snug">Continue to Pontifex Platform Hub</span>
+              <ArrowRight className="w-4 h-4 shrink-0" />
+            </button>
           )}
 
           {/* Fast path — returning user: one tap back to their company's login */}
