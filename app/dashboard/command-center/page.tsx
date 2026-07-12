@@ -24,6 +24,8 @@ import { getCurrentUser, type User } from '@/lib/auth';
 import { formatTime } from '@/lib/dates';
 import { COMMAND_CENTER_ROLES } from '@/lib/rbac';
 import { useArtifexVoice } from '@/lib/use-artifex-voice';
+import { useTheme } from '@/contexts/ThemeContext';
+import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import NeuralBrain, { type NeuralBrainState } from '@/components/command-center/NeuralBrain';
 import ArtifexAmbient from '@/components/command-center/ArtifexAmbient';
 import ArtifexChat, { type ArtifexConversationSummary } from '@/components/command-center/ArtifexChat';
@@ -69,6 +71,7 @@ export default function CommandCenterPage() {
   // orb can read the live ElevenLabs amplitude; the transcript panel is the
   // background surface, toggled on demand.
   const voice = useArtifexVoice();
+  const { theme } = useTheme();
   const [transcriptOpen, setTranscriptOpen] = useState(false);
   // The orb BREATHES with the voice (founder: "move and size up and down when
   // speaking") — a rAF loop scales the wrapper from the live amplitude ref.
@@ -205,7 +208,7 @@ export default function CommandCenterPage() {
 
   if (!authChecked || !user) {
     return (
-      <div className="flex h-full w-full items-center justify-center bg-[#030208]">
+      <div className="flex h-full w-full items-center justify-center bg-slate-100 dark:bg-[#070B14]">
         <NeuralBrain state="thinking" size={120} />
       </div>
     );
@@ -224,40 +227,41 @@ export default function CommandCenterPage() {
   return (
     <div className="relative flex h-full w-full flex-col">
       {/* 2nd-brain ambience — connecting dots behind the whole room */}
-      <ArtifexAmbient className="z-0" />
+      <ArtifexAmbient className="z-0" mode={theme === 'dark' ? 'dark' : 'light'} />
       {/* ── Top bar ───────────────────────────────────────────────────────── */}
-      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
+      <header className="relative z-10 flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 dark:border-white/10 px-4 py-3 sm:px-6">
         <div className="flex items-center gap-3">
           <Link
             href="/dashboard/admin"
             aria-label="Back to dashboard"
-            className="flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white/70 dark:hover:bg-white/10 dark:hover:text-white"
           >
             <ChevronLeft className="h-5 w-5" />
           </Link>
           <div className="flex items-center gap-2.5">
             <NeuralBrain state="idle" size={28} />
-            <h1 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/90 sm:text-base">
-              Artifex <span className="text-white/40 normal-case tracking-normal text-xs sm:text-sm">by Pontifex</span>
+            <h1 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-900 dark:text-white/90 sm:text-base">
+              Artifex <span className="text-slate-400 dark:text-white/40 normal-case tracking-normal text-xs sm:text-sm">by Pontifex</span>
             </h1>
           </div>
         </div>
         <div className="flex items-center gap-3 text-right">
+          <DarkModeIconToggle />
           <button
             type="button"
             onClick={() => setFocusMode((v) => !v)}
             aria-label={focusMode ? 'Exit focus mode' : 'Enter focus mode'}
             title={focusMode ? 'Exit focus mode' : 'Focus mode (for demos)'}
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-white/5 dark:text-white/50 dark:hover:bg-white/10 dark:hover:text-white"
           >
             {focusMode ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
-          <Clock className="hidden h-4 w-4 text-sky-300/70 sm:block" />
+          <Clock className="hidden h-4 w-4 text-sky-600 dark:text-sky-300/70 sm:block" />
           <div className="leading-tight">
-            <div className="font-mono text-sm font-semibold tabular-nums text-white sm:text-base">
+            <div className="font-mono text-sm font-semibold tabular-nums text-slate-900 dark:text-white sm:text-base">
               {clockTime}
             </div>
-            <div className="text-[11px] uppercase tracking-wide text-white/40">{clockDate}</div>
+            <div className="text-[11px] uppercase tracking-wide text-slate-400 dark:text-white/40">{clockDate}</div>
           </div>
         </div>
       </header>
@@ -267,6 +271,13 @@ export default function CommandCenterPage() {
         {/* CENTER — reactor first in DOM so it stacks on TOP on mobile */}
         <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-6">
           <div ref={orbWrapRef} className="relative flex items-center justify-center will-change-transform">
+            {/* Reactor bezel — an always-dark housing so the orb art reads
+                perfectly on the light theme too (device-in-a-clean-room look). */}
+            <div
+              aria-hidden
+              className="absolute rounded-full bg-[radial-gradient(circle_at_50%_42%,#0E1626_0%,#070B14_62%,rgba(7,11,20,0.0)_100%)] ring-1 ring-slate-300/70 shadow-[inset_0_2px_18px_rgba(0,0,0,0.55),0_18px_50px_-20px_rgba(2,6,17,0.45)] dark:ring-white/10 dark:shadow-none"
+              style={{ width: reactorSize + 36, height: reactorSize + 36 }}
+            />
             <NeuralBrain
               state={chatReactorState}
               size={reactorSize}
@@ -301,12 +312,12 @@ export default function CommandCenterPage() {
               <button
                 type="button"
                 onClick={() => setTranscriptOpen(false)}
-                className="mt-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-400/70 transition-colors hover:text-sky-200"
+                className="mt-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-500 transition-colors hover:text-sky-700 dark:text-slate-400/70 dark:hover:text-sky-200"
               >
                 Back to voice
               </button>
             ) : (
-              <p className="mt-4 text-center text-[10px] uppercase tracking-[0.25em] text-slate-500/60">
+              <p className="mt-4 text-center text-[10px] uppercase tracking-[0.25em] text-slate-400 dark:text-slate-500/60">
                 {asOfLabel}
               </p>
             )}
@@ -317,9 +328,9 @@ export default function CommandCenterPage() {
         {!focusMode && (
           <nav
             aria-label="Management"
-            className="order-2 shrink-0 border-t border-white/10 px-4 py-5 lg:order-1 lg:w-64 lg:border-r lg:border-t-0 lg:px-4 lg:py-6"
+            className="order-2 shrink-0 border-t border-slate-200 dark:border-white/10 px-4 py-5 lg:order-1 lg:w-64 lg:border-r lg:border-t-0 lg:px-4 lg:py-6"
           >
-            <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+            <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-white/35">
               Management
             </p>
             <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-1">
@@ -327,7 +338,7 @@ export default function CommandCenterPage() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="group flex min-h-[44px] items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3.5 py-3 text-sm text-white/75 transition-all hover:border-sky-400/40 hover:bg-white/[0.07] hover:text-white"
+                    className="group flex min-h-[44px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-600 shadow-sm transition-all hover:border-sky-400/60 hover:text-slate-900 dark:border-white/10 dark:bg-white/[0.03] dark:text-white/75 dark:shadow-none dark:hover:bg-white/[0.07] dark:hover:text-white artifex-panel-in"
                   >
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-[#0EA5E9]/20 to-[#DC2626]/25 text-sky-200 transition-colors group-hover:from-[#0EA5E9]/40 group-hover:to-[#DC2626]/45">
                       <Icon className="h-4 w-4" />
@@ -344,9 +355,9 @@ export default function CommandCenterPage() {
         {!focusMode && (
           <aside
             aria-label="Live metrics"
-            className="order-3 shrink-0 border-t border-white/10 px-4 py-5 lg:w-72 lg:border-l lg:border-t-0 lg:px-4 lg:py-6"
+            className="order-3 shrink-0 border-t border-slate-200 dark:border-white/10 px-4 py-5 lg:w-72 lg:border-l lg:border-t-0 lg:px-4 lg:py-6"
           >
-            <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">
+            <p className="mb-3 px-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-white/35">
               Live
             </p>
             <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
@@ -404,22 +415,22 @@ function MetricCard({
   loading: boolean;
 }) {
   return (
-    <div className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-white/[0.03] dark:shadow-none artifex-panel-in">
       <div className="flex items-center gap-2">
         <span
           className={`flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br ${accent} text-white/90`}
         >
           <Icon className="h-3.5 w-3.5" />
         </span>
-        <span className="text-[11px] font-medium uppercase tracking-wide text-white/45">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400 dark:text-white/45">
           {label}
         </span>
       </div>
       <div className="mt-2.5">
         {loading && value === null ? (
-          <div className="h-7 w-16 animate-pulse rounded bg-white/10" />
+          <div className="h-7 w-16 animate-pulse rounded bg-slate-200 dark:bg-white/10" />
         ) : (
-          <span className="font-mono text-2xl font-semibold tabular-nums text-white">
+          <span className="font-mono text-2xl font-semibold tabular-nums text-slate-900 dark:text-white">
             {value ?? '—'}
           </span>
         )}

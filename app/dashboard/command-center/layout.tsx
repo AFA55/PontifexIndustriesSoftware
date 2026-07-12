@@ -8,8 +8,10 @@
  * renders no visible chrome. This wrapper just pins the scene to the full viewport
  * with the deep-indigo HUD background.
  *
- * Intentional dark HUD: the background is hardcoded brand indigo and does NOT
- * follow light/dark mode — the command center is always dark.
+ * Theme parity (founder P1, Jul 12): the room follows the app's light/dark
+ * toggle. Light = clean-room slate (panels read like the admin app); dark =
+ * midnight-steel HUD. The orb sits in an always-dark reactor bezel so the
+ * canvas art works on both.
  */
 export default function CommandCenterLayout({
   children,
@@ -17,7 +19,7 @@ export default function CommandCenterLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] overflow-hidden bg-[#0d0820] text-white">
+    <div className="fixed inset-0 z-[60] overflow-hidden bg-slate-100 text-slate-900 dark:bg-[#070B14] dark:text-white">
       {children}
     </div>
   );

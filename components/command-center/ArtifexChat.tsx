@@ -272,7 +272,7 @@ export default function ArtifexChat({
     return (
       <div className="flex w-full max-w-xl flex-col items-center gap-4">
         {/* Status line — the HUD readout under the orb */}
-        <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-sky-300/60" aria-live="polite">
+        <p className="font-mono text-[11px] uppercase tracking-[0.35em] text-sky-700/80 dark:text-sky-300/60" aria-live="polite">
           {statusLine}
           {(voice.listening || busy) && <span className="animate-pulse">…</span>}
         </p>
@@ -280,18 +280,18 @@ export default function ArtifexChat({
         {/* Caption — what was said / the spoken reply, so the orb "talks" visibly */}
         <div className="min-h-[3.5rem] w-full text-center">
           {error ? (
-            <p className="text-sm text-red-300/90">Artifex hit an error. Try again in a moment.</p>
+            <p className="text-sm text-red-600 dark:text-red-300/90">Artifex hit an error. Try again in a moment.</p>
           ) : assistantText ? (
             <>
               {userText && (
-                <p className="mb-1 truncate text-xs text-slate-400/80">“{userText}”</p>
+                <p className="mb-1 truncate text-xs text-slate-500 dark:text-slate-400/80">“{userText}”</p>
               )}
-              <p className="mx-auto max-w-lg text-[15px] leading-relaxed text-slate-100/95 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">
+              <p className="mx-auto max-w-lg text-[15px] leading-relaxed text-slate-800 dark:text-slate-100/95 [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">
                 {assistantText}
               </p>
             </>
           ) : (
-            <p className="text-sm text-slate-400/70">
+            <p className="text-sm text-slate-500 dark:text-slate-400/70">
               {voice.micSupported ? 'Tap the mic and talk to Artifex.' : 'Open the transcript to type to Artifex.'}
             </p>
           )}
@@ -304,7 +304,7 @@ export default function ArtifexChat({
             onClick={onOpenTranscript}
             aria-label="Open transcript"
             title="Transcript & typing"
-            className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-500/25 bg-slate-500/[0.08] text-slate-300/70 transition-colors hover:border-sky-400/40 hover:text-sky-200"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-500 shadow-sm transition-colors hover:border-sky-500/60 hover:text-sky-700 dark:border-slate-500/25 dark:bg-slate-500/[0.08] dark:text-slate-300/70 dark:shadow-none dark:hover:border-sky-400/40 dark:hover:text-sky-200"
           >
             <MessageSquare className="h-4 w-4" />
           </button>
@@ -346,7 +346,7 @@ export default function ArtifexChat({
               className={`flex h-11 w-11 items-center justify-center rounded-full border transition-colors ${
                 voiceOn
                   ? 'border-red-400/40 bg-red-500/10 text-red-300'
-                  : 'border-slate-500/25 bg-slate-500/[0.08] text-slate-400/70 hover:text-slate-200'
+                  : 'border-slate-300 bg-white text-slate-400 shadow-sm hover:text-slate-700 dark:border-slate-500/25 dark:bg-slate-500/[0.08] dark:text-slate-400/70 dark:shadow-none dark:hover:text-slate-200'
               } ${voice.speaking ? 'animate-pulse' : ''}`}
             >
               {voiceOn ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
@@ -361,7 +361,7 @@ export default function ArtifexChat({
 
   // ── PANEL variant — full transcript ──────────────────────────────────────
   return (
-    <div className="flex w-full max-w-3xl overflow-hidden rounded-2xl border border-sky-400/15 bg-[#050B16]/80 shadow-[0_0_60px_-15px_rgba(56,189,248,0.25)] backdrop-blur-xl">
+    <div className="flex w-full max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white/95 shadow-xl backdrop-blur-xl dark:border-sky-400/15 dark:bg-[#050B16]/80 dark:shadow-[0_0_60px_-15px_rgba(56,189,248,0.25)]">
       {hasHistory && (
         <ConversationSidebar
           open={historyOpen}
@@ -373,7 +373,7 @@ export default function ArtifexChat({
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex items-center justify-between gap-2 border-b border-white/[0.06] px-3 py-2 sm:px-4">
+        <div className="flex items-center justify-between gap-2 border-b border-slate-200 dark:border-white/[0.06] px-3 py-2 sm:px-4">
           <div className="flex items-center gap-2">
             {hasHistory && (
               <button
@@ -381,12 +381,12 @@ export default function ArtifexChat({
                 onClick={() => setHistoryOpen((v) => !v)}
                 aria-label={historyOpen ? 'Hide conversation history' : 'Show conversation history'}
                 aria-expanded={historyOpen}
-                className="flex h-9 w-9 items-center justify-center rounded-lg text-white/40 transition-colors hover:bg-white/[0.06] hover:text-white/80"
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:text-white/40 dark:hover:bg-white/[0.06] dark:hover:text-white/80"
               >
                 {historyOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
               </button>
             )}
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-200/40">Artifex Transcript</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-sky-700/60 dark:text-sky-200/40">Artifex Transcript</span>
             {voice.ttsAvailable !== false && (
               <button
                 type="button"
@@ -405,7 +405,7 @@ export default function ArtifexChat({
             <button
               type="button"
               onClick={onNewConversation}
-              className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-white/50 transition-colors hover:bg-white/[0.06] hover:text-white/90"
+              className="flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:text-white/50 dark:hover:bg-white/[0.06] dark:hover:text-white/90"
             >
               <MessageSquarePlus className="h-3.5 w-3.5" />
               New chat
@@ -415,10 +415,10 @@ export default function ArtifexChat({
 
         <div ref={scrollRef} className="flex max-h-[42vh] min-h-[160px] flex-col gap-3 overflow-y-auto px-4 py-4 sm:px-5">
           {historyLoading && (
-            <p className="text-center text-sm text-white/35">Loading conversation…</p>
+            <p className="text-center text-sm text-slate-400 dark:text-white/35">Loading conversation…</p>
           )}
           {!historyLoading && messages.length === 0 && (
-            <p className="text-center text-sm text-white/35">
+            <p className="text-center text-sm text-slate-400 dark:text-white/35">
               Ask Artifex about jobs, the team, hours, approvals — or have it create a job ticket.
             </p>
           )}
@@ -428,7 +428,7 @@ export default function ArtifexChat({
                 className={
                   message.role === 'user'
                     ? 'max-w-[85%] rounded-2xl rounded-br-sm bg-gradient-to-br from-[#DC2626] to-[#7F1D1D] px-4 py-2.5 text-sm text-white shadow-[0_2px_20px_-4px_rgba(220,38,38,0.5)]'
-                    : 'max-w-[85%] rounded-2xl rounded-bl-sm border border-white/[0.08] bg-white/[0.035] px-4 py-2.5 text-sm text-white/90'
+                    : 'max-w-[85%] rounded-2xl rounded-bl-sm border border-slate-200 bg-slate-100 px-4 py-2.5 text-sm text-slate-800 dark:border-white/[0.08] dark:bg-white/[0.035] dark:text-white/90'
                 }
               >
                 {message.parts.map((part, i) => {
@@ -445,7 +445,7 @@ export default function ArtifexChat({
                   return (
                     <div
                       key={i}
-                      className="my-1 flex items-center gap-1.5 text-xs text-sky-200/70 first:mt-0"
+                      className="my-1 flex items-center gap-1.5 text-xs text-sky-700/80 dark:text-sky-200/70 first:mt-0"
                     >
                       {done ? (
                         <CheckCircle2 className="h-3 w-3 text-emerald-400/80" />
@@ -466,13 +466,13 @@ export default function ArtifexChat({
           )}
         </div>
 
-        <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-white/[0.06] px-3 py-3 sm:px-4">
+        <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-slate-200 dark:border-white/[0.06] px-3 py-3 sm:px-4">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask Artifex…"
-            className="min-h-[44px] flex-1 rounded-xl border border-white/[0.08] bg-white/[0.04] px-4 text-sm text-white placeholder:text-white/30 focus:border-sky-400/50 focus:outline-none"
+            className="min-h-[44px] flex-1 rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-sky-500 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white dark:placeholder:text-white/30 dark:focus:border-sky-400/50 focus:outline-none"
           />
           {voice.micSupported && (
             <button
@@ -482,7 +482,7 @@ export default function ArtifexChat({
               className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                 voice.listening
                   ? 'border-sky-400/50 bg-sky-500/15 text-sky-300 animate-pulse'
-                  : 'border-white/[0.08] bg-white/[0.04] text-white/50 hover:text-white/85'
+                  : 'border-slate-300 bg-white text-slate-400 hover:text-slate-700 dark:border-white/[0.08] dark:bg-white/[0.04] dark:text-white/50 dark:hover:text-white/85'
               }`}
             >
               <Mic className="h-4 w-4" />
@@ -519,17 +519,17 @@ function ConversationSidebar({
 }) {
   return (
     <div
-      className={`shrink-0 overflow-hidden border-r border-white/[0.06] bg-white/[0.015] transition-[width] duration-200 ${
+      className={`shrink-0 overflow-hidden border-r border-slate-200 bg-slate-50 dark:border-white/[0.06] dark:bg-white/[0.015] transition-[width] duration-200 ${
         open ? 'w-48 sm:w-56' : 'w-0'
       }`}
     >
       <div className="flex h-full w-48 flex-col sm:w-56">
         <div className="flex items-center justify-between px-3 pt-3">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-white/35">History</span>
+          <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-400 dark:text-white/35">History</span>
         </div>
         <div className="flex-1 space-y-1 overflow-y-auto px-2 py-2">
           {conversations.length === 0 && (
-            <p className="px-2 py-4 text-center text-xs leading-relaxed text-white/30">
+            <p className="px-2 py-4 text-center text-xs leading-relaxed text-slate-400 dark:text-white/30">
               No conversations yet. Start one below.
             </p>
           )}
@@ -543,7 +543,7 @@ function ConversationSidebar({
                 className={`flex min-h-[40px] w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs transition-colors ${
                   active
                     ? 'bg-gradient-to-r from-[#DC2626]/25 to-[#38BDF8]/10 text-white'
-                    : 'text-white/55 hover:bg-white/[0.05] hover:text-white/85'
+                    : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-white/55 dark:hover:bg-white/[0.05] dark:hover:text-white/85'
                 }`}
               >
                 <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-60" />
@@ -553,11 +553,11 @@ function ConversationSidebar({
           })}
         </div>
         {onNewConversation && (
-          <div className="border-t border-white/[0.06] p-2">
+          <div className="border-t border-slate-200 dark:border-white/[0.06] p-2">
             <button
               type="button"
               onClick={onNewConversation}
-              className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-lg border border-white/[0.08] text-xs font-medium text-white/60 transition-colors hover:bg-white/[0.05] hover:text-white/90"
+              className="flex min-h-[40px] w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 dark:border-white/[0.08] dark:text-white/60 dark:hover:bg-white/[0.05] dark:hover:text-white/90"
             >
               <MessageSquarePlus className="h-3.5 w-3.5" />
               New chat

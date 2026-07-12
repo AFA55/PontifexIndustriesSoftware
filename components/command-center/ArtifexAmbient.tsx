@@ -17,10 +17,18 @@ import { useEffect, useRef } from 'react';
  * favor of O(n²) over 70 nodes (≈2.5k checks — trivial). Respects
  * prefers-reduced-motion (renders a single static frame).
  */
-export default function ArtifexAmbient({ className }: { className?: string }) {
+export default function ArtifexAmbient({
+  className,
+  mode = 'dark',
+}: {
+  className?: string;
+  /** light = deep-slate ink on the clean-room theme; dark = steel glow. */
+  mode?: 'light' | 'dark';
+}) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
+    const darkMode = mode === 'dark';
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -76,8 +84,8 @@ export default function ArtifexAmbient({ className }: { className?: string }) {
           const dy = nodes[i].y - nodes[j].y;
           const d2 = dx * dx + dy * dy;
           if (d2 < LINK_DIST * LINK_DIST) {
-            const alpha = 0.05 * (1 - Math.sqrt(d2) / LINK_DIST);
-            ctx.strokeStyle = `rgba(125, 211, 252, ${alpha})`;
+            const alpha = (darkMode ? 0.05 : 0.09) * (1 - Math.sqrt(d2) / LINK_DIST);
+            ctx.strokeStyle = darkMode ? `rgba(125, 211, 252, ${alpha})` : `rgba(51, 65, 85, ${alpha})`;
             ctx.lineWidth = 1;
             ctx.beginPath();
             ctx.moveTo(nodes[i].x, nodes[i].y);
@@ -116,7 +124,7 @@ export default function ArtifexAmbient({ className }: { className?: string }) {
         const x = nodes[p.a].x + (nodes[p.b].x - nodes[p.a].x) * p.t;
         const y = nodes[p.a].y + (nodes[p.b].y - nodes[p.a].y) * p.t;
         ctx.save();
-        ctx.fillStyle = 'rgba(255,255,255,0.9)';
+        ctx.fillStyle = darkMode ? 'rgba(255,255,255,0.9)' : 'rgba(2,132,199,0.95)';
         ctx.shadowColor = '#38BDF8';
         ctx.shadowBlur = 8;
         ctx.beginPath();
@@ -130,8 +138,8 @@ export default function ArtifexAmbient({ className }: { className?: string }) {
         ctx.save();
         const ignited = n.glow > 0.05;
         ctx.fillStyle = ignited
-          ? `rgba(186, 230, 253, ${0.5 + n.glow * 0.5})`
-          : 'rgba(125, 211, 252, 0.35)';
+          ? (darkMode ? `rgba(186, 230, 253, ${0.5 + n.glow * 0.5})` : `rgba(2, 132, 199, ${0.55 + n.glow * 0.45})`)
+          : (darkMode ? 'rgba(125, 211, 252, 0.35)' : 'rgba(71, 85, 105, 0.35)');
         if (ignited) {
           ctx.shadowColor = '#7DD3FC';
           ctx.shadowBlur = 10 * n.glow;
@@ -151,7 +159,7 @@ export default function ArtifexAmbient({ className }: { className?: string }) {
       if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('resize', resize);
     };
-  }, []);
+  }, [mode]);
 
   return (
     <canvas
