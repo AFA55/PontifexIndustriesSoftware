@@ -28,6 +28,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import NeuralBrain, { type NeuralBrainState } from '@/components/command-center/NeuralBrain';
 import ArtifexAmbient from '@/components/command-center/ArtifexAmbient';
+import ArtifexCanvas, { type CanvasActivity } from '@/components/command-center/ArtifexCanvas';
 import ArtifexChat, { type ArtifexConversationSummary } from '@/components/command-center/ArtifexChat';
 
 interface OverviewData {
@@ -93,6 +94,9 @@ export default function CommandCenterPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [chatReactorState, setChatReactorState] = useState<NeuralBrainState>('idle');
+  // Live co-pilot canvas — the latest tool call rendering as a document on
+  // the right while the orb slides left (founder Jul 12).
+  const [canvas, setCanvas] = useState<CanvasActivity | null>(null);
 
   // Conversation history — the "2nd brain" sidebar's list + selection state.
   const [conversations, setConversations] = useState<ArtifexConversationSummary[]>([]);
@@ -276,7 +280,8 @@ export default function CommandCenterPage() {
       <div className="relative z-10 flex min-h-0 flex-1 flex-col overflow-y-auto lg:flex-row lg:overflow-hidden">
         {/* CENTER — reactor first in DOM so it stacks on TOP on mobile */}
         <main className="order-1 flex flex-1 flex-col items-center justify-center px-4 py-8 lg:order-2 lg:py-6">
-          <div ref={orbWrapRef} className="relative flex items-center justify-center will-change-transform">
+          <div className={`flex w-full items-center justify-center gap-6 transition-all duration-500 ${canvas ? 'lg:justify-between lg:px-8' : ''}`}>
+          <div ref={orbWrapRef} className="relative flex shrink-0 items-center justify-center will-change-transform transition-transform duration-500">
             {/* Reactor bezel — an always-dark housing so the orb art reads
                 perfectly on the light theme too (device-in-a-clean-room look). */}
             <div
@@ -286,11 +291,23 @@ export default function CommandCenterPage() {
             />
             <NeuralBrain
               state={chatReactorState}
-              size={reactorSize}
+              size={canvas ? Math.round(reactorSize * 0.72) : reactorSize}
               getAmplitude={() => voice.amplitudeRef.current}
               className="drop-shadow-[0_0_44px_rgba(56,189,248,0.25)]"
             />
           </div>
+          {canvas && (
+            <div className="hidden lg:block">
+              <ArtifexCanvas activity={canvas} onClose={() => setCanvas(null)} />
+            </div>
+          )}
+          </div>
+          {/* Mobile: canvas below the orb */}
+          {canvas && (
+            <div className="mt-4 w-full px-2 lg:hidden">
+              <ArtifexCanvas activity={canvas} onClose={() => setCanvas(null)} />
+            </div>
+          )}
 
           <div className="mt-5 flex w-full flex-col items-center px-2">
             <ArtifexChat
@@ -313,6 +330,7 @@ export default function CommandCenterPage() {
                 setActiveConversationId(id);
                 loadConversations();
               }}
+              onToolActivity={setCanvas}
             />
             {transcriptOpen ? (
               <button

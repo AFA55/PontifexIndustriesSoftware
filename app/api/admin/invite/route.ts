@@ -18,6 +18,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
+import { sendSMSAny } from '@/lib/sms';
+import { formatPhoneNumber } from '@/lib/sms';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { canInviteRole, ROLES_WITH_LABELS } from '@/lib/rbac';
 import { Resend } from 'resend';
@@ -132,6 +134,21 @@ export async function POST(request: NextRequest) {
           token: p.token,
           tenantId,
         });
+        // SMS invitation too (founder Jul 12 — toll-free approved): when a
+        // phone was provided, text the same setup link. Best-effort: an SMS
+        // failure never fails the invite (email is the primary channel).
+        const phone = body.phone_number ? formatPhoneNumber(String(body.phone_number)) : null;
+        if (!error && phone) {
+          const setupUrl = `${baseUrl(request)}/setup-account?token=${p.token}`;
+          Promise.resolve(
+            sendSMSAny({
+              to: phone,
+              message: `${p.tenantName}: ${p.inviterName} invited you to join the team. Set up your account: ${setupUrl}`,
+              tenantId,
+              source: 'team_invite_sms',
+            })
+          ).then(() => {}).catch(() => {});
+        }
         return { error: error ?? null };
       },
     });

@@ -42,6 +42,7 @@ import {
 import type { ArtifexVoice } from '@/lib/use-artifex-voice';
 import type { ArtifexUIMessage } from '@/lib/agents/artifex-agent';
 import type { NeuralBrainState } from './NeuralBrain';
+import type { CanvasActivity } from './ArtifexCanvas';
 
 const TOOL_LABELS: Record<string, string> = {
   'tool-get_clocked_in_status': 'Checking who’s clocked in',
@@ -84,6 +85,8 @@ interface ArtifexChatProps {
   onNewConversation?: () => void;
   /** Fires once when the backend assigns a fresh conversation id (first turn of a new chat). */
   onConversationStarted?: (id: string) => void;
+  /** Live co-pilot canvas: reports the latest tool call (input streaming -> output) upward. */
+  onToolActivity?: (activity: CanvasActivity) => void;
 }
 
 export default function ArtifexChat({
@@ -96,6 +99,7 @@ export default function ArtifexChat({
   onSelectConversation,
   onNewConversation,
   onConversationStarted,
+  onToolActivity,
 }: ArtifexChatProps) {
   const [input, setInput] = useState('');
   const [voiceOn, setVoiceOn] = useState(() => {
@@ -194,6 +198,24 @@ export default function ArtifexChat({
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, status]);
+
+  // Live canvas feed: surface the LATEST tool call of the LAST assistant turn
+  // (input streams in while Artifex fills the form; output stamps it done).
+  useEffect(() => {
+    if (!onToolActivity) return;
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    if (!lastAssistant) return;
+    const toolParts = (lastAssistant.parts as any[]).filter((pt) => isToolUIPart(pt));
+    const latest = toolParts[toolParts.length - 1];
+    if (!latest) return;
+    onToolActivity({
+      toolType: latest.type,
+      state: latest.state,
+      input: (latest as any).input,
+      output: (latest as any).output,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages]);
 
   // Drive the orb: listening > speaking > thinking > idle.
   useEffect(() => {

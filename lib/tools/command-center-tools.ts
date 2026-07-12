@@ -23,6 +23,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { toLocalYMD } from '@/lib/dates';
 import { embedText, embedAndStoreNote } from '@/lib/artifex-embeddings';
 import { canInviteRole, getRoleLabel } from '@/lib/rbac';
+import { formatPhoneNumber } from '@/lib/sms';
 import { sendEmail, generateInviteEmail, getTenantEmailBranding, isEmailConfigured } from '@/lib/email';
 
 const FIELD_ROLES = ['operator', 'apprentice'];
@@ -502,8 +503,9 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
         fullName: z.string().min(1).describe('New team member full name'),
         email: z.string().email().describe('Their email — the invite goes here'),
         role: z.enum(['admin', 'operations_manager', 'salesman', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager', 'operator', 'apprentice']),
+        phone: z.string().optional().describe('Optional cell number — the setup link is ALSO texted from the company toll-free line'),
       }),
-      execute: async ({ fullName, email, role: targetRole }) => {
+      execute: async ({ fullName, email, role: targetRole, phone }) => {
         // Same rank guard as the invite screen: strictly below the inviter.
         if (!canInviteRole(role, targetRole)) {
           return { error: `Your role (${getRoleLabel(role)}) cannot invite a ${getRoleLabel(targetRole)}.` };
@@ -557,7 +559,22 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
           html,
         });
         if (!sent) return { error: 'Invitation created but the email failed to send — resend it from Team Management.' };
-        return { invited: true, email: cleanEmail, role: getRoleLabel(targetRole), note: 'They have 7 days to accept the setup link.' };
+        // Optional SMS with the same setup link (best-effort, metered).
+        let texted = false;
+        if (phone) {
+          const formatted = formatPhoneNumber(phone);
+          if (formatted) {
+            const { sendSMSAny } = await import('@/lib/sms');
+            const sms = await sendSMSAny({
+              to: formatted,
+              message: `${tenant?.name || branding.companyName}: you're invited to join the team. Set up your account: ${baseUrl}/setup-account?token=${invite.token}`,
+              tenantId,
+              source: 'team_invite_sms',
+            }).catch(() => ({ success: false }));
+            texted = !!(sms as any)?.success;
+          }
+        }
+        return { invited: true, email: cleanEmail, texted, role: getRoleLabel(targetRole), note: 'They have 7 days to accept the setup link.' };
       },
     }),
 
