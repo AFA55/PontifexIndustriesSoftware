@@ -230,7 +230,15 @@ function SubscriptionPageInner() {
   const success = searchParams.get('success') === 'true';
   const canceled = searchParams.get('canceled') === 'true';
 
+  // Super_admin deep-links from the Platform Hub carry ?tenantId= — forward it
+  // to the billing APIs or the hub link silently manages the WRONG tenant.
+  const tenantIdParam = searchParams.get('tenantId');
+  const tenantQS = tenantIdParam ? `?tenantId=${tenantIdParam}` : '';
+
   const [sub, setSub] = useState<SubscriptionData | null>(null);
+  const [usage, setUsage] = useState<{
+    month: string; smsCount: number; emailCount: number; billedTotal: number; pendingBilled: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -246,9 +254,11 @@ function SubscriptionPageInner() {
         return;
       }
 
-      const res = await fetch('/api/billing/subscription', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const headers = { Authorization: `Bearer ${session.access_token}` };
+      const [res, usageRes] = await Promise.all([
+        fetch(`/api/billing/subscription${tenantQS}`, { headers }),
+        fetch(`/api/billing/usage-summary${tenantQS}`, { headers }),
+      ]);
       const json = await res.json() as { success?: boolean; data?: SubscriptionData; error?: string };
 
       if (!res.ok || !json.success) {
@@ -257,12 +267,16 @@ function SubscriptionPageInner() {
       }
 
       setSub(json.data ?? null);
+      try {
+        const usageJson = await usageRes.json();
+        if (usageRes.ok && usageJson?.success) setUsage(usageJson.data);
+      } catch { /* usage card just hides */ }
     } catch {
       setError('Network error — please try again');
     } finally {
       setLoading(false);
     }
-  }, [router]);
+  }, [router, tenantQS]);
 
   // Auth guard — billing is managed by the tenant's admin/ops/super_admin (per-tenant).
   // The API routes resolve the tenant (admin -> own; super_admin -> ?tenantId / sole tenant).
@@ -413,6 +427,38 @@ function SubscriptionPageInner() {
           <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 text-red-800 rounded-xl p-4">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* This month's metered usage — tenant-facing: billed amounts ONLY
+            (raw provider costs and platform margin never render here). */}
+        {!loading && usage && (
+          <div className="mb-6 bg-white rounded-2xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <h2 className="font-bold text-gray-900">Usage this month</h2>
+              <span className="text-xs font-semibold text-gray-400">{usage.month}</span>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="rounded-xl border border-gray-100 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Text messages</p>
+                <p className="mt-1 text-lg font-black text-gray-900 tabular-nums">{usage.smsCount}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Emails</p>
+                <p className="mt-1 text-lg font-black text-gray-900 tabular-nums">{usage.emailCount}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Billed so far</p>
+                <p className="mt-1 text-lg font-black text-gray-900 tabular-nums">${usage.billedTotal.toFixed(2)}</p>
+              </div>
+              <div className="rounded-xl border border-gray-100 px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">Pending charge</p>
+                <p className="mt-1 text-lg font-black text-gray-900 tabular-nums">${usage.pendingBilled.toFixed(2)}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-gray-400">
+              Message usage bills monthly to the card on file. Months under $1.00 aren&rsquo;t charged.
+            </p>
           </div>
         )}
 

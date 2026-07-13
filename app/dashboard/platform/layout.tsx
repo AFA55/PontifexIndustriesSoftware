@@ -6,8 +6,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { ArrowLeft, RefreshCw } from 'lucide-react';
-import { getCurrentUser, type User } from '@/lib/auth';
+import { ArrowLeft, LogOut, RefreshCw } from 'lucide-react';
+import { getCurrentUser, logout, type User } from '@/lib/auth';
 
 /**
  * Platform Console layout — super_admin ONLY.
@@ -70,12 +70,24 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
               </p>
             </div>
           </div>
-          {user && (
-            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
-              <span className="w-2 h-2 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#EF4444]" />
-              <span className="text-white/70 text-xs font-medium truncate max-w-[160px]">{user.name}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-2">
+            {user && (
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10">
+                <span className="w-2 h-2 rounded-full bg-gradient-to-br from-[#7C3AED] to-[#EF4444]" />
+                <span className="text-white/70 text-xs font-medium truncate max-w-[160px]">{user.name}</span>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={async () => { await logout(); router.push('/company-login'); }}
+              title="Sign out"
+              aria-label="Sign out"
+              className="flex min-h-[44px] min-w-[44px] items-center justify-center gap-1.5 rounded-lg px-2.5 text-white/50 hover:bg-white/10 hover:text-white transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              <span className="hidden sm:inline text-xs font-semibold">Sign out</span>
+            </button>
+          </div>
         </div>
       </header>
 
