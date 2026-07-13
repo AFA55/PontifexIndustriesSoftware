@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   Building2, Plus, ChevronRight, Users as UsersIcon, ToggleRight,
   RefreshCw, ShieldCheck, Globe, Activity, AlertTriangle, Bug,
@@ -135,6 +136,7 @@ function KpiTile({
 // ---------------------------------------------------------------------------
 
 export default function PlatformHubPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [health, setHealth] = useState<HealthData | null>(null);
@@ -147,6 +149,8 @@ export default function PlatformHubPage() {
   const [usageSummary, setUsageSummary] = useState<{
     total: number; ai: number; voice: number; sms: number;
   } | null>(null);
+  // Per-tenant month cost for the client roster table.
+  const [costByTenant, setCostByTenant] = useState<Map<string, number>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -230,6 +234,7 @@ export default function PlatformHubPage() {
             voice: rows.reduce((s, t) => s + Number(t.voiceCost || 0), 0),
             sms: rows.reduce((s, t) => s + Number(t.smsRawCost || 0), 0),
           });
+          setCostByTenant(new Map(rows.map((t) => [t.tenantId, Number(t.totalCost || 0)])));
         }
       } catch { /* tile just hides */ }
     }
@@ -317,55 +322,16 @@ export default function PlatformHubPage() {
       {/* ---------------------------------------------------------------- */}
       {/* KPI tiles */}
       {/* ---------------------------------------------------------------- */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <KpiTile
-          icon={Building2}
-          label="Client Companies"
-          value={clients.length}
-          accent="bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand"
-        />
-        <KpiTile
-          icon={CheckCircle2}
-          label="Active"
-          value={activeClients}
-          accent="bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"
-          sub={`${clients.length - activeClients} trial / suspended`}
-        />
-        <KpiTile
-          icon={Bug}
-          label="Open Bug / Feedback"
-          value={feedbackAvailable ? openBugFeedback : '—'}
-          accent="bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300"
-          sub={feedbackAvailable ? `${feedbackCounts.done} resolved` : 'feedback API offline'}
-        />
-        {health?.errorLogsAvailable && (
-          <KpiTile
-            icon={AlertTriangle}
-            label="Errors (24h)"
-            value={health.errorCount24h}
-            accent="bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
-          />
-        )}
-        <KpiTile
-          icon={HeartPulse}
-          label="Health Alerts"
-          value={healthAlertsAvailable ? sortedHealthAlerts.length : '—'}
-          accent="bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300"
-          sub={
-            healthAlertsAvailable
-              ? `${criticalAlertCount} critical · ${warningAlertCount} warning`
-              : 'health-checks offline'
-          }
-        />
-        {/* Founder: "still haven't seen usage" — the month's AI/voice/SMS cost
-            lives on the cockpit itself now; click through for the per-tenant
-            breakdown. */}
-        <Link href="/dashboard/platform/usage" className="block">
+      {/* KPI band — the operating number anchors TOP-LEFT (the eye's first
+          stop belongs to data, not chrome); every tile carries context, none
+          shout. Capped at 5 above the fold. */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
+        <Link href="/dashboard/platform/usage" className="block col-span-2 lg:col-span-1">
           <KpiTile
             icon={CircuitBoard}
-            label="AI & Usage (This Month)"
+            label="Usage Cost (Month)"
             value={usageSummary ? `$${usageSummary.total.toFixed(2)}` : '—'}
-            accent="bg-violet-100 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"
+            accent="bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand"
             sub={
               usageSummary
                 ? `AI $${usageSummary.ai.toFixed(2)} · Voice $${usageSummary.voice.toFixed(2)} · SMS $${usageSummary.sms.toFixed(2)}`
@@ -373,6 +339,47 @@ export default function PlatformHubPage() {
             }
           />
         </Link>
+        <KpiTile
+          icon={Building2}
+          label="Client Companies"
+          value={clients.length}
+          accent="bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300"
+          sub={`${activeClients} active · ${clients.length - activeClients} trial / suspended`}
+        />
+        <KpiTile
+          icon={Bug}
+          label="Open Bug / Feedback"
+          value={feedbackAvailable ? openBugFeedback : '—'}
+          accent="bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300"
+          sub={feedbackAvailable ? `${feedbackCounts.done} resolved` : 'feedback API offline'}
+        />
+        {health?.errorLogsAvailable && (
+          <KpiTile
+            icon={AlertTriangle}
+            label="Errors (24h)"
+            value={health.errorCount24h}
+            accent={
+              health.errorCount24h > 0
+                ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'
+                : 'bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300'
+            }
+          />
+        )}
+        <KpiTile
+          icon={HeartPulse}
+          label="Health Alerts"
+          value={healthAlertsAvailable ? sortedHealthAlerts.length : '—'}
+          accent={
+            criticalAlertCount > 0
+              ? 'bg-rose-100 text-rose-600 dark:bg-rose-500/15 dark:text-rose-300'
+              : 'bg-slate-100 text-slate-500 dark:bg-white/[0.06] dark:text-slate-300'
+          }
+          sub={
+            healthAlertsAvailable
+              ? `${criticalAlertCount} critical · ${warningAlertCount} warning`
+              : 'health-checks offline'
+          }
+        />
       </div>
 
       {/* ---------------------------------------------------------------- */}
@@ -382,7 +389,7 @@ export default function PlatformHubPage() {
         {/* Stack on mobile + scroll the action row so New Client / View all stay
             reachable at 375px (QA loop #5). */}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-amber-500 flex items-center gap-1.5">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-400 dark:text-slate-400 flex items-center gap-1.5">
             <Building2 className="w-4 h-4" /> Client Companies
           </h2>
           <div className="flex items-center gap-2 overflow-x-auto -mx-1 px-1 pb-1">
@@ -445,72 +452,74 @@ export default function PlatformHubPage() {
             </Link>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
-            {clients.map((tenant) => {
-              const mods = moduleSummary(tenant.features);
-              const uc = userCount(tenant);
-              const protectedTenant = isProtectedTenant(tenant);
-              return (
-                <Link
-                  key={tenant.id}
-                  href={`/dashboard/platform/tenants/${tenant.id}`}
-                  className="group bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-4 hover:shadow-md hover:border-brand/40 dark:hover:border-brand/40 transition-all"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 bg-gradient-to-br from-brand to-brand-accent rounded-xl flex items-center justify-center text-white font-bold text-sm flex-shrink-0">
-                        {tenant.name[0]?.toUpperCase() || '?'}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="font-bold text-gray-900 dark:text-white truncate flex items-center gap-1.5 text-sm">
-                          {tenant.name}
-                          {protectedTenant && (
-                            <ShieldCheck className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
-                          )}
-                        </h3>
-                        <p className="text-[11px] text-gray-400 font-mono truncate">
-                          {tenant.company_code || tenant.slug}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full border flex-shrink-0 ${statusColors[tenant.status] || 'bg-gray-100 text-gray-500'}`}>
-                      {tenant.status.toUpperCase()}
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2 mb-3">
-                    <div className="text-center p-2 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                      <p className="text-[10px] text-gray-400">Plan</p>
-                      <div className="flex items-center justify-center gap-1 mt-1">
-                        {planIcons[tenant.plan]}
-                        <span className="text-[11px] font-bold text-gray-900 dark:text-white capitalize truncate">{tenant.plan}</span>
-                      </div>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                      <p className="text-[10px] text-gray-400 flex items-center justify-center gap-1"><UsersIcon className="w-3 h-3" />Users</p>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">
-                        {uc != null ? uc : '—'}<span className="text-[10px] text-gray-400 font-normal">/{tenant.max_users}</span>
-                      </p>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 dark:bg-slate-800 rounded-lg">
-                      <p className="text-[10px] text-gray-400 flex items-center justify-center gap-1"><ToggleRight className="w-3 h-3" />Mods</p>
-                      <p className="text-sm font-bold text-gray-900 dark:text-white mt-1">{mods.on}<span className="text-[10px] text-gray-400 font-normal">/{mods.total}</span></p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-100 dark:border-slate-800">
-                    {tenant.domain ? (
-                      <span className="flex items-center gap-1 text-[11px] text-gray-400 truncate min-w-0">
-                        <Globe className="w-3 h-3 flex-shrink-0" />{tenant.domain}
-                      </span>
-                    ) : <span />}
-                    <span className="text-xs text-brand dark:text-brand font-medium flex items-center gap-0.5 group-hover:gap-1.5 transition-all flex-shrink-0">
-                      Manage <ChevronRight className="w-3.5 h-3.5" />
-                    </span>
-                  </div>
-                </Link>
-              );
-            })}
+          /* Roster = a TABLE, not a card grid (the enterprise-admin pattern:
+             an owner scans and compares rows; cards bury the comparison).
+             Mobile keeps a slim two-line row — no horizontal overflow. */
+          <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+            <table className="w-full text-sm">
+              <thead className="hidden sm:table-header-group">
+                <tr className="border-b border-gray-200 text-left text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:border-slate-700">
+                  <th className="px-4 py-3">Company</th>
+                  <th className="px-3 py-3">Plan</th>
+                  <th className="px-3 py-3 text-right">Users</th>
+                  <th className="px-3 py-3 text-right">Modules</th>
+                  <th className="px-3 py-3 text-right">Usage (mo)</th>
+                  <th className="px-3 py-3">Status</th>
+                  <th className="px-3 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {clients.map((tenant) => {
+                  const mods = moduleSummary(tenant.features);
+                  const uc = userCount(tenant);
+                  const protectedTenant = isProtectedTenant(tenant);
+                  const monthCost = costByTenant.get(tenant.id);
+                  return (
+                    <tr
+                      key={tenant.id}
+                      onClick={() => router.push(`/dashboard/platform/tenants/${tenant.id}`)}
+                      className="cursor-pointer border-b border-gray-100 transition-colors last:border-0 hover:bg-gray-50 dark:border-slate-800 dark:hover:bg-white/[0.03]"
+                    >
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-brand to-brand-accent text-xs font-bold text-white">
+                            {tenant.name[0]?.toUpperCase() || '?'}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="flex items-center gap-1.5 truncate font-semibold text-gray-900 dark:text-white">
+                              {tenant.name}
+                              {protectedTenant && <ShieldCheck className="h-3.5 w-3.5 flex-shrink-0 text-gray-300 dark:text-slate-500" />}
+                            </p>
+                            <p className="truncate font-mono text-[11px] text-gray-400">
+                              {tenant.company_code || tenant.slug}
+                              <span className="sm:hidden"> · {tenant.plan} · {uc != null ? uc : '—'}/{tenant.max_users} users</span>
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="hidden px-3 py-3 capitalize text-gray-600 dark:text-slate-300 sm:table-cell">{tenant.plan}</td>
+                      <td className="hidden px-3 py-3 text-right tabular-nums text-gray-600 dark:text-slate-300 sm:table-cell">
+                        {uc != null ? uc : '—'}<span className="text-gray-400">/{tenant.max_users}</span>
+                      </td>
+                      <td className="hidden px-3 py-3 text-right tabular-nums text-gray-600 dark:text-slate-300 sm:table-cell">
+                        {mods.on}<span className="text-gray-400">/{mods.total}</span>
+                      </td>
+                      <td className="hidden px-3 py-3 text-right tabular-nums font-semibold text-gray-900 dark:text-white sm:table-cell">
+                        {monthCost != null ? `$${monthCost.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="hidden px-3 py-3 sm:table-cell">
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${statusColors[tenant.status] || 'bg-gray-100 text-gray-500'}`}>
+                          {tenant.status.toUpperCase()}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        <ChevronRight className="ml-auto h-4 w-4 text-gray-300 dark:text-slate-600" />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         )}
       </section>
@@ -521,7 +530,7 @@ export default function PlatformHubPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Health + monitoring */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-amber-500 flex items-center gap-1.5 mb-4">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-400 dark:text-slate-400 flex items-center gap-1.5 mb-4">
             <Activity className="w-4 h-4" /> Health &amp; Monitoring
           </h2>
 
@@ -585,7 +594,7 @@ export default function PlatformHubPage() {
         {/* Bug + feedback */}
         <section className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-amber-500 flex items-center gap-1.5">
+            <h2 className="text-sm font-bold uppercase tracking-wide text-gray-400 dark:text-slate-400 flex items-center gap-1.5">
               <MessageSquareWarning className="w-4 h-4" /> Bug &amp; Feedback
             </h2>
             <Link
@@ -664,7 +673,7 @@ export default function PlatformHubPage() {
       {/* ---------------------------------------------------------------- */}
       <section className="bg-white dark:bg-slate-900 rounded-2xl border border-gray-200 dark:border-slate-700 p-5">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-amber-500 flex items-center gap-1.5">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-gray-400 dark:text-slate-400 flex items-center gap-1.5">
             <HeartPulse className="w-4 h-4" /> Platform Health Alerts
           </h2>
         </div>
