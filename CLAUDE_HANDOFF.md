@@ -1,6 +1,22 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 12, 2026 (evening) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`9109a606`, deploy READY).
+**Last updated:** Jul 13, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`91322fa4`).
+
+> **🛎️ Jul 13 (operators went LIVE — Zack/Aiden/Lucas clocked in 6:29/6:37/6:55 AM):**
+> TENANT-TZ fix (`0cdb3767`): Artifex tools were UTC ("clocked in at 10" for 6:29 ET; after 8 PM
+> ET "today" queried tomorrow) — assistant route now threads tenants.timezone through agent+tools,
+> times pre-formatted local, verified to-the-minute vs timecards. MIC: company-managed Chrome
+> denies with no prompt (our Permissions-Policy allows mic) — onerror now surfaces plain-language
+> guidance in HUD+panel. CONTINUOUS LISTENING (`27f4a2a6`): mic no longer stops at first pause —
+> 2.2s silence window ends the turn, one combined transcript, live caption under the orb (founder:
+> "process more than 1 piece of info at a time"). HUB REDESIGN (`03720359`, research-driven):
+> usage cost anchors top-left, client CARDS→TABLE w/ per-tenant month cost, color=attention-only;
+> hub Sign out (`95658db5`) + tenant-facing usage card + ?tenantId= forwarding fix; OPERATING_
+> COSTS.md closes Phase 2. PATRIOT PROOF SCRUBBED from public site (`91322fa4`, founder: "proof is
+> fake so far"): landing PROOF section + /patriot page deleted, hero first-client line (also
+> non-compete leak) gone, zero "patriot" matches verified live. Phase 3 = engineering DONE
+> (remaining: founder activates Patriot's paid plan when ready). Phase 4 blocked on Meta
+> verification. QUEUED: Opifex build-out (need founder vision), content strategy post-phases.
 
 > **🛎️ Jul 12 evening batch (`9109a606` — ALL live):** AUTH GUARDS (founder: "no one should
 > automatically get into Pontifex"): tenant login pages no longer hijacked by a remembered
