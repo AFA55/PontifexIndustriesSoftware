@@ -45,6 +45,7 @@ SCOPE: you answer questions about this company's live operations — who's worki
 CREATING JOB TICKETS (your one write action — treat it with care): you can create a quick-add job ticket via create_job_ticket. Work like an experienced dispatcher taking a job over the phone, using SLOT-FILLING — never a rigid script:
 - The slots: REQUIRED = customer/contractor name, job type, start date. OPTIONAL = jobsite address, scope description, site contact + phone, amount.
 - People talk out of order and in bundles ("it's at 500 Main Street for ACME, sometime next week, wall sawing"). EXTRACT every slot the message fills — regardless of order — briefly acknowledge, then ask for UP TO THREE missing things in ONE natural sentence ("When does it start, and do you have a site contact and their number?"). They can answer any part in any order. NEVER re-ask for something already given.
+- CUSTOMER NAMES ARE THE #1 TRANSCRIPTION CASUALTY ("Trail" for "Trehel"). The moment you hear a customer name, call search_customers with it. Existing match -> use ITS exact spelling and say it aloud ("Got it — Trehel Construction, the one we've worked with"). No match -> treat as a NEW customer and confirm the spelling explicitly before creating ("I don't have them on file — new customer? Spell the name for me so I get it right.").
 - LIVE DRAFT PAD (the user watches the form fill on screen): during ticket building, call update_ticket_draft after EVERY user message with everything collected so far — even from their very first sentence. It saves nothing; it only paints the form. Then create_job_ticket (after confirmation) does the real save.
 - If a value is vague ("next week"), propose a concrete interpretation ("I'll put Monday July 20 — okay?") instead of an open-ended question.
 - Before creating, ALWAYS read back a one-line summary of ALL collected slots ("Creating: wall sawing for ACME, July 20, at 500 Main St — confirm?") and WAIT for an explicit yes. Never call create_job_ticket without that confirmation in this conversation.
@@ -63,7 +64,13 @@ INVITING TEAM MEMBERS (admins only — the tool exists only for them): collect f
 
 Be concise. A one-line answer beats a paragraph when a one-line answer is accurate.`;
 
-export function createArtifexAgent(tenantId: string, role: string, userId: string, timezone = 'America/New_York') {
+export function createArtifexAgent(
+  tenantId: string,
+  role: string,
+  userId: string,
+  timezone = 'America/New_York',
+  callerName?: string | null
+) {
   // Today's date is load-bearing: without it the model guesses the year on
   // date-range tool calls ("July 1-8" became 2024 in live testing) and every
   // "this week / last pay period" question silently queries the wrong window.
@@ -71,10 +78,16 @@ export function createArtifexAgent(tenantId: string, role: string, userId: strin
   // ~8 PM Eastern the server's "today" is already tomorrow (founder Jul 13:
   // clock-in times also read as UTC; tools now format in tenant tz too).
   const todaysDate = `TODAY'S DATE: ${ymdInTz(timezone)} (timezone: ${timezone}). All times your tools return are already in this local timezone — repeat them as-is, never convert. Resolve all relative dates ("this week", "last month", a month with no year) against this date before calling tools.`;
+  // Who you're talking to — lets Artifex address people naturally and keep
+  // per-person context in memory (founder Jul 13: "based on who uses it, it
+  // has to remember their name or their preferred name").
+  const callerLine = callerName
+    ? `CALLER: You are talking to ${callerName} (role: ${role}). Use their first name naturally — a greeting, a confirmation ("Got it, ${callerName.split(' ')[0]}") — without overdoing it. If they state a preference (a nickname, how they like tickets filled, a shorthand they use), save it with save_memory_note prefixed with their name so you apply it in future conversations.`
+    : '';
   const isField = ARTIFEX_FIELD_ROLES.includes(role);
   return new ToolLoopAgent({
     model: 'anthropic/claude-haiku-4.5',
-    instructions: `${isField ? OPERATOR_INSTRUCTIONS : ARTIFEX_INSTRUCTIONS}\n\n${todaysDate}`,
+    instructions: `${isField ? OPERATOR_INSTRUCTIONS : ARTIFEX_INSTRUCTIONS}\n\n${todaysDate}${callerLine ? `\n\n${callerLine}` : ''}`,
     // The toolset IS the permission wall: field roles get operator tools only
     // (own jobs/hours, directions, site contact) — no management tools exist
     // in their runtime, so there is nothing to jailbreak into.

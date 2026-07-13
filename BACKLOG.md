@@ -118,6 +118,15 @@
 ## 🟠 P1 — This week
 
 ### Jul 12 — founder-queued next blocks
+- [ ] **Artifex scope PHOTOS (founder Jul 13)** — attach pictures of the scope of work while
+      creating a ticket in the Artifex room: upload button (+ camera on mobile) in the chat →
+      job-photos storage bucket → attached to the draft/created job order → visible on the
+      schedule-form review. Design decision: photos land on job_orders the same way
+      work-performed photos do (reuse /api/job-orders/[id]/photos post-create).
+- [ ] **Artifex voice barge-in (founder Jul 13)** — interrupt Felix mid-reply by speaking.
+      Needs echo handling (speaker output feeding the mic transcribes Felix's own words) —
+      prototype with keeping recognition open during TTS + drop results that fuzzy-match the
+      spoken reply text; headset-first rollout.
 - [ ] **Opifex build-out** (founder Jul 12: "now we can work on Opifex") — scope TBD with founder;
       existing Opifex tenant = hiring/job-board front door.
 - [ ] **Content strategy — deliver & showcase the software** (founder Jul 12: AFTER the finish-line

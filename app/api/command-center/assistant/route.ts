@@ -119,17 +119,19 @@ export async function POST(request: NextRequest) {
 
   const uiMessages = [...priorMessages, ...incomingMessages];
   // Tenant timezone drives every "today" and every displayed time in the
-  // tools (server is UTC on Vercel). Default matches the clock-in route.
+  // tools (server is UTC on Vercel); caller name lets Artifex address the
+  // person and keep per-person preferences in memory.
   let timezone = 'America/New_York';
+  let callerName: string | null = null;
   try {
-    const { data: tzRow } = await supabaseAdmin
-      .from('tenants')
-      .select('timezone')
-      .eq('id', tenantId)
-      .maybeSingle();
-    if (tzRow?.timezone) timezone = tzRow.timezone;
-  } catch { /* default tz */ }
-  const agent = createArtifexAgent(tenantId, auth.role, auth.userId, timezone);
+    const [tzRes, profileRes] = await Promise.all([
+      supabaseAdmin.from('tenants').select('timezone').eq('id', tenantId).maybeSingle(),
+      supabaseAdmin.from('profiles').select('full_name').eq('id', auth.userId).maybeSingle(),
+    ]);
+    if (tzRes.data?.timezone) timezone = tzRes.data.timezone;
+    if (profileRes.data?.full_name) callerName = profileRes.data.full_name;
+  } catch { /* defaults */ }
+  const agent = createArtifexAgent(tenantId, auth.role, auth.userId, timezone, callerName);
 
   return createAgentUIStreamResponse({
     agent,

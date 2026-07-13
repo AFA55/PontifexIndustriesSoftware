@@ -53,6 +53,7 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-get_recent_activity': 'Checking recent activity',
   'tool-get_revenue_snapshot': 'Pulling revenue numbers',
   'tool-search_job_history': 'Searching schedule history',
+  'tool-search_customers': 'Checking your customer list',
   'tool-get_hours_summary': 'Crunching hours',
   'tool-get_attendance_summary': 'Pulling attendance',
   'tool-update_ticket_draft': 'Drafting the ticket',
@@ -243,6 +244,9 @@ export default function ArtifexChat({
   const wasStreamingRef = useRef(false);
   useEffect(() => {
     if (wasStreamingRef.current && !busy) {
+      // Reply is in — retire the held live transcript so the caption hands
+      // over to the answer (it persisted through THINKING on purpose).
+      voice.clearLiveTranscript();
       if (conversationIdRef.current) onConversationStarted?.(conversationIdRef.current);
       const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
       const text = (lastAssistant?.parts ?? [])
@@ -316,7 +320,7 @@ export default function ArtifexChat({
             While LISTENING, the live transcript accumulates here in real time —
             the user watches their multi-part answer being captured across pauses. */}
         <div className="min-h-[3.5rem] w-full text-center">
-          {voice.listening && voice.liveTranscript ? (
+          {voice.liveTranscript ? (
             <p className="mx-auto max-w-lg text-[15px] italic leading-relaxed text-sky-800/90 dark:text-sky-200/90">
               “{voice.liveTranscript}”
             </p>

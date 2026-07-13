@@ -267,7 +267,9 @@ export function useArtifexVoice() {
         sent = true;
         if (silenceTimer) clearTimeout(silenceTimer);
         clearTimeout(maxTimer);
-        setLiveTranscript('');
+        // Deliberately DO NOT clear liveTranscript here — the words stay on
+        // screen while Artifex thinks (founder: "I stopped seeing the words").
+        // It clears when the reply starts or a new listen begins.
         try { rec.stop(); } catch { /* already stopped */ }
         const text = latest.trim();
         if (text) onTranscript(text);
@@ -334,6 +336,7 @@ export function useArtifexVoice() {
     micSupported,
     micError,
     liveTranscript,
+    clearLiveTranscript: useCallback(() => setLiveTranscript(''), []),
     amplitudeRef,
     speak,
     stopSpeaking,

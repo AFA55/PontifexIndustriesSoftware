@@ -72,7 +72,7 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
     operations_manager: Object.keys(all) as (keyof typeof all)[],
     admin: Object.keys(all) as (keyof typeof all)[],
     // Sales: operational reads + ticket creation. No payroll, revenue, or invites.
-    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'update_ticket_draft', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
+    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'search_customers', 'update_ticket_draft', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
     // Supervisors: operational reads + approvals visibility. No writes.
     // (get_attendance_summary matches the attendance_events RLS read grant.)
     supervisor: ['get_clocked_in_status', 'get_todays_jobs', 'get_pending_approvals', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'get_attendance_summary', 'save_memory_note', 'recall_memory_notes'],
@@ -523,6 +523,51 @@ function buildAllTools(tenantId: string, role: string, userId: string, timezone 
           note: 'codeCounts = manually marked tracker codes; autoLateDays/autoTimeOffDays are derived from clock-ins and approved time off (same overlays the Attendance Calendar shows). For "how many times late/tardy", use T count + autoLateDays.',
           count: employees.length,
           employees,
+        };
+      },
+    }),
+
+    search_customers: tool({
+      description:
+        "Look up EXISTING customers/contractors by (partial, possibly misheard) name — searches the CRM customer list AND every past job's customer. ALWAYS call this while collecting a job-ticket customer name: voice transcripts garble company names ('Trail' vs 'Trehel'), and snapping to the real existing customer keeps history connected. If nothing matches, it's likely a NEW customer — confirm the spelling with the user before creating.",
+      inputSchema: z.object({
+        query: z.string().min(2).describe('The customer name as heard — partial is fine'),
+      }),
+      execute: async ({ query }) => {
+        const term = `%${query.trim()}%`;
+        const [crmRes, jobsRes] = await Promise.all([
+          supabaseAdmin
+            .from('customers')
+            .select('name, display_name, primary_contact_name, primary_contact_phone')
+            .eq('tenant_id', tenantId)
+            .or(`name.ilike.${term},display_name.ilike.${term}`)
+            .limit(8),
+          supabaseAdmin
+            .from('job_orders')
+            .select('customer_name')
+            .eq('tenant_id', tenantId)
+            .ilike('customer_name', term)
+            .limit(50),
+        ]);
+        const crm = (crmRes.data ?? []).map((c: any) => ({
+          name: c.display_name || c.name,
+          contact: c.primary_contact_name ?? null,
+          phone: c.primary_contact_phone ?? null,
+          source: 'customer list',
+        }));
+        const crmNames = new Set(crm.map((c) => c.name.toLowerCase()));
+        const fromJobs = [...new Set((jobsRes.data ?? []).map((j: any) => j.customer_name).filter(Boolean))]
+          .filter((n: string) => !crmNames.has(n.toLowerCase()))
+          .slice(0, 8)
+          .map((n: string) => ({ name: n, contact: null, phone: null, source: 'past jobs' }));
+        const matches = [...crm, ...fromJobs];
+        return {
+          count: matches.length,
+          matches,
+          note:
+            matches.length === 0
+              ? 'No existing customer matches — likely a NEW customer. Confirm the exact spelling with the user before creating the ticket.'
+              : 'If one of these is who the user meant, use ITS exact name on the ticket and confirm aloud.',
         };
       },
     }),
