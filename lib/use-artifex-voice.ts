@@ -42,10 +42,21 @@ function getRecognition(): SpeechRecognitionLike | null {
   if (!Ctor) return null;
   const rec: SpeechRecognitionLike = new Ctor();
   rec.lang = 'en-US';
-  rec.interimResults = false;
-  rec.continuous = false;
+  // CONTINUOUS multi-utterance capture (founder Jul 13: "process more than
+  // one piece of information at a time"). Single-utterance mode stopped at
+  // the FIRST natural pause, so "starts Monday… contact is Joe… 555-1234"
+  // was cut off after "Monday". Now we keep listening across pauses and a
+  // silence window (below) decides when the person is actually done.
+  rec.interimResults = true;
+  rec.continuous = true;
   return rec;
 }
+
+/** Silence (no new speech) that ends the turn — long enough for natural
+ * mid-sentence pauses, short enough to feel responsive. */
+const SILENCE_MS = 2200;
+/** Hard cap per listening turn so a hot mic can't run forever. */
+const MAX_LISTEN_MS = 45_000;
 
 export function useArtifexVoice() {
   // null = unknown (assume available until a 503 says otherwise)
@@ -58,6 +69,9 @@ export function useArtifexVoice() {
   const [pendingBuffer, setPendingBuffer] = useState<AudioBuffer | null>(null);
   // Plain-language reason the mic failed (permission policy, no device, …).
   const [micError, setMicError] = useState<string | null>(null);
+  // What the mic is hearing RIGHT NOW (interim + finals) — the UI shows it
+  // live under the orb so long multi-part answers visibly accumulate.
+  const [liveTranscript, setLiveTranscript] = useState('');
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
@@ -240,14 +254,46 @@ export function useArtifexVoice() {
       recRef.current?.abort();
       recRef.current = rec;
       setMicError(null);
+      setLiveTranscript('');
       setListening(true);
-      rec.onresult = (e) => {
-        const transcript = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript)
-          .join(' ')
-          .trim();
-        if (transcript) onTranscript(transcript);
+
+      // Accumulate EVERYTHING said this turn; a silence window (not the first
+      // pause) ends the turn and sends one combined transcript.
+      let latest = '';
+      let sent = false;
+      let silenceTimer: ReturnType<typeof setTimeout> | null = null;
+      const finish = () => {
+        if (sent) return;
+        sent = true;
+        if (silenceTimer) clearTimeout(silenceTimer);
+        clearTimeout(maxTimer);
+        setLiveTranscript('');
+        try { rec.stop(); } catch { /* already stopped */ }
+        const text = latest.trim();
+        if (text) onTranscript(text);
       };
-      rec.onend = () => setListening(false);
+      const armSilenceTimer = () => {
+        if (silenceTimer) clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(finish, SILENCE_MS);
+      };
+      const maxTimer = setTimeout(finish, MAX_LISTEN_MS);
+
+      rec.onresult = (e) => {
+        // In continuous mode e.results accumulates — rebuild the full text
+        // each event (finals + current interim) instead of appending.
+        latest = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript)
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        setLiveTranscript(latest);
+        armSilenceTimer(); // still talking — push the deadline out
+      };
+      rec.onend = () => {
+        setListening(false);
+        // Browser ended recognition on its own (tab blur, engine timeout):
+        // don't lose what was said — send it.
+        finish();
+      };
       // Surface WHY the mic died instead of silently flipping off (founder on
       // a managed company Chrome: policy denies mic with NO permission prompt
       // — 'not-allowed' fires immediately and the UI looked like nothing
@@ -287,6 +333,7 @@ export function useArtifexVoice() {
     listening,
     micSupported,
     micError,
+    liveTranscript,
     amplitudeRef,
     speak,
     stopSpeaking,

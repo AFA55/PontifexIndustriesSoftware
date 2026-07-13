@@ -312,9 +312,15 @@ export default function ArtifexChat({
           {(voice.listening || busy) && <span className="animate-pulse">…</span>}
         </p>
 
-        {/* Caption — what was said / the spoken reply, so the orb "talks" visibly */}
+        {/* Caption — what was said / the spoken reply, so the orb "talks" visibly.
+            While LISTENING, the live transcript accumulates here in real time —
+            the user watches their multi-part answer being captured across pauses. */}
         <div className="min-h-[3.5rem] w-full text-center">
-          {error ? (
+          {voice.listening && voice.liveTranscript ? (
+            <p className="mx-auto max-w-lg text-[15px] italic leading-relaxed text-sky-800/90 dark:text-sky-200/90">
+              “{voice.liveTranscript}”
+            </p>
+          ) : error ? (
             <p className="text-sm text-red-600 dark:text-red-300/90">Artifex hit an error. Try again in a moment.</p>
           ) : assistantText ? (
             <>
