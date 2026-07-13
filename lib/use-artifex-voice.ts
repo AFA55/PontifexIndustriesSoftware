@@ -29,7 +29,7 @@ type SpeechRecognitionLike = {
   continuous: boolean;
   onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null;
   onend: (() => void) | null;
-  onerror: (() => void) | null;
+  onerror: ((e?: { error?: string }) => void) | null;
   start: () => void;
   stop: () => void;
   abort: () => void;
@@ -56,6 +56,8 @@ export function useArtifexVoice() {
   // Set when the browser BLOCKED autoplay of a finished reply — the UI shows
   // a "tap to hear" button; tapping plays inside a fresh gesture (always allowed).
   const [pendingBuffer, setPendingBuffer] = useState<AudioBuffer | null>(null);
+  // Plain-language reason the mic failed (permission policy, no device, …).
+  const [micError, setMicError] = useState<string | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
@@ -237,6 +239,7 @@ export function useArtifexVoice() {
       if (!rec) return;
       recRef.current?.abort();
       recRef.current = rec;
+      setMicError(null);
       setListening(true);
       rec.onresult = (e) => {
         const transcript = Array.from({ length: e.results.length }, (_, i) => e.results[i][0].transcript)
@@ -245,7 +248,25 @@ export function useArtifexVoice() {
         if (transcript) onTranscript(transcript);
       };
       rec.onend = () => setListening(false);
-      rec.onerror = () => setListening(false);
+      // Surface WHY the mic died instead of silently flipping off (founder on
+      // a managed company Chrome: policy denies mic with NO permission prompt
+      // — 'not-allowed' fires immediately and the UI looked like nothing
+      // happened). The UI renders a plain-language explanation per code.
+      rec.onerror = (e) => {
+        setListening(false);
+        const code = e?.error ?? 'unknown';
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
+          setMicError(
+            'Microphone access is blocked in this browser. On a company-managed computer this is usually an IT policy (Chrome may not even ask). Check the mic icon in the address bar or Site Settings → Microphone — or just type below.'
+          );
+        } else if (code === 'audio-capture') {
+          setMicError('No microphone was found on this device. Plug one in or type instead.');
+        } else if (code === 'network') {
+          setMicError('Speech recognition needs a network connection — it dropped. Try again.');
+        } else if (code !== 'aborted' && code !== 'no-speech') {
+          setMicError('The microphone stopped unexpectedly. Try again, or type instead.');
+        }
+      };
       try {
         rec.start();
       } catch {
@@ -265,6 +286,7 @@ export function useArtifexVoice() {
     speaking,
     listening,
     micSupported,
+    micError,
     amplitudeRef,
     speak,
     stopSpeaking,

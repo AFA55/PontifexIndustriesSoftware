@@ -13,9 +13,8 @@
  * factual claim has to come from a tool call.
  */
 import { ToolLoopAgent, InferAgentUIMessage, isStepCount } from 'ai';
-import { createCommandCenterTools, commandCenterToolsForTypes } from '@/lib/tools/command-center-tools';
+import { createCommandCenterTools, commandCenterToolsForTypes, ymdInTz } from '@/lib/tools/command-center-tools';
 import { createOperatorArtifexTools } from '@/lib/tools/operator-artifex-tools';
-import { toLocalYMD } from '@/lib/dates';
 
 /** Field roles get the OPERATOR agent — a different toolset IS the permission wall. */
 export const ARTIFEX_FIELD_ROLES = ['operator', 'apprentice'];
@@ -64,11 +63,14 @@ INVITING TEAM MEMBERS (admins only — the tool exists only for them): collect f
 
 Be concise. A one-line answer beats a paragraph when a one-line answer is accurate.`;
 
-export function createArtifexAgent(tenantId: string, role: string, userId: string) {
+export function createArtifexAgent(tenantId: string, role: string, userId: string, timezone = 'America/New_York') {
   // Today's date is load-bearing: without it the model guesses the year on
   // date-range tool calls ("July 1-8" became 2024 in live testing) and every
   // "this week / last pay period" question silently queries the wrong window.
-  const todaysDate = `TODAY'S DATE: ${toLocalYMD()}. Resolve all relative dates ("this week", "last month", a month with no year) against this date before calling tools.`;
+  // Computed in the TENANT's timezone — the server is UTC on Vercel, so after
+  // ~8 PM Eastern the server's "today" is already tomorrow (founder Jul 13:
+  // clock-in times also read as UTC; tools now format in tenant tz too).
+  const todaysDate = `TODAY'S DATE: ${ymdInTz(timezone)} (timezone: ${timezone}). All times your tools return are already in this local timezone — repeat them as-is, never convert. Resolve all relative dates ("this week", "last month", a month with no year) against this date before calling tools.`;
   const isField = ARTIFEX_FIELD_ROLES.includes(role);
   return new ToolLoopAgent({
     model: 'anthropic/claude-haiku-4.5',
@@ -77,8 +79,8 @@ export function createArtifexAgent(tenantId: string, role: string, userId: strin
     // (own jobs/hours, directions, site contact) — no management tools exist
     // in their runtime, so there is nothing to jailbreak into.
     tools: isField
-      ? (createOperatorArtifexTools(tenantId, userId) as any)
-      : createCommandCenterTools(tenantId, role, userId),
+      ? (createOperatorArtifexTools(tenantId, userId, timezone) as any)
+      : createCommandCenterTools(tenantId, role, userId, timezone),
     stopWhen: isStepCount(6),
   });
 }

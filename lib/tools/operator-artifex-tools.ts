@@ -14,7 +14,7 @@
 import { tool } from 'ai';
 import { z } from 'zod';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { toLocalYMD } from '@/lib/dates';
+import { ymdInTz } from '@/lib/tools/command-center-tools';
 
 const mapsUrl = (address: string) =>
   `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
@@ -40,14 +40,14 @@ function dayOfLabel(j: any, date: string): string | undefined {
   return `Day ${current} of ${total}`;
 }
 
-export function createOperatorArtifexTools(tenantId: string, userId: string) {
+export function createOperatorArtifexTools(tenantId: string, userId: string, timezone = 'America/New_York') {
   return {
     get_my_jobs_today: tool({
       description:
         "The caller's OWN jobs for today (as operator or helper): job number, customer, address, arrival time, status. Use for 'what do I have today' or 'where am I going'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const today = toLocalYMD();
+        const today = ymdInTz(timezone);
         // Span-aware: a multi-day job counts as "today" every day it runs,
         // not just its start date (day 2+ was invisible with a plain eq).
         // Matches: single-day jobs starting today, OR a multi-day span that
@@ -78,13 +78,13 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
       description: "The caller's OWN jobs for the next 7 days. Use for 'what's my week look like'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const today = toLocalYMD();
+        const today = ymdInTz(timezone);
         const week = new Date();
         week.setDate(week.getDate() + 7);
         // Include a multi-day job still running today even though it STARTED
         // before today (otherwise day 2+ vanishes from "my week").
         const { data, error } = await myJobsQuery(tenantId, userId)
-          .lte('scheduled_date', toLocalYMD(week))
+          .lte('scheduled_date', ymdInTz(timezone, week))
           .or(`scheduled_date.gte.${today},end_date.gte.${today}`)
           .not('status', 'in', '("completed","cancelled")')
           .order('scheduled_date');
@@ -110,7 +110,7 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
         jobNumber: z.string().optional().describe("Job number like QA-2026-123456; omit to use today's first job"),
       }),
       execute: async ({ jobNumber }) => {
-        const today = toLocalYMD();
+        const today = ymdInTz(timezone);
         let q = myJobsQuery(tenantId, userId);
         q = jobNumber
           ? q.eq('job_number', jobNumber)
@@ -154,8 +154,8 @@ export function createOperatorArtifexTools(tenantId: string, userId: string) {
           .select('date, net_hours, total_hours, overtime_hours, is_late')
           .eq('tenant_id', tenantId)
           .eq('user_id', userId)
-          .gte('date', toLocalYMD(monday))
-          .lte('date', toLocalYMD(now));
+          .gte('date', ymdInTz(timezone, monday))
+          .lte('date', ymdInTz(timezone, now));
         if (error) throw new Error(`get_my_hours_this_week: ${error.message}`);
         const rows = data ?? [];
         const total = rows.reduce((s: number, r: any) => s + Number(r.net_hours ?? r.total_hours ?? 0), 0);

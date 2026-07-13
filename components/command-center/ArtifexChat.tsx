@@ -332,6 +332,12 @@ export default function ArtifexChat({
           )}
         </div>
 
+        {voice.micError && (
+          <p className="max-w-md rounded-xl border border-amber-400/40 bg-amber-500/10 px-4 py-2.5 text-center text-xs leading-relaxed text-amber-700 dark:text-amber-200">
+            {voice.micError}
+          </p>
+        )}
+
         {voice.pendingAudio && (
           <button
             type="button"
@@ -524,6 +530,11 @@ export default function ArtifexChat({
           )}
         </div>
 
+        {voice.micError && (
+          <p className="border-t border-amber-400/20 bg-amber-500/10 px-4 py-2 text-center text-xs leading-relaxed text-amber-700 dark:text-amber-200">
+            {voice.micError}
+          </p>
+        )}
         <form onSubmit={handleSubmit} className="flex items-center gap-2 border-t border-slate-200 dark:border-white/[0.06] px-3 py-3 sm:px-4">
           <input
             type="text"

@@ -30,6 +30,19 @@ const FIELD_ROLES = ['operator', 'apprentice'];
 const MEMORY_RECALL_DEFAULT_LIMIT = 20;
 
 /**
+ * TENANT-timezone date/time helpers. NEVER toLocalYMD() for "today" here —
+ * the server is UTC on Vercel, so after ~8 PM Eastern the server's "today"
+ * is already tomorrow (tools queried the wrong day) and raw timestamps read
+ * as UTC ("clocked in at 10" for a 6 AM Eastern clock-in — founder Jul 13).
+ */
+export const ymdInTz = (tz: string, d: Date = new Date()) =>
+  d.toLocaleDateString('en-CA', { timeZone: tz });
+export const timeInTz = (iso: string | null | undefined, tz: string) =>
+  iso
+    ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: tz })
+    : null;
+
+/**
  * Two-step name lookup instead of a PostgREST embed — this repo has a documented
  * embed-fragility gotcha (a missing/renamed FK silently 500s the whole query; see
  * the office-documents incident). A plain `.in('id', ids)` select is more robust.
@@ -45,8 +58,8 @@ async function lookupNames(tenantId: string, ids: (string | null)[]): Promise<Ma
   return new Map((data ?? []).map((p: any) => [p.id, p.full_name]));
 }
 
-export function createCommandCenterTools(tenantId: string, role: string, userId: string) {
-  const all = buildAllTools(tenantId, role, userId);
+export function createCommandCenterTools(tenantId: string, role: string, userId: string, timezone = 'America/New_York') {
+  const all = buildAllTools(tenantId, role, userId, timezone);
 
   // ── STRUCTURAL PERMISSION MATRIX (founder Jul 12: "certain people should
   // have access to certain things — make sure this is solid"). A role's agent
@@ -72,14 +85,14 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
   return Object.fromEntries(Object.entries(all).filter(([k]) => (allowed as string[]).includes(k))) as typeof all;
 }
 
-function buildAllTools(tenantId: string, role: string, userId: string) {
+function buildAllTools(tenantId: string, role: string, userId: string, timezone = 'America/New_York') {
   return {
     get_clocked_in_status: tool({
       description:
         "Who is clocked in right now, vs. the total active field roster. Use for questions like 'who's working today' or 'how many people are clocked in'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const today = toLocalYMD();
+        const today = ymdInTz(timezone);
         const [timecardsRes, rosterRes] = await Promise.all([
           supabaseAdmin
             .from('timecards')
@@ -100,7 +113,7 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
         const namesById = await lookupNames(tenantId, openTimecards.map((t: any) => t.user_id));
         const clockedIn = openTimecards.map((t: any) => ({
           name: namesById.get(t.user_id) ?? 'Unknown',
-          clockInTime: t.clock_in_time,
+          clockInTime: timeInTz(t.clock_in_time, timezone),
         }));
         return { clockedInCount: clockedIn.length, rosterSize: rosterRes.count ?? 0, clockedIn };
       },
@@ -111,7 +124,7 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
         "Job orders scheduled for today, with status and assigned operator. Use for 'what jobs are running today' or 'what's the status of today's jobs'.",
       inputSchema: z.object({}),
       execute: async () => {
-        const today = toLocalYMD();
+        const today = ymdInTz(timezone);
         // schedule_board_view (not the base job_orders table) is this repo's
         // established source for operator_name/helper_name — job_orders itself
         // only has assigned_to (an id). See schedule-board/page.tsx's own comment.
@@ -231,7 +244,7 @@ function buildAllTools(tenantId: string, role: string, userId: string) {
           events: events.map((t: any) => ({
             name: namesById.get(t.user_id) ?? 'Unknown',
             date: t.date,
-            clockInTime: t.clock_in_time,
+            clockInTime: timeInTz(t.clock_in_time, timezone),
             clockOutTime: t.clock_out_time,
             status: t.clock_out_time ? 'completed' : 'still clocked in',
           })),

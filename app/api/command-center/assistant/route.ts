@@ -118,7 +118,18 @@ export async function POST(request: NextRequest) {
   }
 
   const uiMessages = [...priorMessages, ...incomingMessages];
-  const agent = createArtifexAgent(tenantId, auth.role, auth.userId);
+  // Tenant timezone drives every "today" and every displayed time in the
+  // tools (server is UTC on Vercel). Default matches the clock-in route.
+  let timezone = 'America/New_York';
+  try {
+    const { data: tzRow } = await supabaseAdmin
+      .from('tenants')
+      .select('timezone')
+      .eq('id', tenantId)
+      .maybeSingle();
+    if (tzRow?.timezone) timezone = tzRow.timezone;
+  } catch { /* default tz */ }
+  const agent = createArtifexAgent(tenantId, auth.role, auth.userId, timezone);
 
   return createAgentUIStreamResponse({
     agent,
