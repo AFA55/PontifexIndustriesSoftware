@@ -152,7 +152,7 @@ export default function HowItWorks() {
                 <div className="flex items-center gap-3">
                   <div className="w-3 h-3 rounded-full bg-blue-500" />
                   <div className="flex-1 h-8 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center px-3">
-                    <span className="text-blue-300 text-xs font-mono">Patriot Concrete (PATRIOT)</span>
+                    <span className="text-blue-300 text-xs font-mono">Summit Field Services (SUMMIT)</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

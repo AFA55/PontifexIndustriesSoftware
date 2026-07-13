@@ -132,14 +132,6 @@ export default function Hero() {
             </motion.div>
 
             {/* Sub-CTA Text */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.65, duration: 0.6 }}
-              className="text-zinc-500 text-sm mt-5 text-center lg:text-left"
-            >
-              First client: Patriot Concrete Cutting (code: PATRIOT)
-            </motion.p>
           </div>
 
           {/* Right Column - Platform Preview */}

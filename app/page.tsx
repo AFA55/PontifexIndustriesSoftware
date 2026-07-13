@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     url: 'https://www.pontifexindustries.com',
     title: 'Custom Software & AI Automations Built Around How You Work',
     description:
-      'Own the digital tools that run your business — adaptable custom software built around your workflow, not the other way around. Proven with Patriot, our first customer.',
+      'Own the digital tools that run your business — adaptable custom software built around your workflow, not the other way around.',
     siteName: 'Pontifex Industries',
   },
   twitter: {
@@ -67,7 +67,7 @@ const FAQS = [
   },
   {
     q: 'How do I get started?',
-    a: 'Request a demo. We will walk through how you work today, show you what we have built for companies like Patriot, and map out what an adaptable, tailored solution would look like for your business.',
+    a: 'Request a demo. We will walk through how you work today, show you the platform live, and map out what an adaptable, tailored solution would look like for your business.',
   },
 ];
 
@@ -392,87 +392,6 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* ── 5. PROOF — Patriot case study ─────────────────────────────────── */}
-        <section id="proof" className="relative py-24 px-6 overflow-hidden border-t border-white/[0.05]">
-          <div
-            aria-hidden="true"
-            className="absolute inset-0 pointer-events-none opacity-[0.12]"
-            style={{
-              background:
-                'radial-gradient(45% 50% at 20% 40%, #7C3AED, transparent), radial-gradient(45% 50% at 80% 60%, #EF4444, transparent)',
-            }}
-          />
-          <div className="relative z-10 max-w-5xl mx-auto">
-            <div className="text-center mb-12 space-y-4">
-              <Eyebrow>Proof</Eyebrow>
-              <h2 className="text-3xl sm:text-5xl font-black leading-tight">
-                A real company.{' '}
-                <span className="bg-gradient-to-r from-violet-400 to-rose-400 bg-clip-text text-transparent">
-                  A real, running platform.
-                </span>
-              </h2>
-              <p className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                Patriot runs its entire operation on a custom platform we built around
-                their crews — scheduling, dispatch, GPS timecards, equipment, job logs, invoicing, and a
-                customer portal. One source of truth, owned by them.
-              </p>
-            </div>
-
-            <div className="rounded-3xl bg-white/[0.03] border border-white/[0.08] p-8 sm:p-10 grid sm:grid-cols-3 gap-8 items-center">
-              <div className="sm:col-span-2 space-y-5">
-                <div className="flex items-center gap-3">
-                  <span className="w-12 h-12 rounded-2xl bg-violet-500/15 border border-violet-500/25 flex items-center justify-center">
-                    <Hammer className="w-6 h-6 text-violet-300" />
-                  </span>
-                  <div>
-                    <h3 className="text-xl font-bold text-white">Patriot</h3>
-                    <p className="text-zinc-500 text-sm">Field service &amp; operations</p>
-                  </div>
-                </div>
-                <blockquote className="text-zinc-300 text-lg leading-relaxed border-l-2 border-violet-500/50 pl-5">
-                  &ldquo;We went from scheduling by memory and chasing paper timecards on Friday to one
-                  platform that runs the whole operation — built around how our crews actually work.&rdquo;
-                </blockquote>
-                <ul className="flex flex-wrap gap-3">
-                  {['Schedule board', 'GPS / NFC timecards', 'Voice equipment checkout', 'Invoicing', 'Customer portal'].map(
-                    (t) => (
-                      <li
-                        key={t}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20 text-violet-200 text-sm"
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        {t}
-                      </li>
-                    )
-                  )}
-                </ul>
-                <a
-                  href="/patriot"
-                  className="inline-flex items-center gap-2 text-violet-300 hover:text-violet-200 font-semibold transition-colors"
-                >
-                  See what we built for Patriot
-                  <ArrowRight className="w-4 h-4" />
-                </a>
-              </div>
-              <div className="grid grid-cols-3 sm:grid-cols-1 gap-4">
-                {[
-                  { stat: 'One', label: 'platform for the whole operation' },
-                  { stat: '~20 hrs', label: 'admin time saved per week' },
-                  { stat: '100%', label: 'of their data, owned by them' },
-                ].map((s) => (
-                  <div
-                    key={s.label}
-                    className="rounded-2xl bg-gradient-to-br from-violet-600/15 to-rose-600/10 border border-violet-500/20 p-4 text-center"
-                  >
-                    <div className="text-2xl font-black text-white">{s.stat}</div>
-                    <div className="text-zinc-400 text-xs leading-snug mt-1">{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* ── WHO IT'S FOR ──────────────────────────────────────────────────── */}
         <section className="relative py-20 px-6 border-t border-white/[0.05]">
           <div className="max-w-4xl mx-auto text-center space-y-6">
@@ -578,7 +497,6 @@ export default function HomePage() {
             <ul className="space-y-2 text-sm text-zinc-500">
               <li><a href="#how" className="hover:text-zinc-300 transition-colors">How It Works</a></li>
               <li><a href="#custom" className="hover:text-zinc-300 transition-colors">Custom Builds</a></li>
-              <li><a href="#proof" className="hover:text-zinc-300 transition-colors">Proof</a></li>
               <li><a href="/request-demo" className="hover:text-zinc-300 transition-colors">Request a Demo</a></li>
             </ul>
           </nav>
