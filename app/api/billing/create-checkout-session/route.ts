@@ -19,12 +19,20 @@ export async function POST(request: NextRequest) {
     const body = await request.json() as { planId: string };
     const { planId } = body;
 
-    if (!planId || !(planId in PLANS)) {
+    // 'test' = $5/mo cycle-verification plan (founder Jul 13: "I can do 5
+    // dollars a month right now, at least to test the payment cycles").
+    // super_admin only, no trial (the point is to see a real charge cycle),
+    // priced inline via price_data so no Stripe-dashboard setup is needed.
+    const isTestPlan = planId === 'test';
+    if (isTestPlan && auth.role !== 'super_admin') {
+      return NextResponse.json({ error: 'Test plan is owner-only.' }, { status: 403 });
+    }
+    if (!isTestPlan && (!planId || !(planId in PLANS))) {
       return NextResponse.json({ error: 'Invalid plan ID' }, { status: 400 });
     }
 
-    const plan = PLANS[planId as PlanId];
-    if (!plan.priceId) {
+    const plan = isTestPlan ? null : PLANS[planId as PlanId];
+    if (plan && !plan.priceId) {
       return NextResponse.json(
         { error: 'This plan is not available for self-serve checkout. Contact sales.' },
         { status: 400 }
@@ -62,11 +70,24 @@ export async function POST(request: NextRequest) {
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: stripeCustomerId,
-      line_items: [{ price: plan.priceId, quantity: 1 }],
+      line_items: [
+        plan
+          ? { price: plan.priceId, quantity: 1 }
+          : {
+              price_data: {
+                currency: 'usd',
+                recurring: { interval: 'month' },
+                unit_amount: 500, // $5.00
+                product_data: { name: 'Pontifex Test Plan (payment-cycle verification)' },
+              },
+              quantity: 1,
+            },
+      ],
       success_url: `${origin}/dashboard/admin/subscription?success=true`,
       cancel_url: `${origin}/dashboard/admin/subscription?canceled=true`,
       subscription_data: {
-        trial_period_days: 14,
+        // Test plan: NO trial — the point is a real, immediate charge cycle.
+        ...(isTestPlan ? {} : { trial_period_days: 14 }),
         metadata: { tenant_id: tenantId, plan: planId },
       },
       metadata: { tenant_id: tenantId, plan: planId },

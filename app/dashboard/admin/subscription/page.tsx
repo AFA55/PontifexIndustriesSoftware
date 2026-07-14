@@ -289,7 +289,7 @@ function SubscriptionPageInner() {
     fetchSub();
   }, [fetchSub, router]);
 
-  const handleCheckout = async (planId: PlanId) => {
+  const handleCheckout = async (planId: PlanId | 'test') => {
     setCheckoutLoading(planId);
     setError(null);
     try {
@@ -427,6 +427,25 @@ function SubscriptionPageInner() {
           <div className="mb-6 flex items-start gap-3 bg-red-50 border border-red-200 text-red-800 rounded-xl p-4">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
             <p className="text-sm">{error}</p>
+          </div>
+        )}
+
+        {/* Owner-only: $5/mo payment-cycle test plan (founder Jul 13) —
+            real Stripe subscription, no trial, cancel from the Stripe portal
+            once the cycle is verified. Hidden from tenant admins. */}
+        {!loading && getCurrentUser()?.role === 'super_admin' && sub?.status !== 'active' && (
+          <div className="mb-6 flex items-center justify-between gap-4 rounded-2xl border border-dashed border-gray-300 bg-white p-4">
+            <div>
+              <p className="text-sm font-bold text-gray-900">Payment-cycle test — $5/month</p>
+              <p className="text-xs text-gray-500">Owner-only. Real charge, no trial, cancel anytime via Manage Billing. For verifying the billing pipeline end-to-end.</p>
+            </div>
+            <button
+              onClick={() => handleCheckout('test')}
+              disabled={checkoutLoading !== null}
+              className="shrink-0 rounded-xl border border-gray-300 px-4 py-2 min-h-[44px] text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {checkoutLoading === 'test' ? 'Opening…' : 'Start $5 test'}
+            </button>
           </div>
         )}
 

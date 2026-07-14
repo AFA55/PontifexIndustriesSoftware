@@ -118,6 +118,17 @@
 ## 🟠 P1 — This week
 
 ### Jul 12 — founder-queued next blocks
+- [ ] **🔴 NEXT: Job-ad creation upgrade (founder Jul 13 — BLOCKS his hiring card + FB/TikTok
+      connect: "we need to fix the ad creation first")**. Two parts:
+      (a) **Company logo on ads** — surface tenant_branding.logo_url on the ad-kit preview +
+      upload/replace control (job page); store per-job override if uploaded there. Ad creative
+      previews (FB/IG/TikTok mock) render the logo.
+      (b) **Context for better copy** — the HiringJob fields ALREADY EXIST (pay_min/max,
+      schedule_text, requirements, benefits, generation_instructions, target_areas) but the
+      creation UI only exposes title+description. Add an "Ad context" section (pay range,
+      schedule, top 3 selling points, company one-liner, tone) on the job create/detail pages,
+      feed ALL of it into generateAdKit's prompt, + a Regenerate button showing what context
+      was used. Founder then: adds hiring card -> connects Facebook + TikTok (Phase 4 gate).
 - [ ] **Artifex scope PHOTOS (founder Jul 13)** — attach pictures of the scope of work while
       creating a ticket in the Artifex room: upload button (+ camera on mobile) in the chat →
       job-photos storage bucket → attached to the draft/created job order → visible on the
