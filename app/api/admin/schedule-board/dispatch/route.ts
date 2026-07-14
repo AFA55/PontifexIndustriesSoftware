@@ -64,14 +64,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // 1. Find all assigned jobs active on the target date (single-day AND multi-day)
-    //    A job is active on targetDate if: scheduled_date <= targetDate AND (end_date IS NULL OR end_date >= targetDate)
+    if (!auth.tenantId) {
+      return NextResponse.json({ error: 'Tenant scope required to dispatch.' }, { status: 403 });
+    }
+
+    // 1. Find THIS TENANT's assigned jobs active on the target date.
+    //    TENANT FILTER IS LOAD-BEARING: supabaseAdmin bypasses RLS — without
+    //    it this route counted AND texted other tenants' crews (found Jul 13).
+    //    Span shape: single-day jobs match ONLY their exact date; multi-day
+    //    jobs match inside their range. NOT `end_date.is.null` in the span
+    //    arm — that made every stale never-finished single-day job from past
+    //    weeks "active" forever (founder: "5 tickets and nothing on the
+    //    schedule").
     const { data: jobs, error: fetchError } = await supabaseAdmin
       .from('job_orders')
       .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date, end_date, dispatched_at')
+      .eq('tenant_id', auth.tenantId)
       .not('assigned_to', 'is', null)
       .lte('scheduled_date', targetDate)
-      .or(`end_date.is.null,end_date.gte.${targetDate}`)
+      .or(`scheduled_date.eq.${targetDate},end_date.gte.${targetDate}`)
       .in('status', ['scheduled', 'assigned', 'in_progress'])
       .is('deleted_at', null);
 
@@ -304,15 +315,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'date query param required.' }, { status: 400 });
   }
 
+  if (!auth.tenantId) {
+    return NextResponse.json({ error: 'Tenant scope required.' }, { status: 403 });
+  }
+
   try {
-    // Query jobs active on targetDate (single-day and multi-day)
+    // Same tenant + span rules as POST (see comment there) — the count the
+    // button shows must be exactly the set POST would text.
     const { data: jobs, error } = await supabaseAdmin
       .from('job_orders')
-      .select('id, customer_name, scheduled_date, end_date')
+      .select('id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to')
+      .eq('tenant_id', auth.tenantId)
       .not('assigned_to', 'is', null)
       .is('deleted_at', null)
       .lte('scheduled_date', targetDate)
-      .or(`end_date.is.null,end_date.gte.${targetDate}`)
+      .or(`scheduled_date.eq.${targetDate},end_date.gte.${targetDate}`)
       .in('status', ['scheduled', 'assigned', 'in_route', 'in_progress']);
 
     if (error) {
@@ -321,6 +338,14 @@ export async function GET(request: NextRequest) {
 
     const jobList = jobs || [];
     const total = jobList.length;
+
+    // Operator names so the modal can LIST exactly what will be pushed
+    // (founder: "let me SEE the tickets that are about to be dispatched").
+    const opIds = [...new Set(jobList.map((j: any) => j.assigned_to).filter(Boolean))];
+    const { data: ops } = opIds.length
+      ? await supabaseAdmin.from('profiles').select('id, full_name').in('id', opIds)
+      : { data: [] as { id: string; full_name: string }[] };
+    const opName = new Map((ops ?? []).map((p: any) => [p.id, p.full_name]));
 
     // Check AR: find overdue balances for customers being dispatched
     const customerNames = [...new Set(jobList.map(j => j.customer_name).filter(Boolean))];
@@ -371,6 +396,15 @@ export async function GET(request: NextRequest) {
       dispatched: 0,
       undispatched: total,
       ar_warnings: arWarnings,
+      jobs: jobList.map((j: any) => ({
+        id: j.id,
+        job_number: j.job_number,
+        customer_name: j.customer_name,
+        scheduled_date: j.scheduled_date,
+        end_date: j.end_date,
+        arrival_time: j.arrival_time,
+        operator_name: opName.get(j.assigned_to) ?? 'Unassigned',
+      })),
     });
   } catch (error) {
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });

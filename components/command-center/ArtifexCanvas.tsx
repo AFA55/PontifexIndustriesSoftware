@@ -16,7 +16,8 @@
  * the panel stamps DONE. The header link opens the real page.
  */
 import Link from 'next/link';
-import { CheckCircle2, ExternalLink, FileText, Loader2, Mail, Table2, X } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, ExternalLink, FileText, Loader2, Mail, Pencil, Table2, X } from 'lucide-react';
 import { attendanceCodeColor } from '@/lib/attendance-codes';
 
 export interface CanvasActivity {
@@ -42,12 +43,37 @@ const FIELD_LABELS: Record<string, string> = {
   personName: 'Person', customerNameFilter: 'Customer', startDateFilter: 'From', endDateFilter: 'To',
 };
 
-function Row({ label, value, pending }: { label: string; value: any; pending?: boolean }) {
+function Row({ label, value, pending, onEdit }: { label: string; value: any; pending?: boolean; onEdit?: (newValue: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const commit = () => {
+    setEditing(false);
+    const next = draft.trim();
+    if (next && next !== String(value ?? '')) onEdit?.(next);
+  };
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 py-2 last:border-0 dark:border-white/5">
+    <div className="group flex items-start justify-between gap-3 border-b border-slate-100 py-2 last:border-0 dark:border-white/5">
       <span className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-white/40">{label}</span>
-      {value != null && value !== '' ? (
-        <span className="max-w-[60%] text-right text-sm font-semibold text-slate-800 dark:text-white/90">{String(value)}</span>
+      {editing ? (
+        <input
+          autoFocus
+          defaultValue={value != null ? String(value) : ''}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+          className="w-[60%] rounded-lg border border-sky-400/60 bg-white px-2 py-1 text-right text-sm font-semibold text-slate-900 focus:outline-none dark:bg-slate-900 dark:text-white"
+        />
+      ) : value != null && value !== '' ? (
+        <button
+          type="button"
+          disabled={!onEdit}
+          onClick={() => { if (onEdit) { setDraft(String(value)); setEditing(true); } }}
+          className={`flex max-w-[60%] items-center gap-1.5 text-right text-sm font-semibold text-slate-800 dark:text-white/90 ${onEdit ? 'cursor-text hover:text-sky-700 dark:hover:text-sky-300' : 'cursor-default'}`}
+          title={onEdit ? 'Click to correct' : undefined}
+        >
+          <span className="truncate">{String(value)}</span>
+          {onEdit && <Pencil className="h-3 w-3 shrink-0 text-slate-300 opacity-0 transition-opacity group-hover:opacity-100 dark:text-white/30" />}
+        </button>
       ) : (
         <span className={`h-4 w-24 rounded bg-slate-100 dark:bg-white/10 ${pending ? 'animate-pulse' : ''}`} />
       )}
@@ -55,7 +81,17 @@ function Row({ label, value, pending }: { label: string; value: any; pending?: b
   );
 }
 
-export default function ArtifexCanvas({ activity, onClose }: { activity: CanvasActivity; onClose: () => void }) {
+export default function ArtifexCanvas({
+  activity,
+  onClose,
+  onCorrection,
+}: {
+  activity: CanvasActivity;
+  onClose: () => void;
+  /** Draft panel only: the user typed a correction into a field — feed it back
+   * into the conversation so the model updates its draft + uses it at create. */
+  onCorrection?: (fieldLabel: string, newValue: string) => void;
+}) {
   const meta = PANEL_META[activity.toolType] ?? {
     title: activity.toolType.replace(/^tool-/, '').replace(/_/g, ' '),
     href: '/dashboard/command-center',
@@ -167,7 +203,17 @@ export default function ArtifexCanvas({ activity, onClose }: { activity: CanvasA
           <>
             {Object.entries(input).length > 0 ? (
               Object.entries(input).map(([k, v]) => (
-                <Row key={k} label={FIELD_LABELS[k] ?? k} value={v as any} pending={working} />
+                <Row
+                  key={k}
+                  label={FIELD_LABELS[k] ?? k}
+                  value={v as any}
+                  pending={working}
+                  onEdit={
+                    isDraft && onCorrection
+                      ? (newValue) => onCorrection(FIELD_LABELS[k] ?? k, newValue)
+                      : undefined
+                  }
+                />
               ))
             ) : (
               <div className="space-y-2 py-1">

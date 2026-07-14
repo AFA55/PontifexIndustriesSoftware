@@ -94,6 +94,9 @@ interface ArtifexChatProps {
   onConversationStarted?: (id: string) => void;
   /** Live co-pilot canvas: reports the latest tool call (input streaming -> output) upward. */
   onToolActivity?: (activity: CanvasActivity) => void;
+  /** A message injected from outside the chat (canvas field corrections). */
+  injectedMessage?: string | null;
+  onInjectedHandled?: () => void;
 }
 
 export default function ArtifexChat({
@@ -108,6 +111,8 @@ export default function ArtifexChat({
   onNewConversation,
   onConversationStarted,
   onToolActivity,
+  injectedMessage,
+  onInjectedHandled,
 }: ArtifexChatProps) {
   const [input, setInput] = useState('');
   const [voiceOn, setVoiceOn] = useState(() => {
@@ -197,6 +202,17 @@ export default function ArtifexChat({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Canvas field corrections arrive as injected messages — send them into the
+  // SAME conversation so the model updates its draft (typed edit == spoken edit).
+  useEffect(() => {
+    if (!injectedMessage || busy || historyLoading) return;
+    hasSentThisMountRef.current = true;
+    lastTurnWasVoiceRef.current = false;
+    sendMessage({ text: injectedMessage });
+    onInjectedHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [injectedMessage, busy, historyLoading]);
 
   // Pick up a freshly-assigned conversation id off the streamed 'start' metadata.
   useEffect(() => {

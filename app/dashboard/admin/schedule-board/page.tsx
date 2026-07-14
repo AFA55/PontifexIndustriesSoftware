@@ -124,7 +124,10 @@ export default function ScheduleBoardPage() {
   // Dispatch state
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [dispatchLoading, setDispatchLoading] = useState(false);
-  const [dispatchInfo, setDispatchInfo] = useState<{ total: number; dispatched: number; undispatched: number } | null>(null);
+  const [dispatchInfo, setDispatchInfo] = useState<{
+    total: number; dispatched: number; undispatched: number;
+    jobs?: { id: string; job_number: string; customer_name: string; scheduled_date: string; end_date: string | null; arrival_time: string | null; operator_name: string }[];
+  } | null>(null);
 
   // Update schedule state
   const [updatingSchedule, setUpdatingSchedule] = useState(false);
@@ -171,7 +174,7 @@ export default function ScheduleBoardPage() {
       const res = await apiFetch(`/api/admin/schedule-board/dispatch?date=${date}`);
       if (res.ok) {
         const json = await res.json();
-        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched });
+        setDispatchInfo({ total: json.total, dispatched: json.dispatched, undispatched: json.undispatched, jobs: json.jobs });
       }
     } catch { /* ignore */ }
   }, []);

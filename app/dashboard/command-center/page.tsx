@@ -97,6 +97,11 @@ export default function CommandCenterPage() {
   // Live co-pilot canvas — the latest tool call rendering as a document on
   // the right while the orb slides left (founder Jul 12).
   const [canvas, setCanvas] = useState<CanvasActivity | null>(null);
+  // A field correction typed directly on the draft canvas — injected into the
+  // chat as a normal turn so the model updates its draft.
+  const [canvasCorrection, setCanvasCorrection] = useState<string | null>(null);
+  const handleCorrection = (label: string, value: string) =>
+    setCanvasCorrection(`Correction from the form: ${label} should be "${value}". Update the draft with this exact value and keep going.`);
 
   // Conversation history — the "2nd brain" sidebar's list + selection state.
   const [conversations, setConversations] = useState<ArtifexConversationSummary[]>([]);
@@ -298,14 +303,14 @@ export default function CommandCenterPage() {
           </div>
           {canvas && (
             <div className="hidden lg:block">
-              <ArtifexCanvas activity={canvas} onClose={() => setCanvas(null)} />
+              <ArtifexCanvas activity={canvas} onClose={() => setCanvas(null)} onCorrection={handleCorrection} />
             </div>
           )}
           </div>
           {/* Mobile: canvas below the orb */}
           {canvas && (
             <div className="mt-4 w-full px-2 lg:hidden">
-              <ArtifexCanvas activity={canvas} onClose={() => setCanvas(null)} />
+              <ArtifexCanvas activity={canvas} onClose={() => setCanvas(null)} onCorrection={handleCorrection} />
             </div>
           )}
 
@@ -334,6 +339,8 @@ export default function CommandCenterPage() {
                 loadConversations();
               }}
               onToolActivity={setCanvas}
+              injectedMessage={canvasCorrection}
+              onInjectedHandled={() => setCanvasCorrection(null)}
             />
             {transcriptOpen ? (
               <button

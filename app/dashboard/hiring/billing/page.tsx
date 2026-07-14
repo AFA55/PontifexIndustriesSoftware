@@ -225,7 +225,7 @@ export default function HiringBillingPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-950 flex items-center justify-center">
         <Loader2 className="w-8 h-8 text-brand animate-spin" />
       </div>
     );
@@ -236,40 +236,40 @@ export default function HiringBillingPage() {
   const canPayNow = !!data?.hasPaymentMethod && balance > 0 && balance >= threshold;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
+    <div className="min-h-screen bg-gray-50 dark:bg-slate-950 pb-16">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
         {/* Header */}
         <div>
           <Link
             href="/dashboard/hiring"
-            className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 min-h-[44px]"
+            className="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-slate-400 hover:text-gray-800 dark:text-slate-200 min-h-[44px]"
           >
             <ArrowLeft className="w-4 h-4" />
             Job Board
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900 mt-1">Billing</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mt-1">Billing</h1>
+          <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
             You only pay for ad spend — there&apos;s no subscription fee.
           </p>
         </div>
 
         {pageError && (
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+          <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
-            <p className="text-sm text-red-700">{pageError}</p>
+            <p className="text-sm text-red-700 dark:text-red-300">{pageError}</p>
           </div>
         )}
 
         {/* Balance card */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-slate-400">
                 <DollarSign className="w-4 h-4 text-brand" />
                 Current balance
               </div>
-              <div className="text-4xl font-bold text-gray-900 mt-2">{money(balance)}</div>
-              <div className="text-xs text-gray-500 mt-1">
+              <div className="text-4xl font-bold text-gray-900 dark:text-white mt-2">{money(balance)}</div>
+              <div className="text-xs text-gray-500 dark:text-slate-400 mt-1">
                 {money(data?.unbilledSpend ?? 0)} in unbilled ad spend ·{' '}
                 {money(data?.billing.lifetime_billed ?? 0)} billed lifetime
               </div>
@@ -287,9 +287,9 @@ export default function HiringBillingPage() {
           </div>
 
           {payError && (
-            <div className="mt-4 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+            <div className="mt-4 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-3 flex items-start gap-2">
               <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-              <p className="text-sm text-red-700">{payError}</p>
+              <p className="text-sm text-red-700 dark:text-red-300">{payError}</p>
             </div>
           )}
           {paySuccess && (
@@ -302,13 +302,13 @@ export default function HiringBillingPage() {
           {/* Threshold explainer (Hireline-style FAQ copy) */}
           <div className="mt-5 bg-brand/5 border border-brand/15 rounded-xl p-4 flex items-start gap-3">
             <Info className="w-4 h-4 text-brand shrink-0 mt-0.5" />
-            <div className="text-sm text-gray-800 dark:text-white/85">
+            <div className="text-sm text-gray-800 dark:text-slate-200 dark:text-white/85">
               <p>
                 You&apos;ll be charged what you owe on the 1st of each month, when the amount you
                 owe reaches <span className="font-semibold">{money(threshold)}</span>, or after you
                 pause all your jobs — whichever comes first.
               </p>
-              <p className="text-xs text-gray-600 dark:text-white/60 mt-1.5">
+              <p className="text-xs text-gray-600 dark:text-slate-300 dark:text-white/60 mt-1.5">
                 As your lifetime spend grows, this threshold increases automatically ($25 → $50 →
                 $250), so you see fewer, larger charges.
               </p>
@@ -317,14 +317,14 @@ export default function HiringBillingPage() {
         </div>
 
         {/* Payment method card */}
-        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl p-6 shadow-sm">
           <div className="flex items-center gap-2 mb-4">
             <CreditCard className="w-4 h-4 text-brand" />
-            <h2 className="text-base font-semibold text-gray-900">Payment method</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Payment method</h2>
           </div>
 
           {data?.hasPaymentMethod ? (
-            <div className="flex items-center gap-2 text-sm text-gray-700 mb-4">
+            <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-slate-300 mb-4">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               {cardSaved ? (
                 <span>
@@ -335,7 +335,7 @@ export default function HiringBillingPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-500 mb-4">
+            <p className="text-sm text-gray-500 dark:text-slate-400 mb-4">
               Add a card to run job ads — it&apos;s only charged for actual ad spend, per the
               schedule above.
             </p>
@@ -353,14 +353,14 @@ export default function HiringBillingPage() {
                 </button>
               )}
               {cardFlow === 'starting' && (
-                <div className="inline-flex items-center gap-2 text-sm text-gray-500 min-h-[44px]">
+                <div className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400 min-h-[44px]">
                   <Loader2 className="w-4 h-4 animate-spin" />
                   Preparing secure card entry…
                 </div>
               )}
               {(cardFlow === 'ready' || cardFlow === 'saving') && (
                 <div className="space-y-4">
-                  <div ref={mountRef} className="border border-gray-200 rounded-xl p-4 bg-white" />
+                  <div ref={mountRef} className="border border-gray-200 dark:border-slate-700 rounded-xl p-4 bg-white dark:bg-slate-900" />
                   <div className="flex flex-col sm:flex-row gap-2">
                     <button
                       onClick={saveCard}
@@ -378,28 +378,28 @@ export default function HiringBillingPage() {
                         elementsRef.current = null;
                       }}
                       disabled={cardFlow === 'saving'}
-                      className="inline-flex items-center justify-center px-5 min-h-[44px] rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-60 transition-colors"
+                      className="inline-flex items-center justify-center px-5 min-h-[44px] rounded-xl border border-gray-200 dark:border-slate-700 text-gray-600 dark:text-slate-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
                     >
                       Cancel
                     </button>
                   </div>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-xs text-gray-400 dark:text-slate-500">
                     Card details go directly to Stripe — they never touch our servers.
                   </p>
                 </div>
               )}
               {cardError && (
-                <div className="mt-3 bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2">
+                <div className="mt-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl p-3 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                  <p className="text-sm text-red-700">{cardError}</p>
+                  <p className="text-sm text-red-700 dark:text-red-300">{cardError}</p>
                 </div>
               )}
             </div>
           ) : (
-            <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl p-5 text-center">
+            <div className="bg-gray-50 dark:bg-slate-800/60 border border-dashed border-gray-300 dark:border-slate-600 rounded-xl p-5 text-center">
               <CreditCard className="w-6 h-6 text-gray-300 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Card entry is coming online shortly</p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-sm font-medium text-gray-600 dark:text-slate-300">Card entry is coming online shortly</p>
+              <p className="text-xs text-gray-400 dark:text-slate-500 mt-1">
                 Secure card-on-file setup will appear here once payments are switched on.
               </p>
             </div>
@@ -407,16 +407,16 @@ export default function HiringBillingPage() {
         </div>
 
         {/* Spend history */}
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+        <div className="bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-2xl shadow-sm overflow-hidden">
           <div className="flex items-center gap-2 px-6 pt-6 pb-4">
             <Receipt className="w-4 h-4 text-brand" />
-            <h2 className="text-base font-semibold text-gray-900">Spend history</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-white">Spend history</h2>
           </div>
           {data && data.recentLedger.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-gray-400 border-t border-b border-gray-100 bg-gray-50">
+                  <tr className="text-left text-xs uppercase tracking-wide text-gray-400 dark:text-slate-500 border-t border-b border-gray-100 bg-gray-50">
                     <th className="px-6 py-3 font-medium">Date</th>
                     <th className="px-4 py-3 font-medium">Job</th>
                     <th className="px-4 py-3 font-medium">Channel</th>
@@ -424,9 +424,9 @@ export default function HiringBillingPage() {
                     <th className="px-6 py-3 font-medium text-right">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-slate-800">
                   {data.recentLedger.map((entry) => (
-                    <tr key={entry.id} className="text-gray-700">
+                    <tr key={entry.id} className="text-gray-700 dark:text-slate-300">
                       <td className="px-6 py-3 whitespace-nowrap">
                         {/* Bare DATE column — parse local, never as UTC (lib/dates convention) */}
                         {new Date(entry.spend_date + 'T00:00:00').toLocaleDateString('en-US', {
@@ -436,7 +436,7 @@ export default function HiringBillingPage() {
                         })}
                       </td>
                       <td className="px-4 py-3 max-w-[220px] truncate">
-                        {entry.job_title || <span className="text-gray-400">—</span>}
+                        {entry.job_title || <span className="text-gray-400 dark:text-slate-500">—</span>}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         {CHANNEL_LABELS[entry.channel] || entry.channel}
@@ -446,12 +446,12 @@ export default function HiringBillingPage() {
                       </td>
                       <td className="px-6 py-3 text-right whitespace-nowrap">
                         {entry.invoiced ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30">
                             <CheckCircle2 className="w-3 h-3" />
                             Paid
                           </span>
                         ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
                             Unbilled
                           </span>
                         )}
@@ -463,14 +463,14 @@ export default function HiringBillingPage() {
             </div>
           ) : (
             <div className="px-6 pb-8 pt-2 text-center">
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-400 dark:text-slate-500">
                 No ad spend yet. Once your job ads start running, each day&apos;s spend shows up
                 here.
               </p>
             </div>
           )}
           {data && data.recentLedger.length > 0 && (
-            <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400">
+            <div className="px-6 py-3 border-t border-gray-100 text-xs text-gray-400 dark:text-slate-500">
               Showing the last {data.recentLedger.length} entries.
             </div>
           )}

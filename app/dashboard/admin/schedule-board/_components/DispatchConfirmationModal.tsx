@@ -7,6 +7,15 @@ interface DispatchInfo {
   total: number;
   dispatched: number;
   undispatched: number;
+  jobs?: {
+    id: string;
+    job_number: string;
+    customer_name: string;
+    scheduled_date: string;
+    end_date: string | null;
+    arrival_time: string | null;
+    operator_name: string;
+  }[];
 }
 
 interface DispatchConfirmationModalProps {
@@ -53,6 +62,29 @@ export default function DispatchConfirmationModal({
                     <div className="text-xs text-gray-500 dark:text-white/60 font-medium mt-1">Assigned Jobs</div>
                   </div>
                 </div>
+
+                {/* Exactly WHICH tickets are about to go out (founder Jul 13:
+                    "let me see the tickets that are about to be dispatched").
+                    A stale/wrong job here gets fixed on the board (cancel or
+                    reschedule) BEFORE pushing — crews only get real tickets. */}
+                {(dispatchInfo.jobs?.length ?? 0) > 0 && (
+                  <div className="max-h-56 overflow-y-auto rounded-xl border border-gray-200 dark:border-white/10 divide-y divide-gray-100 dark:divide-white/5">
+                    {dispatchInfo.jobs!.map((j) => (
+                      <div key={j.id} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-gray-800 dark:text-white/90">{j.customer_name}</p>
+                          <p className="truncate text-xs text-gray-500 dark:text-white/50">
+                            {j.job_number} · {j.operator_name}
+                            {j.end_date && j.end_date !== j.scheduled_date ? ` · ${j.scheduled_date} → ${j.end_date}` : ` · ${j.scheduled_date}`}
+                          </p>
+                        </div>
+                        {j.arrival_time && (
+                          <span className="shrink-0 text-xs font-semibold text-gray-500 dark:text-white/50">{j.arrival_time.slice(0, 5)}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 {dispatchInfo.total === 0 ? (
                   <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-white/10 rounded-xl">
