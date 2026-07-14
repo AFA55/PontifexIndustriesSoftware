@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { PLATFORM_TENANT_ID } from '@/lib/rbac';
 import { getCurrentUser, logout, isAdmin, type User } from '@/lib/auth';
 import { verifyShopLocation } from '@/lib/geolocation';
 import { supabase } from '@/lib/supabase';
@@ -110,7 +111,9 @@ export default function Dashboard() {
     // They can still navigate INTO client dashboards explicitly — this only
     // changes the DEFAULT landing at /dashboard. Keep before the admin block.
     if (currentUser.role === 'super_admin') {
-      router.replace('/dashboard/platform');
+      // Hub is the PONTIFEX org's console; a tenant's super admin runs their
+      // own company and lands on their admin dashboard.
+      router.replace(currentUser.tenant_id === PLATFORM_TENANT_ID ? '/dashboard/platform' : '/dashboard/admin');
       return;
     }
 

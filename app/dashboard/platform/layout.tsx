@@ -8,6 +8,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, LogOut, RefreshCw } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
+import { PLATFORM_TENANT_ID } from '@/lib/rbac';
 
 /**
  * Platform Console layout — super_admin ONLY.
@@ -27,8 +28,12 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
 
   useEffect(() => {
     const u = getCurrentUser();
-    if (!u || u.role !== 'super_admin') {
-      router.push('/dashboard');
+    // Owner console = PONTIFEX org's super admin ONLY. A tenant's super
+    // admin (e.g. the Patriot demo account) runs their own company — send
+    // them to their admin dashboard (founder Jul 14: logging into Patriot
+    // "sent me to Pontifex platform first").
+    if (!u || u.role !== 'super_admin' || u.tenant_id !== PLATFORM_TENANT_ID) {
+      router.push(u && u.role === 'super_admin' ? '/dashboard/admin' : '/dashboard');
       return;
     }
     setUser(u);

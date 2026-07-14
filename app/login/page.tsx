@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { supabase } from '@/lib/supabase';
+import { PLATFORM_TENANT_ID } from '@/lib/rbac';
 import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, ScanFace } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BIOMETRIC_DECLINED_KEY, biometricAvailable, biometryLabel, disableBiometric, enrolledBiometricEmail, enrollBiometric, hasEnrolledBiometric, verifyAndGetSession } from '@/lib/biometric';
@@ -348,7 +349,10 @@ function LoginPageInner() {
       // roles → field dashboard.
       let target: string | null = null;
       if (result.user.role === 'super_admin') {
-        target = '/dashboard/platform';
+        // The Platform Hub is the PONTIFEX org's console only — a tenant's
+        // super admin (e.g. Patriot demo) lands in THEIR portal (founder
+        // Jul 14: "it sent me to Pontifex platform first").
+        target = result.user.tenant_id === PLATFORM_TENANT_ID ? '/dashboard/platform' : '/dashboard/admin';
       } else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(result.user.role)) {
         target = '/dashboard/admin';
       } else if (['operator', 'apprentice'].includes(result.user.role)) {
@@ -432,6 +436,7 @@ function LoginPageInner() {
 
       // Resolve the dashboard profile blob the guards read, then route by role.
       let role = '';
+      let tenantIdForLanding: string | null = null;
       let target: string | null = null;
       let profileWritten = false;
       try {
@@ -470,7 +475,7 @@ function LoginPageInner() {
       }
       try { localStorage.setItem('pontifex.lastEmail', result.email); } catch { /* non-fatal */ }
 
-      if (role === 'super_admin') target = '/dashboard/platform';
+      if (role === 'super_admin') target = tenantIdForLanding === PLATFORM_TENANT_ID ? '/dashboard/platform' : '/dashboard/admin';
       else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(role)) target = '/dashboard/admin';
       else if (['operator', 'apprentice'].includes(role)) target = '/dashboard';
       else target = '/dashboard'; // safe default; the dashboard re-guards by role
@@ -492,20 +497,23 @@ function LoginPageInner() {
       const session = data.session;
       if (!session) { setLoading(false); return; }
       let role = '';
+      let tenantIdForLanding: string | null = null;
       try {
         const res = await fetch('/api/my-profile', {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         const json = await res.json();
         role = json?.data?.role || '';
+        tenantIdForLanding = json?.data?.tenant_id ?? null;
         if (json?.data) {
           localStorage.setItem('supabase-user', JSON.stringify({
             id: json.data.id, name: json.data.full_name, email: json.data.email, role: json.data.role,
+            tenant_id: tenantIdForLanding,
           }));
         }
       } catch { /* non-fatal — dashboard re-guards by role */ }
       let target = '/dashboard';
-      if (role === 'super_admin') target = '/dashboard/platform';
+      if (role === 'super_admin') target = tenantIdForLanding === PLATFORM_TENANT_ID ? '/dashboard/platform' : '/dashboard/admin';
       else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(role)) target = '/dashboard/admin';
       navigateAfterLogin(target);
     } catch {

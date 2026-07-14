@@ -114,15 +114,13 @@ function CompanyLoginContent() {
           // console is entered by an explicit click; tenant users keep the
           // silent remember-me resume their office staff rely on.
           let storedTenant: string | null = null;
-          let storedRole: string | null = null;
           try {
-            const blob = JSON.parse(storedUser);
-            storedTenant = blob?.tenant_id ?? null;
-            storedRole = blob?.role ?? null;
+            storedTenant = JSON.parse(storedUser)?.tenant_id ?? null;
           } catch { /* unverifiable */ }
-          // Platform org OR any super_admin (super_admins role-route to the
-          // hub) — both doors into the owner console stay click-to-enter.
-          if (storedTenant === PLATFORM_TENANT_ID || storedRole === 'super_admin') {
+          // PONTIFEX-org sessions only (founder Jul 14: a TENANT's super
+          // admin belongs in their own portal, never the owner console) —
+          // and even the owner enters by an explicit click, never silently.
+          if (storedTenant === PLATFORM_TENANT_ID) {
             setPlatformSession(true);
             showEntry();
             return;
