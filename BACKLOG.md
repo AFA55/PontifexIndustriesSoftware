@@ -75,6 +75,18 @@
 
 ## 🔴 P0 — Verify / unblock now
 
+### Jul 14 — crew workflow (founder-directed; plan: `docs/plans/SHOP_TICKETS_AND_CREW_PLAN.md`)
+- [ ] **P0 BUG: helper couldn't see assigned ticket** (real crew, job QA-2026-105647 Jul 14).
+      Diagnostic state + suspects in the plan doc §"Live-bug". Also fix the adjacent
+      role-vs-slot bug (my-jobs keys helper visibility on role==='apprentice').
+- [ ] **Helper staged view**: helpers always see scope/crew/equipment; ADDRESS reveals only
+      once the operator taps In Route (gate on in_route_at, client + server).
+- [ ] **Multi-helper crews**: `job_crew` junction (spec in plan doc) + assign UI "+ Add
+      helper" + dispatch notifies all crew + 5 read-path updates listed in the doc.
+- [ ] **Shop tickets**: ticket_kind='shop' on job_orders; assign crew; end-of-day "what I did
+      at the shop" log; ADMIN signature sign-off; skips GPS/customer-SMS/survey. Board lane +
+      Quick Add toggle.
+
 ### Jul 2 — full security audit + Artifex "2nd brain" upgrade + onboarding infra Phase 1
 - [x] ~~**Tenant-creation wizard (Platform Hub v2 Build Item 1)**~~ — ✅ SHIPPED (`08ebf148`), unpushed. Replaces the flat "New Tenant" form with a 5-step guided sequence (Company → Branding → Modules → First Admin → Review & Launch), matching the founder's ask for scalable multi-company onboarding + a demo-request-to-tenant conversion path. Live company-code/slug uniqueness check, reactive login-page preview, 3 module presets (Starter/Field Ops/Full) over the existing switchboard, demo-request lead linking (`demo_requests.tenant_id`, column existed unused until now). Verified end-to-end live: created + inspected + cleaned up a real test tenant, 375px mobile clean, no console/network errors. Remaining Platform Hub v2 items (hub overview KPIs, brand polish) still open — see `docs/plans/PLATFORM_HUB_V2_PLAN.md`.
 - [x] ~~**Ticket → AI draft-resolution pipeline**~~ — ✅ SHIPPED. `lib/tools/ticket-analysis-tools.ts` + `lib/agents/ticket-analysis-agent.ts` (Sonnet 5, tenant-scoped read-only investigation) + `POST /api/admin/feedback/[id]/analyze` (`requireSuperAdmin`) + an "Analyze with AI" button/panel on the feedback triage page. Draft-only per the founder's explicit scope call — verified by 2 independent reviewers that no write path exists beyond `ai_analysis`/`ai_analyzed_at` on the ticket itself. **Live-tested with a real ticket against real Patriot data**: the agent found actual flagged/pending timecard rows for specific operators and produced a grounded diagnosis tied to real user IDs and dates, not a generic guess.

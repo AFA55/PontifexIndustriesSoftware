@@ -1,6 +1,63 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 13, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`91322fa4`).
+**Last updated:** Jul 14, 2026 (evening — Fable 5 credits exhausted, handoff to Opus) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`7e67aa80`).
+
+> ## 🤝 OPUS HANDOFF — read this block, then work
+>
+> **YOU ARE PICKING UP MID-SPRINT.** Founder (Andres, non-technical, typo-heavy, sends
+> screenshots while live-testing prod) runs 3 REAL operators daily on Patriot. He directs;
+> you architect, build, verify, ship. Truth > reassurance. Read the read path AND write path.
+>
+> **THE LOOP (every change):** build → guardian-review (money/auth = adversarial) →
+> LIVE-verify in the browser preview (login super@pontifex.com/super0202! code PATRIOT;
+> founder's own = andres…@gmail.com/PONTIFEX → Platform Hub) → gate
+> (`rm -rf .next && npm run build` + `npx tsc --noEmit` + `npx jest`; 163 tests, the 2
+> email-suite TextEncoder failures are pre-existing env noise) → commit (batch!) →
+> `git push origin main` = ~$1–2 billed build, once per batch, watch deploy READY (~90s).
+> Browser-pane gotchas: React inputs need the native-setter+input-event trick, then
+> `form.requestSubmit()`; sessions die between preview restarts — just re-login.
+>
+> **NEXT WORK, IN ORDER (founder-directed Jul 14):**
+> 1. **`docs/plans/SHOP_TICKETS_AND_CREW_PLAN.md`** — LIVE helper-visibility bug (his real
+>    crew, job QA-2026-105647; diagnostic state + suspects in the doc) → then multi-helper
+>    crews (`job_crew`) → then shop tickets w/ admin sign-off. Rollout order + verification
+>    steps are in the doc. START WITH THE BUG.
+> 2. **Job-ad creation upgrade** (BACKLOG P1 top, full spec) — logo on ad previews + "Ad
+>    context" fields feeding generateAdKit. GATES: founder's hiring card + FB/TikTok connect.
+> 3. Founder-side pending: his $5 subscription test (button live), real paper-ticket scans,
+>    Meta business verification (Phase 4 gate), correcting the "Conrade Richardson" invite
+>    name if wrong (pencil icon, Invite Users).
+>
+> **YOUR TEAM (use it):** worktree subagent builders for parallel independent items
+> (`parallel-burndown` skill; ALWAYS merge worktrees back + clean `.claude/worktrees/`);
+> `guardian-review` behind every builder; `rls-policy-auditor` on every migration;
+> `supabase-migration-author` for new tables; `mobile-responsive-auditor` before operator-UI
+> merges; `dev-decisions` skill BEFORE any architecture/vendor/schema decision (honest-options
+> rule); `prod-deploy` skill for the push gate. Supabase MCP = live prod DB (execute_sql for
+> ground truth — verify before asserting); Vercel MCP = deploy watch.
+>
+> **HARD RULES:** never touch secret VALUES (founder pastes into Vercel); tenant_id filter on
+> every supabaseAdmin query (it bypasses RLS — the filter IS the boundary; the Jul 13 dispatch
+> bug was exactly this); tenant timezone for anything time-ish (`ymdInTz` — server is UTC);
+> voice transcription garbles PROPER NOUNS → Artifex spells back names/emails, snaps customers
+> via search_customers, job types via enum; PLATFORM_TENANT_ID gates the hub; never market as
+> "concrete cutting software" (non-compete — positioning: custom digital infrastructure).
+
+> **🛎️ Jul 14 shipped (all live through `7e67aa80`):** invite name editing (PATCH pending
+> invitation + pencil UI, verified E2E) + Artifex spells invite names/emails letter-by-letter;
+> Platform-Hub landing fixed = PONTIFEX-org only (4 decision points + hub guard + company-login
+> button; tenant super admins land in their own portal); $5/mo owner-only payment-cycle test
+> plan (inline price_data, no trial, live on Subscription page); deep-set rule (>15in wall/slab
+> → ask); equipment learning (suggest_equipment from job history + memory loop, verified: DFS →
+> "5000 slab saw + 30-inch guard"); paper-ticket scanner (Scan Ticket on board → Haiku vision →
+> Quick Add prefill, review-first — founder still to test with REAL paper tickets); dispatch
+> repair (tenant filter was MISSING — was counting/texting other tenants' crews; stale-span
+> fixed; modal lists exact tickets); editable draft canvas (click-to-correct fields feed back
+> into the conversation); Job Board Billing dark mode; multi-day fixes (week-view spans,
+> approval preserves duration, crew-safe day counts via 60-day real-DB stress test); Artifex
+> caller identity + customer lookup + persistent live captions + continuous multi-part
+> listening (2.2s silence window); tenant-tz everywhere; mic-blocked explanations (company
+> Chrome policy / NO MIC on office desktop — founder buying USB mic).
 
 > **🛎️ Jul 13 (operators went LIVE — Zack/Aiden/Lucas clocked in 6:29/6:37/6:55 AM):**
 > TENANT-TZ fix (`0cdb3767`): Artifex tools were UTC ("clocked in at 10" for 6:29 ET; after 8 PM
