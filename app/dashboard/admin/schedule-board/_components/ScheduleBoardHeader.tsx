@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {
   Calendar, ChevronLeft, Bell, FolderOpen, FileText, Sparkles,
-  Plus, RefreshCw, Loader2, Megaphone, KeyRound,
+  Plus, RefreshCw, Loader2, Megaphone, KeyRound, ScanLine,
 } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -21,6 +21,8 @@ interface ScheduleBoardHeaderProps {
   onToggleWillCall: () => void;
   onAutoSchedule: () => void;
   onQuickAdd: () => void;
+  onScanTicket?: () => void;
+  scanningTicket?: boolean;
   onUpdateSchedule: () => void;
   onOpenDispatchModal: () => void;
   onOpenDailyCode: () => void;
@@ -40,6 +42,8 @@ export default function ScheduleBoardHeader({
   onToggleWillCall,
   onAutoSchedule,
   onQuickAdd,
+  onScanTicket,
+  scanningTicket,
   onUpdateSchedule,
   onOpenDispatchModal,
   onOpenDailyCode,
@@ -117,6 +121,17 @@ export default function ScheduleBoardHeader({
                 >
                   <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">Quick Add</span>
                 </button>
+                {onScanTicket && (
+                  <button
+                    onClick={onScanTicket}
+                    disabled={scanningTicket}
+                    className="h-9 px-3 bg-gradient-to-r from-slate-600 to-slate-800 hover:from-slate-700 hover:to-slate-900 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-60"
+                    title="Photograph a paper ticket — fields prefill into Quick Add for review"
+                  >
+                    {scanningTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
+                    <span className="whitespace-nowrap">{scanningTicket ? 'Reading…' : 'Scan Ticket'}</span>
+                  </button>
+                )}
                 <button
                   onClick={onUpdateSchedule}
                   disabled={updatingSchedule}

@@ -72,7 +72,7 @@ export function createCommandCenterTools(tenantId: string, role: string, userId:
     operations_manager: Object.keys(all) as (keyof typeof all)[],
     admin: Object.keys(all) as (keyof typeof all)[],
     // Sales: operational reads + ticket creation. No payroll, revenue, or invites.
-    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'search_customers', 'update_ticket_draft', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
+    salesman: ['get_clocked_in_status', 'get_todays_jobs', 'get_team_roster', 'search_job_history', 'search_customers', 'suggest_equipment', 'update_ticket_draft', 'create_job_ticket', 'save_memory_note', 'recall_memory_notes'],
     // Supervisors: operational reads + approvals visibility. No writes.
     // (get_attendance_summary matches the attendance_events RLS read grant.)
     supervisor: ['get_clocked_in_status', 'get_todays_jobs', 'get_pending_approvals', 'get_team_roster', 'get_recent_activity', 'search_job_history', 'get_attendance_summary', 'save_memory_note', 'recall_memory_notes'],
@@ -572,6 +572,61 @@ function buildAllTools(tenantId: string, role: string, userId: string, timezone 
       },
     }),
 
+    suggest_equipment: tool({
+      description:
+        "What equipment does a job like this usually need? Learned from THIS company's past tickets (frequency of equipment_needed by job type). Call it once the job type is known while building a ticket, then PROPOSE the suggestions aloud ('jobs like this usually take the 5000 slab saw and a 26 guard — want those on the ticket?'). NEVER add equipment silently; the user confirms. If the user names equipment that isn't suggested, that's new knowledge — save it with save_memory_note.",
+      inputSchema: z.object({
+        jobType: z.string().describe('The job/service type being scheduled'),
+      }),
+      execute: async ({ jobType }) => {
+        // Past tickets often use shorthand ("DFS" for Diesel Floor Sawing),
+        // so match the full name OR its known aliases.
+        const ALIASES: Record<string, string[]> = {
+          'diesel floor sawing': ['DFS', 'floor saw'],
+          'electric floor sawing': ['EFS', 'floor saw'],
+          'wall/track sawing': ['WS/TS', 'WS', 'wall saw', 'track saw'],
+          'wire sawing': ['wire'],
+          'electric core drilling': ['ECD', 'core'],
+          'high frequency core drilling': ['HF', 'core'],
+          'hydraulic core drilling': ['HCD', 'core'],
+          'chain sawing': ['chain'],
+          'handheld / push sawing': ['handheld', 'push saw'],
+          'gpr scanning': ['GPR'],
+          'selective demo': ['demo'],
+          'brokk': ['brokk'],
+        };
+        const keys = [jobType, ...(ALIASES[jobType.toLowerCase().trim()] ?? [])];
+        const orExpr = keys.map((k) => `job_type.ilike.%${k.replace(/[%,()]/g, '')}%`).join(',');
+        const { data, error } = await supabaseAdmin
+          .from('job_orders')
+          .select('equipment_needed')
+          .eq('tenant_id', tenantId)
+          .or(orExpr)
+          .not('equipment_needed', 'is', null)
+          .limit(300);
+        if (error) throw new Error(`suggest_equipment: ${error.message}`);
+        const counts = new Map<string, number>();
+        for (const row of data ?? []) {
+          for (const item of (row.equipment_needed as string[]) ?? []) {
+            const k = item.trim();
+            if (k) counts.set(k, (counts.get(k) ?? 0) + 1);
+          }
+        }
+        const suggestions = [...counts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 8)
+          .map(([item, timesUsed]) => ({ item, timesUsed }));
+        return {
+          jobType,
+          suggestions,
+          note:
+            suggestions.length > 0
+              ? 'Propose these to the user — confirm before putting them on the ticket. Also recall_memory_notes for equipment preferences saved earlier.'
+              : 'No equipment history for this job type yet — ask the user what to bring, and save what they say with save_memory_note so next time you can suggest it.',
+        };
+      },
+    }),
+
     update_ticket_draft: tool({
       description:
         "LIVE DRAFT PAD — saves NOTHING. While collecting job-ticket details in conversation, call this after EVERY user message with ALL slots gathered so far (even partial). It renders the ticket form on the user's screen filling in live, so they can watch and correct you as you go. Always call it during ticket building, before you have enough to create.",
@@ -584,6 +639,7 @@ function buildAllTools(tenantId: string, role: string, userId: string, timezone 
         address: z.string().optional(),
         contactName: z.string().optional(),
         contactPhone: z.string().optional(),
+        equipment: z.string().optional().describe('Comma-separated equipment list for the ticket'),
       }),
       execute: async (slots) => ({ ok: true, drafted: Object.keys(slots).filter((k) => (slots as any)[k]) }),
     }),
@@ -603,8 +659,9 @@ function buildAllTools(tenantId: string, role: string, userId: string, timezone 
         contactName: z.string().optional().describe('Site contact name'),
         contactPhone: z.string().optional().describe('Site contact phone'),
         priority: z.enum(['low', 'medium', 'high']).optional(),
+        equipmentNeeded: z.array(z.string()).optional().describe('Equipment for the ticket — ONLY items the user confirmed'),
       }),
-      execute: async ({ customerName, jobType, startDate, endDate, scope, address, contactName, contactPhone, priority }) => {
+      execute: async ({ customerName, jobType, startDate, endDate, scope, address, contactName, contactPhone, priority, equipmentNeeded }) => {
         // Write access mirrors the schedule board's own quick-add population.
         const CAN_CREATE = ['admin', 'super_admin', 'operations_manager', 'salesman'];
         if (!CAN_CREATE.includes(role)) {
@@ -640,6 +697,7 @@ function buildAllTools(tenantId: string, role: string, userId: string, timezone 
             job_type: jobType.trim(),
             address: address || null,
             location: address || null,
+            equipment_needed: equipmentNeeded && equipmentNeeded.length ? equipmentNeeded : null,
             foreman_name: contactName || null,
             foreman_phone: contactPhone || null,
             salesman_name: creator?.full_name || null,

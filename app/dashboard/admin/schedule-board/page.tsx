@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { CalendarOff } from 'lucide-react';
@@ -118,6 +118,61 @@ export default function ScheduleBoardPage() {
   const [showPendingQueue, setShowPendingQueue] = useState(false);
   const [showWillCall, setShowWillCall] = useState(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
+  // Paper-ticket scanner: photo -> vision extraction -> Quick Add PREFILL
+  // (review-first: nothing is created until the human submits the form).
+  const [quickAddPrefill, setQuickAddPrefill] = useState<Partial<QuickAddData> | null>(null);
+  const [scanningTicket, setScanningTicket] = useState(false);
+  const scanInputRef = useRef<HTMLInputElement | null>(null);
+
+  const handleScanFile = async (file: File) => {
+    setScanningTicket(true);
+    try {
+      // Downscale client-side (~1600px, JPEG) — keeps upload + vision cost sane.
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const scale = Math.min(1, 1600 / Math.max(img.width, img.height));
+          const c = document.createElement('canvas');
+          c.width = Math.round(img.width * scale);
+          c.height = Math.round(img.height * scale);
+          c.getContext('2d')!.drawImage(img, 0, 0, c.width, c.height);
+          URL.revokeObjectURL(url);
+          resolve(c.toDataURL('image/jpeg', 0.85));
+        };
+        img.onerror = reject;
+        img.src = url;
+      });
+      const res = await apiFetch('/api/admin/schedule-board/scan-ticket', {
+        method: 'POST',
+        body: JSON.stringify({ image: dataUrl }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) {
+        addToast('error', 'Scan Failed', json.error || 'Could not read the ticket.');
+        return;
+      }
+      const t = json.data;
+      setQuickAddPrefill({
+        contractorName: t.contractorName ?? '',
+        start_date: t.startDate ?? '',
+        end_date: t.endDate ?? t.startDate ?? '',
+        address: t.address ?? '',
+        scope: [t.scope, t.equipment?.length ? `Equipment on ticket: ${t.equipment.join(', ')}` : null, t.jobTypeGuess ? `Job type on ticket: ${t.jobTypeGuess}` : null]
+          .filter(Boolean)
+          .join('\n'),
+        contactName: t.contactName ?? '',
+        contactPhone: t.contactPhone ?? '',
+      });
+      setShowQuickAdd(true);
+      addToast('success', 'Ticket Read', `Fields prefilled — review everything before saving.${t.illegibleNotes ? ` Couldn't read: ${t.illegibleNotes}` : ''}`);
+    } catch {
+      addToast('error', 'Scan Failed', 'Could not process that photo.');
+    } finally {
+      setScanningTicket(false);
+      if (scanInputRef.current) scanInputRef.current.value = '';
+    }
+  };
   const [showCapacitySettings, setShowCapacitySettings] = useState(false);
   const [toasts, setToasts] = useState<ToastData[]>([]);
 
@@ -1711,7 +1766,9 @@ export default function ScheduleBoardPage() {
         onOpenPendingQueue={() => setShowPendingQueue(true)}
         onToggleWillCall={() => setShowWillCall(!showWillCall)}
         onAutoSchedule={handleAutoSchedule}
-        onQuickAdd={() => setShowQuickAdd(true)}
+        onQuickAdd={() => { setQuickAddPrefill(null); setShowQuickAdd(true); }}
+        onScanTicket={() => scanInputRef.current?.click()}
+        scanningTicket={scanningTicket}
         onUpdateSchedule={handleUpdateSchedule}
         onOpenDispatchModal={() => { fetchDispatchStatus(selectedDate); setShowDispatchModal(true); }}
         onOpenDailyCode={() => { setShowDailyCode(true); fetchDailyCode(); }}
@@ -1979,7 +2036,23 @@ export default function ScheduleBoardPage() {
         />
       )}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
-      {showQuickAdd && <QuickAddModal salesmen={SALESMEN} onSubmit={handleQuickAdd} onClose={() => setShowQuickAdd(false)} />}
+      {showQuickAdd && (
+        <QuickAddModal
+          salesmen={SALESMEN}
+          onSubmit={handleQuickAdd}
+          onClose={() => { setShowQuickAdd(false); setQuickAddPrefill(null); }}
+          initialValues={quickAddPrefill ?? undefined}
+        />
+      )}
+      {/* Hidden input for the paper-ticket scanner (camera on mobile) */}
+      <input
+        ref={scanInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleScanFile(f); }}
+      />
 
       {/* ═══ AI AUTO-SCHEDULE RESULTS MODAL ═══ */}
       {autoScheduleResults && (

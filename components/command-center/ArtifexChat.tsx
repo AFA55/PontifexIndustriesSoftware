@@ -54,6 +54,7 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-get_revenue_snapshot': 'Pulling revenue numbers',
   'tool-search_job_history': 'Searching schedule history',
   'tool-search_customers': 'Checking your customer list',
+  'tool-suggest_equipment': 'Checking what equipment jobs like this take',
   'tool-get_hours_summary': 'Crunching hours',
   'tool-get_attendance_summary': 'Pulling attendance',
   'tool-update_ticket_draft': 'Drafting the ticket',

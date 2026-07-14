@@ -39,7 +39,7 @@ const PANEL_META: Record<string, { title: string; href: string; icon: any }> = {
 const FIELD_LABELS: Record<string, string> = {
   customerName: 'Customer', jobType: 'Job type', startDate: 'Start date', endDate: 'End date',
   scope: 'Scope', address: 'Address', contactName: 'Site contact', contactPhone: 'Contact phone',
-  priority: 'Priority', fullName: 'Name', email: 'Email', role: 'Role', phone: 'Phone',
+  priority: 'Priority', equipment: 'Equipment', equipmentNeeded: 'Equipment', fullName: 'Name', email: 'Email', role: 'Role', phone: 'Phone',
   personName: 'Person', customerNameFilter: 'Customer', startDateFilter: 'From', endDateFilter: 'To',
 };
 

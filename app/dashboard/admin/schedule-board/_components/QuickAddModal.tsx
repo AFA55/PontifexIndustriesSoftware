@@ -40,19 +40,22 @@ interface QuickAddModalProps {
   salesmen: string[];
   onSubmit: (data: QuickAddData) => void;
   onClose: () => void;
+  /** Prefill from the paper-ticket scanner — the human still reviews every
+   * field (and picks job types + salesman) before submitting. */
+  initialValues?: Partial<QuickAddData>;
 }
 
-export default function QuickAddModal({ salesmen, onSubmit, onClose }: QuickAddModalProps) {
+export default function QuickAddModal({ salesmen, onSubmit, onClose, initialValues }: QuickAddModalProps) {
   const [salesmanName, setSalesmanName] = useState('');
   const [salesmanId, setSalesmanId] = useState('');
-  const [start_date, setStartDate] = useState('');
-  const [end_date, setEndDate] = useState('');
-  const [contractorName, setContractorName] = useState('');
-  const [scope, setScope] = useState('');
+  const [start_date, setStartDate] = useState(initialValues?.start_date ?? '');
+  const [end_date, setEndDate] = useState(initialValues?.end_date ?? '');
+  const [contractorName, setContractorName] = useState(initialValues?.contractorName ?? '');
+  const [scope, setScope] = useState(initialValues?.scope ?? '');
   const [jobTypes, setJobTypes] = useState<string[]>([]);
-  const [address, setAddress] = useState('');
-  const [contactName, setContactName] = useState('');
-  const [contactPhone, setContactPhone] = useState('');
+  const [address, setAddress] = useState(initialValues?.address ?? '');
+  const [contactName, setContactName] = useState(initialValues?.contactName ?? '');
+  const [contactPhone, setContactPhone] = useState(initialValues?.contactPhone ?? '');
   const [priority, setPriority] = useState('medium');
   const [estimatedCost, setEstimatedCost] = useState('');
   const [salesmanOptions, setSalesmanOptions] = useState<SalesmanOption[]>([]);
