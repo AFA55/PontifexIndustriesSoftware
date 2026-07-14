@@ -25,7 +25,7 @@ import { getInvitableRoles, getRoleLabel } from '@/lib/rbac';
 import {
   ArrowLeft, UserPlus, Mail, Loader2, CheckCircle2, Clock,
   AlertTriangle, RefreshCw, Send, Phone, User as UserIcon, Shield,
-  Inbox, Check, X, Building2,
+  Inbox, Check, X, Building2, Pencil,
 } from 'lucide-react';
 
 const ALLOWED_ROLES = ['admin', 'super_admin', 'operations_manager'];
@@ -88,6 +88,10 @@ export default function InviteUsersPage() {
   const [invitations, setInvitations] = useState<Invitation[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [resendingId, setResendingId] = useState<string | null>(null);
+  // Inline name correction on pending invitations.
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
+  const [savingNameId, setSavingNameId] = useState<string | null>(null);
 
   // ── Access Requests tab state ──────────────────────────────────────────────
   const [activeTab, setActiveTab] = useState<TabKey>('invite');
@@ -326,6 +330,31 @@ export default function InviteUsersPage() {
       setRequestsError(err instanceof Error ? err.message : 'Failed to deny request');
     } finally {
       setActioningId(null);
+    }
+  };
+
+  // Correct a pending invitation's name (Artifex voice invites can garble
+  // spellings) — updates invited_name so the setup link pre-fills right.
+  const handleSaveName = async (id: string) => {
+    const name = editingNameValue.trim();
+    if (!name) return;
+    setSavingNameId(id);
+    setFormError('');
+    try {
+      const res = await fetch(`/api/admin/invite${tenantQS}`, {
+        method: 'PATCH',
+        headers: await authHeaders(),
+        body: JSON.stringify({ invitation_id: id, name }),
+      });
+      const json = await res.json();
+      if (!json.success) throw new Error(json.error || 'Failed to update name');
+      setEditingNameId(null);
+      setFormSuccess(`Name updated to ${name}.`);
+      await loadInvitations();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Failed to update name');
+    } finally {
+      setSavingNameId(null);
     }
   };
 
@@ -813,9 +842,43 @@ export default function InviteUsersPage() {
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-slate-900 dark:text-white truncate">
-                      {inv.name || inv.email}
-                    </span>
+                    {editingNameId === inv.id ? (
+                      <form
+                        className="flex items-center gap-1.5"
+                        onSubmit={(e) => { e.preventDefault(); handleSaveName(inv.id); }}
+                      >
+                        <input
+                          autoFocus
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setEditingNameId(null); }}
+                          className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-sm font-semibold text-slate-900 focus:border-brand focus:outline-none dark:border-white/20 dark:bg-white/5 dark:text-white"
+                          aria-label="Corrected name"
+                        />
+                        <button
+                          type="submit"
+                          disabled={savingNameId === inv.id || !editingNameValue.trim()}
+                          className="rounded-lg bg-brand px-2.5 py-1.5 text-xs font-semibold text-white disabled:opacity-50 min-h-[32px]"
+                        >
+                          {savingNameId === inv.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Save'}
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="font-semibold text-slate-900 dark:text-white truncate">
+                        {inv.name || inv.email}
+                      </span>
+                    )}
+                    {inv.status !== 'accepted' && editingNameId !== inv.id && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditingNameId(inv.id); setEditingNameValue(inv.name || ''); }}
+                        title="Correct the name (updates the setup link's pre-fill)"
+                        aria-label={`Edit name for ${inv.email}`}
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                     {statusChip(inv.status)}
                   </div>
                   <div className="text-sm text-slate-500 dark:text-white/60 truncate">{inv.email}</div>

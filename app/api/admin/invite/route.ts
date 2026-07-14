@@ -165,6 +165,56 @@ export async function POST(request: NextRequest) {
 }
 
 // ============================================================
+// PATCH — correct a PENDING invitation's name (founder Jul 14: "Artifex
+// spelled a user we invited's name wrong"). invited_name pre-fills the setup
+// form and becomes the profile's full_name, so fixing it here fixes the
+// downstream account. Accepted invitations are immutable — edit the profile
+// in Team Profiles instead.
+// ============================================================
+export async function PATCH(request: NextRequest) {
+  try {
+    const auth = await requireAdmin(request);
+    if (!auth.authorized) return auth.response;
+
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
+    const body = await request.json().catch(() => null);
+    const invitationId = typeof body?.invitation_id === 'string' ? body.invitation_id : '';
+    const name = typeof body?.name === 'string' ? body.name.trim().slice(0, 120) : '';
+    if (!invitationId || !name) {
+      return NextResponse.json({ error: 'invitation_id and name are required' }, { status: 400 });
+    }
+
+    const { data: updated, error } = await supabaseAdmin
+      .from('user_invitations')
+      .update({ invited_name: name })
+      .eq('id', invitationId)
+      .eq('tenant_id', tenantId)
+      .is('accepted_at', null)
+      .select('id, invited_name')
+      .maybeSingle();
+
+    if (error) {
+      console.error('[invite] PATCH error:', error);
+      return NextResponse.json({ error: 'Failed to update invitation' }, { status: 500 });
+    }
+    if (!updated) {
+      return NextResponse.json(
+        { error: 'Invitation not found, already accepted, or not in your company. For accepted users, edit the name in Team Profiles.' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({ success: true, data: { id: updated.id, name: updated.invited_name } });
+  } catch (err) {
+    console.error('[invite] PATCH unexpected error:', err);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ============================================================
 // GET — list invitations for the caller's tenant
 // ============================================================
 export async function GET(request: NextRequest) {
