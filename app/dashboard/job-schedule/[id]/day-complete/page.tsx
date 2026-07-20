@@ -266,6 +266,18 @@ export default function DayCompletePage() {
     }
   };
 
+
+  // LATE COMPLETION (founder Jul 20): finishing a ticket after its scheduled
+  // day books the work to THAT day, not the submission day. Only for jobs
+  // with no prior daily logs (multi-day in-flight jobs keep normal dating).
+  const lateWorkDate = (() => {
+    if (!job?.scheduled_date) return undefined;
+    const d = new Date();
+    const localToday = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (job.scheduled_date < localToday && !(job.total_days_worked > 0)) return job.scheduled_date;
+    return undefined;
+  })();
+
   // Calculate hours worked today
   const getHoursWorked = () => {
     if (!job) return 0;
@@ -308,6 +320,7 @@ export default function DayCompletePage() {
         body: JSON.stringify({
           workPerformed,
           notes: `Day complete. Continuing tomorrow.`,
+          work_date: lateWorkDate,
           continueNextDay: true,
           latitude: null,
           longitude: null,
@@ -393,6 +406,7 @@ export default function DayCompletePage() {
           'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
+          work_date: lateWorkDate,
           workPerformed,
           notes: 'Final day. Job complete.',
           signerName: signerName || undefined,
@@ -540,6 +554,7 @@ export default function DayCompletePage() {
           Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
+          work_date: lateWorkDate,
           workPerformed,
           notes: `Job complete. Remote signature link sent to ${remotePhone.trim()}.`,
           continueNextDay: false,

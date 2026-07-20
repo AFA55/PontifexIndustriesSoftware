@@ -28,6 +28,9 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const { latitude, longitude, accuracy, clock_out_method, nfc_tag_uid, nfc_tag_id, clock_out_photo_url } = body;
+    // True when the operator saw the "unfinished ticket" warning and chose
+    // "clock out anyway — remind me later" (founder Jul 20: warn, don't wall).
+    const acknowledgeIncomplete = body.acknowledge_incomplete === true;
     const isRemoteOut = clock_out_method === 'remote';
 
     // Validation — GPS coords are required for a normal clock-out; a REMOTE (photo)
@@ -105,30 +108,65 @@ export async function POST(request: NextRequest) {
       : { isWithinRange: false, distance: 0, distanceFormatted: 'unknown' };
 
     if (['operator', 'apprentice'].includes(userRole)) {
-      // For operators: check if any dispatched jobs are not completed
+      // Unfinished-ticket gate (founder Jul 20: WARN with a choice, don't
+      // hard-block). A ticket counts as fulfilled for TODAY when the job is
+      // completed OR the operator submitted a daily log today ("Done for
+      // Today" on multi-day jobs must never trip this).
       if (userRole === 'operator') {
-        const { data: incompleteJobs } = await supabaseAdmin
+        const { data: candidateJobs } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name')
           .eq('assigned_to', auth.userId)
-          .eq('scheduled_date', today)
+          .lte('scheduled_date', today)
+          .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
           .not('dispatched_at', 'is', null)
           .is('work_completed_at', null)
-          .neq('status', 'cancelled');
+          .not('status', 'in', '("cancelled","completed","pending_completion")');
 
-        if (incompleteJobs && incompleteJobs.length > 0) {
+        let incompleteJobs = candidateJobs ?? [];
+        if (incompleteJobs.length > 0) {
+          const { data: todaysLogs } = await supabaseAdmin
+            .from('daily_job_logs')
+            .select('job_order_id')
+            .eq('operator_id', auth.userId)
+            .eq('log_date', today)
+            .in('job_order_id', incompleteJobs.map((j: any) => j.id));
+          const loggedToday = new Set((todaysLogs ?? []).map((l: any) => l.job_order_id));
+          incompleteJobs = incompleteJobs.filter((j: any) => !loggedToday.has(j.id));
+        }
+
+        if (incompleteJobs.length > 0 && !acknowledgeIncomplete) {
+          // Soft gate: the client shows "Complete now / Clock out anyway".
           return NextResponse.json(
             {
-              error: 'You must complete work performed for all dispatched jobs before clocking out.',
-              block_type: 'work_performed_required',
+              error: 'You have unfinished job tickets for today.',
+              block_type: 'incomplete_tickets_warning',
               incomplete_jobs: incompleteJobs.map((j: any) => ({
                 id: j.id,
                 job_number: j.job_number,
                 customer_name: j.customer_name,
               })),
             },
-            { status: 403 }
+            { status: 409 }
           );
+        }
+
+        if (incompleteJobs.length > 0 && acknowledgeIncomplete) {
+          // They chose "finish later" — set the reminder NOW (in-app bell +
+          // the ticket also lands in My Jobs' Unfinished section until done).
+          // Fire-and-forget per platform logging convention.
+          Promise.resolve(
+            supabaseAdmin.from('notifications').insert(
+              incompleteJobs.map((j: any) => ({
+                user_id: auth.userId,
+                type: 'ticket_incomplete_reminder',
+                title: 'Unfinished job ticket',
+                message: `You clocked out without completing the ticket for ${j.customer_name} (${j.job_number}). Open it in My Jobs to finish — your work will be logged to the day it was scheduled.`,
+                job_id: j.id,
+                action_url: `/dashboard/my-jobs/${j.id}`,
+              }))
+            )
+          ).then(() => {}).catch(() => {});
         }
       }
 

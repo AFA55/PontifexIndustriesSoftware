@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { PLATFORM_TENANT_ID } from '@/lib/rbac';
@@ -92,6 +92,9 @@ export default function Dashboard() {
   useEffect(() => {
     if (user?.role === 'apprentice' || user?.role === 'operator') setIsShopHours(workLocation === 'shop');
   }, [workLocation, user?.role]);
+  // Payload of the clock-out attempt that hit the unfinished-ticket warning —
+  // replayed with acknowledge_incomplete when the operator picks "clock out anyway".
+  const pendingClockOutRef = useRef<any>(null);
   const [clockOutBlock, setClockOutBlock] = useState<{
     show: boolean;
     blockType: string;
@@ -534,6 +537,7 @@ export default function Dashboard() {
     latitude: number;
     longitude: number;
     accuracy?: number;
+    acknowledge_incomplete?: boolean;
   }) => {
     setClockLoading(true);
     setClockMessage(null);
@@ -558,13 +562,27 @@ export default function Dashboard() {
           clock_out_photo_url: data.clock_out_photo_url,
           nfc_tag_id: data.nfc_tag_id,
           nfc_tag_uid: data.nfc_tag_uid,
+          acknowledge_incomplete: data.acknowledge_incomplete === true,
         }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        // Work-performed / helper-log gates (and rate limit) still block — surface the reason.
+        // SOFT gate (founder Jul 20): unfinished tickets warn with a choice —
+        // complete now, or clock out anyway and get a reminder. Stash the
+        // clock-out payload so "clock out anyway" retries with the ack flag.
+        if (result.block_type === 'incomplete_tickets_warning') {
+          pendingClockOutRef.current = data;
+          setClockOutBlock({
+            show: true,
+            blockType: 'incomplete_tickets_warning',
+            incompleteJobs: result.incomplete_jobs || [],
+          });
+          setShowNfcClockInModal(false);
+          return;
+        }
+        // Helper-log gate / rate limit still hard-block — surface the reason.
         const msg = (result.error || 'Failed to clock out') + (result.details ? `\n${result.details}` : '');
         setClockMessage({ type: 'error', text: msg });
         throw new Error(msg);
@@ -619,9 +637,13 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Cannot Clock Out</h3>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Finish your ticket?' : 'Cannot Clock Out'}
+              </h3>
               <p className="text-gray-600 text-sm">
-                {clockOutBlock.blockType === 'work_performed_required'
+                {clockOutBlock.blockType === 'incomplete_tickets_warning'
+                  ? "You haven't completed today's job ticket. Finish it now, or clock out and we'll remind you — your work will be logged to the day it was scheduled."
+                  : clockOutBlock.blockType === 'work_performed_required'
                   ? 'You must complete work performed for all dispatched jobs before clocking out.'
                   : 'You must submit a work log for all dispatched jobs before clocking out.'}
               </p>
@@ -634,7 +656,9 @@ export default function Dashboard() {
                   key={job.id}
                   onClick={() => {
                     setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
-                    if (clockOutBlock.blockType === 'work_performed_required') {
+                    if (clockOutBlock.blockType === 'incomplete_tickets_warning') {
+                      router.push(`/dashboard/my-jobs/${job.id}`);
+                    } else if (clockOutBlock.blockType === 'work_performed_required') {
                       router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
                     } else {
                       router.push('/dashboard/my-jobs');
@@ -653,11 +677,26 @@ export default function Dashboard() {
               ))}
             </div>
 
+            {clockOutBlock.blockType === 'incomplete_tickets_warning' && (
+              <button
+                onClick={async () => {
+                  setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
+                  const pending = pendingClockOutRef.current;
+                  pendingClockOutRef.current = null;
+                  if (pending) {
+                    try { await performClockOut({ ...pending, acknowledge_incomplete: true }); } catch { /* surfaced via clockMessage */ }
+                  }
+                }}
+                className="w-full px-6 py-3 mb-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all font-semibold min-h-[48px]"
+              >
+                Clock out anyway — remind me later
+              </button>
+            )}
             <button
               onClick={() => setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] })}
               className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
             >
-              Close
+              {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Go back — I\'ll finish it now' : 'Close'}
             </button>
           </div>
         </div>

@@ -47,7 +47,8 @@ export async function POST(
       continueNextDay,
       latitude,
       longitude,
-      stayed_overnight
+      stayed_overnight,
+      work_date
     } = body;
 
     // Get job order (scoped to tenant)
@@ -113,31 +114,47 @@ export async function POST(
     }
 
     const now = new Date().toISOString();
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    // Tenant timezone FIRST — server is UTC on Vercel; every date below must
+    // be the tenant's calendar, and late completions must be able to backfill.
+    let tenantTz = 'America/New_York';
+    try {
+      const { data: tzRow } = await supabaseAdmin
+        .from('tenants')
+        .select('timezone')
+        .eq('id', tenantId)
+        .maybeSingle();
+      if (tzRow?.timezone) tenantTz = tzRow.timezone;
+    } catch { /* default tz, same as clock-in route */ }
+    const todayTz = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
+    // LATE COMPLETION (founder Jul 20): an operator finishing a ticket AFTER
+    // its scheduled day passes work_date so the log books to the day the work
+    // actually happened — not the submission day. Clamped: a valid calendar
+    // date, not before the job's scheduled date, never in the future.
+    const requestedWorkDate = typeof work_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(work_date)
+      ? work_date
+      : null;
+    const effectiveDate =
+      requestedWorkDate &&
+      requestedWorkDate <= todayTz &&
+      (!job.scheduled_date || requestedWorkDate >= job.scheduled_date)
+        ? requestedWorkDate
+        : todayTz;
+    const isBackfill = effectiveDate !== todayTz;
 
     // ─── Subsistence (out-of-town overnight) — fire-and-forget side effect ───
     // Never trust the client for the out-of-town gate: re-derive from the DB job.
     // This MUST NOT block or fail the operator's day-complete flow.
     const jobIsOutOfTown = job?.scheduling_flexibility?.out_of_town === true;
-    if (jobIsOutOfTown && typeof stayed_overnight === 'boolean') {
+    // Backfilled logs never write subsistence — the overnight question is about
+    // TONIGHT; retroactive nights are an admin correction, not an operator claim.
+    if (jobIsOutOfTown && typeof stayed_overnight === 'boolean' && !isBackfill) {
       // Calendar night in the TENANT timezone — MUST match the clock-in route's
       // derivation (app/api/timecard/clock-in/route.ts) exactly, or a late-night
       // US clock-in and this day-complete write land on different night_date rows
       // and the (operator_id, night_date) unique row never converges → a single
       // night gets double-counted in payroll. NEVER toLocalYMD() (server-local =
       // UTC on Vercel) here. Default tz mirrors the clock-in route.
-      let tenantTz = 'America/New_York';
-      try {
-        const { data: tzRow } = await supabaseAdmin
-          .from('tenants')
-          .select('timezone')
-          .eq('id', tenantId)
-          .maybeSingle();
-        if (tzRow?.timezone) tenantTz = tzRow.timezone;
-      } catch {
-        // Non-critical — fall back to the default tz (same as clock-in route).
-      }
-      const nightDate = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz }); // YYYY-MM-DD
+      const nightDate = todayTz;
       if (stayed_overnight === true) {
         // Idempotent: one subsistence night per operator per calendar date.
         Promise.resolve(
@@ -177,7 +194,7 @@ export async function POST(
         .from('timecards')
         .select('clock_in_time, clock_out_time, total_hours')
         .eq('user_id', user.id)
-        .eq('date', today)
+        .eq('date', effectiveDate)
         .order('clock_in_time', { ascending: true })
         .limit(1)
         .maybeSingle();
@@ -194,12 +211,19 @@ export async function POST(
       // fall through to wall-clock fallback
     }
     if (hoursSource !== 'timecard') {
-      const routeStarted = job.route_started_at ? new Date(job.route_started_at) : null;
-      const workStarted = job.work_started_at ? new Date(job.work_started_at) : null;
-      const startTime = workStarted || routeStarted;
-      hoursWorked = startTime
-        ? (new Date().getTime() - startTime.getTime()) / 3600000
-        : 0;
+      if (isBackfill) {
+        // A late completion with no timecard for that day: NEVER wall-clock
+        // (now - start_of_that_day would book a day-plus of hours). Zero it —
+        // admins reconcile hours from the timecard side.
+        hoursWorked = 0;
+      } else {
+        const routeStarted = job.route_started_at ? new Date(job.route_started_at) : null;
+        const workStarted = job.work_started_at ? new Date(job.work_started_at) : null;
+        const startTime = workStarted || routeStarted;
+        hoursWorked = startTime
+          ? (new Date().getTime() - startTime.getTime()) / 3600000
+          : 0;
+      }
     }
 
     // Create daily log entry — gracefully handle missing table
@@ -211,7 +235,7 @@ export async function POST(
       .upsert({
         job_order_id: jobId,
         operator_id: user.id,
-        log_date: today,
+        log_date: effectiveDate,
         route_started_at: job.route_started_at,
         work_started_at: job.work_started_at,
         day_completed_at: now,

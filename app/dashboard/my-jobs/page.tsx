@@ -189,26 +189,29 @@ export default function MyJobsPage() {
 
       const today = toDateString(new Date());
 
-      // Fetch on_hold, in_progress, pending_completion, and scheduled (multi-day reset) jobs
-      const [onHoldRes, inProgressRes, pendingCompletionRes, scheduledRes] = await Promise.all([
-        fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }),
-        fetch(`/api/job-orders?status=in_progress&include_helper_jobs=true&includeCompleted=false`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }),
-        fetch(`/api/job-orders?status=pending_completion&include_helper_jobs=true&includeCompleted=false`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }),
-        fetch(`/api/job-orders?status=scheduled&include_helper_jobs=true&includeCompleted=false`, {
-          headers: { Authorization: `Bearer ${session.access_token}` }
-        }),
+      // Fetch on_hold, in_progress, pending_completion, scheduled (multi-day
+      // reset), assigned + in_route (unfinished tickets from past days —
+      // founder Jul 20: forgot-to-complete tickets must stay visible so the
+      // clock-out reminder has a landing place and late completion works)
+      const authH = { headers: { Authorization: `Bearer ${session.access_token}` } };
+      const [onHoldRes, inProgressRes, pendingCompletionRes, scheduledRes, assignedRes, inRouteRes] = await Promise.all([
+        fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false`, authH),
+        fetch(`/api/job-orders?status=in_progress&include_helper_jobs=true&includeCompleted=false`, authH),
+        fetch(`/api/job-orders?status=pending_completion&include_helper_jobs=true&includeCompleted=false`, authH),
+        fetch(`/api/job-orders?status=scheduled&include_helper_jobs=true&includeCompleted=false`, authH),
+        fetch(`/api/job-orders?status=assigned&include_helper_jobs=true&includeCompleted=false`, authH),
+        fetch(`/api/job-orders?status=in_route&include_helper_jobs=true&includeCompleted=false`, authH),
       ]);
 
       const onHoldData = onHoldRes.ok ? (await onHoldRes.json()).data || [] : [];
       const inProgressData = inProgressRes.ok ? (await inProgressRes.json()).data || [] : [];
       const pendingCompletionData = pendingCompletionRes.ok ? (await pendingCompletionRes.json()).data || [] : [];
       const scheduledData = scheduledRes.ok ? (await scheduledRes.json()).data || [] : [];
+      const assignedData = assignedRes.ok ? (await assignedRes.json()).data || [] : [];
+      const inRouteData = inRouteRes.ok ? (await inRouteRes.json()).data || [] : [];
+      // Past-date single-day jobs that never got completed count as continuing
+      // work too (multi-day resets keep their own dedicated card below).
+      const staleSingles = [...assignedData, ...inRouteData, ...scheduledData.filter((j: any) => j.is_multi_day !== true)];
 
       // Combine, filter to past dates only (don't double-show today's jobs)
       const uid = session.user.id;
@@ -217,7 +220,7 @@ export default function MyJobsPage() {
         userRole === 'apprentice'
           ? j.assigned_to === uid || j.helper_assigned_to === uid
           : j.assigned_to === uid;
-      const all = [...onHoldData, ...inProgressData, ...pendingCompletionData].filter((j: any) => {
+      const all = [...onHoldData, ...inProgressData, ...pendingCompletionData, ...staleSingles].filter((j: any) => {
         const isPastDate = j.scheduled_date && j.scheduled_date < today;
         return isPrimaryOrHelper(j) && isPastDate;
       });
