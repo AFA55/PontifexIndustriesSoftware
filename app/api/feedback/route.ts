@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
  * feedback_submissions still scopes reporter reads to their own rows.
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 
@@ -94,12 +94,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── Fire-and-forget: AUTO AI analysis (Rock-Solid batch 3 — founder:
+  // ── Post-response: AUTO AI analysis (Rock-Solid batch 3 — founder:
   // submit -> agent analyzes -> founder just approves in the Hub). Runs the
   // same tenant-scoped ticket-analysis agent the Hub's manual button uses;
   // a failure leaves ai_analysis null and the Hub button remains a retry.
-  Promise.resolve(
-    (async () => {
+  // after() (not bare fire-and-forget) — Vercel freezes the function once the
+  // response returns, killing pending promises; after() keeps it alive.
+  // (Jul 21 E2E: bare promise version never completed on prod.)
+  after(async () => {
+    try {
       if (!insert.tenant_id) return;
       const { createTicketAnalysisAgent } = await import('@/lib/agents/ticket-analysis-agent');
       const agent = createTicketAnalysisAgent(insert.tenant_id);
@@ -110,12 +113,14 @@ export async function POST(request: NextRequest) {
         .from('feedback_submissions')
         .update({ ai_analysis: result.output, ai_analyzed_at: new Date().toISOString() })
         .eq('id', data.id);
-    })()
-  ).catch((err) => console.warn('[feedback] auto-analysis failed (Hub can retry):', err?.message));
+    } catch (err: any) {
+      console.warn('[feedback] auto-analysis failed (Hub can retry):', err?.message);
+    }
+  });
 
-  // ── Fire-and-forget: notify tenant admins/ops (best-effort, optional) ───
-  Promise.resolve(
-    (async () => {
+  // ── Post-response: notify tenant admins/ops (best-effort) ───────────────
+  after(async () => {
+    try {
       const truncated = text.length > 60 ? text.slice(0, 57) + '...' : text;
       const typeLabel =
         type === 'bug' ? 'a bug' : type === 'change_request' ? 'a change request' : 'an idea';
@@ -142,8 +147,10 @@ export async function POST(request: NextRequest) {
         }));
         await supabaseAdmin.from('notifications').insert(rows);
       }
-    })()
-  ).catch(() => {});
+    } catch {
+      /* best-effort */
+    }
+  });
 
   return NextResponse.json({ success: true, id: data.id }, { status: 201 });
 }
