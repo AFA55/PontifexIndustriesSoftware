@@ -161,6 +161,26 @@ function FeedbackRow({
     }
   }
 
+  // One-click founder decisions (batch 3): Approve fix -> 'planned' (the
+  // dev-session pickup queue), Dismiss -> 'declined'. Same PATCH as Save.
+  async function quickStatus(next: 'planned' | 'declined') {
+    setSaving(true);
+    try {
+      const headers = await getJsonHeaders();
+      const res = await fetch(`/api/admin/feedback/${item.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ status: next, admin_response: response.trim() || null }),
+      });
+      if (res.ok) {
+        setStatus(next);
+        onChanged({ id: item.id, status: next, admin_response: response.trim() || null });
+      }
+    } catch { /* UI stays editable */ } finally {
+      setSaving(false);
+    }
+  }
+
   async function remove() {
     if (!window.confirm('Delete this feedback item? This cannot be undone.')) return;
     setDeleting(true);
@@ -280,6 +300,27 @@ function FeedbackRow({
             </button>
           )}
           {analysisError && <p className="text-xs text-rose-500 mt-1">{analysisError}</p>}
+
+          {/* One-click founder decisions on the analyzed report (batch 3):
+              Approve queues it for the next dev session; Dismiss closes it. */}
+          {item.ai_analysis && status !== 'planned' && status !== 'declined' && status !== 'done' && (
+            <div className="mt-2 flex gap-2">
+              <button
+                onClick={() => quickStatus('planned')}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 min-h-[36px] text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                ✓ Approve fix
+              </button>
+              <button
+                onClick={() => quickStatus('declined')}
+                disabled={saving}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-gray-300 dark:border-slate-600 px-3 py-2 min-h-[36px] text-xs font-bold text-gray-600 dark:text-slate-300 hover:bg-gray-50 dark:hover:bg-slate-800 disabled:opacity-50"
+              >
+                Dismiss
+              </button>
+            </div>
+          )}
         </div>
       )}
 

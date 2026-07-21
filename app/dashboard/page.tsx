@@ -1149,6 +1149,36 @@ export default function Dashboard() {
             </div>
           </Link>
 
+          {/* Report a Problem — feeds the AI-triaged issue loop (batch 3):
+              report → auto-analysis → founder approves in the Platform Hub. */}
+          <Link
+            href="/dashboard/feedback/new"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-amber-500/5 dark:from-white/[0.05] dark:to-amber-500/10 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-300 hover:scale-[1.03]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-amber-500 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-amber-500/10 dark:ring-amber-500/20 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01M5.07 19h13.86c1.54 0 2.5-1.67 1.73-3L13.73 4c-.77-1.33-2.69-1.33-3.46 0L3.34 16c-.77 1.33.19 3 1.73 3z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2 transition-colors duration-300">
+                Report a Problem
+              </h3>
+              <p className="text-gray-700 dark:text-white/70 group-hover:text-white/95 font-semibold transition-colors duration-300">
+                Something broken or confusing? Tell us
+              </p>
+              <div className="mt-5 flex items-center text-amber-600 dark:text-amber-400 group-hover:text-white font-bold transition-colors duration-300">
+                <span>Report It</span>
+                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
           {/* Request Time Off - Premium Purple Card */}
           <Link
             href="/dashboard/request-time-off"

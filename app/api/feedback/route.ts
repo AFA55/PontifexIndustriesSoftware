@@ -94,6 +94,25 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── Fire-and-forget: AUTO AI analysis (Rock-Solid batch 3 — founder:
+  // submit -> agent analyzes -> founder just approves in the Hub). Runs the
+  // same tenant-scoped ticket-analysis agent the Hub's manual button uses;
+  // a failure leaves ai_analysis null and the Hub button remains a retry.
+  Promise.resolve(
+    (async () => {
+      if (!insert.tenant_id) return;
+      const { createTicketAnalysisAgent } = await import('@/lib/agents/ticket-analysis-agent');
+      const agent = createTicketAnalysisAgent(insert.tenant_id);
+      const result = await agent.generate({
+        prompt: `Investigate this ticket and produce your diagnosis.\n\nTicket type: ${insert.type}\nTitle: ${insert.title ?? '(none)'}\nReported by role: ${insert.reporter_role ?? 'unknown'}\nPage URL: ${insert.page_url ?? 'unknown'}\n\nBody:\n${insert.body}`,
+      });
+      await supabaseAdmin
+        .from('feedback_submissions')
+        .update({ ai_analysis: result.output, ai_analyzed_at: new Date().toISOString() })
+        .eq('id', data.id);
+    })()
+  ).catch((err) => console.warn('[feedback] auto-analysis failed (Hub can retry):', err?.message));
+
   // ── Fire-and-forget: notify tenant admins/ops (best-effort, optional) ───
   Promise.resolve(
     (async () => {
