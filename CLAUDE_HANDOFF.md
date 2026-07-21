@@ -1,6 +1,11 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 14, 2026 (evening — Fable 5 credits exhausted, handoff to Opus) | **Branch:** `main` | **Prod:** ✅ LIVE + fully pushed (`7e67aa80`).
+**Last updated:** Jul 21, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE through `9d133b5f`; **1 UNPUSHED commit** (privacy policy v1.2 + compliance batch 4 — push with next batch).
+
+> ## 📌 Jul 21 session (Fable 5)
+> - **DATA CLEANUP (founder-ordered, prod DB):** Apex demo tenant fully deleted (tenant, 8 @apexdemo.com profiles+auth users, 6 demo jobs, flags, alerts). ALL 11 Patriot test tickets hard-deleted (Scout Mech QA-2026-105647, Trehel QA-2026-755047, Touch of Chisholm QA-2026-792208 + 8 soft-deleted) + test invoice INV-2026-463087 + "Patriot Test GC" customer + 2 stale health alerts. Real crew timecards untouched (verified zero referenced test jobs). Patriot is clean: 0 tickets, 0 invoices. Real-looking customers (Harper, INEO, Westmoreland, AM King, Triangle, Touch of tism) KEPT pending founder word.
+> - **ROCK-SOLID BATCH 4 (compliance) DONE:** audit in `docs/plans/COMPLIANCE_AUDIT.md`. Fixed: privacy policy v1.2 (accurate GPS disclosure incl. In-Route live sharing, full 9-subprocessor table, new biometric/push/SMS sections), setup-account waiver now links /privacy+/terms, privacy page renderer bolds list items. Follow-ups in BACKLOG "Jul 21" block (iOS Info.plist location strings = next native build; store data-safety labels = founder; SMS STOP webhook; retention cron).
+> - All 4 Rock-Solid batches complete. Next: crew plan (helper bug first) per the Jul 14 block below.
 
 > ## 🤝 OPUS HANDOFF — read this block, then work
 >

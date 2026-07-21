@@ -129,6 +129,24 @@
 
 ## 🟠 P1 — This week
 
+### Jul 21 — compliance audit follow-ups (batch 4 done; audit: `docs/plans/COMPLIANCE_AUDIT.md`)
+- [ ] **P1 — iOS location permission strings** (`ios/App/App/Info.plist`): reword
+      `NSLocationWhenInUseUsageDescription` + AlwaysAndWhenInUse — current "checked once per
+      clock-in" understates In-Route live sharing (Apple rejects on mismatch). NATIVE change →
+      bundle with the next store build (Universal Links build is the natural vehicle).
+- [ ] **P1 — store data-safety labels** (founder, ~10 min each): recheck App Store privacy
+      labels + Play data-safety form against privacy policy v1.2 (location = collected, linked,
+      app-functionality, no tracking).
+- [ ] **P2 — SMS STOP enforcement in our code**: inbound Telnyx+Twilio webhook → set
+      `sms_consent.opted_out` → suppression check in `lib/sms.ts` before send. (Carrier-level
+      STOP already blocks delivery today, so users DO stop getting texts — this is
+      belt-and-suspenders + audit trail.)
+- [ ] **P2 — data-retention cron** (`/api/cron/data-retention`, monthly): purge
+      `operator_location_pings` + `timecard_gps_logs` > 3yr, voice artifacts > 90d — the policy
+      §4 table promises these windows; nearest real deadline is voice (90d).
+- [ ] **P3 — EXIF strip on photo upload** (`components/PhotoUploader.tsx` canvas re-encode);
+      **P3 — cookie/localStorage section** in next policy rev.
+
 ### Jul 12 — founder-queued next blocks
 - [ ] **🔴 NEXT: Job-ad creation upgrade (founder Jul 13 — BLOCKS his hiring card + FB/TikTok
       connect: "we need to fix the ad creation first")**. Two parts:

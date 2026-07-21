@@ -631,7 +631,9 @@ function SetupAccountInner() {
 
                 <p><strong className="text-slate-900 dark:text-white">8. Governing Law.</strong> This agreement is governed by applicable state and federal law. Any disputes shall be resolved in the jurisdiction where {invitation?.tenantName} is primarily located.</p>
 
-                <p className="text-slate-400 dark:text-white/40 text-xs pt-2 border-t border-slate-200 dark:border-white/10">Last updated: April 2026 — Pontifex Platform</p>
+                <p><strong className="text-slate-900 dark:text-white">9. Privacy Policy &amp; Terms of Service.</strong> Your use of the Platform is also governed by the Pontifex <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-violet-600 dark:text-violet-400 underline">Privacy Policy</a> and <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-violet-600 dark:text-violet-400 underline">Terms of Service</a>, which describe in detail what data is collected (including location, photos, and notifications) and how it is used and retained.</p>
+
+                <p className="text-slate-400 dark:text-white/40 text-xs pt-2 border-t border-slate-200 dark:border-white/10">Last updated: July 2026 — Pontifex Platform</p>
               </div>
 
               <label className="flex items-start gap-3 cursor-pointer group min-h-[44px]">
@@ -648,7 +650,7 @@ function SetupAccountInner() {
                   </div>
                 </div>
                 <span className="text-sm text-slate-600 dark:text-white/70 leading-relaxed">
-                  I have read and agree to the Platform User Agreement &amp; Liability Waiver. I understand my use of this platform is subject to these terms.
+                  I have read and agree to the Platform User Agreement &amp; Liability Waiver, the <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-violet-600 dark:text-violet-400 underline" onClick={e => e.stopPropagation()}>Privacy Policy</a>, and the <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-violet-600 dark:text-violet-400 underline" onClick={e => e.stopPropagation()}>Terms of Service</a>. I understand my use of this platform is subject to these terms.
                 </span>
               </label>
 

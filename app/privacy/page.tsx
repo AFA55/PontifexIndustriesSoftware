@@ -18,7 +18,15 @@ export default function PrivacyPolicyPage() {
     if (line.startsWith('## ')) return <h2 key={i} className="text-xl font-bold text-gray-800 mt-8 mb-3">{line.replace('## ', '')}</h2>;
     if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-semibold text-gray-700 mt-4 mb-2">{line.replace('### ', '')}</h3>;
     if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-semibold text-gray-600 mb-2">{line.replace(/\*\*/g, '')}</p>;
-    if (line.startsWith('- ')) return <li key={i} className="ml-6 text-gray-600 list-disc">{line.replace('- ', '')}</li>;
+    if (line.startsWith('- ')) {
+      const item = line.replace('- ', '');
+      const parts = item.split(/\*\*(.*?)\*\*/g);
+      return (
+        <li key={i} className="ml-6 text-gray-600 list-disc">
+          {parts.map((part, j) => (j % 2 === 1 ? <strong key={j} className="text-gray-800">{part}</strong> : part))}
+        </li>
+      );
+    }
     if (line.startsWith('| ') && line.includes('---')) return null;
     if (line.startsWith('| ')) {
       const cells = line.split('|').filter(c => c.trim());
