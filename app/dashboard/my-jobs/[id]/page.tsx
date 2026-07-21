@@ -298,7 +298,15 @@ export default function JobDetailPage() {
       });
 
       if (!statusRes.ok) {
+        const err = await statusRes.json().catch(() => null);
+        if (err?.block_type === 'overdue_ticket_block') {
+          alert(err.error);
+          const overdue = err.overdue_jobs?.[0];
+          if (overdue?.id) router.push(`/dashboard/my-jobs/${overdue.id}`);
+          return;
+        }
         console.error('Failed to update job status to in_route');
+        if (err?.error) alert(err.error);
         return;
       }
 

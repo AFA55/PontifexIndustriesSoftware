@@ -577,6 +577,37 @@ export async function POST(request: NextRequest) {
       ? isWithinShopRadius({ latitude, longitude, accuracy }, shopOverride)
       : { isWithinRange: false, distance: 0, distanceFormatted: 'N/A' };
 
+    // ── Morning unfinished-ticket gate (founder Jul 21): if they clocked out
+    // with an open ticket from a previous day, the morning clock-in tells them
+    // to finish it FIRST — before starting today's ticket. This response
+    // powers the dashboard modal; /api/job-orders/[id]/status enforces it
+    // server-side (overdue_ticket_block) so it can't be skipped.
+    let overdueTickets: Array<{ id: string; job_number: string; customer_name: string; scheduled_date: string }> = [];
+    if (profile?.role === 'operator') {
+      try {
+        const { data: overdueCandidates } = await supabaseAdmin
+          .from('job_orders')
+          .select('id, job_number, customer_name, scheduled_date, end_date')
+          .eq('assigned_to', user.id)
+          .lt('scheduled_date', todayDate)
+          .not('dispatched_at', 'is', null)
+          .is('work_completed_at', null)
+          .not('status', 'in', '("cancelled","completed","pending_completion")');
+        // A multi-day job still running today (end_date >= today) is NOT
+        // overdue — "Done for Today" logs keep it legitimately open.
+        overdueTickets = (overdueCandidates ?? [])
+          .filter((j: any) => !(j.end_date && j.end_date >= todayDate))
+          .map((j: any) => ({
+            id: j.id,
+            job_number: j.job_number,
+            customer_name: j.customer_name,
+            scheduled_date: j.scheduled_date,
+          }));
+      } catch {
+        // Non-critical — never block a successful clock-in
+      }
+    }
+
     console.log(`Clock in: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);
 
     return NextResponse.json(
@@ -600,6 +631,7 @@ export async function POST(request: NextRequest) {
             accuracy: timecard.clock_in_accuracy,
           },
           distanceFromShop: locationCheck.distanceFormatted,
+          overdueTickets,
         },
       },
       { status: 201 }

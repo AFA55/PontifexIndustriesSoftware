@@ -147,6 +147,56 @@ async function updateJobStatus(
       );
     }
 
+    // ── Overdue-ticket gate (founder Jul 21): an operator may NOT start a
+    // NEW job while a ticket from a previous day is still unfinished — they
+    // complete it first (late completion books to its scheduled day), THEN
+    // start today's. The morning clock-in modal points them there; this is
+    // the server-side enforcement so the order can't be skipped.
+    if (status === 'in_route' && isAssignedOperator && !isAdmin) {
+      try {
+        let tenantTz = 'America/New_York';
+        if (existingJob.tenant_id) {
+          const { data: tzRow } = await supabaseAdmin
+            .from('tenants')
+            .select('timezone')
+            .eq('id', existingJob.tenant_id)
+            .maybeSingle();
+          if (tzRow?.timezone) tenantTz = tzRow.timezone;
+        }
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
+        const { data: overdueCandidates } = await supabaseAdmin
+          .from('job_orders')
+          .select('id, job_number, customer_name, scheduled_date, end_date')
+          .eq('assigned_to', user.id)
+          .neq('id', jobId)
+          .lt('scheduled_date', today)
+          .not('dispatched_at', 'is', null)
+          .is('work_completed_at', null)
+          .not('status', 'in', '("cancelled","completed","pending_completion")');
+        // Multi-day jobs still running today are NOT overdue.
+        const blocking = (overdueCandidates ?? []).filter(
+          (j: any) => !(j.end_date && j.end_date >= today)
+        );
+        if (blocking.length > 0) {
+          return NextResponse.json(
+            {
+              error: `Finish your unfinished ticket first: ${blocking[0].job_number} (${blocking[0].customer_name}). Complete it, then start this job — the office needs that information.`,
+              block_type: 'overdue_ticket_block',
+              overdue_jobs: blocking.map((j: any) => ({
+                id: j.id,
+                job_number: j.job_number,
+                customer_name: j.customer_name,
+                scheduled_date: j.scheduled_date,
+              })),
+            },
+            { status: 409 }
+          );
+        }
+      } catch {
+        // Gate fails OPEN on unexpected errors — never strand a live crew.
+      }
+    }
+
     // Prepare update data with automatic timestamp tracking
     const updateData: any = {
       status,

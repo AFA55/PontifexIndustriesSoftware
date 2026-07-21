@@ -1,4 +1,8 @@
 export const dynamic = 'force-dynamic';
+// The response returns in <2s; the budget is for the after() auto-analysis
+// agent (Sonnet, up to 6 tool steps ≈ 20-90s). Without this, Vercel's 25s
+// default killed the analysis mid-run (Jul 21 E2E: "Task timed out after 25s").
+export const maxDuration = 120;
 
 /**
  * Feedback API — reporter side (operators / helpers / anyone authenticated).

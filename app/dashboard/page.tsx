@@ -100,6 +100,12 @@ export default function Dashboard() {
     blockType: string;
     incompleteJobs: { id: string; job_number: string; customer_name: string }[];
   }>({ show: false, blockType: '', incompleteJobs: [] });
+  // Morning gate (founder Jul 21): clock-in returns tickets left unfinished
+  // from previous days — the operator finishes those FIRST. The /status API
+  // also hard-blocks starting a new job until they do.
+  const [morningGateJobs, setMorningGateJobs] = useState<
+    { id: string; job_number: string; customer_name: string; scheduled_date?: string }[]
+  >([]);
   const router = useRouter();
 
   useEffect(() => {
@@ -479,6 +485,12 @@ export default function Dashboard() {
       setCurrentStatus('clocked_in');
       setShowNfcClockInModal(false);
 
+      // Morning gate: unfinished tickets from previous days come back on the
+      // clock-in response — surface them immediately, before today's work.
+      if (Array.isArray(result.data.overdueTickets) && result.data.overdueTickets.length > 0) {
+        setMorningGateJobs(result.data.overdueTickets);
+      }
+
       const flags = [];
       if (isShopHours) flags.push('🏭 Shop Hours');
       if (result.data.isNightShift) flags.push('🌙 Night Shift');
@@ -700,6 +712,55 @@ export default function Dashboard() {
               className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
             >
               {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Go back — I\'ll finish it now' : 'Close'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Morning gate: finish yesterday's ticket before starting today */}
+      {morningGateJobs.length > 0 && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+            <div className="text-center mb-6">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Finish yesterday&apos;s ticket first</h3>
+              <p className="text-gray-600 text-sm">
+                You clocked out with this ticket unfinished. Complete it now — your work will be
+                logged to the day it was scheduled — then start today&apos;s job. You won&apos;t be
+                able to start a new job until this is done.
+              </p>
+            </div>
+
+            <div className="space-y-2 mb-6">
+              {morningGateJobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => {
+                    setMorningGateJobs([]);
+                    router.push(`/dashboard/my-jobs/${job.id}`);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl transition-all text-left min-h-[48px]"
+                >
+                  <div>
+                    <span className="text-sm font-bold text-gray-900">#{job.job_number}</span>
+                    <span className="text-sm text-gray-600 ml-2">{job.customer_name}</span>
+                  </div>
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setMorningGateJobs([])}
+              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold min-h-[48px]"
+            >
+              Not yet — I know I can&apos;t start a new job
             </button>
           </div>
         </div>

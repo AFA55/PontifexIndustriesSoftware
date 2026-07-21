@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+// Sonnet 6-step investigations vary 20-90s — 60 was cutting it close (Jul 21).
+export const maxDuration = 120;
 
 /**
  * POST /api/admin/feedback/[id]/analyze

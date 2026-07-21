@@ -60,7 +60,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
       if (!session) return;
 
       // Update status to in_route
-      await fetch(`/api/job-orders/${job.id}/status`, {
+      const statusRes = await fetch(`/api/job-orders/${job.id}/status`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -68,6 +68,18 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
         },
         body: JSON.stringify({ status: 'in_route' }),
       });
+
+      if (!statusRes.ok) {
+        const err = await statusRes.json().catch(() => null);
+        if (err?.block_type === 'overdue_ticket_block') {
+          alert(err.error);
+          const overdue = err.overdue_jobs?.[0];
+          if (overdue?.id) router.push(`/dashboard/my-jobs/${overdue.id}`);
+          return;
+        }
+        if (err?.error) alert(err.error);
+        return;
+      }
 
       // Navigate to in-route page
       router.push(`/dashboard/job-schedule/${job.id}/in-route`);
