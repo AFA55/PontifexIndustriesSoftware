@@ -49,7 +49,7 @@ export default function ScheduleBoardHeader({
   onOpenDailyCode,
 }: ScheduleBoardHeaderProps) {
   return (
-    <div className="backdrop-blur-xl bg-white/90 dark:bg-[#0e0720]/95 border-b border-gray-200 dark:border-white/10 sticky top-0 z-30 shadow-lg">
+    <div className="backdrop-blur-xl bg-white/90 dark:bg-[#0e0720]/95 border-b border-gray-200 dark:border-white/10 relative lg:sticky lg:top-0 z-30 shadow-lg">
       <div className="container mx-auto px-4 md:px-6 py-3">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex items-center gap-3">

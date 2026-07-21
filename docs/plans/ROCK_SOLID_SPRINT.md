@@ -27,8 +27,15 @@ NotificationBell, clock modals, SMS bodies). FIX PLAN once it reports:
   (link only helps web users; it ALWAYS opens the browser from a text). Long-term option:
   Universal Links / App Links (needs native build + AASA + assetlinks hosting — a store
   release; queue as iOS Build 10 / Android vc3 item, founder decides timing).
-- **Ask the founder (blocking Q):** for each symptom, did the operator tap INSIDE the app or
-  on a TEXT-MESSAGE link? And iPhone or Android? (Determines which fix closes their exact case.)
+- **Founder repro (Jul 21):** (1) tapped the "continue ticket" NOTIFICATION then pressed the
+  ticket → ejected (one Android, one iPhone); (2) pressed the "timecard tab" → ejected.
+  Batch-1 fixed the PDF window.open paths + SMS link. REMAINING LEADS if it recurs after
+  batch 1: (a) OS push tap on a COLD app (route may be delivered before login completes —
+  trace PushRegistration timing); (b) app/api/admin/notifications/send/route.ts:73 builds an
+  ABSOLUTE appUrl link into push bodies — if that lands in data.route, router.push(absolute)
+  hard-navigates; make all push routes RELATIVE; (c) my-jobs/[id] doc anchors target=_blank
+  (audit #6) + maps anchors (#5) — gate with isNativeApp. Ask employees to retry AFTER
+  today's update and report whether it still ejects.
 
 ## P0-B · Login lifecycle on native (log out / log in / remembered / Face ID)
 
