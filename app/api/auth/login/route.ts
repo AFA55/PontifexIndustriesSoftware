@@ -103,6 +103,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // COMPANY-CODE BOUNDARY (founder Jul 20): the branded login page IS a
+    // tenant boundary. Signing in on Company A's page with Company B's
+    // credentials must be rejected — not silently logged into Company B
+    // (repro: Patriot credentials accepted on the PONTIFEX login page).
+    // Enforced server-side; the page sends the tenant it's branded for.
+    const expectedTenantId = typeof body.expected_tenant_id === 'string' ? body.expected_tenant_id : null;
+    if (expectedTenantId && profile.tenant_id && profile.tenant_id !== expectedTenantId) {
+      logLoginAttempt({ email, success: false, failureReason: 'wrong_tenant_login_page', userId: authData.user.id, request });
+      await supabase.auth.signOut();
+      return NextResponse.json(
+        { error: "This account belongs to a different company. Tap 'Change company' below and sign in through your own company's page." },
+        { status: 403 }
+      );
+    }
+
     // Step 3: Get tenant details for branding (if user has a tenant)
     let tenant = null;
     if (profile.tenant_id) {

@@ -277,6 +277,9 @@ function LoginPageInner() {
         body: JSON.stringify({
           email: data.email,
           password: data.password,
+          // The tenant this login page is branded for — the server rejects
+          // credentials belonging to a different company (Jul 20 boundary).
+          expected_tenant_id: tenantId || null,
         }),
       });
 
