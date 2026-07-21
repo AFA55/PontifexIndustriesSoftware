@@ -390,8 +390,11 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, [isClockedIn, currentTimecard]);
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    // MUST await: logout() clears the session + storage async. Navigating
+    // first raced company-login's auto-resume against the in-flight signOut
+    // and bounced operators straight back into the dashboard (Jul 21 audit).
+    await logout();
     router.push('/login');
   };
 

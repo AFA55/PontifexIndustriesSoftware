@@ -16,6 +16,7 @@ import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
 import type { JobTicketData } from '../_components/JobTicketCard';
 import { isMandatoryComplete, getDisplayName } from '@/lib/equipment-map';
+import { viewPdfBlob } from '@/lib/open-pdf';
 import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from '@/lib/equipment-unifier';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import { PhotoViewer } from '@/components/PhotoUploader';
@@ -556,9 +557,9 @@ export default function JobDetailPage() {
                     headers: { Authorization: `Bearer ${session.access_token}` },
                   });
                   if (res.ok) {
-                    const blob = await res.blob();
-                    const pdfUrl = URL.createObjectURL(blob);
-                    window.open(pdfUrl, '_blank');
+                    // In-app viewer on native — window.open ejected operators
+                    // to Safari mid-ticket (Jul 21 audit finding #2).
+                    viewPdfBlob(await res.blob());
                   }
                 } catch (err) {
                   console.error('Error generating PDF:', err);

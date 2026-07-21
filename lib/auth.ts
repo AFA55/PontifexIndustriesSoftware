@@ -57,23 +57,34 @@ export const getCurrentUser = (): User | null => {
 export const logout = async (): Promise<void> => {
   if (typeof window === 'undefined') return;
 
-  // Sign out from Supabase to clear the session token
+  // Sign out from Supabase. When a Face ID enrollment exists on this device,
+  // sign out LOCALLY only (scope:'local' clears this device's session WITHOUT
+  // revoking the refresh token server-side) — so the Keychain copy stays
+  // valid and "log out → Face ID back in" actually works (founder Jul 21;
+  // previously every logout revoked the token AND wiped enrollment, forcing
+  // a password login + re-enroll every time). With no enrollment, a full
+  // (global) signOut revokes as before.
+  let keepBiometric = false;
+  try {
+    const { hasEnrolledBiometric } = await import('@/lib/biometric');
+    keepBiometric = await hasEnrolledBiometric();
+  } catch {
+    /* biometric plugin absent / web — treat as not enrolled */
+  }
   try {
     const { supabase } = await import('@/lib/supabase');
-    await supabase.auth.signOut();
+    await supabase.auth.signOut(keepBiometric ? { scope: 'local' } : undefined);
   } catch {
     // Supabase signOut may fail if no session exists
   }
-
-  // Clear the biometric Keychain entry. We now store the Supabase REFRESH TOKEN
-  // (not the password) behind Face ID, and signOut() revokes that token server-side
-  // — so a preserved Keychain copy would be a dead/invalid token. The user re-enrolls
-  // on their next password login (the post-login prompt offers it again). No-op on web.
-  try {
-    const { disableBiometric } = await import('@/lib/biometric');
-    await disableBiometric();
-  } catch {
-    /* biometric plugin absent / web — non-fatal */
+  if (!keepBiometric) {
+    // No enrollment to preserve — clear any stale Keychain entry.
+    try {
+      const { disableBiometric } = await import('@/lib/biometric');
+      await disableBiometric();
+    } catch {
+      /* biometric plugin absent / web — non-fatal */
+    }
   }
 
   localStorage.removeItem('patriot-user');
@@ -92,9 +103,8 @@ export const logout = async (): Promise<void> => {
   //  - localStorage 'pontifex.lastCompany' → powers the one-tap "Continue to
   //    {Company}" fast path on /company-login (no re-typing the company code)
   //  - localStorage 'pontifex.rememberMe' → the user's remember-me preference
-  // NOTE: the iOS Keychain biometric entry is CLEARED above (it holds a Supabase
-  // refresh token that signOut() revokes, so keeping it would store a dead token).
-  // The user re-enrolls on their next password login via the post-login prompt.
+  //  - the iOS Keychain biometric entry WHEN ENROLLED (local-scope signOut above
+  //    keeps its refresh token valid so Face ID re-login works after logout)
   console.log('User logged out');
 };
 

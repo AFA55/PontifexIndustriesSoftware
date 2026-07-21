@@ -10,6 +10,8 @@ import {
   LogOut, Loader2, FileText, CalendarOff, Edit2, X, Send, ClipboardList
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { viewPdfUrl } from '@/lib/open-pdf';
+import { isNativeApp } from '@/lib/is-native';
 import GpsClockIn, { type ClockInResult } from '@/components/NFCClockIn';
 import { requestLocation, LocationBlockedModal, type LocationErrorKind } from '@/components/ui/LocationPermissionGuard';
 
@@ -701,9 +703,23 @@ function TimecardPage() {
         {/* ── PDF Download ──────────────────────────────── */}
         <div className="mb-5 flex justify-end">
           <button
-            onClick={() => {
+            onClick={async () => {
               const mondayStr = toLocalDateStr(monday);
-              window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
+              // WEB: keep the original synchronous window.open (popup-blocker
+              // safe, unchanged behavior). NATIVE: fetch + in-app viewer —
+              // window.open ejected operators to the browser ("clicked
+              // timecard, sent to website", Jul 21 audit finding #1).
+              if (!isNativeApp()) {
+                window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
+                return;
+              }
+              try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session) return;
+                await viewPdfUrl(`/api/timecard/pdf?weekStart=${mondayStr}`, session.access_token);
+              } catch (err) {
+                console.error('Timecard PDF failed:', err);
+              }
             }}
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-blue-700 dark:text-blue-400 rounded-lg transition-all text-sm font-medium border border-blue-200 dark:border-white/10 shadow-sm hover:shadow"
           >

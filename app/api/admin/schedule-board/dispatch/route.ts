@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
           job.arrival_time ? `Arrival: ${formatTime(job.arrival_time)}` : null,
           job.job_type ? `Type: ${job.job_type}` : null,
           role === 'helper' ? '(You are assigned as Helper)' : null,
-          appUrl ? `View: ${appUrl}/dashboard/job-schedule` : null,
+          'Open the Pontifex app \u2192 My Jobs to view your ticket.',
         ].filter(Boolean);
         return lines.join('\n');
       };
