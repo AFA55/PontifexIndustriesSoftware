@@ -51,6 +51,10 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const DEMO_ACCOUNTS = [
+  // ⚠️ These ship in the public bundle — demo/test accounts ONLY. Rotate the
+  // super admin password when live testing settles (founder-accepted risk,
+  // Jul 21, for fast login while stabilizing the app).
+  { label: 'Super Admin', name: 'Super Admin (Demo)', email: 'super@pontifex.com', password: 'super0202!', color: 'rose' },
   { label: 'Admin',      name: 'Demo Admin', email: 'admin@pontifex.com',      password: 'PontifexDemo2026!', color: 'violet' },
   { label: 'Supervisor', name: 'David',      email: 'supervisor@pontifex.com', password: 'PontifexDemo2026!', color: 'amber' },
   { label: 'Operator',   name: 'Zack',  email: 'zack@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },
@@ -63,6 +67,7 @@ const DEMO_ACCOUNTS = [
 ];
 // per-color Tailwind classes (literal strings so Tailwind keeps them in the build)
 const DEMO_COLORS: Record<string, { wrap: string; text: string; badge: string }> = {
+  rose:    { wrap: 'bg-rose-50 border-rose-200 hover:border-rose-300',       text: 'text-rose-600',    badge: 'bg-rose-100 text-rose-700' },
   blue:    { wrap: 'bg-blue-50 border-blue-200 hover:border-blue-300',       text: 'text-blue-600',    badge: 'bg-blue-100 text-blue-700' },
   emerald: { wrap: 'bg-emerald-50 border-emerald-200 hover:border-emerald-300', text: 'text-emerald-600', badge: 'bg-emerald-100 text-emerald-700' },
   violet:  { wrap: 'bg-violet-50 border-violet-200 hover:border-violet-300',  text: 'text-violet-600',  badge: 'bg-violet-100 text-violet-700' },
