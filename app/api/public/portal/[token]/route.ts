@@ -83,7 +83,9 @@ export async function GET(
       const { data: job } = await supabaseAdmin
         .from('job_orders')
         .select(
-          'id, job_number, project_name, scheduled_date, status, address, location, customer_name, customer_email, customer_signature, customer_signed_at, total_cost, completed_at, description, job_type'
+          // completed_at is aliased — the real column is work_completed_at
+          // (bare completed_at 42703'd the whole select silently; Jul 21 find)
+          'id, job_number, project_name, scheduled_date, status, address, location, customer_name, customer_email, customer_signature, customer_signed_at, total_cost, completed_at:work_completed_at, description, job_type'
         )
         .eq('id', portalToken.job_order_id)
         .eq('tenant_id', portalToken.tenant_id)
@@ -117,7 +119,7 @@ export async function GET(
     // filter syntax and manipulate which rows are returned (query injection).
     // Instead, run two separate parameterised queries and merge in TypeScript.
     const jobSelectColumns =
-      'id, job_number, project_name, scheduled_date, status, address, location, customer_signature, customer_signed_at, total_cost, completed_at';
+      'id, job_number, project_name, scheduled_date, status, address, location, customer_signature, customer_signed_at, total_cost, completed_at:work_completed_at';
 
     let jobHistory: Record<string, any>[] = [];
 

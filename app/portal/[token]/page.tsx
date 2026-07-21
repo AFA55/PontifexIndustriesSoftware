@@ -137,7 +137,10 @@ export default function CustomerPortalPage() {
       }
 
       const json = await res.json();
-      setData(json);
+      // API returns { success, data: {...} } — store the inner payload.
+      // (Storing the envelope crashed the ready render on undefined fields —
+      // the error boundary customers saw. Jul 21 live-test find.)
+      setData(json.data ?? json);
       setPageState('ready');
     } catch {
       setErrorMessage('Unable to load. Please check your connection and try again.');
