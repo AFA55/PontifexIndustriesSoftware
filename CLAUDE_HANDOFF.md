@@ -12,6 +12,19 @@
 >   pontifexindustries@gmail.com — his real logins untouched). `/jobs` = feature marketing →
 >   /request-demo. Only tenants now: PATRIOT + PONTIFEX. Doc: `docs/plans/OPIFEX_FEATURE_PLAN.md`.
 >   Committed, UNPUSHED (say "push it").
+> - **LATER JUL 21 (all PUSHED through `acbd8106`, deploys verified):** (1) feedback loop
+>   actually works now — bare fire-and-forget died on Vercel (use `after()` + maxDuration 120;
+>   E2E: analysis lands ~25s); (2) **notifications_notification_type_check DROPPED** — it
+>   silently ate EVERY typed notification platform-wide (only 'general' ever landed);
+>   (3) **morning clock-in gate** built+verified (clock-in returns overdueTickets → amber modal;
+>   /status 409 overdue_ticket_block hard-blocks starting a new job w/ an overdue one);
+>   (4) live SMS workflow test w/ founder as contact (QA-2026-320243, kept on board) — caught
+>   TWO more silent bugs: job_orders_status_check missing on_site/pending_completion/archived
+>   (fixed via migration), and **customer portal never rendered** (completed_at→
+>   work_completed_at alias + page stored envelope not json.data — fixed, verified w/ live
+>   token). Feedback row "[TEST-3]" left in Hub for founder to try Approve. LESSON: check
+>   constraints vs code enums drift silently because ALL our inserts are fire-and-forget —
+>   when adding a typed insert, verify the CHECK constraint allows the value.
 
 > ## 🤝 OPUS HANDOFF — read this block, then work
 >
