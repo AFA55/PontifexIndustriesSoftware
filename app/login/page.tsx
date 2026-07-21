@@ -157,7 +157,14 @@ function LoginPageInner() {
   // last choice on mount — desktop office staff check it once, it stays.
   useEffect(() => {
     try {
-      if (localStorage.getItem('pontifex.rememberMe') === 'true') {
+      const flag = localStorage.getItem('pontifex.rememberMe');
+      if (flag === 'true') {
+        setValue('remember', true);
+      } else if (flag !== 'false' && isNativeApp()) {
+        // NATIVE default = ON (founder Jul 21: employees were re-typing
+        // passwords every launch because the box defaulted unchecked and
+        // WKWebView drops unsaved sessions on app kill). An explicit
+        // uncheck ('false') is still respected.
         setValue('remember', true);
       }
     } catch { /* storage unavailable — leave unchecked */ }

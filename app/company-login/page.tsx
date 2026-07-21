@@ -125,6 +125,23 @@ function CompanyLoginContent() {
             showEntry();
             return;
           }
+          // NATIVE + Face ID enrolled: the face gates the resume (founder
+          // Jul 21 — employees expected a scan, not a silent let-in). Cancel
+          // → the manual fast-path buttons; plugin absent → resume as before.
+          try {
+            const { isNativeApp } = await import('@/lib/is-native');
+            if (isNativeApp()) {
+              const { hasEnrolledBiometric, verifyAndGetSession } = await import('@/lib/biometric');
+              if (await hasEnrolledBiometric()) {
+                const ok = await verifyAndGetSession('Unlock Pontifex');
+                if (cancelled) return;
+                if (!ok) {
+                  showEntry();
+                  return;
+                }
+              }
+            }
+          } catch { /* biometric plugin absent — silent resume */ }
           setView('resuming');
           router.replace('/dashboard');
           return;
@@ -132,6 +149,21 @@ function CompanyLoginContent() {
         // Session truly gone (signed out / refresh token revoked) — the stale
         // profile blob must not linger or guards mis-render before bouncing.
         localStorage.removeItem('supabase-user');
+        // NATIVE + enrolled: hand off to /login, whose Face ID auto-prompt +
+        // token-rotation + profile-restore machinery already handles biometric
+        // re-login end to end (the app cold-launches HERE, so the prompt never
+        // fired before — Jul 21 audit finding #3).
+        try {
+          const { isNativeApp } = await import('@/lib/is-native');
+          if (isNativeApp()) {
+            const { hasEnrolledBiometric } = await import('@/lib/biometric');
+            const last = readLastCompany();
+            if (last?.tenantId && (await hasEnrolledBiometric())) {
+              router.replace(`/login?tenant_id=${last.tenantId}`);
+              return;
+            }
+          }
+        } catch { /* plugin absent — normal entry */ }
         showEntry();
       } catch {
         showEntry();
