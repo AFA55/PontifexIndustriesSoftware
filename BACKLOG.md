@@ -168,8 +168,10 @@
       Needs echo handling (speaker output feeding the mic transcribes Felix's own words) —
       prototype with keeping recognition open during TTS + drop results that fuzzy-match the
       spoken reply text; headset-first rollout.
-- [ ] **Opifex build-out** (founder Jul 12: "now we can work on Opifex") — scope TBD with founder;
-      existing Opifex tenant = hiring/job-board front door.
+- [x] ~~**Opifex build-out**~~ — ✅ RESOLVED Jul 21 (founder: "feature instead of independent
+      app"): Opifex folded into the platform as the hiring module. Front-door tenant +
+      self-serve signup retired; /jobs → feature marketing → /request-demo. Architecture:
+      `docs/plans/OPIFEX_FEATURE_PLAN.md`.
 - [ ] **Content strategy — deliver & showcase the software** (founder Jul 12: AFTER the finish-line
       phases). Positioning constraint is NON-NEGOTIABLE: never market as "concrete cutting
       software" (non-compete) — position as the bridge for companies to build custom digital

@@ -9,13 +9,16 @@
 
 ## Test credentials
 - Patriot super admin (demo): `super@pontifex.com` / `super0202!` (tenant ee3d8081…, lands on Platform Hub)
-- Opifex hiring-only admin (QA account): `opifex.tester@example.com` / `OpifexTest2026!` (tenant 32d26561…)
+- ~~Opifex hiring-only admin~~ — GONE Jul 21: the OPIFEX front-door tenant was retired (Opifex
+  folded in as the hiring module — `docs/plans/OPIFEX_FEATURE_PLAN.md`). To run Loop 1, create a
+  throwaway hiring-only tenant via the Platform Hub (features: hiring on, scheduling off) and
+  delete it after.
 - Login URLs: `/login?tenant_id=<id>` skips the company-code step.
 - Cleanup after: soft-delete test jobs (`deleted_at`), delete their publish requests, revert any
   patched job rows. Never leave test data live — Patriot is a paying customer.
 
-## Loop 1 — Opifex customer (hiring-only tenant)
-1. Login page shows **Opifex** branding → sign in → must land on **/dashboard/hiring** (NOT the ops dashboard).
+## Loop 1 — hiring-only tenant (Hub-provisioned)
+1. Login page shows the tenant's branding → sign in → must land on **/dashboard/hiring** (NOT the ops dashboard).
 2. Nav audit: Job Board present; Schedule Board / Equipment / Fleet / Timecards / Invoicing / Customers ABSENT.
 3. New Job (title+description only) → Build my ad → job workspace w/ ad kit (FB/IG/TikTok) + 4-6 screeners incl. an 18+ auto-reject.
 4. Activate → Overview shows "Ad review: in progress with Pontifex".
@@ -31,14 +34,16 @@
 4. Artifex: Command Center loads, one chat round-trip streams a coherent reply.
 
 ## Loop 3 — Public candidate + prospect
-1. `/jobs`: Opifex front door renders, mentions company code OPIFEX (never HIRE), clean at 375px.
-2. Signup form: generic success; repeat with same email → identical generic success (no existence oracle).
+1. `/jobs`: feature marketing page renders (no signup form, no company-code mention), CTAs →
+   /request-demo + /company-login, clean at 375px.
+2. ~~Signup form~~ — removed Jul 21 (self-serve signup retired with the Opifex fold-in).
 3. `/apply/[slug]` of an ACTIVE job at 375px: full application; submit → success. Re-apply answering the
    18+ question "No" → success screen must be IDENTICAL (silent auto-reject; verify status='rejected'
    + auto_rejected=true in DB).
 4. Auth edges: /forgot-password (generic confirmation), /update-password with no token (graceful),
    /setup-account with no token (graceful).
-5. Branding sweep: /company-login codes OPIFEX → Opifex, PATRIOT → Patriot, ZZZZZ → clean not-found.
+5. Branding sweep: /company-login codes PATRIOT → Patriot, OPIFEX → clean not-found (tenant
+   retired Jul 21), ZZZZZ → clean not-found.
 
 ## Loop 4 — Patriot operator (run when ops surfaces change)
 The pre-existing operator flow: login as an operator → my-jobs → jobsite → clock-in (GPS) →

@@ -6,6 +6,12 @@
 > - **DATA CLEANUP (founder-ordered, prod DB):** Apex demo tenant fully deleted (tenant, 8 @apexdemo.com profiles+auth users, 6 demo jobs, flags, alerts). ALL 11 Patriot test tickets hard-deleted (Scout Mech QA-2026-105647, Trehel QA-2026-755047, Touch of Chisholm QA-2026-792208 + 8 soft-deleted) + test invoice INV-2026-463087 + "Patriot Test GC" customer + 2 stale health alerts. Real crew timecards untouched (verified zero referenced test jobs). Patriot is clean: 0 tickets, 0 invoices. Real-looking customers (Harper, INEO, Westmoreland, AM King, Triangle, Touch of tism) KEPT pending founder word.
 > - **ROCK-SOLID BATCH 4 (compliance) DONE:** audit in `docs/plans/COMPLIANCE_AUDIT.md`. Fixed: privacy policy v1.2 (accurate GPS disclosure incl. In-Route live sharing, full 9-subprocessor table, new biometric/push/SMS sections), setup-account waiver now links /privacy+/terms, privacy page renderer bolds list items. Follow-ups in BACKLOG "Jul 21" block (iOS Info.plist location strings = next native build; store data-safety labels = founder; SMS STOP webhook; retention cron).
 > - All 4 Rock-Solid batches complete. Next: crew plan (helper bug first) per the Jul 14 block below.
+> - **OPIFEX FOLDED IN (founder Jul 21: "feature instead of independent app"):** hiring is now a
+>   plain platform module — deleted the self-serve signup route, `HIRE_TENANT_ID` special-casing,
+>   and the OPIFEX front-door tenant from prod (incl. founder's own test signup
+>   pontifexindustries@gmail.com — his real logins untouched). `/jobs` = feature marketing →
+>   /request-demo. Only tenants now: PATRIOT + PONTIFEX. Doc: `docs/plans/OPIFEX_FEATURE_PLAN.md`.
+>   Committed, UNPUSHED (say "push it").
 
 > ## 🤝 OPUS HANDOFF — read this block, then work
 >

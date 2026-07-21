@@ -23,9 +23,9 @@ export type ScreenerType = (typeof SCREENER_TYPES)[number];
 /** Roles allowed to manage hiring (mirrors RLS policies in the migration). */
 export const HIRING_ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'];
 
-/** The front-door tenant for the job-board product Opifex (company code OPIFEX). */
-export const HIRE_TENANT_ID = '32d26561-0b88-4b4f-b879-ec0b33b033ea';
-export const HIRE_COMPANY_CODE = 'OPIFEX'; // Opifex — the Latin -fex family: Pontifex, Artifex, Opifex
+// (Jul 21, 2026) Opifex was folded into the platform as the "hiring" module —
+// the standalone front-door tenant + self-serve signup were retired. Hiring is
+// enabled per-tenant via tenants.features.hiring; see docs/plans/OPIFEX_FEATURE_PLAN.md.
 
 /**
  * ⚖️ ADEA LEGAL GUARDRAIL — age-based screening is prohibited.
@@ -203,7 +203,6 @@ export interface HiringBilling {
 //                                             -> evaluates auto-reject server-side -> { success, data: { candidateId } }
 //                                                (NEVER return autoRejected publicly - it is an oracle for the
 //                                                 disqualifying answers; guardian finding Jul 3)
-// PUBLIC POST /api/hiring/public/signup       -> body { company_name, contact_name, email } -> creates hiring-only tenant + setup email
 // GET    /api/hiring/publish-requests          -> SUPER_ADMIN. ?status= filter. { success, data: { requests: [{ ...req, tenant_name, job }] } }
 // GET    /api/hiring/publish-requests/mine     -> ?jobId= (tenant-scoped) -> { success, data: { request: HiringPublishRequest | null } }
 // PATCH  /api/hiring/publish-requests/[id]     -> SUPER_ADMIN. body { action: 'approve'|'reject'|'mark_published', note? }

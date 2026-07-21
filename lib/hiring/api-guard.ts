@@ -7,7 +7,7 @@
  *   3. tenant scope resolved to a guaranteed non-null tenantId
  *      (super_admin may pass ?tenantId=, else falls back to profile tenant)
  *   4. tenants.features.hiring gate — the module must be enabled for the tenant
- *      (super_admin bypasses the gate; the HIRE front-door tenant is always on)
+ *      (super_admin bypasses the gate)
  *
  * All downstream queries use supabaseAdmin with an explicit
  * .eq('tenant_id', guard.tenantId) — that IS the security boundary here
@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth, resolveTenantScope } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { HIRING_ADMIN_ROLES, HIRE_TENANT_ID } from '@/lib/hiring/types';
+import { HIRING_ADMIN_ROLES } from '@/lib/hiring/types';
 
 export interface HiringGuardSuccess {
   ok: true;
@@ -53,9 +53,8 @@ export async function requireHiringAdmin(request: NextRequest): Promise<HiringGu
   const tenantId = scope.tenantId;
 
   // Feature gate: tenants.features jsonb must include hiring: true.
-  // super_admin bypasses (platform operators manage any tenant); the HIRE
-  // front-door tenant is implicitly enabled.
-  if (auth.role !== 'super_admin' && tenantId !== HIRE_TENANT_ID) {
+  // super_admin bypasses (platform operators manage any tenant).
+  if (auth.role !== 'super_admin') {
     const { data: tenant } = await supabaseAdmin
       .from('tenants')
       .select('features')

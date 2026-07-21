@@ -1,5 +1,11 @@
 # Hireline-Style Hiring Module — Build Plan
 
+> **⚠️ ARCHITECTURE UPDATE (Jul 21, 2026):** §5.1's standalone-product model (OPIFEX front-door
+> tenant + self-serve signup) was RETIRED — Opifex is now a platform feature (module), per the
+> founder. Tenants get hiring via `features.hiring`; tenant creation happens only in the Platform
+> Hub. See `docs/plans/OPIFEX_FEATURE_PLAN.md`. The module internals below (ad kit, ADEA
+> guardrails, billing spread, agency Meta model, publish queue) remain accurate.
+
 > Founder ask (Jul 2, 2026): duplicate what Hireline does inside Pontifex so any tenant can run
 > hiring/recruiting ads, PLUS two improvements Hireline lacks: (1) one-click **translation** of
 > finalized ad/screener copy, (2) better up-front **screening** (his words: filter out applicants
