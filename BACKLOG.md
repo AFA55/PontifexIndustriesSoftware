@@ -129,6 +129,20 @@
 
 ## 🟠 P1 — This week
 
+### Jul 22 — Takeoffs module (founder-directed; plan: `docs/plans/TAKEOFFS_MODULE_PLAN.md`)
+- [ ] **T1 Foundation**: takeoff_documents/pages/conditions/measurements migrations + `takeoff-documents`
+      bucket + RLS, upload flow, pdf.js viewer (viewport-clipped rendering, page virtualization),
+      sheet-index extraction (text-layer heuristics) + review table
+- [ ] **T2 Measurement core**: calibrate-by-dimension flow (+ named scales + verify prompt),
+      SVG overlay (single-matrix), linear/area/count tools, conditions CRUD w/ TRADE FIELDS
+      (cut depth, core diameter, wall/slab), live totals, server-side quantity recompute
+- [ ] **T3 Deliverables**: annotated-PDF export (GC-ready marked scope), CSV totals, quote handoff,
+      full-text sheet search
+- [ ] **T4 AI v1** ("AI suggests, human confirms"): sheet auto-naming/classification, scale
+      suggestion, page scope rundown, callout pins (SAW CUT/CORE DRILL text-layer anchored,
+      accept/reject). NO auto-counting into bids (34-39% benchmark accuracy — v2 w/ guardrails).
+- Founder-side bridge: optionally resubscribe Easy Takeoffs $39/mo while T1-T3 build (his call).
+
 ### Jul 21 — compliance audit follow-ups (batch 4 done; audit: `docs/plans/COMPLIANCE_AUDIT.md`)
 - [ ] **P1 — iOS location permission strings** (`ios/App/App/Info.plist`): reword
       `NSLocationWhenInUseUsageDescription` + AlwaysAndWhenInUse — current "checked once per
