@@ -79,6 +79,9 @@ function CompanyLoginContent() {
 
   useEffect(() => {
     let cancelled = false;
+    // True while the OS Face ID sheet is (or may be) on screen — the watchdog
+    // must never yank the UI out from under an active biometric prompt.
+    let interactivePrompt = false;
 
     const showEntry = () => {
       if (cancelled) return;
@@ -90,6 +93,20 @@ function CompanyLoginContent() {
         setView('form');
       }
     };
+
+    // WATCHDOG (founder Jul 21: crews launched the app into a card with NO
+    // form — the init chain below stalled, most likely getSession()'s silent
+    // token refresh on a weak connection, and 'pending' has no UI). The
+    // resume path is a convenience; the form is the lifeline. If no view has
+    // been chosen in 5s and we're not mid-Face-ID, force the entry UI.
+    const watchdog = setTimeout(() => {
+      if (!cancelled && !interactivePrompt) showEntry();
+    }, 5000);
+
+    // Bound a promise that may never settle (network fetch with no timeout,
+    // native plugin bridge). On timeout, resolve with the fallback value.
+    const within = <T,>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+      Promise.race([p, new Promise<T>((r) => setTimeout(() => r(fallback), ms))]);
 
     (async () => {
       try {
@@ -106,7 +123,14 @@ function CompanyLoginContent() {
 
         // getSession() returns the persisted session and transparently
         // refreshes an expired access token when the refresh token is valid.
-        const { data: { session } } = await supabase.auth.getSession();
+        // BOUNDED: the refresh is a network fetch with no timeout of its own —
+        // on a weak connection it can hang minutes (the Jul 21 stranded-crew
+        // bug). 4s without an answer = treat as signed out and show the form.
+        const { data: { session } } = await within(
+          supabase.auth.getSession(),
+          4000,
+          { data: { session: null } } as Awaited<ReturnType<typeof supabase.auth.getSession>>
+        );
         if (cancelled) return;
         if (session) {
           // PLATFORM-ORG sessions never silently forward (founder Jul 12:
@@ -132,8 +156,13 @@ function CompanyLoginContent() {
             const { isNativeApp } = await import('@/lib/is-native');
             if (isNativeApp()) {
               const { hasEnrolledBiometric, verifyAndGetSession } = await import('@/lib/biometric');
-              if (await hasEnrolledBiometric()) {
+              // Bounded: a stalled plugin bridge must not strand 'pending'.
+              if (await within(hasEnrolledBiometric(), 2500, false)) {
+                // The OS face-scan sheet is user-paced — no timeout, but tell
+                // the watchdog to stand down while it's up.
+                interactivePrompt = true;
                 const ok = await verifyAndGetSession('Unlock Pontifex');
+                interactivePrompt = false;
                 if (cancelled) return;
                 if (!ok) {
                   showEntry();
@@ -158,7 +187,7 @@ function CompanyLoginContent() {
           if (isNativeApp()) {
             const { hasEnrolledBiometric } = await import('@/lib/biometric');
             const last = readLastCompany();
-            if (last?.tenantId && (await hasEnrolledBiometric())) {
+            if (last?.tenantId && (await within(hasEnrolledBiometric(), 2500, false))) {
               router.replace(`/login?tenant_id=${last.tenantId}`);
               return;
             }
@@ -170,7 +199,7 @@ function CompanyLoginContent() {
       }
     })();
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; clearTimeout(watchdog); };
   }, [router]);
 
   const handleContinue = () => {
