@@ -99,6 +99,9 @@ function SetupAccountInner() {
   const [emailConsent, setEmailConsent] = useState(true);
   const [smsConsent, setSmsConsent] = useState(false);
   const [waiverSigned, setWaiverSigned] = useState(false);
+  // Set when the token belongs to an ALREADY-ACCEPTED invitation — the person
+  // has an account; show "you're already set up → sign in" instead of an error.
+  const [alreadyUsed, setAlreadyUsed] = useState<{ tenantId: string; tenantName: string | null } | null>(null);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -119,6 +122,21 @@ function SetupAccountInner() {
       .then(r => r.json())
       .then(json => {
         if (!json.success) {
+          // Already-used invite = the account EXISTS. Route the person to the
+          // real sign-in for their company instead of a dead-end error
+          // (founder Jul 23: re-clicked an old accept link, read the generic
+          // card + company-login as "it sent me to the homepage").
+          if (json.already_used && json.tenant_id) {
+            setAlreadyUsed({ tenantId: json.tenant_id, tenantName: json.tenant_name ?? null });
+            try {
+              localStorage.setItem('pontifex.lastCompany', JSON.stringify({
+                tenantId: json.tenant_id,
+                name: json.tenant_name ?? undefined,
+              }));
+            } catch { /* non-fatal */ }
+            setStep(-1);
+            return;
+          }
           setError(json.error || 'Invalid or expired invitation link.');
           setStep(-1);
         } else {
@@ -282,6 +300,38 @@ function SetupAccountInner() {
 
   // ── Error state ────────────────────────────────────────────────────────────
   if (step === -1) {
+    // Already-used invite: the account exists — this is a SIGN-IN moment,
+    // not an error. Deep-link the company's real login form.
+    if (alreadyUsed) {
+      return (
+        <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center p-4">
+          <div className="bg-white/90 ring-1 ring-emerald-200 shadow-sm rounded-2xl p-8 max-w-md w-full text-center dark:bg-white/[0.04] dark:ring-emerald-500/30">
+            <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+            </div>
+            <h1 className="text-xl font-bold text-slate-900 dark:text-white mb-2">You&apos;re already set up</h1>
+            <p className="text-slate-500 dark:text-white/60 mb-6">
+              This invitation was already used to create your account
+              {alreadyUsed.tenantName ? <> with <span className="font-semibold">{alreadyUsed.tenantName}</span></> : null}.
+              Sign in with your email and password.
+            </p>
+            <a
+              href={`/login?tenant_id=${alreadyUsed.tenantId}`}
+              className="inline-flex items-center justify-center gap-2 w-full bg-violet-600 hover:bg-violet-700 text-white rounded-xl py-3 font-semibold transition-colors min-h-[44px]"
+            >
+              Sign in
+              <ArrowRight className="w-4 h-4" />
+            </a>
+            <a
+              href="/forgot-password"
+              className="inline-block mt-3 text-sm text-slate-500 hover:text-slate-700 dark:text-white/50 dark:hover:text-white/80 underline min-h-[44px] leading-[44px]"
+            >
+              Forgot your password?
+            </a>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white dark:from-[#0b0618] dark:to-[#0e0720] flex items-center justify-center p-4">
         <div className="bg-white/90 ring-1 ring-red-200 shadow-sm rounded-2xl p-8 max-w-md w-full text-center dark:bg-white/[0.04] dark:ring-red-500/30">

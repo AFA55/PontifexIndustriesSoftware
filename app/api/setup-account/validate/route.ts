@@ -56,6 +56,28 @@ export async function GET(request: NextRequest) {
     }
 
     if (!inv) {
+      // Distinguish "already used" from "expired/garbage" (founder Jul 23:
+      // re-clicking an old accept link read as a dead end — the system KNOWS
+      // this invite completed, so say that and route to the real sign-in).
+      const { data: usedInv } = await supabaseAdmin
+        .from('user_invitations')
+        .select('email, tenant_id, used_at, accepted_at, tenants(name, company_code)')
+        .eq('token', token)
+        .not('accepted_at', 'is', null)
+        .maybeSingle();
+      if (usedInv) {
+        const usedTenant = Array.isArray(usedInv.tenants) ? usedInv.tenants[0] : usedInv.tenants;
+        return NextResponse.json(
+          {
+            error: 'This invitation was already used — your account is set up.',
+            already_used: true,
+            tenant_id: usedInv.tenant_id,
+            tenant_name: (usedTenant as any)?.name ?? null,
+            accepted_on: usedInv.accepted_at,
+          },
+          { status: 410 }
+        );
+      }
       return NextResponse.json(
         { error: 'Invalid or expired invitation link. Please contact your administrator.' },
         { status: 404 }
