@@ -1,8 +1,28 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Camera, X, Loader2, ImageIcon, MapPin } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { toDisplayUrls, needsSigning } from '@/lib/storage-url';
+
+/**
+ * Resolve stored photo URLs to display URLs (re-signs private-bucket URLs,
+ * security F1). Private-bucket entries start blank so a private `/public/` URL
+ * never flashes as a broken image; public/other URLs render immediately.
+ */
+function useSignedPhotos(urls: string[]): string[] {
+  const [resolved, setResolved] = useState<string[]>(() =>
+    urls.map((u) => (needsSigning(u) ? '' : u))
+  );
+  const key = JSON.stringify(urls);
+  useEffect(() => {
+    let alive = true;
+    toDisplayUrls(urls).then((r) => { if (alive) setResolved(r); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+  return resolved;
+}
 
 interface PhotoUploaderProps {
   bucket: string;
@@ -58,6 +78,9 @@ export default function PhotoUploader({
   const [error, setError] = useState('');
   const [lastStamp, setLastStamp] = useState<{ lat: number; lng: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Display URLs (signed for private buckets). The `photos` prop stays the
+  // source of truth for onPhotosChange — we only re-sign for rendering.
+  const displayPhotos = useSignedPhotos(photos);
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
@@ -179,11 +202,13 @@ export default function PhotoUploader({
           {photos.map((url, i) => (
             <div key={i} className={`relative group ${compact ? 'w-16 h-16' : 'w-20 h-20'} rounded-xl overflow-hidden border-2 ${lightMode ? 'border-slate-200 bg-slate-50' : 'border-slate-600 bg-slate-900'}`}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={url}
-                alt={`Upload ${i + 1}`}
-                className="w-full h-full object-cover"
-              />
+              {displayPhotos[i] && (
+                <img
+                  src={displayPhotos[i]}
+                  alt={`Upload ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
               <button
                 type="button"
                 onClick={() => removePhoto(i)}
@@ -262,6 +287,7 @@ export default function PhotoUploader({
  * Read-only photo viewer (for operator job detail pages)
  */
 export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; label?: string }) {
+  const displayPhotos = useSignedPhotos(photos ?? []);
   if (!photos || photos.length === 0) return null;
 
   return (
@@ -274,17 +300,19 @@ export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; la
         {photos.map((url, i) => (
           <a
             key={i}
-            href={url}
+            href={displayPhotos[i] || url}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 hover:border-blue-400 transition-colors"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={url}
-              alt={`${label} ${i + 1}`}
-              className="w-full h-full object-cover"
-            />
+            {displayPhotos[i] && (
+              <img
+                src={displayPhotos[i]}
+                alt={`${label} ${i + 1}`}
+                className="w-full h-full object-cover"
+              />
+            )}
           </a>
         ))}
       </div>

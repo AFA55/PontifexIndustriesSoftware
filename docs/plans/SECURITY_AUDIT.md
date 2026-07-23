@@ -41,7 +41,27 @@ Also fixed alongside (not strictly security): the Platform-Hub "add user to tena
 
 ## FLAGGED — needs a founder decision (NOT rushed; a careless fix breaks live features)
 
-### F1 — Public storage buckets hold customer/PII documents (RLS audit C1)
+### F1 — Public storage buckets — IN PROGRESS
+**Done (Jul 23):** `scope-photos` + `jobsite-area-docs` (20 of 31 files) flipped
+PUBLIC→PRIVATE. Display is 100% centralized in PhotoViewer/PhotoUploader, which
+now re-sign stored URLs at render time via `lib/storage-url.ts` (no data
+migration — the resolver extracts the path from the old `/public/` URL). Added
+authenticated-read `storage.objects` policies so the logged-in client can sign.
+Verified live: public path now 400s, an authenticated operator signs + loads
+(200), anon signing denied (400), and the operator UI renders the photos as
+signed URLs. Migration `20260723_privatize_scope_jobsite_buckets.sql`.
+
+**Remaining (follow-up):**
+- `job-photos` (7 files) — entangled with the job-DOCUMENT upload path
+  (`my-jobs` stores a job-photos URL into `job_documents.file_url`); needs those
+  display/download sites converted too before flipping. NOT in completion PDFs
+  (verified). Add `job-photos` to `PRIVATE_DISPLAY_BUCKETS` + convert the doc
+  sites, then flip.
+- `contracts` + `completion-pdfs` (4 files) — customer-EMAILED, so flipping
+  needs signed-URL delivery in the email (or portal-token gating). The original
+  F1 note below covers this.
+
+### F1 (original) — customer-facing document buckets (RLS audit C1)
 `contracts`, `certification-documents`, `completion-pdfs`, `job-photos`, `jobsite-area-docs`, `scope-photos`, `site-compliance-docs` are `public=true` — anyone with (or guessing) the URL fetches the file, no auth, RLS bypassed.
 **Why not auto-fixed:** these URLs are **emailed to customers** (contracts, completion PDFs, signature pages) who have **no login** — flipping the buckets to private breaks customer document delivery. Paths are `tenant_id/record_id/type-timestamp.pdf` (UUIDs, hard to enumerate but not secret).
 **The real fix (a small project):** switch customer-facing delivery to **short-lived signed URLs** (`createSignedUrl`), then flip the buckets private + add tenant-scoped `storage.objects` policies. Prioritize `contracts` + `certification-documents` (worker PII). **Decision needed:** greenlight the signed-URL migration (est. ~1 session).
