@@ -130,18 +130,20 @@
 ## 🟠 P1 — This week
 
 ### Jul 22 — Takeoffs module (founder-directed; plan: `docs/plans/TAKEOFFS_MODULE_PLAN.md`)
-- [ ] **T1 Foundation**: takeoff_documents/pages/conditions/measurements migrations + `takeoff-documents`
-      bucket + RLS, upload flow, pdf.js viewer (viewport-clipped rendering, page virtualization),
-      sheet-index extraction (text-layer heuristics) + review table
-- [ ] **T2 Measurement core**: calibrate-by-dimension flow (+ named scales + verify prompt),
-      SVG overlay (single-matrix), linear/area/count tools, conditions CRUD w/ TRADE FIELDS
-      (cut depth, core diameter, wall/slab), live totals, server-side quantity recompute
+- [x] ~~T1+T2 core + AI scope analysis~~ — ✅ SHIPPED Jul 22 (`10c7b1ec`, Patriot enabled):
+      upload (signed-URL) → pdf.js viewer → calibrate-by-dimension (snaps to named scales,
+      apply-to-all) → linear + count measuring w/ scope buckets (depth/diameter/surface trade
+      fields) + live totals + server-side recompute → "Analyze scope" AI (text-layer only,
+      rundown + key sheets + suggested buckets w/ evidence). E2E-verified against a
+      known-geometry blueprint (scale snapped exactly; 720pt wall = 40.05 LF server-verified;
+      AI found all 3 planted scope items). "E2E Test Blueprint" doc left in Patriot for the
+      founder to play with.
 - [ ] **T3 Deliverables**: annotated-PDF export (GC-ready marked scope), CSV totals, quote handoff,
-      full-text sheet search
-- [ ] **T4 AI v1** ("AI suggests, human confirms"): sheet auto-naming/classification, scale
-      suggestion, page scope rundown, callout pins (SAW CUT/CORE DRILL text-layer anchored,
-      accept/reject). NO auto-counting into bids (34-39% benchmark accuracy — v2 w/ guardrails).
-- Founder-side bridge: optionally resubscribe Easy Takeoffs $39/mo while T1-T3 build (his call).
+      full-text sheet search; area tool; vertex editing; count-pin delete UX polish
+- [ ] **T4 AI v2**: callout pins ON the sheet (text-layer anchored, accept/reject), scale
+      suggestion from title block. NO auto-counting into bids (34-39% benchmark accuracy).
+- Founder-side: upload a REAL bid set (Wolfie's 43-page IFP) and cross-check LF totals against
+      his Easy Takeoffs numbers; bridge subscription $39/mo optional while T3 builds (his call).
 
 ### Jul 21 — compliance audit follow-ups (batch 4 done; audit: `docs/plans/COMPLIANCE_AUDIT.md`)
 - [ ] **P1 — iOS location permission strings** (`ios/App/App/Info.plist`): reword

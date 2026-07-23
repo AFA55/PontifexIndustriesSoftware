@@ -2,6 +2,20 @@
 
 **Last updated:** Jul 21, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE through `9d133b5f`; **1 UNPUSHED commit** (privacy policy v1.2 + compliance batch 4 — push with next batch).
 
+> ## 📌 Jul 22 session (Fable 5) — TAKEOFFS MODULE SHIPPED
+> - **Takeoffs live for Patriot** (`10c7b1ec`): /dashboard/takeoffs — upload PDF plan sets
+>   (signed-URL to `takeoff-documents` bucket), pdf.js viewer (LEGACY build — modern build's
+>   paint stalls under Turbopack; static worker in public/, keep in sync on upgrades), sheet
+>   numbers auto-extracted (S-101 heuristics), calibrate-by-dimension (snaps to named scales),
+>   linear+count measuring in PDF page coordinates (SVG overlay needs pointer-events:all — svg
+>   roots are click-transparent!), scope buckets w/ trade fields, server-side quantity recompute,
+>   "Analyze scope" AI (text-layer only, after()+maxDuration 120). 4 new tables w/ tenant RLS +
+>   composite tenant FKs (rls-auditor PASS). E2E: scale snapped to 1/4"=1'-0" exactly, 40 LF wall
+>   measured 40.05 server-side, AI found all 3 planted scope items. Research + phases in
+>   docs/plans/TAKEOFFS_MODULE_PLAN.md; T3 (exports/quote handoff) + T4 (callout pins) next.
+> - "E2E Test Blueprint" left in Patriot takeoffs for founder hands-on; founder should re-upload
+>   the real Wolfie's 43-page IFP set and cross-check totals vs his Easy Takeoffs numbers.
+>
 > ## 📌 Jul 21 session (Fable 5)
 > - **DATA CLEANUP (founder-ordered, prod DB):** Apex demo tenant fully deleted (tenant, 8 @apexdemo.com profiles+auth users, 6 demo jobs, flags, alerts). ALL 11 Patriot test tickets hard-deleted (Scout Mech QA-2026-105647, Trehel QA-2026-755047, Touch of Chisholm QA-2026-792208 + 8 soft-deleted) + test invoice INV-2026-463087 + "Patriot Test GC" customer + 2 stale health alerts. Real crew timecards untouched (verified zero referenced test jobs). Patriot is clean: 0 tickets, 0 invoices. Real-looking customers (Harper, INEO, Westmoreland, AM King, Triangle, Touch of tism) KEPT pending founder word.
 > - **ROCK-SOLID BATCH 4 (compliance) DONE:** audit in `docs/plans/COMPLIANCE_AUDIT.md`. Fixed: privacy policy v1.2 (accurate GPS disclosure incl. In-Route live sharing, full 9-subprocessor table, new biometric/push/SMS sections), setup-account waiver now links /privacy+/terms, privacy page renderer bolds list items. Follow-ups in BACKLOG "Jul 21" block (iOS Info.plist location strings = next native build; store data-safety labels = founder; SMS STOP webhook; retention cron).
