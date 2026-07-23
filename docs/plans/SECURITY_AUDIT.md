@@ -41,7 +41,19 @@ Also fixed alongside (not strictly security): the Platform-Hub "add user to tena
 
 ## FLAGGED — needs a founder decision (NOT rushed; a careless fix breaks live features)
 
-### F1 — Public storage buckets — IN PROGRESS
+### F1 — Public storage buckets — ✅ COMPLETE (Jul 23)
+All 5 data-holding buckets flipped PUBLIC→PRIVATE across three slices:
+`scope-photos` + `jobsite-area-docs` (client resolver `lib/storage-url.ts`),
+`job-photos` (client resolver + server signing in the documents API), and
+`contracts` + `completion-pdfs` (customer PII — server-signed in the token-gated
+delivery routes + admin views via `lib/storage-url-server.ts`). Empty buckets
+`certification-documents` + `site-compliance-docs` left public (0 files; flip if
+ever used). Every public path now 400s; authorized viewers (logged-in or valid
+token) get 1-hour signed URLs. Verified end-to-end: public 400, admin contracts
+API returns signed URLs that load 200, operator UI renders signed photos.
+Migrations `20260723`, `20260723b`, `20260723c`.
+
+<details><summary>original planning notes</summary>
 **Done (Jul 23):** `scope-photos` + `jobsite-area-docs` (20 of 31 files) flipped
 PUBLIC→PRIVATE. Display is 100% centralized in PhotoViewer/PhotoUploader, which
 now re-sign stored URLs at render time via `lib/storage-url.ts` (no data
