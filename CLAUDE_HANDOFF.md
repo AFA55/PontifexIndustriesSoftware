@@ -16,6 +16,14 @@
 > - "E2E Test Blueprint" left in Patriot takeoffs for founder hands-on; founder should re-upload
 >   the real Wolfie's 43-page IFP set and cross-check totals vs his Easy Takeoffs numbers.
 >
+> ## 📌 Jul 23 — invite-link UX (PUSHED `d4f798b8`, verified live)
+> - Founder re-clicked his used Jul-12 invite → generic error card → company-login = "sent me
+>   to the homepage". Fixed: validate API returns 410 `already_used` + tenant for accepted
+>   tokens; setup-account shows green "You're already set up" card deep-linking
+>   `/login?tenant_id=…` + Forgot-password. E2E-verified with his real token.
+> - His andres@pontifexindustries.com (PONTIFEX super_admin) EXISTS since Jul 12 — if password
+>   forgotten, the new card's Forgot-password link is the path.
+
 > ## 📌 Jul 21 session (Fable 5)
 > - **DATA CLEANUP (founder-ordered, prod DB):** Apex demo tenant fully deleted (tenant, 8 @apexdemo.com profiles+auth users, 6 demo jobs, flags, alerts). ALL 11 Patriot test tickets hard-deleted (Scout Mech QA-2026-105647, Trehel QA-2026-755047, Touch of Chisholm QA-2026-792208 + 8 soft-deleted) + test invoice INV-2026-463087 + "Patriot Test GC" customer + 2 stale health alerts. Real crew timecards untouched (verified zero referenced test jobs). Patriot is clean: 0 tickets, 0 invoices. Real-looking customers (Harper, INEO, Westmoreland, AM King, Triangle, Touch of tism) KEPT pending founder word.
 > - **ROCK-SOLID BATCH 4 (compliance) DONE:** audit in `docs/plans/COMPLIANCE_AUDIT.md`. Fixed: privacy policy v1.2 (accurate GPS disclosure incl. In-Route live sharing, full 9-subprocessor table, new biometric/push/SMS sections), setup-account waiver now links /privacy+/terms, privacy page renderer bolds list items. Follow-ups in BACKLOG "Jul 21" block (iOS Info.plist location strings = next native build; store data-safety labels = founder; SMS STOP webhook; retention cron).
