@@ -77,6 +77,7 @@ signed URLs. Migration `20260723_privatize_scope_jobsite_buckets.sql`.
 `contracts`, `certification-documents`, `completion-pdfs`, `job-photos`, `jobsite-area-docs`, `scope-photos`, `site-compliance-docs` are `public=true` — anyone with (or guessing) the URL fetches the file, no auth, RLS bypassed.
 **Why not auto-fixed:** these URLs are **emailed to customers** (contracts, completion PDFs, signature pages) who have **no login** — flipping the buckets to private breaks customer document delivery. Paths are `tenant_id/record_id/type-timestamp.pdf` (UUIDs, hard to enumerate but not secret).
 **The real fix (a small project):** switch customer-facing delivery to **short-lived signed URLs** (`createSignedUrl`), then flip the buckets private + add tenant-scoped `storage.objects` policies. Prioritize `contracts` + `certification-documents` (worker PII). **Decision needed:** greenlight the signed-URL migration (est. ~1 session).
+</details>
 
 ### F2 — Rate limiter is per-instance, weak under Vercel scaling (Exposure H1)
 `middleware.ts` uses an in-memory `Map` — every serverless instance has its own, so the real login limit is far above the intended 10/min. Credential-stuffing on `/api/auth/login` is the exposure.
