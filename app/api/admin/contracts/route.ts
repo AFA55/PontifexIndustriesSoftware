@@ -35,7 +35,13 @@ export async function GET(request: NextRequest) {
     console.error('contracts list error:', error);
     return NextResponse.json({ error: 'Failed to load contracts' }, { status: 500 });
   }
-  return NextResponse.json({ success: true, data: { contracts: data ?? [] } });
+  // contracts bucket is private (security F1) — sign pdf_url for the admin
+  // viewer/download links. signStoredUrl only touches private-bucket URLs.
+  const { signStoredUrl } = await import('@/lib/storage-url-server');
+  const contracts = await Promise.all(
+    (data ?? []).map(async (c: any) => ({ ...c, pdf_url: await signStoredUrl(c.pdf_url) }))
+  );
+  return NextResponse.json({ success: true, data: { contracts } });
 }
 
 export async function POST(request: NextRequest) {

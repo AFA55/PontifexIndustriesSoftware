@@ -146,11 +146,27 @@ export async function GET(request: NextRequest, context: RouteContext) {
       },
     };
 
+    // PDF buckets (completion-pdfs, contracts) are private (security F1) —
+    // sign the doc URLs so the admin viewer can load them. signStoredUrl only
+    // touches private-bucket URLs; others pass through unchanged.
+    const { signStoredUrl } = await import('@/lib/storage-url-server');
+    const j = job as any;
+    const [completionPdf, liabilityPdf, workOrderPdf, silicaPdf] = await Promise.all([
+      signStoredUrl(j.completion_pdf_url),
+      signStoredUrl(j.liability_release_pdf_url),
+      signStoredUrl(j.work_order_pdf_url),
+      signStoredUrl(j.silica_plan_pdf_url),
+    ]);
+
     return NextResponse.json({
       success: true,
       data: {
         job: {
           ...job,
+          completion_pdf_url: completionPdf,
+          liability_release_pdf_url: liabilityPdf,
+          work_order_pdf_url: workOrderPdf,
+          silica_plan_pdf_url: silicaPdf,
           actual_cost: null,
           customer_rating: null,
           customer_feedback: null,

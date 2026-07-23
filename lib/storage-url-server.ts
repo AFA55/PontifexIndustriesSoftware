@@ -13,6 +13,8 @@ const PRIVATE_BUCKETS = new Set<string>([
   'scope-photos',
   'jobsite-area-docs',
   'job-photos',
+  'contracts',
+  'completion-pdfs',
 ]);
 
 const PUBLIC_URL_RE = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;

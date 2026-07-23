@@ -53,6 +53,12 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     jobNumber = job?.job_number ?? null;
   }
 
+  // The contracts bucket is private (security F1). The valid token already
+  // authorized this customer for THIS contract — hand back a short-lived
+  // SIGNED url instead of a permanent public one.
+  const { signStoredUrl } = await import('@/lib/storage-url-server');
+  const signedPdfUrl = contract.status === 'signed' ? await signStoredUrl(contract.pdf_url) : null;
+
   // Explicit pick list — never spread the row to a public caller.
   return NextResponse.json({
     success: true,
@@ -65,7 +71,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       customer_name: contract.customer_name,
       status: contract.status,
       signed_at: contract.signed_at,
-      pdf_url: contract.status === 'signed' ? contract.pdf_url : null,
+      pdf_url: signedPdfUrl,
       job_number: jobNumber,
       company: { name: branding.companyName, color: branding.brandColor, logo: branding.logoUrl },
     },

@@ -258,7 +258,12 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({ success: true, pdf_url: pdfUrl });
+    // completion-pdfs is private (security F1): the stored URL is a /public/
+    // path (kept as a path carrier — resolvers re-sign it), but the URL we hand
+    // back for the operator's immediate "view PDF" must be signed to load.
+    const { signStoredUrl } = await import('@/lib/storage-url-server');
+    const signedForView = await signStoredUrl(pdfUrl);
+    return NextResponse.json({ success: true, pdf_url: signedForView });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('Error generating completion PDF:', error);

@@ -144,11 +144,17 @@ export async function GET(
       if (tenant?.name) tenantName = tenant.name;
     }
 
+    // completion-pdfs bucket is private (security F1). The valid portal token
+    // authorized this customer for this job — return a short-lived SIGNED url.
+    const { signStoredUrl } = await import('@/lib/storage-url-server');
+    const signedCompletionPdf = await signStoredUrl((jobRow as any).completion_pdf_url);
+
     return NextResponse.json({
       success: true,
       data: {
         job: {
           ...jobRow,
+          completion_pdf_url: signedCompletionPdf,
           operator_name: operatorName,
         },
         work_items: workItems || [],
