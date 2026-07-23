@@ -79,14 +79,44 @@ signed URLs. Migration `20260723_privatize_scope_jobsite_buckets.sql`.
 **The real fix (a small project):** switch customer-facing delivery to **short-lived signed URLs** (`createSignedUrl`), then flip the buckets private + add tenant-scoped `storage.objects` policies. Prioritize `contracts` + `certification-documents` (worker PII). **Decision needed:** greenlight the signed-URL migration (est. ~1 session).
 </details>
 
-### F2 — Rate limiter is per-instance, weak under Vercel scaling (Exposure H1)
+### F2 — Rate limiter — ✅ CODE DONE (Jul 23), awaiting founder provisioning
+`lib/rate-limit.ts` now uses a SHARED store (Upstash Redis REST — Edge-safe, no
+SDK) when configured, and falls back to the original in-memory Map when not. So
+it shipped safely with **zero behavior change**; it upgrades to a real global
+limit the moment the env vars exist. Fail-open on Redis error/timeout (a
+throttle outage must never lock users out). Middleware is now async.
+Verified locally: 10 requests pass, then 429.
+
+**FOUNDER STEP (~10 min):** provision Upstash Redis (free tier) via the Vercel
+Marketplace, then add to the Vercel project env:
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`. Nothing else to change.
+
+### F3 — Admin RLS policies missing tenant predicate — ✅ COMPLETE (Jul 23)
+Rather than rewrite ~100 role-based policies, added ONE **restrictive** policy
+(`tenant_isolation`) to each of **141 tenant-scoped tables**. Postgres ANDs
+restrictive policies with every permissive policy, so existing rules keep
+working within the tenant while cross-tenant access is blocked everywhere at
+once. `TO authenticated` only (anon paths untouched); `service_role` bypasses
+RLS so all server API routes are unaffected; `super_admin` keeps global access;
+`tenant_id IS NULL` is allowed through because 8 tables hold legacy/global NULL
+rows (blocking them would hide existing data).
+Verified on prod: a Patriot operator now sees ONLY Patriot rows (26), while
+super_admin still sees all tenants (29). App healthy.
+Migration `20260723d_f3_tenant_isolation_restrictive.sql`. Reversible per table.
+**Follow-up:** backfill the NULL `tenant_id` rows, then tighten to strict equality.
+
+<details><summary>original F2 finding</summary>
 `middleware.ts` uses an in-memory `Map` — every serverless instance has its own, so the real login limit is far above the intended 10/min. Credential-stuffing on `/api/auth/login` is the exposure.
 **Why not auto-fixed:** a real fix needs a **shared store** — Upstash Redis / Vercel KV (new vendor + env vars you'd paste) or Vercel WAF rate rules (dashboard).
 **Decision needed:** pick the backing store; I wire it.
+</details>
 
-### F3 — ~25 admin RLS policies lack a tenant predicate (RLS audit H1)
+<details><summary>original F3 finding</summary>
+
+#### F3 (original) — ~25 admin RLS policies lack a tenant predicate (RLS audit H1)
 Tables like `profiles`, the `pay_*` set, `invoice_line_items`, `user_card_permissions`, `customers`, `inventory`, … have admin/`is_admin()` policies with no `tenant_id` clause. Latent (single-tenant today); the API-layer tenant filters we hardened above are the active guard. This is the **must-close-before-tenant-#2** item — a defense-in-depth migration AND-ing `tenant_id = current_user_tenant_id()` into each admin policy.
 **Decision needed:** schedule before onboarding a second company (not urgent while Patriot is the only tenant).
+</details>
 
 ---
 

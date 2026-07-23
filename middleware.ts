@@ -13,33 +13,10 @@ import type { NextRequest } from 'next/server';
  * This middleware adds security headers and rate-limit protection for public endpoints.
  */
 
-// Simple in-memory rate limiter for public API endpoints
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW = 60_000; // 1 minute
-const RATE_LIMIT_MAX = 10; // max requests per window for public endpoints
-
-function isRateLimited(key: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(key);
-
-  // Lazy cleanup: remove expired entries every 100 checks (no setInterval needed for Edge)
-  if (rateLimitMap.size > 50) {
-    for (const [k, v] of rateLimitMap.entries()) {
-      if (now > v.resetAt) rateLimitMap.delete(k);
-    }
-  }
-
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW });
-    return false;
-  }
-
-  entry.count++;
-  if (entry.count > RATE_LIMIT_MAX) {
-    return true;
-  }
-  return false;
-}
+// Rate limiting lives in lib/rate-limit.ts — it uses a SHARED store (Upstash
+// Redis REST) when UPSTASH_REDIS_REST_URL/TOKEN are set, and falls back to the
+// original per-instance in-memory Map when they aren't (security audit F2).
+import { isRateLimited } from '@/lib/rate-limit';
 
 // Public API endpoints that should be rate-limited
 const RATE_LIMITED_PATHS = [
@@ -58,7 +35,7 @@ const RATE_LIMITED_PATHS = [
   '/api/public/contract',
 ];
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Rate limit public API endpoints
@@ -68,7 +45,7 @@ export function middleware(request: NextRequest) {
                'unknown';
     const key = `${ip}:${pathname}`;
 
-    if (isRateLimited(key)) {
+    if (await isRateLimited(key)) {
       return NextResponse.json(
         { error: 'Too many requests. Please try again later.' },
         { status: 429 }
