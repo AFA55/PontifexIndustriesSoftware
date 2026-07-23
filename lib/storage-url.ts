@@ -20,6 +20,7 @@ import { supabase } from '@/lib/supabase';
 export const PRIVATE_DISPLAY_BUCKETS = new Set<string>([
   'scope-photos',
   'jobsite-area-docs',
+  'job-photos',
 ]);
 
 const PUBLIC_URL_RE = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;

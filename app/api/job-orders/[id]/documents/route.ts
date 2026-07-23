@@ -63,7 +63,18 @@ export async function GET(
       return NextResponse.json({ success: true, data: [] });
     }
 
-    return NextResponse.json({ success: true, data: documents || [] });
+    // Sign any now-private-bucket URLs (job-photos) so the client can load them
+    // (security F1). Best-effort per-URL; public/other URLs pass through.
+    const { signStoredUrls } = await import('@/lib/storage-url-server');
+    const signed = await Promise.all(
+      (documents || []).map(async (d: any) => ({
+        ...d,
+        photo_urls: await signStoredUrls(d.photo_urls),
+        file_urls: await signStoredUrls(d.file_urls),
+      }))
+    );
+
+    return NextResponse.json({ success: true, data: signed });
   } catch (error: any) {
     console.error('Unexpected error in GET documents:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
