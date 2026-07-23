@@ -45,7 +45,7 @@
     "@react-email/components": "^1.0.12",
     "@react-email/render": "^2.0.9",
     "@react-pdf/renderer": "^4.3.2",
-    "@sentry/nextjs": "^9.47.1",
+    "@sentry/nextjs": "^10.63.0",
     "@stripe/stripe-js": "^9.0.1",
     "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.110.0",
