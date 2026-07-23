@@ -62,6 +62,8 @@ export const FEATURE_MODULES: readonly FeatureModule[] = [
   // A tenant CAN be provisioned hiring-only via the Platform Hub (hiring on,
   // ops modules off) — that's a module configuration, not a separate product.
   { key: 'hiring', label: 'Job Board (Hiring)', description: 'AI job ads (FB/IG/TikTok), screeners, candidate pipeline, public apply pages.', defaultOn: false },
+  // Takeoffs — OFF by default: estimating module (plan docs/plans/TAKEOFFS_MODULE_PLAN.md).
+  { key: 'takeoffs', label: 'Takeoffs', description: 'Blueprint upload, scale-calibrated measuring (LF/counts), AI scope analysis for estimating.', defaultOn: false },
 ] as const;
 
 /** The canonical module-key union. */

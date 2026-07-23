@@ -40,6 +40,7 @@ import {
   MessageSquareWarning,
   UserPlus,
   Megaphone,
+  Ruler,
 } from 'lucide-react';
 import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { getRoleLabel } from '@/lib/rbac';
@@ -97,6 +98,8 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
       { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms', moduleKey: 'scheduling' },
       // Job board (hiring module) — shows only for tenants with features.hiring = true.
+      // Takeoffs (estimating) — shows only for tenants with features.takeoffs = true.
+      { label: 'Takeoffs', href: '/dashboard/takeoffs', icon: Ruler, roles: ['admin', 'super_admin', 'operations_manager', 'salesman'], moduleKey: 'takeoffs' },
       { label: 'Job Board', href: '/dashboard/hiring', icon: Megaphone, roles: ['admin', 'super_admin', 'operations_manager'], moduleKey: 'hiring' },
       { label: 'Job Board Billing', href: '/dashboard/hiring/billing', icon: CreditCard, roles: ['admin', 'super_admin', 'operations_manager'], moduleKey: 'hiring' },
     ],
