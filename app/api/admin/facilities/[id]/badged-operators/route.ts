@@ -17,6 +17,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
 
+    // Tenant-ownership gate (security audit H2 IDOR): the facility must belong
+    // to the admin's tenant. super_admin (null tenantId) unrestricted.
+    if (auth.tenantId) {
+      const { data: facility } = await supabaseAdmin
+        .from('facilities')
+        .select('id')
+        .eq('id', id)
+        .eq('tenant_id', auth.tenantId)
+        .maybeSingle();
+      if (!facility) return NextResponse.json({ error: 'Facility not found' }, { status: 404 });
+    }
+
     // Get active badges for this facility that haven't expired
     const today = new Date().toISOString().split('T')[0];
 

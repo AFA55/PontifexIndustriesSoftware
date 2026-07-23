@@ -35,9 +35,24 @@ export async function POST(request: NextRequest) {
   try {
     const inventoryData = await request.json()
 
+    // Allowlist writable columns instead of spreading the whole body — a raw
+    // spread let a client set id/created_by/total_value/etc. (mass assignment,
+    // security audit M4). tenant_id + created_by are server-derived.
+    const insertRow: Record<string, unknown> = {
+      tenant_id: tenantId || null,
+      created_by: auth.userId,
+    }
+    for (const k of [
+      'name', 'category', 'manufacturer', 'model_number', 'size', 'equipment_for',
+      'quantity_in_stock', 'quantity_assigned', 'reorder_level', 'unit_price',
+      'total_value', 'qr_code_data', 'qr_code_url', 'notes', 'location',
+    ] as const) {
+      if (inventoryData[k] !== undefined) insertRow[k] = inventoryData[k]
+    }
+
     const { data: newInventory, error } = await supabaseAdmin
       .from('inventory')
-      .insert({ ...inventoryData, tenant_id: tenantId || null })
+      .insert(insertRow)
       .select()
       .single()
 

@@ -69,10 +69,12 @@ export async function POST(request: NextRequest) {
     if (authError || !authData.user) {
       console.error('Auth error for', email, ':', authError?.message || 'No user returned');
       logLoginAttempt({ email, success: false, failureReason: 'invalid_credentials', request });
+      // Collapse ALL auth failures to one generic message. Passing Supabase's
+      // raw text ("Email not confirmed", "User is banned", …) leaks account
+      // state and enables enumeration (security audit M3, Jul 23). The specific
+      // reason is kept in login_attempts + server logs only.
       return NextResponse.json(
-        { error: authError?.message === 'Invalid login credentials'
-            ? 'Invalid email or password. Please check your credentials and try again.'
-            : (authError?.message || 'Authentication failed') },
+        { error: 'Invalid email or password. Please check your credentials and try again.' },
         { status: 401 }
       );
     }

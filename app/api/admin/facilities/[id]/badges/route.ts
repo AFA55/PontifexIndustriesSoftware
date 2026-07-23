@@ -15,6 +15,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params;
 
+    // Tenant-ownership gate: the facility must belong to the admin's tenant,
+    // else an admin could read another tenant's badges by facility id
+    // (security audit H2 IDOR). super_admin (null tenantId) unrestricted.
+    if (auth.tenantId) {
+      const { data: facility } = await supabaseAdmin
+        .from('facilities')
+        .select('id')
+        .eq('id', id)
+        .eq('tenant_id', auth.tenantId)
+        .maybeSingle();
+      if (!facility) return NextResponse.json({ error: 'Facility not found' }, { status: 404 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('badges_with_details')
       .select('*')

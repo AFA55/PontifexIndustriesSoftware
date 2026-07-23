@@ -31,18 +31,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Operator ID is required' }, { status: 400 });
     }
 
-    // Verify operator belongs to the same tenant
+    // Verify operator belongs to the same tenant — UNCONDITIONALLY. The old
+    // `if (tenantId)` skipped the check whenever getTenantId returned null,
+    // letting a tenant-less caller rate any operator in any tenant (security
+    // audit M3). A rater with no tenant is rejected outright.
     const tenantId = await getTenantId(user.id);
-    if (tenantId) {
-      const { data: operatorProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('id')
-        .eq('id', operatorId)
-        .eq('tenant_id', tenantId)
-        .maybeSingle();
-      if (!operatorProfile) {
-        return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
-      }
+    if (!tenantId) {
+      return NextResponse.json({ error: 'No tenant context' }, { status: 403 });
+    }
+    const { data: operatorProfile } = await supabaseAdmin
+      .from('profiles')
+      .select('id')
+      .eq('id', operatorId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+    if (!operatorProfile) {
+      return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
     }
 
     // Validate ratings are between 1-10

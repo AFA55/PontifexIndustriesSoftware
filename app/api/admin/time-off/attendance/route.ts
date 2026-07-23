@@ -15,7 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
-import { CALLOUT_TYPES } from '../route';
+import { CALLOUT_TYPES } from '../constants';
 
 export async function GET(request: NextRequest) {
   try {

@@ -50,6 +50,12 @@ const RATE_LIMITED_PATHS = [
   '/api/public/tenant-by-code',   // unauthenticated tenant lookup (login page)
   '/api/auth/lookup-company',      // unauthenticated company code lookup
   '/api/sms-opt-in',               // unauthenticated SMS opt-in endpoint
+  // Token-guessing surfaces (security audit M4, Jul 23). Tokens are 256-bit
+  // CSPRNG so guessing is infeasible, but throttling probes is free defense.
+  '/api/setup-account/validate',
+  '/api/public/portal',            // prefix-matches /api/public/portal/[token]/*
+  '/api/public/signature',
+  '/api/public/contract',
 ];
 
 export function middleware(request: NextRequest) {

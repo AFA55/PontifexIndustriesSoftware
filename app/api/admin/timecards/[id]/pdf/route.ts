@@ -44,12 +44,16 @@ export async function GET(
     endDate.setDate(endDate.getDate() + 6);
     const weekEnd = endDate.toISOString().split('T')[0];
 
-    // Fetch user profile
-    const { data: profile, error: profileError } = await supabaseAdmin
+    // Fetch user profile — SCOPED to the admin's tenant. Without the tenant
+    // filter, an admin could pull ANY employee's timecard PDF by user id
+    // across tenants (security audit H2 IDOR). super_admin (null tenantId)
+    // is intentionally unrestricted.
+    let profileQuery = supabaseAdmin
       .from('profiles')
-      .select('full_name, email, role')
-      .eq('id', id)
-      .single();
+      .select('full_name, email, role, tenant_id')
+      .eq('id', id);
+    if (auth.tenantId) profileQuery = profileQuery.eq('tenant_id', auth.tenantId);
+    const { data: profile, error: profileError } = await profileQuery.single();
 
     if (profileError || !profile) {
       return NextResponse.json(

@@ -6,13 +6,16 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(request: NextRequest) {
   try {
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
+    // SECURITY: admin-only. requireAuth alone made this an authenticated open
+    // SMS relay — any logged-in user could send arbitrary texts from the
+    // company Telnyx number, on the company's dime (smishing). Only the admin
+    // schedule board calls this. Security audit H1, Jul 23.
+    const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
     const tenantId = await getTenantId(auth.userId);
 

@@ -49,6 +49,97 @@ export function buildSetupUrl(origin: string, token: string): string {
   return `${origin}/setup-account?token=${token}`;
 }
 
+/**
+ * Send OUR branded setup-account invite for an auth user that ALREADY EXISTS
+ * (unconfirmed, no password) — the tenant-onboarding path (Platform Hub "add
+ * user to tenant" + first-admin creation) creates the auth row first, so it
+ * cannot use createOrRefreshInvitation (which rejects existing-auth emails).
+ *
+ * Before this, that path fell back to supabaseAdmin.auth.admin.inviteUserByEmail
+ * — Supabase's OWN email (noreply@mail.app.supabase.io) whose link lands on the
+ * homepage, not our /setup-account page (founder Jul 23: created a Patriot ops
+ * manager from the hub, invitee got a dead-end homepage link).
+ *
+ * Writes a user_invitations row (reusing an unexpired pending one) and emails
+ * the branded setup link via Resend. Best-effort: returns false on failure so
+ * onboarding still succeeds (the admin can resend).
+ */
+export async function sendSetupInviteForExistingAuthUser(opts: {
+  tenantId: string;
+  email: string;
+  name: string;
+  role: string;
+  invitedBy?: string | null;
+  origin?: string | null;
+}): Promise<boolean> {
+  try {
+    const email = opts.email.trim().toLowerCase();
+    const origin = resolveAppOrigin(opts.origin ?? null);
+
+    // Reuse an unexpired pending invite for this email+tenant, else mint one.
+    const { data: pending } = await supabaseAdmin
+      .from('user_invitations')
+      .select('token')
+      .eq('tenant_id', opts.tenantId)
+      .eq('email', email)
+      .is('accepted_at', null)
+      .gt('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    let token = pending?.[0]?.token as string | undefined;
+    if (!token) {
+      token = newToken();
+      await insertInvitation({
+        tenant_id: opts.tenantId,
+        email,
+        role: opts.role,
+        token,
+        invited_by: opts.invitedBy ?? null,
+        invited_name: opts.name,
+        expires_at: new Date(Date.now() + INVITE_TTL_MS).toISOString(),
+      });
+    }
+
+    const setupUrl = buildSetupUrl(origin, token);
+    const { tenantName, companyCode } = await getTenantMeta(opts.tenantId);
+    const roleLabel = ROLES_WITH_LABELS.find((r) => r.value === opts.role)?.label || opts.role;
+
+    // Lazy server-only imports (keep lib/invitations importable widely).
+    const { getResendApiKey, generateInviteEmail, getTenantEmailBranding } = await import('@/lib/email');
+    const { Resend } = await import('resend');
+    const branding = await getTenantEmailBranding(opts.tenantId);
+    const html = await generateInviteEmail({
+      inviteeName: opts.name,
+      inviterName: 'Pontifex Industries',
+      tenantName,
+      roleLabel,
+      companyCode,
+      setupUrl,
+      brandColor: branding.brandColor,
+      accentColor: branding.accentColor,
+      logoUrl: branding.logoUrl,
+    });
+
+    const resend = new Resend(getResendApiKey());
+    const { error } = await resend.emails.send({
+      // VERIFIED sender only (admin.pontifexindustries.com); the root domain 403s.
+      from: 'Pontifex Industries <noreply@admin.pontifexindustries.com>',
+      to: email,
+      subject: `You're invited to join ${tenantName}`,
+      html,
+    });
+    if (error) {
+      console.warn('[invitations] branded setup invite email failed:', error.message);
+      return false;
+    }
+    return true;
+  } catch (err: any) {
+    console.warn('[invitations] sendSetupInviteForExistingAuthUser failed:', err?.message);
+    return false;
+  }
+}
+
 export async function getTenantMeta(tenantId: string) {
   const { data: tenant } = await supabaseAdmin
     .from('tenants')

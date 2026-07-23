@@ -27,7 +27,7 @@ export async function GET(
     // Fetch job with survey data
     const { data: job, error } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, job_survey, assigned_to, helper_assigned_to')
+      .select('id, job_number, job_survey, assigned_to, helper_assigned_to, tenant_id')
       .eq('id', jobId)
       .single();
 
@@ -35,11 +35,13 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Verify user is assigned to this job or is an admin role
-    if (job.assigned_to !== auth.userId && job.helper_assigned_to !== auth.userId) {
-      if (!['admin', 'super_admin', 'operations_manager'].includes(auth.role)) {
-        return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
-      }
+    // Verify user is assigned to this job or is a same-tenant admin. The admin
+    // branch must include the tenant check, else an admin in tenant A could
+    // read/overwrite tenant B's survey by job id (security audit M1 IDOR).
+    const isSurveyAdmin = ['admin', 'super_admin', 'operations_manager'].includes(auth.role)
+      && (!auth.tenantId || (job as any).tenant_id === auth.tenantId);
+    if (job.assigned_to !== auth.userId && job.helper_assigned_to !== auth.userId && !isSurveyAdmin) {
+      return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
     }
 
     return NextResponse.json({
@@ -70,7 +72,7 @@ export async function POST(
     // Fetch job to verify access
     const { data: job, error: jobError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, assigned_to, helper_assigned_to')
+      .select('id, assigned_to, helper_assigned_to, tenant_id')
       .eq('id', jobId)
       .single();
 
@@ -78,11 +80,13 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Verify user is assigned to this job or is an admin role
-    if (job.assigned_to !== auth.userId && job.helper_assigned_to !== auth.userId) {
-      if (!['admin', 'super_admin', 'operations_manager'].includes(auth.role)) {
-        return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
-      }
+    // Verify user is assigned to this job or is a same-tenant admin. The admin
+    // branch must include the tenant check, else an admin in tenant A could
+    // read/overwrite tenant B's survey by job id (security audit M1 IDOR).
+    const isSurveyAdmin = ['admin', 'super_admin', 'operations_manager'].includes(auth.role)
+      && (!auth.tenantId || (job as any).tenant_id === auth.tenantId);
+    if (job.assigned_to !== auth.userId && job.helper_assigned_to !== auth.userId && !isSurveyAdmin) {
+      return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
     }
 
     // Parse survey data from request body

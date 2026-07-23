@@ -110,6 +110,9 @@ export async function POST(request: NextRequest) {
     const userId = authData.user.id;
 
     // ── Step 3: Create profile ───────────────────────────────
+    // Pin the new user to the CREATOR'S tenant (security audit M2). Omitting
+    // tenant_id left new accounts unscoped — RBAC then 403'd them (broken
+    // login) and the user wasn't bound to any tenant.
     const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert({
@@ -117,6 +120,7 @@ export async function POST(request: NextRequest) {
         email: email.trim(),
         full_name: full_name.trim(),
         role,
+        tenant_id: auth.tenantId ?? null,
         phone: '',
         phone_number: '',
         active: true,

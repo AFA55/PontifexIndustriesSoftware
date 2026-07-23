@@ -130,7 +130,7 @@ export async function POST(
     const result = await createAdminUser(
       id,
       { email, fullName: name, tempPassword: body.tempPassword || undefined, role },
-      { tenantUserRole: 'member', invitedBy: auth.userId }
+      { tenantUserRole: 'member', invitedBy: auth.userId, origin: request.headers.get('origin') }
     );
 
     // Audit — REAL audit_logs columns (user_id / resource_* / details / tenant_id).

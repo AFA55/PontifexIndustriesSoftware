@@ -18,16 +18,9 @@ import {
 } from '@/lib/time-off';
 
 // Canonical type list (matches DB constraint)
-export const VALID_TYPES = [
-  'pto', 'unpaid', 'worked_last_night', 'sick', 'callout',
-  'vacation', 'bereavement', 'personal', 'other',
-  'unavailable', 'personal_day', 'no_show',
-] as const;
-
-// Which types are paid by default
-const PAID_BY_DEFAULT: string[] = ['pto', 'vacation', 'bereavement'];
-// Which types count as callouts/attendance incidents
-export const CALLOUT_TYPES: string[] = ['sick', 'callout', 'no_show', 'personal_day'];
+// Constants moved to ./constants (Next 15 forbids non-handler exports from a
+// route file). Re-imported here; attendance/route.ts imports from ./constants.
+import { VALID_TYPES, PAID_BY_DEFAULT, CALLOUT_TYPES } from './constants';
 
 export async function GET(request: NextRequest) {
   try {

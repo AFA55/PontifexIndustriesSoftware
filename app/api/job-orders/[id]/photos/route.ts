@@ -20,7 +20,7 @@ export async function POST(
     // Check authorization: must be assigned to job or admin
     const { data: job } = await supabaseAdmin
       .from('job_orders')
-      .select('assigned_to, helper_assigned_to, photo_urls')
+      .select('assigned_to, helper_assigned_to, photo_urls, tenant_id')
       .eq('id', jobId)
       .single();
 
@@ -33,7 +33,10 @@ export async function POST(
       .single();
 
     const isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
-    const isAdmin = ADMIN_ROLES.includes(profile?.role || '');
+    // Admin branch must ALSO be same-tenant — otherwise an admin in tenant A
+    // could append photos to tenant B's job by id (security audit M1 IDOR).
+    const isAdmin = ADMIN_ROLES.includes(profile?.role || '')
+      && (!auth.tenantId || job.tenant_id === auth.tenantId);
     if (!isAssigned && !isAdmin) {
       return NextResponse.json({ error: 'You are not authorized to upload photos for this job' }, { status: 403 });
     }

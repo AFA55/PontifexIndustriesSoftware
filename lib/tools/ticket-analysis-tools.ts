@@ -96,6 +96,9 @@ export function createTicketAnalysisTools(targetTenantId: string) {
       }),
       execute: async ({ entity, keyword, dateFrom, dateTo, limit }) => {
         const cap = limit ?? 25;
+        // Strip PostgREST filter metachars from the model-derived keyword before
+        // it goes into any .or() string (security audit M3).
+        const kw = keyword ? keyword.replace(/[%,()]/g, '').trim() : keyword;
 
         if (entity === 'job_orders') {
           let q = supabaseAdmin
@@ -106,7 +109,7 @@ export function createTicketAnalysisTools(targetTenantId: string) {
             .limit(cap);
           if (dateFrom) q = q.gte('scheduled_date', dateFrom);
           if (dateTo) q = q.lte('scheduled_date', dateTo);
-          if (keyword) q = q.or(`job_number.ilike.%${keyword}%,customer_name.ilike.%${keyword}%,title.ilike.%${keyword}%`);
+          if (kw) q = q.or(`job_number.ilike.%${kw}%,customer_name.ilike.%${kw}%,title.ilike.%${kw}%`);
           const { data, error } = await q;
           if (error) throw new Error(`search_related_records (job_orders): ${error.message}`);
           return { entity, count: data?.length ?? 0, results: data ?? [] };
@@ -121,7 +124,7 @@ export function createTicketAnalysisTools(targetTenantId: string) {
             .limit(cap);
           if (dateFrom) q = q.gte('invoice_date', dateFrom);
           if (dateTo) q = q.lte('invoice_date', dateTo);
-          if (keyword) q = q.or(`invoice_number.ilike.%${keyword}%,customer_name.ilike.%${keyword}%`);
+          if (kw) q = q.or(`invoice_number.ilike.%${kw}%,customer_name.ilike.%${kw}%`);
           const { data, error } = await q;
           if (error) throw new Error(`search_related_records (invoices): ${error.message}`);
           return { entity, count: data?.length ?? 0, results: data ?? [] };

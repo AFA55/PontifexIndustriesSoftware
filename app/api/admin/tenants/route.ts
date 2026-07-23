@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
             tempPassword: admin_temp_password || undefined,
             role: admin_role || 'admin',
           },
-          { tenantUserRole: 'owner', invitedBy: auth.userId }
+          { tenantUserRole: 'owner', invitedBy: auth.userId, origin: request.headers.get('origin') }
         );
       } catch (userErr: any) {
         // Tenant is created; surface the admin-creation failure without rolling back.

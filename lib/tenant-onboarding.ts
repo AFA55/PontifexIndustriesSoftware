@@ -171,7 +171,7 @@ export async function seedBranding(
 export async function createAdminUser(
   tenantId: string,
   user: OnboardingUserConfig,
-  opts?: { tenantUserRole?: string; invitedBy?: string | null; sendInvite?: boolean }
+  opts?: { tenantUserRole?: string; invitedBy?: string | null; sendInvite?: boolean; origin?: string | null }
 ): Promise<{ userId: string; invited: boolean }> {
   const role = user.role ?? 'admin';
   const email = user.email.trim().toLowerCase();
@@ -202,16 +202,22 @@ export async function createAdminUser(
     .insert({ tenant_id: tenantId, user_id: userId, role: tenantUserRole, invited_by: opts?.invitedBy ?? null })
     .then(() => undefined, () => undefined);
 
-  // If no password was set, send the invite/recovery email so they can set one.
+  // If no password was set, send OUR branded setup email so they set one on
+  // /setup-account (NOT Supabase's inviteUserByEmail, whose email lands on the
+  // homepage — founder Jul 23). The auth user already exists here, so we use
+  // the existing-user helper rather than the createOrRefreshInvitation pipeline
+  // (which rejects emails already present in auth).
   let invited = false;
   if (sendInvite) {
-    const { error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email);
-    if (inviteErr) {
-      // eslint-disable-next-line no-console
-      console.warn(`[tenant-onboarding] invite email warning: ${inviteErr.message}`);
-    } else {
-      invited = true;
-    }
+    const { sendSetupInviteForExistingAuthUser } = await import('@/lib/invitations');
+    invited = await sendSetupInviteForExistingAuthUser({
+      tenantId,
+      email,
+      name: user.fullName,
+      role,
+      invitedBy: opts?.invitedBy ?? null,
+      origin: opts?.origin ?? null,
+    });
   }
 
   return { userId, invited };

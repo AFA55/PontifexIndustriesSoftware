@@ -19,13 +19,16 @@ export async function DELETE(
 
     const { id: jobId, docId } = await params;
 
-    // Fetch the document to verify ownership
-    const { data: doc, error: docError } = await supabaseAdmin
+    // Fetch the document to verify ownership. tenant_id scopes it to the
+    // caller's tenant so an admin can't delete another tenant's doc by id
+    // (security audit M1 IDOR). super_admin (null tenantId) unrestricted.
+    let docQuery = supabaseAdmin
       .from('job_documents')
-      .select('id, job_order_id, uploaded_by')
+      .select('id, job_order_id, uploaded_by, tenant_id')
       .eq('id', docId)
-      .eq('job_order_id', jobId)
-      .single();
+      .eq('job_order_id', jobId);
+    if (auth.tenantId) docQuery = docQuery.eq('tenant_id', auth.tenantId);
+    const { data: doc, error: docError } = await docQuery.single();
 
     if (docError || !doc) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 });

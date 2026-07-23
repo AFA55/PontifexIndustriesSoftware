@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { Resend } from 'resend';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { DEFAULT_EMAIL_FROM, getResendApiKey, isEmailConfigured } from '@/lib/email';
 
 // Allowed domains for PDF URL fetching (SSRF protection)
@@ -32,8 +32,11 @@ function isAllowedPdfUrl(url: string): boolean {
 
 export async function POST(request: NextRequest) {
   try {
-    // SECURITY: Require authenticated user
-    const auth = await requireAuth(request);
+    // SECURITY: admin-only. Gating on requireAuth alone made this an
+    // authenticated open email relay — any operator/apprentice could send
+    // arbitrary HTML to any address from the verified admin.pontifexindustries
+    // .com identity (phishing w/ real SPF/DKIM). Security audit H1, Jul 23.
+    const auth = await requireAdmin(request);
     if (!auth.authorized) {
       return auth.response;
     }
@@ -80,7 +83,9 @@ export async function POST(request: NextRequest) {
       }
 
       try {
-        const pdfResponse = await fetch(pdfUrl);
+        // redirect:'manual' — an allowlisted host that 3xx-redirects to an
+        // internal address would otherwise bypass isAllowedPdfUrl (audit L3).
+        const pdfResponse = await fetch(pdfUrl, { redirect: 'manual' });
 
         if (!pdfResponse.ok) {
           console.error('[send-email] Failed to fetch PDF:', pdfResponse.statusText);

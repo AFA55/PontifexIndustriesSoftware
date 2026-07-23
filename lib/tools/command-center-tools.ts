@@ -534,7 +534,10 @@ function buildAllTools(tenantId: string, role: string, userId: string, timezone 
         query: z.string().min(2).describe('The customer name as heard — partial is fine'),
       }),
       execute: async ({ query }) => {
-        const term = `%${query.trim()}%`;
+        // Strip PostgREST filter metachars before building the .or() string —
+        // an unsanitized `,` or `)` in a (model-controlled) name alters the
+        // filter group (security audit M1; matches sibling tools' sanitizing).
+        const term = `%${query.replace(/[%,()]/g, '').trim()}%`;
         const [crmRes, jobsRes] = await Promise.all([
           supabaseAdmin
             .from('customers')

@@ -22,6 +22,18 @@ export async function GET(
 
     const { id: jobOrderId } = await params;
 
+    // Tenant-ownership gate (security audit H2 IDOR): the job must belong to
+    // the caller's tenant, else another tenant's helper logs leak by job id.
+    if (auth.tenantId) {
+      const { data: job } = await supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobOrderId)
+        .eq('tenant_id', auth.tenantId)
+        .maybeSingle();
+      if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
     const { data, error } = await supabaseAdmin
       .from('helper_work_logs')
       .select('id, helper_id, work_description, log_date, started_at, completed_at, hours_worked, helper:helper_id ( full_name )')
@@ -30,7 +42,7 @@ export async function GET(
 
     if (error) {
       console.error('admin/jobs/[id]/helper-logs GET error:', error);
-      return NextResponse.json({ error: 'Failed to load helper logs', details: error.message }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to load helper logs' }, { status: 500 });
     }
 
     const logs = (data || []).map((l: any) => ({

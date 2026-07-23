@@ -90,7 +90,9 @@ export async function GET(request: NextRequest) {
   if (category) query = query.eq('category', category);
   if (status) query = query.eq('status', status);
   if (search) {
-    const s = search.replace(/[%]/g, '');
+    // Strip `,()` too, not just `%` — a stray comma/paren rewrites the .or()
+    // filter group (security audit M2).
+    const s = search.replace(/[%,()]/g, '');
     query = query.or(`name.ilike.%${s}%,short_name.ilike.%${s}%,asset_tag.ilike.%${s}%,unit_number.ilike.%${s}%,model.ilike.%${s}%,serial_number.ilike.%${s}%`);
   }
 
