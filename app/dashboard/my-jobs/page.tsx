@@ -122,13 +122,13 @@ export default function MyJobsPage() {
           const role = json.user_role || 'operator';
           if (json.user_role) setUserRole(role);
 
-          // Non-apprentice operators should only see jobs where they are the
-          // primary assigned_to — not jobs where they happen to be listed as
-          // helper_assigned_to on another operator's ticket.
-          let visible = (json.data || []) as any[];
-          if (role !== 'apprentice') {
-            visible = visible.filter((j: any) => j.assigned_to === uid);
-          }
+          // Visibility is keyed on the CREW SLOT, not the person's role
+          // (founder Jul 14 bug): an operator assigned to the HELPER slot on
+          // another crew's job was filtered out and never saw the ticket.
+          // If you're in either slot, you're on the crew → you see it.
+          const uidRef = uid;
+          const onCrew = (j: any) => j.assigned_to === uidRef || j.helper_assigned_to === uidRef;
+          const visible = ((json.data || []) as any[]).filter(onCrew);
 
           const enriched = visible.map((j: any) => ({
             ...j,
@@ -215,11 +215,9 @@ export default function MyJobsPage() {
 
       // Combine, filter to past dates only (don't double-show today's jobs)
       const uid = session.user.id;
-      // Non-apprentices only see jobs where they are the primary assigned_to
+      // Slot-based, not role-based (see today-list note): on-crew in either slot.
       const isPrimaryOrHelper = (j: any) =>
-        userRole === 'apprentice'
-          ? j.assigned_to === uid || j.helper_assigned_to === uid
-          : j.assigned_to === uid;
+        j.assigned_to === uid || j.helper_assigned_to === uid;
       const all = [...onHoldData, ...inProgressData, ...pendingCompletionData, ...staleSingles].filter((j: any) => {
         const isPastDate = j.scheduled_date && j.scheduled_date < today;
         return isPrimaryOrHelper(j) && isPastDate;
@@ -263,9 +261,7 @@ export default function MyJobsPage() {
         const json = await res.json();
         const uid = session.user.id;
         const completed = (json.data || []).filter((j: any) => {
-          const isAssigned = userRole === 'apprentice'
-            ? j.assigned_to === uid || j.helper_assigned_to === uid
-            : j.assigned_to === uid;
+          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
           const isCompletedStatus = j.status === 'completed' || j.status === 'pending_completion';
           return isAssigned && isCompletedStatus;
         });

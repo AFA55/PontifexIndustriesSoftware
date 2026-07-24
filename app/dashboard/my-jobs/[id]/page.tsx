@@ -82,7 +82,9 @@ export default function JobDetailPage() {
   const [docNotes, setDocNotes] = useState('');
   const [previewDoc, setPreviewDoc] = useState<any | null>(null);
 
-  const isHelper = userRole === 'apprentice';
+  // NOTE: helper detection is SLOT-based via `jobIsHelper` (job.isHelper),
+  // never the person's role — an operator can be crewed as a helper. A prior
+  // role-based `isHelper` flag here was a trap and is intentionally removed.
 
   // Recent approved change orders for scope-update banner
   const [recentChangeOrders, setRecentChangeOrders] = useState<Array<{ id: string; version: number; scope_description: string; created_at: string }>>([]);
@@ -254,8 +256,13 @@ export default function JobDetailPage() {
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
-  const locationUnlocked = equipmentAllChecked &&
+  const inRouteReached =
     ['in_route', 'on_site', 'in_progress', 'pending_completion', 'completed'].includes(job?.status || '');
+  // Staged location reveal (founder Jul 14): a HELPER sees the address once the
+  // operator taps In Route — helpers don't run the equipment checklist, so
+  // gating them on it would hide the location forever. The OPERATOR keeps the
+  // equipment-loaded + route gate.
+  const locationUnlocked = job?.isHelper ? inRouteReached : (equipmentAllChecked && inRouteReached);
 
   const isCompleted = job?.status === 'completed';
   const isOnHold = job?.status === 'on_hold';
@@ -721,6 +728,32 @@ export default function JobDetailPage() {
               </div>
             )}
 
+            {/* Equipment for this job — read-only (founder Jul 14: helper must
+                see the equipment needed). Interactive confirmation stays the
+                operator's job. */}
+            {unifiedItems.length > 0 && (
+              <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Wrench className="w-5 h-5 text-green-600 dark:text-green-400" />
+                  <p className="text-xs font-bold text-gray-500 dark:text-white/40 uppercase tracking-wider">Equipment For This Job</p>
+                </div>
+                <div className="space-y-1.5">
+                  {unifiedItems.map((it) => (
+                    <div key={it.id} className="flex items-center justify-between px-3 py-2 bg-gray-50 dark:bg-white/[0.03] rounded-lg">
+                      <span className="text-sm font-medium text-gray-800 dark:text-white/80">
+                        {it.label}{it.optionValue ? ` (${it.optionValue})` : ''}
+                      </span>
+                      {it.quantity != null && (
+                        <span className="text-sm font-bold text-gray-900 dark:text-white">
+                          ×{it.quantity}{it.unit ? ` ${it.unit}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Site contact */}
             {(job.foreman_name || job.customer_contact || job.site_contact_phone || job.foreman_phone) && (
               <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-green-200/60 dark:border-white/10 p-5">
@@ -909,7 +942,7 @@ export default function JobDetailPage() {
             <div className="bg-gray-100 dark:bg-white/[0.05] rounded-xl p-4 flex items-center gap-3 text-gray-400 dark:text-white/40 border border-gray-200 dark:border-white/10">
               <Lock className="w-5 h-5 flex-shrink-0" />
               <p className="text-sm">{jobIsHelper
-                ? 'The address unlocks once your operator confirms the equipment for this job — so you know the gear is loaded before you head out.'
+                ? 'The job location unlocks once your operator starts the route. You can review the scope, crew, and equipment now.'
                 : 'Complete equipment checklist and start your route to view location & site contact'}</p>
             </div>
           )
