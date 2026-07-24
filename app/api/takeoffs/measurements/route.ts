@@ -53,14 +53,24 @@ export async function POST(request: NextRequest) {
   if (condition.document_id !== page.document_id) {
     return NextResponse.json({ error: 'Condition and page belong to different documents' }, { status: 400 });
   }
-  if (condition.measure_type === 'linear' && !page.scale_feet_per_point) {
+  // Geometry type must match the condition's measure_type, else computeQuantity
+  // silently returns 0 (linear↔polyline, area↔polygon, count↔count).
+  const expectedType = condition.measure_type === 'linear' ? 'polyline'
+    : condition.measure_type === 'area' ? 'polygon' : 'count';
+  if (body.geometry.type !== expectedType) {
     return NextResponse.json(
-      { error: 'This page has no scale set. Calibrate the page before measuring distances.' },
+      { error: `Geometry "${body.geometry.type}" does not match a ${condition.measure_type} condition` },
+      { status: 400 }
+    );
+  }
+  if ((condition.measure_type === 'linear' || condition.measure_type === 'area') && !page.scale_feet_per_point) {
+    return NextResponse.json(
+      { error: 'This page has no scale set. Calibrate the page before measuring distances or areas.' },
       { status: 409 }
     );
   }
 
-  const { quantity, rawLengthPt } = computeQuantity(
+  const { quantity, rawLengthPt, rawAreaPt } = computeQuantity(
     body.geometry,
     condition.measure_type,
     page.scale_feet_per_point ? Number(page.scale_feet_per_point) : null
@@ -75,6 +85,7 @@ export async function POST(request: NextRequest) {
       geometry: body.geometry,
       quantity,
       raw_length_pt: rawLengthPt,
+      raw_area_pt: rawAreaPt,
       scale_used: page.scale_feet_per_point ? Number(page.scale_feet_per_point) : null,
       label: (body.label ?? '').toString().trim().slice(0, 120) || null,
       created_by: guard.userId,

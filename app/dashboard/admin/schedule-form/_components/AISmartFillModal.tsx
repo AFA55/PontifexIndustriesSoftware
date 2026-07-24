@@ -4,7 +4,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles, X, Mic, MicOff, Send, Loader2, CheckCircle2,
-  AlertTriangle, Brain, Zap, MessageSquare, ChevronRight,
+  AlertTriangle, Brain, Zap, MessageSquare, ChevronRight, Camera,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -20,6 +20,36 @@ interface AISmartFillModalProps {
   onClose: () => void;
 }
 
+// Downscale a phone photo to a reasonable size before upload (a raw shot is
+// several MB; base64 inflates it further). Long edge ≤ 1800px, JPEG q≈0.82.
+async function downscaleToDataUrl(file: File, maxEdge = 1800, quality = 0.82): Promise<string> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(fr.result as string);
+    fr.onerror = () => reject(new Error('Could not read the image'));
+    fr.readAsDataURL(file);
+  });
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const i = new Image();
+      i.onload = () => resolve(i);
+      i.onerror = () => reject(new Error('load'));
+      i.src = dataUrl;
+    });
+    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return dataUrl;
+    ctx.drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', quality);
+  } catch {
+    return dataUrl; // fall back to the original if canvas processing fails
+  }
+}
+
 export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalProps) {
   const [text, setText] = useState('');
   const [isListening, setIsListening] = useState(false);
@@ -31,6 +61,8 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
   const [micPermission, setMicPermission] = useState<'unknown' | 'denied' | 'granted'>('unknown');
   const recognitionRef = useRef<any>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
 
   // Check for speech recognition support
   const speechSupported = typeof window !== 'undefined' &&
@@ -189,6 +221,43 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
     }
   }, [text]);
 
+  // Scan a photographed paper ticket → extract fields (vision) → same review UI.
+  const handleImage = useCallback(async (file: File) => {
+    setError('');
+    setParsedFields([]);
+    setIsProcessing(true);
+    try {
+      const image = await downscaleToDataUrl(file);
+      setImagePreview(image);
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/schedule-form/ai-parse-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.session.access_token}` },
+        body: JSON.stringify({ image }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setError(json.error || 'Failed to read the ticket'); return; }
+
+      const { fields, confidence, summary: resultSummary } = json.data;
+      setSummary(resultSummary);
+      const parsed: ParsedField[] = [];
+      const selected = new Set<string>();
+      for (const [key, value] of Object.entries(fields)) {
+        parsed.push({ key, label: fieldLabels[key] || key.replace(/_/g, ' '), value, confidence: (confidence as Record<string, number>)[key] || 0 });
+        selected.add(key);
+      }
+      setParsedFields(parsed);
+      setSelectedFields(selected);
+    } catch (err: any) {
+      setError(err.message || 'Could not scan the photo');
+    } finally {
+      setIsProcessing(false);
+    }
+    // fieldLabels is a stable literal in component scope.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Apply selected fields
   const handleApply = useCallback(() => {
     const fieldsToApply: Record<string, unknown> = {};
@@ -249,7 +318,7 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">AI Smart Fill</h2>
-              <p className="text-white/80 text-sm">Speak or type a job description — AI fills the form</p>
+              <p className="text-white/80 text-sm">Scan a ticket, speak, or type — AI fills the form</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-white/20 rounded-lg transition-all">
@@ -259,6 +328,27 @@ export default function AISmartFillModal({ onApply, onClose }: AISmartFillModalP
 
         {/* Input Section */}
         <div className="px-6 py-4 border-b border-gray-100">
+          {/* Scan a paper ticket (photo → AI reads the fields) */}
+          <input
+            ref={fileInputRef} type="file" accept="image/*" capture="environment" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImage(f); e.target.value = ''; }}
+          />
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isProcessing}
+            className="w-full mb-3 flex items-center justify-center gap-2 px-4 py-3.5 rounded-xl border-2 border-dashed border-brand/40 bg-brand/5 text-brand font-bold text-sm hover:bg-brand/10 transition-all disabled:opacity-50 min-h-[48px]"
+          >
+            <Camera className="w-4 h-4" /> Scan a paper ticket (take a photo)
+          </button>
+          {imagePreview && (
+            <div className="mb-3 flex items-center gap-3 p-2 rounded-xl bg-gray-50 border border-gray-200">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={imagePreview} alt="Scanned ticket" className="w-14 h-14 object-cover rounded-lg border border-gray-200" />
+              <span className="text-xs text-gray-500 flex-1">Ticket photo attached — review &amp; edit the fields below, then Apply.</span>
+              <button onClick={() => setImagePreview(null)} className="text-gray-400 hover:text-gray-600 p-1" aria-label="Remove photo"><X className="w-4 h-4" /></button>
+            </div>
+          )}
+          <p className="text-[11px] text-gray-400 mb-2 text-center">or type / dictate the job below</p>
           <div className="relative">
             <textarea
               ref={textareaRef}

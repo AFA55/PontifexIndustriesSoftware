@@ -11,6 +11,7 @@
 
 export type TakeoffGeometry =
   | { type: 'polyline'; points: [number, number][] }
+  | { type: 'polygon'; points: [number, number][] }
   | { type: 'count'; points: [number, number][] };
 
 /** Length of a polyline in PDF points (scale-free). */
@@ -22,6 +23,23 @@ export function polylineLengthPt(points: [number, number][]): number {
     len += Math.sqrt(dx * dx + dy * dy);
   }
   return len;
+}
+
+/**
+ * Area of a closed polygon in PDF points² (scale-free), via the shoelace
+ * formula. The polygon auto-closes (last→first); winding direction is
+ * irrelevant (we take the absolute value).
+ */
+export function polygonAreaPt(points: [number, number][]): number {
+  const n = points.length;
+  if (n < 3) return 0;
+  let twice = 0;
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = points[i];
+    const [x2, y2] = points[(i + 1) % n];
+    twice += x1 * y2 - x2 * y1;
+  }
+  return Math.abs(twice) / 2;
 }
 
 /**
@@ -62,24 +80,30 @@ export function snapToNamedScale(feetPerPoint: number, userUnit = 1): { label: s
 
 /**
  * Compute the quantity for a measurement.
- * linear → LF (feet); count → EA. (Area ships in a later phase.)
- * Returns { quantity, rawLengthPt } — rawLengthPt kept so recalibrating a
- * page is a single multiply, never a geometry re-read.
+ * linear → LF (feet); count → EA; area → SF (square feet).
+ * Returns { quantity, rawLengthPt, rawAreaPt } — the raw scale-free values are
+ * kept so recalibrating a page is a single multiply, never a geometry re-read.
+ * Area scales as the SQUARE of feet-per-point (SF = area_pt × fpp²).
  */
 export function computeQuantity(
   geometry: TakeoffGeometry,
   measureType: 'linear' | 'count' | 'area',
   scaleFeetPerPoint: number | null
-): { quantity: number; rawLengthPt: number | null } {
+): { quantity: number; rawLengthPt: number | null; rawAreaPt: number | null } {
   if (measureType === 'count') {
-    return { quantity: geometry.points.length, rawLengthPt: null };
+    return { quantity: geometry.points.length, rawLengthPt: null, rawAreaPt: null };
   }
   if (measureType === 'linear' && geometry.type === 'polyline') {
     const raw = polylineLengthPt(geometry.points);
     const quantity = scaleFeetPerPoint ? raw * scaleFeetPerPoint : 0;
-    return { quantity, rawLengthPt: raw };
+    return { quantity, rawLengthPt: raw, rawAreaPt: null };
   }
-  return { quantity: 0, rawLengthPt: null };
+  if (measureType === 'area' && geometry.type === 'polygon') {
+    const rawArea = polygonAreaPt(geometry.points);
+    const quantity = scaleFeetPerPoint ? rawArea * scaleFeetPerPoint * scaleFeetPerPoint : 0;
+    return { quantity, rawLengthPt: null, rawAreaPt: rawArea };
+  }
+  return { quantity: 0, rawLengthPt: null, rawAreaPt: null };
 }
 
 /** 34.54 → `34'-6"` for display. */
@@ -92,15 +116,37 @@ export function formatFeetInches(feet: number): string {
   return inches > 0 ? `${sign}${ft}'-${inches}"` : `${sign}${ft}'`;
 }
 
-/** Basic geometry validation for API input. */
+/** 1240.6 → `1,241 SF` for display (square feet, whole numbers). */
+export function formatSqFeet(sf: number): string {
+  return `${Math.round(sf).toLocaleString('en-US')} SF`;
+}
+
+/** Basic geometry validation for API input. A polygon needs ≥3 vertices. */
 export function isValidGeometry(g: any): g is TakeoffGeometry {
   if (!g || typeof g !== 'object') return false;
-  if (g.type !== 'polyline' && g.type !== 'count') return false;
-  if (!Array.isArray(g.points) || g.points.length === 0 || g.points.length > 2000) return false;
+  if (g.type !== 'polyline' && g.type !== 'polygon' && g.type !== 'count') return false;
+  if (!Array.isArray(g.points) || g.points.length > 2000) return false;
+  const min = g.type === 'polygon' ? 3 : 1;
+  if (g.points.length < min) return false;
   return g.points.every(
     (p: any) =>
       Array.isArray(p) && p.length === 2 &&
       Number.isFinite(p[0]) && Number.isFinite(p[1]) &&
       Math.abs(p[0]) < 1e6 && Math.abs(p[1]) < 1e6
   );
+}
+
+/**
+ * Snap a segment's end point to the nearest 45° (0/45/90/135/…) relative to
+ * its start — the "ortho/angle constrain" behavior (hold Shift while drawing).
+ * All math in PDF-point space so it is zoom/scale-independent.
+ */
+export function snapAngle(from: [number, number], to: [number, number]): [number, number] {
+  const dx = to[0] - from[0];
+  const dy = to[1] - from[1];
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return to;
+  const step = Math.PI / 4; // 45°
+  const angle = Math.round(Math.atan2(dy, dx) / step) * step;
+  return [from[0] + Math.cos(angle) * dist, from[1] + Math.sin(angle) * dist];
 }

@@ -46,7 +46,21 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         .maybeSingle(),
     ]);
     if (!condition || !page) return NextResponse.json({ error: 'Parents not found' }, { status: 404 });
-    const { quantity, rawLengthPt } = computeQuantity(
+    const expectedType = condition.measure_type === 'linear' ? 'polyline'
+      : condition.measure_type === 'area' ? 'polygon' : 'count';
+    if (body.geometry.type !== expectedType) {
+      return NextResponse.json(
+        { error: `Geometry "${body.geometry.type}" does not match a ${condition.measure_type} condition` },
+        { status: 400 }
+      );
+    }
+    if ((condition.measure_type === 'linear' || condition.measure_type === 'area') && !page.scale_feet_per_point) {
+      return NextResponse.json(
+        { error: 'This page has no scale set. Calibrate before editing distance or area measurements.' },
+        { status: 409 }
+      );
+    }
+    const { quantity, rawLengthPt, rawAreaPt } = computeQuantity(
       body.geometry,
       condition.measure_type,
       page.scale_feet_per_point ? Number(page.scale_feet_per_point) : null
@@ -54,6 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     update.geometry = body.geometry;
     update.quantity = quantity;
     update.raw_length_pt = rawLengthPt;
+    update.raw_area_pt = rawAreaPt;
     update.scale_used = page.scale_feet_per_point ? Number(page.scale_feet_per_point) : null;
   }
 

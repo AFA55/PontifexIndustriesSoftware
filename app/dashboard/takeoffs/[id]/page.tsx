@@ -22,16 +22,17 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Ruler, MousePointer2, Crosshair, Hash, Sparkles, Loader2,
   Trash2, Plus, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight,
+  Square, Undo2, Magnet, Tag,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { takeoffsFetch, TAKEOFF_ROLES_CLIENT } from '@/components/takeoffs/api';
 import {
-  computeQuantity, feetPerPointFromScale, formatFeetInches, NAMED_SCALES,
-  polylineLengthPt, snapToNamedScale, type TakeoffGeometry,
+  feetPerPointFromScale, formatFeetInches, formatSqFeet, NAMED_SCALES,
+  polylineLengthPt, polygonAreaPt, snapAngle, snapToNamedScale, type TakeoffGeometry,
 } from '@/lib/takeoffs/geometry';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
-type Tool = 'select' | 'calibrate' | 'linear' | 'count';
+type Tool = 'select' | 'calibrate' | 'linear' | 'count' | 'area';
 
 interface PageRow {
   id: string; page_number: number; width_pt: number; height_pt: number;
@@ -79,11 +80,21 @@ export default function TakeoffViewerPage() {
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [cssSize, setCssSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
+  const [snapOrtho, setSnapOrtho] = useState(false);      // persistent 0/45/90° snap toggle
+  const [shiftHeld, setShiftHeld] = useState(false);      // momentary snap while Shift is down
+  const [showConditionsSheet, setShowConditionsSheet] = useState(false); // mobile/tablet conditions
+  const [showLabels, setShowLabels] = useState(true);     // on-drawing length/area labels
+  // Vertex editing: while dragging a saved measurement's point, hold the live
+  // geometry here so the drawing follows the cursor; commit (PATCH) on release.
+  const [vertexDrag, setVertexDrag] = useState<{ id: string; index: number; points: [number, number][] } | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<any>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Set true when a vertex actually moves, so the click that fires after the
+  // drag-release doesn't fall through to the canvas and deselect the markup.
+  const suppressClickRef = useRef(false);
   // Measured reactively — the container can be 0-wide in the commit where
   // the PDF lands (flex layout race), which produced negative canvas sizes.
   const [containerW, setContainerW] = useState(0);
@@ -179,6 +190,7 @@ export default function TakeoffViewerPage() {
 
   // ── Tool interactions ────────────────────────────────────────────────────
   const handleCanvasClick = async (e: React.MouseEvent) => {
+    if (suppressClickRef.current) { suppressClickRef.current = false; return; }
     const pt = toPageCoords(e);
     if (!pt || !page) return;
 
@@ -189,17 +201,22 @@ export default function TakeoffViewerPage() {
       return;
     }
 
-    if (tool === 'linear') {
-      if (!activeCondition || activeCondition.measure_type !== 'linear') {
-        setError('Pick (or create) a LINEAR condition first — that is the bucket this measurement lands in.');
+    if (tool === 'linear' || tool === 'area') {
+      const wantType = tool === 'linear' ? 'linear' : 'area';
+      if (!activeCondition || activeCondition.measure_type !== wantType) {
+        setError(
+          tool === 'linear'
+            ? 'Pick (or create) a DISTANCE condition first — that is the bucket this measurement lands in.'
+            : 'Pick (or create) an AREA condition first (e.g. "Demo area").'
+        );
         return;
       }
       if (!page.scale_feet_per_point) {
-        setError('This sheet has no scale yet. Use Calibrate first so distances are real.');
+        setError('This sheet has no scale yet. Use Calibrate first so measurements are real.');
         setTool('calibrate');
         return;
       }
-      setDraft((d) => [...d, pt]);
+      setDraft((d) => [...d, (snapOrtho || shiftHeld) && d.length > 0 ? snapAngle(d[d.length - 1], pt) : pt]);
       return;
     }
 
@@ -243,38 +260,93 @@ export default function TakeoffViewerPage() {
     setSelectedMeasurementId(null);
   };
 
-  const finishLinear = async () => {
-    if (!page || !activeCondition || draft.length < 2) { setDraft([]); return; }
+  // Finish an in-progress linear (polyline) OR area (polygon) run.
+  const finishDraft = async () => {
+    if (saving) return;                                   // guard: Enter + double-tap can both fire
+    if (!page || !activeCondition) { setDraft([]); setCursor(null); return; }
+    const isArea = tool === 'area';
+    if (draft.length < (isArea ? 3 : 2)) { setDraft([]); setCursor(null); return; }
+    const points = draft;
+    setDraft([]);                                         // clear BEFORE await so a second call can't re-post
+    setCursor(null);
     try {
       setSaving(true);
+      const geometry = isArea
+        ? { type: 'polygon' as const, points }
+        : { type: 'polyline' as const, points };
       const created = await takeoffsFetch<MeasurementRow>('/api/takeoffs/measurements', {
         method: 'POST',
-        body: JSON.stringify({
-          condition_id: activeCondition.id,
-          page_id: page.id,
-          geometry: { type: 'polyline', points: draft },
-        }),
+        body: JSON.stringify({ condition_id: activeCondition.id, page_id: page.id, geometry }),
       });
       setPayload((p) => p && { ...p, measurements: [...p.measurements, created] });
       setError(null);
     } catch (err: any) {
       setError(err.message);
     } finally {
-      setDraft([]);
+      setSaving(false);
+    }
+  };
+
+  // ── Vertex editing: drag a point of a saved measurement (server recomputes) ──
+  const moveVertexDrag = (e: React.MouseEvent) => {
+    if (!vertexDrag) return;
+    const pt = toPageCoords(e);
+    if (!pt) return;
+    suppressClickRef.current = true; // a real drag happened → swallow the trailing click
+    setVertexDrag((v) => v && { ...v, points: v.points.map((p, i) => (i === v.index ? pt : p)) });
+  };
+
+  const endVertexDrag = async () => {
+    if (!vertexDrag) return;
+    const drag = vertexDrag;
+    setVertexDrag(null);
+    // Clear the click-suppress flag even when the trailing click never reaches
+    // the canvas (handle stopPropagation, or the pointer left the SVG) — else
+    // the NEXT canvas click gets swallowed.
+    setTimeout(() => { suppressClickRef.current = false; }, 0);
+    const m = payload?.measurements.find((mm) => mm.id === drag.id);
+    if (!m) return;
+    // No-op if the point didn't actually move (a plain click on a handle).
+    const orig = m.geometry.points[drag.index];
+    if (orig && orig[0] === drag.points[drag.index][0] && orig[1] === drag.points[drag.index][1]) return;
+    const geometry = { type: m.geometry.type, points: drag.points } as TakeoffGeometry;
+    // Optimistic: keep the moved point on screen while the PATCH is in flight.
+    setPayload((p) => p && { ...p, measurements: p.measurements.map((mm) => (mm.id === drag.id ? { ...mm, geometry } : mm)) });
+    try {
+      setSaving(true);
+      const updated = await takeoffsFetch<MeasurementRow>(`/api/takeoffs/measurements/${drag.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ geometry }),
+      });
+      setPayload((p) => p && { ...p, measurements: p.measurements.map((mm) => (mm.id === drag.id ? updated : mm)) });
+      setError(null);
+    } catch (e: any) {
+      // Revert to the pre-drag geometry on failure.
+      setPayload((p) => p && { ...p, measurements: p.measurements.map((mm) => (mm.id === drag.id ? m : mm)) });
+      setError(e.message);
+    } finally {
       setSaving(false);
     }
   };
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setDraft([]); setCalibratePts([]); setSelectedMeasurementId(null); }
-      if (e.key === 'Enter' && draft.length >= 2) finishLinear();
-      if ((e.key === 'Delete' || e.key === 'Backspace') && selectedMeasurementId) deleteMeasurement(selectedMeasurementId);
+      if (e.key === 'Shift') setShiftHeld(true);
+      if (e.key === 'Escape') { setDraft([]); setCursor(null); setCalibratePts([]); setSelectedMeasurementId(null); }
+      if (e.key === 'Enter' && draft.length >= (tool === 'area' ? 3 : 2)) finishDraft();
+      // Backspace/Delete undoes the last placed point mid-draw; only deletes a
+      // selected measurement when there is no draft in progress.
+      if (e.key === 'Backspace' || e.key === 'Delete') {
+        if (draft.length > 0) { e.preventDefault(); setDraft((d) => d.slice(0, -1)); }
+        else if (selectedMeasurementId) deleteMeasurement(selectedMeasurementId);
+      }
     };
+    const onKeyUp = (e: KeyboardEvent) => { if (e.key === 'Shift') setShiftHeld(false); };
     window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKeyUp);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKeyUp); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, selectedMeasurementId, page?.id, activeConditionId]);
+  }, [draft, selectedMeasurementId, page?.id, activeConditionId, tool]);
 
   const deleteMeasurement = async (id: string) => {
     try {
@@ -360,9 +432,19 @@ export default function TakeoffViewerPage() {
     return totals;
   }, [payload?.measurements]);
 
-  const draftLengthFt = page?.scale_feet_per_point && draft.length >= 2
-    ? polylineLengthPt(cursor ? [...draft, cursor] : draft) * Number(page.scale_feet_per_point)
+  const draftPts = cursor ? [...draft, cursor] : draft;
+  const draftLengthFt = page?.scale_feet_per_point && tool === 'linear' && draft.length >= 1
+    ? polylineLengthPt(draftPts) * Number(page.scale_feet_per_point)
     : null;
+  const draftAreaSf = page?.scale_feet_per_point && tool === 'area' && draft.length >= 2
+    ? polygonAreaPt(draftPts) * Number(page.scale_feet_per_point) ** 2
+    : null;
+  // Live per-condition subtotal (what's already saved into the active bucket).
+  const activeBucketTotal = activeConditionId ? conditionTotals[activeConditionId] ?? 0 : 0;
+  // Constant-on-screen label sizing: SVG text is in page units, so divide the
+  // target px by the page→px factor to keep labels legible at any zoom.
+  const pageToPx = page && cssSize.w > 0 ? cssSize.w / Number(page.width_pt) : 1;
+  const labelFs = 11 / pageToPx;
 
   if (error && !payload) {
     return (
@@ -407,6 +489,23 @@ export default function TakeoffViewerPage() {
           {page?.scale_feet_per_point ? (page.scale_label ?? 'Calibrated') : 'Scale not set — tap to calibrate'}
         </button>
 
+        {/* Active scope bucket (the condition you measure into) — also the
+            mobile/tablet entry point to the conditions list. */}
+        <button
+          onClick={() => setShowConditionsSheet(true)}
+          title="Active scope bucket — tap to switch or add"
+          className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-medium border border-slate-200 dark:border-white/15 bg-white dark:bg-white/5 max-w-[160px] min-h-[36px]"
+        >
+          {activeCondition ? (
+            <>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: activeCondition.color }} />
+              <span className="truncate text-slate-700 dark:text-slate-200">{activeCondition.name}</span>
+            </>
+          ) : (
+            <span className="text-violet-600 font-semibold">+ Scope bucket</span>
+          )}
+        </button>
+
         <div className="flex-1" />
 
         {/* Tools */}
@@ -415,12 +514,13 @@ export default function TakeoffViewerPage() {
             { t: 'select' as Tool, icon: MousePointer2, label: 'Select' },
             { t: 'calibrate' as Tool, icon: Crosshair, label: 'Calibrate' },
             { t: 'linear' as Tool, icon: Ruler, label: 'Measure distance' },
+            { t: 'area' as Tool, icon: Square, label: 'Measure area' },
             { t: 'count' as Tool, icon: Hash, label: 'Count' },
           ]).map(({ t, icon: Icon, label }) => (
             <button
               key={t}
               title={label}
-              onClick={() => { setTool(t); setDraft([]); setCalibratePts([]); }}
+              onClick={() => { setTool(t); setDraft([]); setCursor(null); setCalibratePts([]); }}
               className={`p-2.5 rounded-lg min-h-[44px] min-w-[44px] transition-colors ${
                 tool === t ? 'bg-violet-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-white/10'
               }`}
@@ -428,6 +528,24 @@ export default function TakeoffViewerPage() {
               <Icon className="w-4 h-4" />
             </button>
           ))}
+        </div>
+
+        {/* Snap + labels toggles */}
+        <div className="flex items-center gap-1">
+          <button
+            title="Snap to 0/45/90° (or hold Shift while drawing)"
+            onClick={() => setSnapOrtho((s) => !s)}
+            className={`p-2.5 rounded-lg min-h-[44px] min-w-[44px] transition-colors ${snapOrtho ? 'bg-violet-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+          >
+            <Magnet className="w-4 h-4" />
+          </button>
+          <button
+            title="Show / hide measurement labels"
+            onClick={() => setShowLabels((s) => !s)}
+            className={`p-2.5 rounded-lg min-h-[44px] min-w-[44px] transition-colors ${showLabels ? 'bg-violet-600 text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10'}`}
+          >
+            <Tag className="w-4 h-4" />
+          </button>
         </div>
 
         {/* Zoom */}
@@ -494,8 +612,16 @@ export default function TakeoffViewerPage() {
                 height={cssSize.h}
                 viewBox={`0 0 ${page.width_pt} ${page.height_pt}`}
                 onClick={handleCanvasClick}
-                onDoubleClick={(e) => { e.preventDefault(); if (tool === 'linear') finishLinear(); }}
-                onMouseMove={(e) => { if (tool === 'linear' && draft.length > 0) setCursor(toPageCoords(e)); }}
+                onDoubleClick={(e) => { e.preventDefault(); if (tool === 'linear' || tool === 'area') finishDraft(); }}
+                onMouseMove={(e) => {
+                  if (vertexDrag) { moveVertexDrag(e); return; }
+                  if ((tool === 'linear' || tool === 'area') && draft.length > 0) {
+                    const raw = toPageCoords(e);
+                    setCursor(raw ? ((snapOrtho || shiftHeld) ? snapAngle(draft[draft.length - 1], raw) : raw) : null);
+                  }
+                }}
+                onMouseUp={() => { if (vertexDrag) endVertexDrag(); }}
+                onMouseLeave={() => { if (vertexDrag) endVertexDrag(); }}
                 // pointerEvents 'all': an svg root is click-TRANSPARENT on empty
                 // space by default (visiblePainted) — without this, every click
                 // fell through to the canvas and no tool ever fired.
@@ -506,23 +632,66 @@ export default function TakeoffViewerPage() {
                   const cond = conditions.find((c) => c.id === m.condition_id);
                   const color = cond?.color ?? '#7C3AED';
                   const selected = m.id === selectedMeasurementId;
-                  if (m.geometry.type === 'polyline') {
-                    const pts = m.geometry.points.map((p) => p.join(',')).join(' ');
+                  // Follow the cursor while a vertex of THIS markup is being dragged.
+                  const pts: [number, number][] = vertexDrag?.id === m.id ? vertexDrag.points : m.geometry.points;
+                  const editable = selected && tool === 'select';
+                  const handleR = 5 / pageToPx;
+                  const hitR = 14 / pageToPx;
+
+                  if (m.geometry.type === 'polyline' || m.geometry.type === 'polygon') {
+                    const isPoly = m.geometry.type === 'polygon';
+                    const ptsStr = pts.map((p) => p.join(',')).join(' ');
+                    const suffix = cond?.depth_in ? ` · ${cond.depth_in}"` : cond?.core_diameter_in ? ` · ⌀${cond.core_diameter_in}"` : '';
+                    const labelText = isPoly
+                      ? `${formatSqFeet(Number(m.quantity))}${suffix}`
+                      : `${formatFeetInches(Number(m.quantity))}${suffix}`;
+                    const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+                    const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+                    const lp: [number, number] = isPoly ? [cx, cy] : pts[pts.length - 1];
                     return (
                       <g key={m.id}>
-                        <polyline points={pts} fill="none" stroke="transparent" strokeWidth={14} style={{ pointerEvents: 'stroke' }}
-                          onClick={(e) => { if (tool === 'select') { e.stopPropagation(); setSelectedMeasurementId(m.id); } }} />
-                        <polyline points={pts} fill="none" stroke={selected ? '#0EA5E9' : color} strokeWidth={selected ? 4 : 2.5}
-                          vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
-                        {m.geometry.points.map((p, i) => (
-                          <circle key={i} cx={p[0]} cy={p[1]} r={4} fill={selected ? '#0EA5E9' : color} pointerEvents="none" vectorEffect="non-scaling-stroke" />
+                        {isPoly ? (
+                          <polygon points={ptsStr} fill={color} fillOpacity={selected ? 0.24 : 0.14} stroke="transparent" strokeWidth={hitR}
+                            style={{ pointerEvents: 'all' }}
+                            onClick={(e) => { if (tool === 'select') { e.stopPropagation(); setSelectedMeasurementId(m.id); } }} />
+                        ) : (
+                          <polyline points={ptsStr} fill="none" stroke="transparent" strokeWidth={hitR} style={{ pointerEvents: 'stroke' }}
+                            onClick={(e) => { if (tool === 'select') { e.stopPropagation(); setSelectedMeasurementId(m.id); } }} />
+                        )}
+                        {isPoly ? (
+                          <polygon points={ptsStr} fill="none" stroke={selected ? '#0EA5E9' : color} strokeWidth={selected ? 4 : 2.5}
+                            vectorEffect="non-scaling-stroke" strokeLinejoin="round" pointerEvents="none" />
+                        ) : (
+                          <polyline points={ptsStr} fill="none" stroke={selected ? '#0EA5E9' : color} strokeWidth={selected ? 4 : 2.5}
+                            vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />
+                        )}
+                        {/* Vertices — draggable handles when selected in Select mode. */}
+                        {pts.map((p, i) => (
+                          <circle
+                            key={i} cx={p[0]} cy={p[1]} r={editable ? handleR : handleR * 0.7}
+                            fill={editable ? '#fff' : (selected ? '#0EA5E9' : color)}
+                            stroke={editable ? '#0EA5E9' : 'none'} strokeWidth={editable ? 1.5 : 0}
+                            vectorEffect="non-scaling-stroke"
+                            style={{ pointerEvents: editable ? 'all' : 'none', cursor: editable ? 'grab' : 'default' }}
+                            onMouseDown={(e) => { if (editable) { e.stopPropagation(); setVertexDrag({ id: m.id, index: i, points: pts.map((q) => [q[0], q[1]] as [number, number]) }); } }}
+                            onClick={(e) => e.stopPropagation()}
+                          />
                         ))}
+                        {showLabels && Number(m.quantity) > 0 && (
+                          <text x={lp[0]} y={lp[1] - (isPoly ? 0 : labelFs * 0.6)} textAnchor="middle" fontSize={labelFs}
+                            fontWeight={700} fill="#fff" stroke="#0f172a" strokeWidth={labelFs * 0.22}
+                            paintOrder="stroke" style={{ paintOrder: 'stroke' }} pointerEvents="none">
+                            {labelText}
+                          </text>
+                        )}
                       </g>
                     );
                   }
+
+                  // count
                   return (
                     <g key={m.id}>
-                      {m.geometry.points.map((p, i) => (
+                      {pts.map((p, i) => (
                         <g key={i} onClick={(e) => { if (tool === 'select') { e.stopPropagation(); setSelectedMeasurementId(m.id); } }} style={{ pointerEvents: 'all' }}>
                           <circle cx={p[0]} cy={p[1]} r={10} fill={color} opacity={selected ? 1 : 0.85} stroke="#fff" strokeWidth={2} />
                           <text x={p[0]} y={p[1] + 3.5} textAnchor="middle" fontSize={10} fill="#fff" fontWeight={700} pointerEvents="none">{i + 1}</text>
@@ -532,16 +701,25 @@ export default function TakeoffViewerPage() {
                   );
                 })}
 
-                {/* Draft polyline */}
+                {/* Draft (in-progress) polyline or polygon */}
                 {draft.length > 0 && (
                   <g pointerEvents="none">
-                    <polyline
-                      points={(cursor ? [...draft, cursor] : draft).map((p) => p.join(',')).join(' ')}
-                      fill="none" stroke={activeCondition?.color ?? '#0EA5E9'} strokeWidth={2.5}
-                      strokeDasharray="6 4" vectorEffect="non-scaling-stroke"
-                    />
+                    {tool === 'area' ? (
+                      <polygon
+                        points={draftPts.map((p) => p.join(',')).join(' ')}
+                        fill={activeCondition?.color ?? '#0EA5E9'} fillOpacity={0.18}
+                        stroke={activeCondition?.color ?? '#0EA5E9'} strokeWidth={2.5}
+                        strokeDasharray="6 4" vectorEffect="non-scaling-stroke"
+                      />
+                    ) : (
+                      <polyline
+                        points={draftPts.map((p) => p.join(',')).join(' ')}
+                        fill="none" stroke={activeCondition?.color ?? '#0EA5E9'} strokeWidth={2.5}
+                        strokeDasharray="6 4" vectorEffect="non-scaling-stroke"
+                      />
+                    )}
                     {draft.map((p, i) => (
-                      <circle key={i} cx={p[0]} cy={p[1]} r={4} fill={activeCondition?.color ?? '#0EA5E9'} />
+                      <circle key={i} cx={p[0]} cy={p[1]} r={4} fill={activeCondition?.color ?? '#0EA5E9'} vectorEffect="non-scaling-stroke" />
                     ))}
                   </g>
                 )}
@@ -561,15 +739,29 @@ export default function TakeoffViewerPage() {
             )}
           </div>
 
-          {/* Draft HUD */}
-          {tool === 'linear' && (
-            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-xs px-4 py-2.5 rounded-full flex items-center gap-3 z-20">
+          {/* Draft HUD (distance + area) */}
+          {(tool === 'linear' || tool === 'area') && (
+            <div className="fixed bottom-4 left-1/2 -translate-x-1/2 bg-slate-900/90 text-white text-xs px-4 py-2.5 rounded-full flex items-center gap-3 z-20 max-w-[94vw]">
               {draft.length === 0
-                ? 'Tap along the cut line — Enter or double-tap to finish'
+                ? (tool === 'area'
+                    ? 'Tap the corners of the area — Enter or double-tap to close'
+                    : 'Tap along the cut line — Enter or double-tap to finish')
                 : <>
-                    <span className="font-bold">{draftLengthFt !== null ? formatFeetInches(draftLengthFt) : `${draft.length} pts`}</span>
-                    <button onClick={finishLinear} disabled={draft.length < 2 || saving} className="bg-violet-600 px-3 py-1 rounded-full font-semibold disabled:opacity-50">Done</button>
-                    <button onClick={() => setDraft([])} className="text-slate-300">Cancel</button>
+                    <span className="font-bold">
+                      {tool === 'area'
+                        ? (draftAreaSf !== null ? formatSqFeet(draftAreaSf) : `${draft.length} pts`)
+                        : (draftLengthFt !== null ? formatFeetInches(draftLengthFt) : `${draft.length} pts`)}
+                    </span>
+                    {activeCondition && (
+                      <span className="text-slate-300 hidden sm:inline">
+                        {activeCondition.name}: {activeCondition.measure_type === 'area' ? formatSqFeet(activeBucketTotal) : formatFeetInches(activeBucketTotal)} saved
+                      </span>
+                    )}
+                    <button onClick={() => setDraft((d) => d.slice(0, -1))} className="text-slate-300 min-h-[32px]" title="Undo last point (Backspace)">
+                      <Undo2 className="w-3.5 h-3.5" />
+                    </button>
+                    <button onClick={finishDraft} disabled={draft.length < (tool === 'area' ? 3 : 2) || saving} className="bg-violet-600 px-3 py-1 rounded-full font-semibold disabled:opacity-50">Done</button>
+                    <button onClick={() => { setDraft([]); setCursor(null); }} className="text-slate-300">Cancel</button>
                   </>}
             </div>
           )}
@@ -616,7 +808,9 @@ export default function TakeoffViewerPage() {
                 <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
                   {c.measure_type === 'linear'
                     ? formatFeetInches(conditionTotals[c.id] ?? 0)
-                    : `${Math.round(conditionTotals[c.id] ?? 0)} ${c.unit}`}
+                    : c.measure_type === 'area'
+                      ? formatSqFeet(conditionTotals[c.id] ?? 0)
+                      : `${Math.round(conditionTotals[c.id] ?? 0)} ${c.unit}`}
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 mt-0.5 ml-5">
@@ -655,6 +849,44 @@ export default function TakeoffViewerPage() {
             }
           }}
         />
+      )}
+
+      {/* ── Conditions sheet (mobile/tablet access + quick switch) ──────── */}
+      {showConditionsSheet && (
+        <div className="fixed inset-0 bg-black/50 z-[92] flex items-end sm:items-center justify-center p-0 sm:p-6" onClick={() => setShowConditionsSheet(false)}>
+          <div className="bg-white dark:bg-slate-900 w-full sm:max-w-md max-h-[80vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-4 py-3 border-b border-slate-100 dark:border-white/10 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900">
+              <span className="text-sm font-bold text-slate-900 dark:text-white">Scope buckets</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => { setShowConditionsSheet(false); setShowConditionForm(true); }} className="text-xs font-semibold text-violet-600 inline-flex items-center gap-1 min-h-[44px] px-2">
+                  <Plus className="w-4 h-4" /> New
+                </button>
+                <button onClick={() => setShowConditionsSheet(false)} className="p-2 min-h-[44px] min-w-[44px]" aria-label="Close"><X className="w-4 h-4" /></button>
+              </div>
+            </div>
+            {conditions.length === 0 && (
+              <div className="p-6 text-center">
+                <p className="text-sm text-slate-400 mb-2">No scope buckets yet.</p>
+                <button onClick={() => { setShowConditionsSheet(false); setShowConditionForm(true); }} className="text-sm text-violet-600 font-semibold">+ Create one (e.g. &quot;Wall saw 12in&quot;)</button>
+              </div>
+            )}
+            {conditions.map((c) => (
+              <button key={c.id} onClick={() => { setActiveConditionId(c.id); setShowConditionsSheet(false); }}
+                className={`w-full text-left px-4 py-3 border-b border-slate-50 dark:border-white/5 flex items-center gap-3 min-h-[52px] ${c.id === activeConditionId ? 'bg-violet-50 dark:bg-violet-500/10' : ''}`}>
+                <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ background: c.color }} />
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-semibold text-slate-900 dark:text-white truncate">{c.name}</span>
+                  <span className="block text-[11px] text-slate-400">{c.measure_type}{c.surface ? ` · ${c.surface}` : ''}{c.depth_in ? ` · ${c.depth_in}" deep` : ''}{c.core_diameter_in ? ` · ⌀${c.core_diameter_in}"` : ''}</span>
+                </span>
+                <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                  {c.measure_type === 'linear' ? formatFeetInches(conditionTotals[c.id] ?? 0)
+                    : c.measure_type === 'area' ? formatSqFeet(conditionTotals[c.id] ?? 0)
+                    : `${Math.round(conditionTotals[c.id] ?? 0)} EA`}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* ── AI panel ────────────────────────────────────────────────────── */}
@@ -826,7 +1058,7 @@ function ConditionForm({
   onCreate: (form: Record<string, unknown>) => void;
 }) {
   const [name, setName] = useState('');
-  const [measureType, setMeasureType] = useState<'linear' | 'count'>('linear');
+  const [measureType, setMeasureType] = useState<'linear' | 'count' | 'area'>('linear');
   const [surface, setSurface] = useState<string>('');
   const [depthIn, setDepthIn] = useState('');
   const [coreDiaIn, setCoreDiaIn] = useState('');
@@ -837,14 +1069,15 @@ function ConditionForm({
       <div className="bg-white dark:bg-slate-900 rounded-3xl max-w-sm w-full p-6">
         <h3 className="font-bold text-slate-900 dark:text-white mb-4">New scope bucket</h3>
         <input
-          value={name} onChange={(e) => setName(e.target.value)} placeholder={measureType === 'count' ? 'e.g. 4in cores — 8in slab' : 'e.g. Wall saw — 12in'}
+          value={name} onChange={(e) => setName(e.target.value)}
+          placeholder={measureType === 'count' ? 'e.g. 4in cores — 8in slab' : measureType === 'area' ? 'e.g. Demo area — 6in slab' : 'e.g. Wall saw — 12in'}
           className="w-full px-3 py-3 rounded-xl border border-slate-300 dark:border-white/20 bg-transparent text-slate-900 dark:text-white text-base mb-3"
         />
-        <div className="grid grid-cols-2 gap-2 mb-3">
-          {(['linear', 'count'] as const).map((t) => (
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {(['linear', 'area', 'count'] as const).map((t) => (
             <button key={t} onClick={() => setMeasureType(t)}
-              className={`px-3 py-3 rounded-xl text-sm font-semibold min-h-[48px] border ${measureType === t ? 'bg-violet-600 text-white border-violet-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300'}`}>
-              {t === 'linear' ? 'Distance (LF)' : 'Count (EA)'}
+              className={`px-2 py-3 rounded-xl text-xs font-semibold min-h-[48px] border ${measureType === t ? 'bg-violet-600 text-white border-violet-600' : 'border-slate-300 dark:border-white/20 text-slate-600 dark:text-slate-300'}`}>
+              {t === 'linear' ? 'Distance (LF)' : t === 'area' ? 'Area (SF)' : 'Count (EA)'}
             </button>
           ))}
         </div>
