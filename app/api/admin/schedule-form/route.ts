@@ -113,6 +113,7 @@ export async function POST(request: NextRequest) {
       description: body.description || null,
       job_type: body.job_type,
       estimated_cost: body.estimated_cost || null,
+      estimated_hours: nonNegativeNumberOrNull(body.estimated_hours),
       scope_details: body.scope_details || {},
       scope_photo_urls: body.scope_photo_urls || [],
 

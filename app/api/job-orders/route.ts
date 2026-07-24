@@ -118,6 +118,9 @@ export async function GET(request: NextRequest) {
         assignedOperatorProfile = assignedProfile;
       }
 
+      // Operators must not see the PM's time estimate.
+      if (!isAdmin) specificJob.estimated_hours = null;
+
       console.log('Returning specific job:', specificJob.job_number);
       return NextResponse.json(
         {
@@ -149,6 +152,12 @@ export async function GET(request: NextRequest) {
       } else {
         query = query.eq('assigned_to', user.id);
       }
+      // Operators only see DISPATCHED tickets — no peeking at tomorrow's work
+      // until it's dispatched (founder). BUT always show a job that is actively
+      // in the field (in_progress/on_hold/on_site/pending_completion) even if
+      // some path left dispatched_at null — so a same-day or continuing/unfinished
+      // job an operator is working can never be hidden from them.
+      query = query.or('dispatched_at.not.is.null,status.in.(in_progress,on_hold,on_site,pending_completion)');
     }
 
     // Filter by scheduled_date if provided
@@ -212,10 +221,16 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Operators must not see the PM's time estimate (founder: don't reveal how
+    // much time they "have"). Null estimated_hours for non-admins.
+    const safeOrders = isAdmin
+      ? filteredOrders
+      : filteredOrders.map((j: any) => ({ ...j, estimated_hours: null }));
+
     return NextResponse.json(
       {
         success: true,
-        data: filteredOrders,
+        data: safeOrders,
         user_role: userRole,
       },
       { status: 200 }

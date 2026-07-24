@@ -374,12 +374,7 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Quoted By</Text>
                   <Text style={s.fieldValue}>{job.salesman_name || '—'}</Text>
                 </View>
-                {job.estimated_hours && (
-                  <View style={s.fieldRow}>
-                    <Text style={s.fieldLabel}>Est. Hours</Text>
-                    <Text style={s.fieldValue}>{job.estimated_hours}h</Text>
-                  </View>
-                )}
+                {/* Estimated hours intentionally NOT printed on the crew ticket (admin-only). */}
                 <View style={s.fieldRow}>
                   <Text style={s.fieldLabel}>Job Type</Text>
                   <Text style={s.fieldValue}>{job.job_type || '—'}</Text>

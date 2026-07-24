@@ -472,6 +472,7 @@ interface FormData {
   assigned_form_template_ids: string[];
   // Step 7
   difficulty_rating: number;
+  estimated_hours: number | null;   // PM's time estimate — admin-only, hidden from operators
   additional_notes: string;
   // Step 8
   water_available: boolean;
@@ -561,6 +562,7 @@ const initialFormData: FormData = {
   require_completion_signature: false,
   assigned_form_template_ids: [],
   difficulty_rating: 1,
+  estimated_hours: null,
   additional_notes: '',
   water_available: false,
   water_available_ft: '',
@@ -1793,6 +1795,7 @@ export default function ScheduleFormPage() {
         require_completion_signature: form.require_completion_signature,
         assigned_form_template_ids: form.assigned_form_template_ids.length > 0 ? form.assigned_form_template_ids : undefined,
         difficulty_rating: form.difficulty_rating,
+        estimated_hours: form.estimated_hours,
         additional_notes: form.additional_notes || null,
         jobsite_conditions: {
           water_available: form.water_available,
@@ -4356,6 +4359,17 @@ export default function ScheduleFormPage() {
       case 4:
         return (
           <div className="space-y-6">
+            {/* Estimated hours — office-only; NEVER shown to operators. */}
+            <div>
+              <Label>Estimated Hours <span className="font-normal text-slate-400">(office only — operators don&apos;t see this)</span></Label>
+              <input
+                type="number" min="0" step="0.25" inputMode="decimal"
+                value={form.estimated_hours ?? ''}
+                onChange={(e) => updateForm({ estimated_hours: e.target.value === '' ? null : Number(e.target.value) })}
+                placeholder="e.g. 6"
+                className="mt-1 w-40 px-3 py-3 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white text-base focus:outline-none focus:border-brand"
+              />
+            </div>
             <div>
               <Label>Job Difficulty Rating (1–10)</Label>
               <p className="text-xs text-slate-400 dark:text-white/30 mb-4 -mt-1">1 = Routine &nbsp;|&nbsp; 5 = Moderate &nbsp;|&nbsp; 10 = Highly Complex</p>

@@ -1078,9 +1078,7 @@ export default function JobDetailPage() {
                 <span className="px-4 py-1.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-lg text-base font-bold">
                   {job.job_type}
                 </span>
-                {job.estimated_hours && (
-                  <span className="text-base text-gray-500 dark:text-white/40">Est. {job.estimated_hours} hrs</span>
-                )}
+                {/* Estimated hours intentionally NOT shown to operators (admin-only). */}
                 {job.po_number && (
                   <span className="text-sm text-gray-500 dark:text-white/40 bg-gray-100 dark:bg-white/10 px-2 py-1 rounded-lg">PO: {job.po_number}</span>
                 )}

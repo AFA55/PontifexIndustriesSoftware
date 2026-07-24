@@ -190,13 +190,7 @@ export default function JobTicketCard({ job, doneToday }: JobTicketCardProps) {
                 <span className="font-semibold">{job.job_type}</span>
               </div>
             </div>
-
-            {/* Estimated Hours */}
-            {job.estimated_hours && (
-              <div className="text-xs text-gray-500 dark:text-white/60 mt-1 font-medium">
-                Est. {job.estimated_hours} hrs
-              </div>
-            )}
+            {/* Estimated hours intentionally NOT shown to operators (admin-only). */}
           </div>
 
           <ChevronRight className="w-5 h-5 text-gray-400 dark:text-white/40 flex-shrink-0" />

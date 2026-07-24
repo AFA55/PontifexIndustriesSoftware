@@ -192,9 +192,7 @@ export default function JobTicketDetail({ job, isHelper, isMultiDayContinuation 
                         <span className="px-3 py-1 bg-brand/10 text-brand rounded-lg text-sm font-bold">
                           {job.job_type}
                         </span>
-                        {job.estimated_hours && (
-                          <span className="text-sm text-gray-500 dark:text-white/60">Est. {job.estimated_hours} hrs</span>
-                        )}
+                        {/* Estimated hours intentionally NOT shown to operators (admin-only). */}
                         {job.po_number && (
                           <span className="text-xs text-gray-500">PO: {job.po_number}</span>
                         )}

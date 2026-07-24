@@ -1,6 +1,8 @@
 'use client';
 
+import { useState, useEffect, useCallback } from 'react';
 import { Megaphone, AlertCircle, Loader2, X } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 import { formatDisplayDate } from './helpers';
 
 interface DispatchInfo {
@@ -33,6 +35,40 @@ export default function DispatchConfirmationModal({
   onDispatch,
   onClose,
 }: DispatchConfirmationModalProps) {
+  // Auto-dispatch daily toggle (tenants.features.auto_dispatch).
+  const [autoOn, setAutoOn] = useState<boolean | null>(null);
+  const [autoSaving, setAutoSaving] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data: s } = await supabase.auth.getSession();
+        const token = s.session?.access_token;
+        if (!token) return;
+        const res = await fetch('/api/admin/schedule-board/auto-dispatch', { headers: { Authorization: `Bearer ${token}` } });
+        const json = await res.json();
+        if (res.ok) setAutoOn(!!json.enabled);
+      } catch { /* leave null → toggle stays disabled */ }
+    })();
+  }, []);
+
+  const toggleAuto = useCallback(async () => {
+    if (autoOn === null || autoSaving) return;
+    const next = !autoOn;
+    setAutoSaving(true);
+    try {
+      const { data: s } = await supabase.auth.getSession();
+      const token = s.session?.access_token;
+      const res = await fetch('/api/admin/schedule-board/auto-dispatch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ enabled: next }),
+      });
+      const json = await res.json();
+      if (res.ok) setAutoOn(!!json.enabled);
+    } catch { /* ignore */ } finally { setAutoSaving(false); }
+  }, [autoOn, autoSaving]);
+
   return (
     <>
       <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[70]" onClick={() => !dispatchLoading && onClose()} />
@@ -109,6 +145,21 @@ export default function DispatchConfirmationModal({
                 <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
               </div>
             )}
+
+            {/* Auto-dispatch daily toggle */}
+            <button
+              onClick={toggleAuto}
+              disabled={autoOn === null || autoSaving}
+              className="w-full flex items-center justify-between gap-3 p-3 rounded-xl border border-gray-200 dark:border-white/10 text-left disabled:opacity-60"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-800 dark:text-white/90">Auto-dispatch daily at 7:05 AM</p>
+                <p className="text-xs text-gray-500 dark:text-white/50">Tickets go out automatically each morning (Eastern). Off = you push manually.</p>
+              </div>
+              <span className={`shrink-0 inline-flex h-6 w-11 items-center rounded-full transition-colors ${autoOn ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-white/20'}`}>
+                <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${autoOn ? 'translate-x-5' : 'translate-x-1'}`} />
+              </span>
+            </button>
 
             <div className="flex gap-3 pt-2">
               <button
