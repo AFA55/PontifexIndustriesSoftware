@@ -58,6 +58,26 @@ interface DocPayload {
 
 const MAX_CANVAS_PIXELS = 16_000_000;
 
+// AI soft-markup suggestions for the current sheet (geometry already in PDF pts).
+interface Suggestion {
+  sid: string;
+  page_id: string;   // the sheet this was computed for (guards the async page-race)
+  name: string;
+  measure_type: 'linear' | 'count' | 'area';
+  work_type: 'cutting' | 'coring' | 'demo' | 'trench' | 'other';
+  surface?: string;
+  depth_in?: number;
+  core_diameter_in?: number;
+  rationale: string;
+  evidence?: string;
+  confidence: number;
+  geometry: TakeoffGeometry;
+  status: 'suggested' | 'accepted';
+}
+const WORK_COLORS: Record<string, string> = {
+  cutting: '#7C3AED', coring: '#DC2626', demo: '#D97706', trench: '#0EA5E9', other: '#64748B',
+};
+
 export default function TakeoffViewerPage() {
   const params = useParams();
   const router = useRouter();
@@ -77,6 +97,11 @@ export default function TakeoffViewerPage() {
   const [showConditionForm, setShowConditionForm] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
+  // Per-sheet AI soft markup (the focused, credit-cheap analysis).
+  const [pageSuggestions, setPageSuggestions] = useState<Suggestion[]>([]);
+  const [pageSummary, setPageSummary] = useState('');
+  const [analyzingPage, setAnalyzingPage] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [cssSize, setCssSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 });
@@ -116,6 +141,17 @@ export default function TakeoffViewerPage() {
     () => (payload && page ? payload.measurements.filter((m) => m.page_id === page.id) : []),
     [payload, page]
   );
+
+  // AI suggestions are per-sheet; clear them when the sheet changes, and track
+  // the current sheet id so an in-flight analysis can't land on the wrong page.
+  const pageIdRef = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    pageIdRef.current = page?.id;
+    setPageSuggestions([]);
+    setShowSuggestions(false);
+    setPageSummary('');
+    setAnalyzingPage(false);
+  }, [page?.id]);
 
   // ── Load document + PDF ──────────────────────────────────────────────────
   useEffect(() => {
@@ -423,6 +459,93 @@ export default function TakeoffViewerPage() {
     }
   };
 
+  // ── Per-sheet AI soft markup ─────────────────────────────────────────────
+  // Render just the current page to an image (offscreen, fixed resolution) so
+  // the vision model sees the drawing; geometry comes back in PDF-point coords.
+  const renderPageToImage = async (pageNumber: number, maxEdge = 1600): Promise<string | null> => {
+    if (!pdf) return null;
+    const pdfPage = await pdf.getPage(pageNumber);
+    const b = pdfPage.getViewport({ scale: 1 });
+    const scale = Math.min(4, maxEdge / Math.max(b.width, b.height));
+    const viewport = pdfPage.getViewport({ scale });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.floor(viewport.width);
+    canvas.height = Math.floor(viewport.height);
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    try {
+      await pdfPage.render({ canvas, viewport } as any).promise;
+      return canvas.toDataURL('image/jpeg', 0.85);
+    } finally {
+      pdfPage.cleanup?.();
+    }
+  };
+
+  const analyzeCurrentPage = async () => {
+    if (!page || !pdf || analyzingPage) return;
+    const reqPageId = page.id;                 // the sheet we're analyzing
+    setAnalyzingPage(true);
+    setShowSuggestions(true);
+    setError(null);
+    setPageSuggestions([]);
+    setPageSummary('');
+    try {
+      const image = await renderPageToImage(page.page_number);
+      if (!image) throw new Error('Could not render this sheet');
+      const res = await takeoffsFetch<{ pageSummary: string; suggestions: any[] }>(
+        `/api/takeoffs/documents/${docId}/mark-page`,
+        { method: 'POST', body: JSON.stringify({ page_id: reqPageId, image }) }
+      );
+      // Discard if the estimator navigated to another sheet while this ran —
+      // otherwise sheet A's geometry would render/accept onto sheet B.
+      if (pageIdRef.current !== reqPageId) return;
+      setPageSummary(res.pageSummary || '');
+      setPageSuggestions((res.suggestions ?? []).map((s: any, i: number) => ({ ...s, sid: `sg_${i}`, page_id: reqPageId, status: 'suggested' as const })));
+    } catch (e: any) {
+      if (pageIdRef.current === reqPageId) setError(e.message || 'Sheet analysis failed');
+    } finally {
+      if (pageIdRef.current === reqPageId) setAnalyzingPage(false);
+    }
+  };
+
+  const acceptSuggestion = async (s: Suggestion) => {
+    if (!page) return;
+    if (s.page_id !== page.id) { setError('Switch to the sheet this suggestion was made on to accept it.'); return; }
+    if ((s.measure_type === 'linear' || s.measure_type === 'area') && !page.scale_feet_per_point) {
+      setError('Set the sheet scale (Calibrate) before accepting a distance or area suggestion.');
+      return;
+    }
+    try {
+      setSaving(true);
+      let cond = conditions.find((c) => c.name.toLowerCase() === s.name.toLowerCase() && c.measure_type === s.measure_type);
+      if (!cond) {
+        cond = await takeoffsFetch<ConditionRow>('/api/takeoffs/conditions', {
+          method: 'POST',
+          body: JSON.stringify({
+            document_id: docId, name: s.name, measure_type: s.measure_type,
+            surface: s.surface, depth_in: s.depth_in, core_diameter_in: s.core_diameter_in,
+            color: WORK_COLORS[s.work_type] ?? '#7C3AED',
+          }),
+        });
+        setPayload((p) => p && { ...p, conditions: [...p.conditions, cond!] });
+      }
+      const created = await takeoffsFetch<MeasurementRow>('/api/takeoffs/measurements', {
+        method: 'POST',
+        body: JSON.stringify({ condition_id: cond.id, page_id: page.id, geometry: s.geometry }),
+      });
+      setPayload((p) => p && { ...p, measurements: [...p.measurements, created] });
+      setActiveConditionId(cond.id);
+      setPageSuggestions((prev) => prev.map((x) => (x.sid === s.sid ? { ...x, status: 'accepted' } : x)));
+      setError(null);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const rejectSuggestion = (sid: string) => setPageSuggestions((prev) => prev.filter((x) => x.sid !== sid));
+
   // ── Totals per condition ─────────────────────────────────────────────────
   const conditionTotals = useMemo(() => {
     const totals: Record<string, number> = {};
@@ -556,13 +679,19 @@ export default function TakeoffViewerPage() {
         </div>
 
         <button
-          onClick={ai ? () => setShowAiPanel(true) : runAnalysis}
-          disabled={analyzing}
+          onClick={analyzeCurrentPage}
+          disabled={analyzingPage}
+          title="AI reads THIS sheet and softly marks suspected cutting / coring / demo scope"
           className="inline-flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white text-xs font-semibold min-h-[44px] disabled:opacity-60"
         >
-          {analyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-          {analyzing ? 'Analyzing…' : ai ? 'Scope analysis' : 'Analyze scope'}
+          {analyzingPage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+          {analyzingPage ? 'Reading sheet…' : 'Analyze sheet'}
         </button>
+        {pageSuggestions.length > 0 && !showSuggestions && (
+          <button onClick={() => setShowSuggestions(true)} className="text-xs px-2.5 py-2.5 rounded-lg text-violet-600 font-bold min-h-[44px]" title="Show AI suggestions">
+            {pageSuggestions.filter((s) => s.status === 'suggested').length} AI
+          </button>
+        )}
       </div>
 
       {error && (
@@ -613,6 +742,11 @@ export default function TakeoffViewerPage() {
                 viewBox={`0 0 ${page.width_pt} ${page.height_pt}`}
                 onClick={handleCanvasClick}
                 onDoubleClick={(e) => { e.preventDefault(); if (tool === 'linear' || tool === 'area') finishDraft(); }}
+                onContextMenu={(e) => {
+                  // Right-click finishes the current run (a common takeoff-tool
+                  // convention); only hijack the menu while actively drawing.
+                  if ((tool === 'linear' || tool === 'area') && draft.length > 0) { e.preventDefault(); finishDraft(); }
+                }}
                 onMouseMove={(e) => {
                   if (vertexDrag) { moveVertexDrag(e); return; }
                   if ((tool === 'linear' || tool === 'area') && draft.length > 0) {
@@ -696,6 +830,25 @@ export default function TakeoffViewerPage() {
                           <circle cx={p[0]} cy={p[1]} r={10} fill={color} opacity={selected ? 1 : 0.85} stroke="#fff" strokeWidth={2} />
                           <text x={p[0]} y={p[1] + 3.5} textAnchor="middle" fontSize={10} fill="#fff" fontWeight={700} pointerEvents="none">{i + 1}</text>
                         </g>
+                      ))}
+                    </g>
+                  );
+                })}
+
+                {/* AI soft-markup suggestions (dashed + distinct — confirm in the panel) */}
+                {pageSuggestions.filter((s) => s.status === 'suggested' && s.page_id === page.id).map((s) => {
+                  const color = WORK_COLORS[s.work_type] ?? '#7C3AED';
+                  const ptsStr = s.geometry.points.map((p) => p.join(',')).join(' ');
+                  if (s.geometry.type === 'polygon') {
+                    return <polygon key={s.sid} points={ptsStr} fill={color} fillOpacity={0.12} stroke={color} strokeWidth={2.5} strokeDasharray="8 5" vectorEffect="non-scaling-stroke" pointerEvents="none" />;
+                  }
+                  if (s.geometry.type === 'polyline') {
+                    return <polyline key={s.sid} points={ptsStr} fill="none" stroke={color} strokeWidth={2.5} strokeDasharray="8 5" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" pointerEvents="none" />;
+                  }
+                  return (
+                    <g key={s.sid} pointerEvents="none">
+                      {s.geometry.points.map((p, i) => (
+                        <circle key={i} cx={p[0]} cy={p[1]} r={9} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={2.5} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
                       ))}
                     </g>
                   );
@@ -885,6 +1038,81 @@ export default function TakeoffViewerPage() {
                 </span>
               </button>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── AI sheet-scope suggestions (soft markup review) ─────────────── */}
+      {showSuggestions && (
+        <div className="fixed inset-0 z-[91] flex items-end sm:items-center justify-center bg-black/40 p-0 sm:p-6" onClick={() => setShowSuggestions(false)}>
+          <div className="bg-white dark:bg-slate-900 w-full sm:max-w-lg max-h-[80vh] overflow-y-auto rounded-t-3xl sm:rounded-3xl" onClick={(e) => e.stopPropagation()}>
+            <div className="px-5 py-3 border-b border-slate-100 dark:border-white/10 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm">
+                <Sparkles className="w-4 h-4 text-violet-600" /> AI scope — {page?.sheet_number ?? `sheet ${page ? page.page_number : ''}`}
+              </h3>
+              <button onClick={() => setShowSuggestions(false)} className="p-2 min-h-[44px] min-w-[44px]" aria-label="Close"><X className="w-4 h-4" /></button>
+            </div>
+
+            {analyzingPage && (
+              <div className="py-10 text-center text-slate-400">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+                <p className="text-sm">Reading this sheet for cutting, coring &amp; demo scope…</p>
+              </div>
+            )}
+
+            {!analyzingPage && (
+              <div className="p-5 space-y-4">
+                {pageSummary && <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed whitespace-pre-wrap">{pageSummary}</p>}
+
+                {pageSuggestions.filter((s) => s.status === 'suggested').length === 0 && (
+                  <p className="text-sm text-slate-400">
+                    {pageSuggestions.length > 0
+                      ? 'All suggestions handled.'
+                      : 'No cutting / coring / demo scope suggested on this sheet. Try another sheet, or add conditions and measure manually.'}
+                  </p>
+                )}
+
+                {pageSuggestions.filter((s) => s.status === 'suggested').map((s) => {
+                  const color = WORK_COLORS[s.work_type] ?? '#7C3AED';
+                  return (
+                    <div key={s.sid} className="rounded-2xl border border-slate-200 dark:border-white/10 p-3">
+                      <div className="flex items-start gap-2">
+                        <span className="w-3 h-3 rounded-full shrink-0 mt-1" style={{ background: color }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{s.name}</p>
+                          <p className="text-[11px] text-slate-500 mt-0.5">
+                            {s.work_type} · {s.measure_type}{s.depth_in ? ` · ${s.depth_in}"` : ''}{s.core_diameter_in ? ` · ⌀${s.core_diameter_in}"` : ''} · {Math.round(s.confidence * 100)}% sure
+                          </p>
+                          <p className="text-xs text-slate-600 dark:text-slate-300 mt-1.5 leading-relaxed">{s.rationale}</p>
+                          {s.evidence && (
+                            <p className="text-[11px] text-slate-400 mt-1 leading-relaxed border-l-2 border-slate-200 dark:border-white/10 pl-2">
+                              <span className="font-semibold text-slate-500">Evidence:</span> {s.evidence}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 mt-3">
+                        <button onClick={() => acceptSuggestion(s)} disabled={saving}
+                          className="flex-1 px-3 py-2.5 rounded-xl bg-violet-600 text-white text-xs font-bold min-h-[44px] disabled:opacity-60">
+                          Accept &amp; place
+                        </button>
+                        <button onClick={() => rejectSuggestion(s.sid)}
+                          className="px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-xs font-semibold min-h-[44px]">
+                          Dismiss
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <p className="text-[10px] text-slate-400">
+                  AI suggestions — it reasons about implied scope (e.g. cutting over existing lines marked to be replaced) but can be wrong. Accepting drops an editable measurement you can drag, recolor, or delete. Always verify against the drawing.
+                </p>
+                <button onClick={() => { setShowSuggestions(false); runAnalysis(); }} className="text-[11px] text-slate-400 underline">
+                  Or scan the whole set&apos;s text instead
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
