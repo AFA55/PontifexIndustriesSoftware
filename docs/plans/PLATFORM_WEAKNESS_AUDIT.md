@@ -80,6 +80,25 @@ the leaks activate the day a second real client onboards.
 - Login "wrong company code" check is client-supplied/advisory (`auth/login`).
 - Onboarding `.or().maybeSingle()` ignores multi-match error (`tenant-onboarding.ts`).
 
+## STATUS — remediation SHIPPED (Jul 25)
+- **Tranche 1 (e05a05a1):** owner-aware `resolveTenantScope` + `requirePlatformOwner()`;
+  analytics / po-lookup / invoices leaks closed; `on_hold` constraint restored.
+- **Tranche 2 (41f50305):** schedule-board cluster (5 routes incl. auto-schedule write),
+  IDOR routes (job-notes, daily-notes DELETE, liability/work-order PDFs, shop work-orders),
+  platform-owner gate on 10 console routes. Guardian-caught regression fixed (team/invite
+  company picker now owner-only). Fixes also: back button + Face ID login (dfee1f62).
+- **Verified:** live Supabase advisor has ZERO user_metadata-in-RLS. All tenant tables
+  fully backfilled (0 null tenant_id). Multi-tenant isolation is now enforced at the API
+  layer — clean to onboard a second client.
+
+### Remaining small items (P3, non-blocking)
+- `team-profiles` "Grant Super Admin" button is visible to a client super_admin but the API
+  now 403s (owner-only) — hide the button for non-owners (cosmetic).
+- `crew-grid/route.ts` selects `max_slots/warning_threshold` from `schedule_settings` — those
+  columns don't exist (table is key/value JSON); coloring silently uses defaults. Pre-existing.
+- P3 hardening from the live advisor: `pg_trgm` in public schema; 2 RLS-enabled-no-policy
+  tables (server-only); a few intentional public-insert `WITH CHECK (true)` policies.
+
 ## Recommended remediation order
 1. Ship the 2 fixes already done (back button + Face ID).
 2. Before onboarding client #2: P1.1 (platform-owner gate) + P1.2 (tenant-scope the
