@@ -20,6 +20,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
+import { PLATFORM_TENANT_ID } from '@/lib/rbac';
 import { supabase } from '@/lib/supabase';
 import { getInvitableRoles, getRoleLabel } from '@/lib/rbac';
 import {
@@ -113,14 +114,18 @@ export default function InviteUsersPage() {
   const [tenants, setTenants] = useState<TenantOption[]>([]);
   const [loadingTenants, setLoadingTenants] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState('');
+  const [userTenantId, setUserTenantId] = useState<string | null>(null);
 
   const isSuperAdmin = inviterRole === 'super_admin';
+  // Only the PLATFORM OWNER (Pontifex org super_admin) may enumerate/choose any
+  // tenant. A tenant-scoped super_admin invites into their OWN tenant only.
+  const isPlatformOwner = isSuperAdmin && userTenantId === PLATFORM_TENANT_ID;
   /** Query-string suffix scoping a request to the chosen tenant ('' for non-super-admins). */
   const tenantQS = isSuperAdmin && selectedTenantId
     ? `?tenantId=${encodeURIComponent(selectedTenantId)}`
     : '';
   /** True while a super_admin hasn't chosen a company yet — data loads + sends are held. */
-  const tenantPending = isSuperAdmin && !selectedTenantId;
+  const tenantPending = isPlatformOwner && !selectedTenantId;
 
   const invitableRoles = inviterRole ? getInvitableRoles(inviterRole) : [];
   const pendingRequests = requests.filter((r) => r.status === 'pending');
@@ -187,6 +192,13 @@ export default function InviteUsersPage() {
       return;
     }
     setInviterRole(user.role);
+    setUserTenantId(user.tenant_id ?? null);
+    // A tenant-scoped (non-owner) super_admin can't list all tenants (that route
+    // is platform-owner-only now) — default the target to their own tenant and
+    // skip the company picker so the page stays usable.
+    if (user.role === 'super_admin' && user.tenant_id && user.tenant_id !== PLATFORM_TENANT_ID) {
+      setSelectedTenantId(user.tenant_id);
+    }
     setAuthChecked(true);
     // Deep link: /dashboard/admin/team/invite?tab=requests
     if (typeof window !== 'undefined' &&
@@ -203,9 +215,10 @@ export default function InviteUsersPage() {
     void loadRequests();
   }, [authChecked, loadInvitations, loadRequests]);
 
-  // super_admin only: fetch the tenant list for the Company picker.
+  // Platform OWNER only: fetch the tenant list for the Company picker. A
+  // non-owner super_admin can't call /api/admin/tenants (403) and doesn't need it.
   useEffect(() => {
-    if (!authChecked || inviterRole !== 'super_admin') return;
+    if (!authChecked || !isPlatformOwner) return;
     let cancelled = false;
     (async () => {
       setLoadingTenants(true);
@@ -228,7 +241,7 @@ export default function InviteUsersPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [authChecked, inviterRole, authHeaders]);
+  }, [authChecked, isPlatformOwner, authHeaders]);
 
   // Default the role select to the first invitable role once known.
   useEffect(() => {
@@ -428,10 +441,12 @@ export default function InviteUsersPage() {
           </div>
         </div>
 
-        {/* Super-admin company picker — forces an EXPLICIT tenant choice.
+        {/* Platform-owner company picker — forces an EXPLICIT tenant choice.
             A real onboarding once landed in the wrong tenant because the
-            super_admin's own org was silently used as the default. */}
-        {isSuperAdmin && (
+            super_admin's own org was silently used as the default. Only the
+            Pontifex owner can pick any tenant; a client super_admin is scoped
+            to their own tenant (no picker). */}
+        {isPlatformOwner && (
           <div className="bg-white/90 ring-1 ring-brand/30 shadow-sm rounded-2xl p-4 sm:p-5 mb-6 dark:bg-white/[0.04] dark:ring-brand/30">
             <label htmlFor="invite-tenant" className="text-sm text-slate-500 dark:text-white/60 mb-1.5 flex items-center gap-1.5">
               <Building2 className="w-3.5 h-3.5" /> Company
