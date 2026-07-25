@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  *   message, details, createdAt }] } sorted critical → warning → info, newest first.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requirePlatformOwner } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 const SEVERITY_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
@@ -23,7 +23,7 @@ async function lookupTenantNames(tenantIds: (string | null)[]): Promise<Map<stri
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   const { data: alerts, error } = await supabaseAdmin

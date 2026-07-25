@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
  * health-alerts/route.ts's lookupTenantNames / lib/tools/command-center-tools.ts).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { requirePlatformOwner, isTableNotFoundError } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /** Admin-tier roles per lib/rbac.ts ROLE_RANK (super_admin=8, operations_manager=7, admin=6). */
@@ -52,7 +52,7 @@ async function lookupTenantNames(tenantIds: string[]): Promise<Map<string, { nam
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   const { data: tenants, error: tenantsError } = await supabaseAdmin

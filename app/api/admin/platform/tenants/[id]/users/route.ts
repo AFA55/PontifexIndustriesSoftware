@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requirePlatformOwner } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { createAdminUser } from '@/lib/tenant-onboarding';
 
@@ -14,7 +14,7 @@ import { createAdminUser } from '@/lib/tenant-onboarding';
  *        — add a user TO tenant [id]
  *
  * SECURITY MODEL (non-negotiable):
- *  - requireSuperAdmin on every verb.
+ *  - requirePlatformOwner on every verb (platform owner org only).
  *  - The target tenant is the EXPLICIT path param [id]. We resolve it directly
  *    (verify it exists) and NEVER use the caller's own tenant_id as scope.
  *  - supabaseAdmin bypasses RLS, so the app layer is the enforcement boundary:
@@ -47,7 +47,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   const { id } = await params;
@@ -75,7 +75,7 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   const { id } = await params;
