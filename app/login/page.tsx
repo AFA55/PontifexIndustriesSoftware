@@ -460,12 +460,14 @@ function LoginPageInner() {
         });
         const json = await res.json();
         role = json?.data?.role || '';
+        tenantIdForLanding = json?.data?.tenant_id ?? null; // needed to land the Pontifex owner on the Hub
         if (json?.data) {
           localStorage.setItem('supabase-user', JSON.stringify({
             id: json.data.id,
             name: json.data.full_name,
             email: json.data.email,
             role: json.data.role,
+            tenant_id: json.data.tenant_id ?? null, // guards read this; omitting it stranded the owner
           }));
           profileWritten = true;
         }

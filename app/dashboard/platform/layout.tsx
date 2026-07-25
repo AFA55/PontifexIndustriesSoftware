@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ArrowLeft, LogOut, RefreshCw } from 'lucide-react';
@@ -23,6 +23,8 @@ import { PLATFORM_TENANT_ID } from '@/lib/rbac';
  */
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const isHubHome = pathname === '/dashboard/platform';
   const [checked, setChecked] = useState(false);
   const [user, setUser] = useState<User | null>(null);
 
@@ -53,13 +55,17 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
       <header className="bg-[#120A24] border-b border-white/10 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <Link
-              href="/dashboard/admin"
-              title="Back to admin"
-              className="p-2 -ml-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
-            >
-              <ArrowLeft className="w-5 h-5" />
-            </Link>
+            {/* The Platform Hub IS the owner's home — no back button there. On
+                sub-pages, back returns to the Hub, never a tenant dashboard. */}
+            {!isHubHome && (
+              <Link
+                href="/dashboard/platform"
+                title="Back to Platform Hub"
+                className="p-2 -ml-2 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-colors flex-shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Link>
+            )}
             <div className="w-9 h-9 rounded-xl bg-white p-1.5 shadow-lg shadow-violet-500/20 flex-shrink-0">
               <Image src="/icon-512.png" alt="Pontifex Industries" width={36} height={36} className="w-full h-full object-contain" priority />
             </div>
