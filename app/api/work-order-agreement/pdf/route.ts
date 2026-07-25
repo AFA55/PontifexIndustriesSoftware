@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAuth, resolveTenantScope } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { WorkOrderAgreementPDF } from '@/components/pdf/WorkOrderAgreementPDF';
 
@@ -19,6 +19,10 @@ export async function POST(request: NextRequest) {
     // SECURITY: Require authenticated user
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
+
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     // Parse request body
     const body = await request.json();
@@ -53,12 +57,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify the target job belongs to the caller's tenant before generating or
+    // storing anything against it (cross-tenant IDOR guard).
+    const { data: targetJob } = await supabaseAdmin
+      .from('job_orders')
+      .select('id')
+      .eq('id', jobId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!targetJob) {
+      return NextResponse.json({ error: 'Job order not found' }, { status: 404 });
+    }
+
     // Fetch branding for PDF
     let pdfBranding: Record<string, unknown> = {};
     try {
       const { data: brandingRow } = await supabaseAdmin
         .from('tenant_branding')
         .select('company_name, support_phone, support_email, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
+        .eq('tenant_id', tenantId)
         .limit(1)
         .single();
       if (brandingRow) {
@@ -108,7 +126,8 @@ export async function POST(request: NextRequest) {
         agreement_pdf: pdfBase64,
         agreement_pdf_generated_at: new Date().toISOString()
       })
-      .eq('id', jobId);
+      .eq('id', jobId)
+      .eq('tenant_id', tenantId);
 
     if (updateError) {
       console.error('[AGREEMENT PDF] Error storing PDF:', updateError);

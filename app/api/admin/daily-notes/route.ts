@@ -7,13 +7,17 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { requireScheduleBoardAccess, resolveTenantScope } from '@/lib/api-auth';
 
 // GET: Fetch notes for a specific date
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
+
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date');
@@ -29,6 +33,7 @@ export async function GET(request: NextRequest) {
       .from('daily_notes')
       .select('*')
       .eq('note_date', date)
+      .eq('tenant_id', tenantId)
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -55,6 +60,10 @@ export async function POST(request: NextRequest) {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const body = await request.json();
 
     if (!body.date || !body.content) {
@@ -77,6 +86,7 @@ export async function POST(request: NextRequest) {
       .from('daily_notes')
       .insert({
         note_date: body.date,
+        tenant_id: tenantId,
         author_id: auth.userId,
         author_name: authorName,
         content: body.content,
@@ -111,6 +121,10 @@ export async function DELETE(request: NextRequest) {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const { searchParams } = new URL(request.url);
     const noteId = searchParams.get('id');
 
@@ -124,7 +138,8 @@ export async function DELETE(request: NextRequest) {
     const { error } = await supabaseAdmin
       .from('daily_notes')
       .delete()
-      .eq('id', noteId);
+      .eq('id', noteId)
+      .eq('tenant_id', tenantId);
 
     if (error) {
       console.error('Error deleting daily note:', error);

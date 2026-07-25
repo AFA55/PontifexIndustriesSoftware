@@ -7,13 +7,17 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireShopUser } from '@/lib/api-auth';
+import { requireShopUser, resolveTenantScope } from '@/lib/api-auth';
 
 // GET: List work orders with filtering and pagination
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireShopUser(request);
     if (!auth.authorized) return auth.response;
+
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
@@ -26,7 +30,8 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabaseAdmin
       .from('maintenance_work_orders')
-      .select('*', { count: 'exact' });
+      .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId);
 
     // Status filter (can be comma-separated)
     if (statusParam) {
@@ -107,6 +112,10 @@ export async function POST(request: NextRequest) {
     const auth = await requireShopUser(request);
     if (!auth.authorized) return auth.response;
 
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const body = await request.json();
     const { unit_id, title, description, priority, assigned_to, estimated_hours } = body;
 
@@ -117,11 +126,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify unit exists
+    // Verify unit exists AND belongs to the caller's tenant (prevents attaching
+    // a work order to another tenant's equipment).
     const { data: unit, error: unitError } = await supabaseAdmin
       .from('equipment_units')
       .select('id, name')
       .eq('id', unit_id)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (unitError || !unit) {
@@ -130,6 +141,7 @@ export async function POST(request: NextRequest) {
 
     const insertData: any = {
       unit_id,
+      tenant_id: tenantId,
       title,
       description: description || null,
       priority: priority || 'normal',
