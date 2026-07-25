@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireSalesStaff } from '@/lib/api-auth';
+import { requireSalesStaff, resolveTenantScope } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { notifySalesperson } from '@/lib/notify-salesperson';
 
@@ -17,27 +17,28 @@ export async function GET(request: NextRequest) {
     const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
-    let tenantId = await getTenantId(auth.userId);
-
-    // super_admin can pass ?tenantId= to scope; without it, they see all tenants
-    if (!tenantId && auth.role === 'super_admin') {
-      const { searchParams: sp } = new URL(request.url);
-      tenantId = sp.get('tenantId');
-    }
-
-    if (!tenantId && auth.role !== 'super_admin') {
-      return NextResponse.json({ error: 'Tenant scope required.' }, { status: 400 });
-    }
-    // Auto-mark overdue: flip any sent invoices past due_date to 'overdue' (fire-and-forget)
+    // Owner-aware tenant scope: non-owner super_admins can't escape their tenant
+    // via ?tenantId=; the platform owner drills into a client with it. Always a
+    // non-null tenantId after this (no more cross-tenant invoice reads).
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+    // Auto-mark overdue: flip this TENANT's sent invoices past due_date to
+    // 'overdue' (fire-and-forget). MUST be tenant-scoped — this is a money-state
+    // write, and unscoped it flipped every tenant's invoices. Skipped for a
+    // super_admin viewing all-tenants (no tenant to scope the write to).
     const today = new Date().toISOString().split('T')[0];
-    Promise.resolve(
-      supabaseAdmin
-        .from('invoices')
-        .update({ status: 'overdue' })
-        .eq('status', 'sent')
-        .lt('due_date', today)
-        .gt('balance_due', 0)
-    ).then(() => {}).catch(() => {});
+    if (tenantId) {
+      Promise.resolve(
+        supabaseAdmin
+          .from('invoices')
+          .update({ status: 'overdue' })
+          .eq('tenant_id', tenantId)
+          .eq('status', 'sent')
+          .lt('due_date', today)
+          .gt('balance_due', 0)
+      ).then(() => {}).catch(() => {});
+    }
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status'); // draft, sent, paid, overdue, void

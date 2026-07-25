@@ -7,12 +7,18 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 export async function GET(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
+
+  // Scope ALL analytics to the caller's tenant — supabaseAdmin bypasses RLS, so
+  // without this every query returned every tenant's revenue/jobs/roster/hours.
+  const scope = await resolveTenantScope(request, auth);
+  if ('response' in scope) return scope.response;
+  const tenantId = scope.tenantId;
 
   try {
     const now = new Date();
@@ -36,6 +42,7 @@ export async function GET(request: NextRequest) {
       supabaseAdmin
         .from('job_orders')
         .select('id, status, job_quote, scheduled_date, customer_name, job_type')
+        .eq('tenant_id', tenantId)
         .gte('scheduled_date', firstOfMonth)
         .lte('scheduled_date', today)
         .is('deleted_at', null),
@@ -44,6 +51,7 @@ export async function GET(request: NextRequest) {
       supabaseAdmin
         .from('job_orders')
         .select('id, status, job_quote')
+        .eq('tenant_id', tenantId)
         .gte('scheduled_date', firstOfLastMonth)
         .lt('scheduled_date', firstOfMonth)
         .is('deleted_at', null),
@@ -52,6 +60,7 @@ export async function GET(request: NextRequest) {
       supabaseAdmin
         .from('job_orders')
         .select('id, status, job_quote, scheduled_date, job_type')
+        .eq('tenant_id', tenantId)
         .gte('scheduled_date', firstOfYear)
         .is('deleted_at', null),
 
@@ -59,18 +68,21 @@ export async function GET(request: NextRequest) {
       supabaseAdmin
         .from('invoices')
         .select('id, status, total_amount, balance_due, due_date, invoice_date')
+        .eq('tenant_id', tenantId)
         .gte('invoice_date', firstOfYear),
 
       // Operator stats (active operators)
       supabaseAdmin
         .from('profiles')
         .select('id, full_name, role')
+        .eq('tenant_id', tenantId)
         .in('role', ['operator', 'apprentice']),
 
       // Recent 7 days jobs for trend
       supabaseAdmin
         .from('job_orders')
         .select('id, status, scheduled_date, job_quote, job_type')
+        .eq('tenant_id', tenantId)
         .gte('scheduled_date', sevenDaysAgo)
         .is('deleted_at', null)
         .order('scheduled_date', { ascending: true }),
@@ -79,6 +91,7 @@ export async function GET(request: NextRequest) {
       supabaseAdmin
         .from('timecards')
         .select('id, user_id, total_hours, date, hour_type')
+        .eq('tenant_id', tenantId)
         .gte('date', sevenDaysAgo)
         .not('clock_out_time', 'is', null),
     ]);
@@ -94,7 +107,7 @@ export async function GET(request: NextRequest) {
     // ── Job Stats ──────────────────────────────────
     const completedThisMonth = thisMonthJobs.filter(j => j.status === 'completed').length;
     const completedLastMonth = lastMonthJobs.filter(j => j.status === 'completed').length;
-    const scheduledThisMonth = thisMonthJobs.filter(j => ['scheduled', 'dispatched', 'en_route', 'in_progress'].includes(j.status)).length;
+    const scheduledThisMonth = thisMonthJobs.filter(j => ['scheduled', 'assigned', 'in_route', 'on_site', 'in_progress'].includes(j.status)).length;
 
     const jobsByStatus: Record<string, number> = {};
     for (const job of ytdJobs) {

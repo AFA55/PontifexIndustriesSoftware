@@ -8,12 +8,18 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireSalesStaff } from '@/lib/api-auth';
+import { requireSalesStaff, resolveTenantScope } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
+
+    // Scope to the caller's tenant — a PO number must not surface another
+    // tenant's customer name/address/phone (cross-tenant PII leak).
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     const { searchParams } = new URL(request.url);
     const po = searchParams.get('po');
@@ -26,6 +32,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from('job_orders')
       .select('customer_name, address, location, customer_contact, site_contact_phone')
+      .eq('tenant_id', tenantId)
       .ilike('po_number', po.trim())
       .order('created_at', { ascending: false })
       .limit(1)

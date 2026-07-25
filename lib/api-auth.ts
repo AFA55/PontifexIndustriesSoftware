@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { PLATFORM_TENANT_ID } from '@/lib/rbac';
 
 export interface AuthSuccess {
   authorized: true;
@@ -347,12 +348,38 @@ export async function resolveTenantScope(
     return { tenantId: auth.tenantId };
   }
 
-  // super_admin: prefer explicit tenantId param; auto-resolve from profile if absent
+  // super_admin. Resolve the caller's OWN tenant first (auth.tenantId may be
+  // null in the type; look it up from the profile if so).
+  let callerTenant = auth.tenantId;
+  if (!callerTenant) {
+    const { data: prof } = await supabaseAdmin
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', auth.userId)
+      .maybeSingle();
+    callerTenant = prof?.tenant_id ?? null;
+  }
+  // Only the PLATFORM OWNER (Pontifex parent org) may act across tenants via
+  // ?tenantId=. A tenant-scoped super_admin (e.g. a client's own super_admin)
+  // is confined to their OWN tenant regardless of any override — otherwise one
+  // client's super_admin could read/write another client's data.
+  const isPlatformOwner = callerTenant === PLATFORM_TENANT_ID;
+
   const { searchParams } = new URL(request.url);
   const explicit = searchParams.get('tenantId') || searchParams.get('tenant_id');
 
   if (explicit) {
-    // Explicit override — validate it exists
+    if (!isPlatformOwner) {
+      // Non-owner super_admin — ignore the override, scope to their own tenant.
+      if (callerTenant) return { tenantId: callerTenant };
+      return {
+        response: NextResponse.json(
+          { error: 'Forbidden. Cross-tenant access is restricted to the platform owner.' },
+          { status: 403 }
+        ),
+      };
+    }
+    // Platform owner — validate the target tenant exists.
     const { data: tenant, error } = await supabaseAdmin
       .from('tenants')
       .select('id')
@@ -364,23 +391,55 @@ export async function resolveTenantScope(
     return { tenantId: tenant.id };
   }
 
-  // No explicit tenantId — look up from super_admin's own profile
-  const { data: profile } = await supabaseAdmin
-    .from('profiles')
-    .select('tenant_id')
-    .eq('id', auth.userId)
-    .maybeSingle();
-
-  if (profile?.tenant_id) {
-    return { tenantId: profile.tenant_id };
+  // No explicit tenantId — scope to the caller's own tenant.
+  if (callerTenant) {
+    return { tenantId: callerTenant };
   }
 
-  // Last resort: return 400
   return {
     response: NextResponse.json(
       { error: 'Could not resolve tenant. Pass ?tenantId= or ensure your profile has a tenant_id.' },
       { status: 400 }
     ),
+  };
+}
+
+/**
+ * Require the PLATFORM OWNER (Pontifex parent org super_admin) — role
+ * super_admin AND tenant_id === PLATFORM_TENANT_ID. Use on platform-console /
+ * cross-tenant routes (tenants CRUD, grant-super-admin, backups, platform/*) so
+ * a tenant-scoped super_admin can't reach the owner console over the wire.
+ */
+export async function requirePlatformOwner(request: NextRequest): Promise<AuthResult> {
+  const r = await resolveAuth(request);
+  if (!r.ok) return { authorized: false, response: r.response };
+
+  let tenantId = r.tenantId;
+  if (r.role === 'super_admin' && !tenantId) {
+    const { data: prof } = await supabaseAdmin
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', r.userId)
+      .maybeSingle();
+    tenantId = prof?.tenant_id ?? null;
+  }
+
+  if (r.role !== 'super_admin' || tenantId !== PLATFORM_TENANT_ID) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Platform owner access required.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    authorized: true,
+    userId: r.userId,
+    userEmail: r.userEmail,
+    role: r.role,
+    tenantId,
   };
 }
 
