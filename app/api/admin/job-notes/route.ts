@@ -7,13 +7,17 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { requireScheduleBoardAccess, resolveTenantScope } from '@/lib/api-auth';
 
 // GET: Fetch notes for a specific job order
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
+
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     const { searchParams } = new URL(request.url);
     const jobOrderId = searchParams.get('jobOrderId');
@@ -25,10 +29,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Verify the parent job belongs to the caller's tenant (prevents reading
+    // another tenant's notes by guessing job_order_id).
+    const { data: parentJob } = await supabaseAdmin
+      .from('job_orders')
+      .select('id')
+      .eq('id', jobOrderId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!parentJob) {
+      return NextResponse.json({ error: 'Job order not found' }, { status: 404 });
+    }
+
     const { data: notes, error } = await supabaseAdmin
       .from('job_notes')
       .select('*')
       .eq('job_order_id', jobOrderId)
+      .eq('tenant_id', tenantId)
       .neq('note_type', 'change_log')
       .order('created_at', { ascending: false });
 
@@ -56,6 +74,10 @@ export async function POST(request: NextRequest) {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const body = await request.json();
 
     if (!body.jobOrderId || !body.content) {
@@ -63,6 +85,19 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields: jobOrderId, content' },
         { status: 400 }
       );
+    }
+
+    // Verify the parent job belongs to the caller's tenant before inserting a
+    // note against it (prevents cross-tenant note injection).
+    const { data: parentJob } = await supabaseAdmin
+      .from('job_orders')
+      .select('id')
+      .eq('id', body.jobOrderId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!parentJob) {
+      return NextResponse.json({ error: 'Job order not found' }, { status: 404 });
     }
 
     // Get author name from profile
@@ -78,6 +113,7 @@ export async function POST(request: NextRequest) {
       .from('job_notes')
       .insert({
         job_order_id: body.jobOrderId,
+        tenant_id: tenantId,
         author_id: auth.userId,
         author_name: authorName,
         content: body.content,

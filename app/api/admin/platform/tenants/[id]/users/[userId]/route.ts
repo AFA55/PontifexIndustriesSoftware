@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requirePlatformOwner } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -10,7 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * PLATFORM CONSOLE, super_admin only.
  *
  * SECURITY MODEL (non-negotiable):
- *  - requireSuperAdmin.
+ *  - requirePlatformOwner (platform owner org only).
  *  - The target tenant is the EXPLICIT path param [id]; never the caller's own.
  *  - Cross-tenant-escalation guard: re-fetch the target user and ASSERT
  *    user.tenant_id === [id] before any write. A 404 otherwise.
@@ -37,7 +37,7 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string; userId: string }> }
 ) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   const { id, userId } = await params;

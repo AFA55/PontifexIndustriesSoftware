@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin } from '@/lib/api-auth';
+import { requirePlatformOwner } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import {
@@ -25,7 +25,7 @@ const ALLOWED_FIRST_ADMIN_ROLES = [
  * POST /api/admin/tenants — Create a new tenant (super_admin only)
  */
 export async function GET(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   try {
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   try {

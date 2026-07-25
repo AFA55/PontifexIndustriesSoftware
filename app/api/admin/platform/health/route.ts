@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireSuperAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { requirePlatformOwner, isTableNotFoundError } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 
 /**
@@ -17,7 +17,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
  * NEVER fabricates uptime numbers — only reports what we can actually observe.
  */
 export async function GET(request: NextRequest) {
-  const auth = await requireSuperAdmin(request);
+  const auth = await requirePlatformOwner(request);
   if (!auth.authorized) return auth.response;
 
   const url = new URL(request.url);
