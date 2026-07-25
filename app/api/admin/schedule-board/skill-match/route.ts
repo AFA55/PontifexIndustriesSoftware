@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { requireScheduleBoardAccess, resolveTenantScope } from '@/lib/api-auth';
 import {
   resolveAllScopesForServiceCode,
   type ScopeKey,
@@ -20,6 +20,11 @@ export async function GET(request: NextRequest) {
   try {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
+
+    // Scope every query to the caller's tenant — supabaseAdmin bypasses RLS.
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     const jobId = request.nextUrl.searchParams.get('jobId');
     const date = request.nextUrl.searchParams.get('date'); // optional YYYY-MM-DD
@@ -33,6 +38,7 @@ export async function GET(request: NextRequest) {
       .from('job_orders')
       .select('id, difficulty_rating, job_type')
       .eq('id', jobId)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (jobError || !job) {
@@ -61,6 +67,7 @@ export async function GET(request: NextRequest) {
     const { data: operators, error: opError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, skill_level_numeric, tasks_qualified_for, skill_levels')
+      .eq('tenant_id', tenantId)
       .eq('role', 'operator')
       .order('full_name');
 
@@ -75,6 +82,7 @@ export async function GET(request: NextRequest) {
       const { data: busyJobs } = await supabaseAdmin
         .from('job_orders')
         .select('assigned_to, helper_assigned_to, scheduled_date, scheduled_end_date')
+        .eq('tenant_id', tenantId)
         .in('status', ['scheduled', 'in_progress', 'pending'])
         .lte('scheduled_date', date)
         .or(`scheduled_end_date.gte.${date},scheduled_end_date.is.null`);

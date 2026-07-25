@@ -11,16 +11,22 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin, requireSuperAdmin } from '@/lib/api-auth';
+import { requireAdmin, requireSuperAdmin, resolveTenantScope } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    // Scope to the caller's tenant — supabaseAdmin bypasses RLS.
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const { data: operators, error } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, skill_level_numeric')
+      .eq('tenant_id', tenantId)
       .eq('role', 'operator')
       .order('full_name');
 
@@ -41,6 +47,12 @@ export async function PATCH(request: NextRequest) {
     const auth = await requireSuperAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    // Scope the update to the caller's tenant — supabaseAdmin bypasses RLS, so
+    // without this a super_admin's PATCH could rewrite another tenant's operator.
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const body = await request.json();
     const { operator_id, skill_level } = body;
 
@@ -56,6 +68,7 @@ export async function PATCH(request: NextRequest) {
       .from('profiles')
       .update({ skill_level_numeric: skill_level })
       .eq('id', operator_id)
+      .eq('tenant_id', tenantId)
       .select('id, full_name, skill_level_numeric')
       .single();
 

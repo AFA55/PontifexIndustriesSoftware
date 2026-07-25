@@ -12,12 +12,18 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { requireScheduleBoardAccess, resolveTenantScope } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
+
+    // Scope every query to the caller's tenant — supabaseAdmin bypasses RLS,
+    // so an unscoped read would return other tenants' rosters + job data.
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
 
     const { searchParams } = new URL(request.url);
     const startDateParam = searchParams.get('startDate');
@@ -43,6 +49,7 @@ export async function GET(request: NextRequest) {
     const { data: operators } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, role, skill_level_numeric, active')
+      .eq('tenant_id', tenantId)
       .in('role', ['operator', 'apprentice'])
       .order('full_name', { ascending: true });
 
@@ -50,6 +57,7 @@ export async function GET(request: NextRequest) {
     const { data: jobs } = await supabaseAdmin
       .from('job_orders')
       .select('id, job_number, customer_name, job_type, status, scheduled_date, arrival_time, assigned_to, helper_assigned_to, estimated_hours, address')
+      .eq('tenant_id', tenantId)
       .gte('scheduled_date', dates[0])
       .lte('scheduled_date', endDate)
       .not('status', 'in', '("cancelled","void")');
@@ -111,6 +119,7 @@ export async function GET(request: NextRequest) {
     const { data: settings } = await supabaseAdmin
       .from('schedule_settings')
       .select('max_slots, warning_threshold')
+      .eq('tenant_id', tenantId)
       .limit(1)
       .single();
 

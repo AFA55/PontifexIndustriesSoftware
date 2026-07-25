@@ -15,16 +15,17 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { requireScheduleBoardAccess, resolveTenantScope } from '@/lib/api-auth';
 
 const DEFAULT_MAX_SLOTS = 10;
 const DEFAULT_WARNING_THRESHOLD = 8;
 
-async function getCapacitySettings() {
+async function getCapacitySettings(tenantId: string) {
   try {
     const { data } = await supabaseAdmin
       .from('schedule_settings')
       .select('setting_value')
+      .eq('tenant_id', tenantId)
       .eq('setting_key', 'capacity')
       .single();
     return {
@@ -36,10 +37,11 @@ async function getCapacitySettings() {
   }
 }
 
-async function countJobsOnDate(dateStr: string): Promise<number> {
+async function countJobsOnDate(dateStr: string, tenantId: string): Promise<number> {
   const { count } = await supabaseAdmin
     .from('job_orders')
     .select('*', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
     .eq('scheduled_date', dateStr)
     .not('status', 'in', '("pending_approval","cancelled")')
     .eq('is_will_call', false)
@@ -56,6 +58,11 @@ export async function GET(request: NextRequest) {
     const auth = await requireScheduleBoardAccess(request);
     if (!auth.authorized) return auth.response;
 
+    // Scope every query to the caller's tenant — supabaseAdmin bypasses RLS.
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const { searchParams } = new URL(request.url);
     const singleDate = searchParams.get('date');
     const startDate = searchParams.get('startDate');
@@ -63,7 +70,7 @@ export async function GET(request: NextRequest) {
     const findNext = searchParams.get('findNext') === 'true';
     const fromDate = searchParams.get('from');
 
-    const { maxSlots, warningThreshold } = await getCapacitySettings();
+    const { maxSlots, warningThreshold } = await getCapacitySettings(tenantId);
 
     // ── Find Next Available Date ──
     if (findNext) {
@@ -77,7 +84,7 @@ export async function GET(request: NextRequest) {
         if (d.getDay() === 0 || d.getDay() === 6) continue;
 
         const dateStr = toDateStr(d);
-        const jobCount = await countJobsOnDate(dateStr);
+        const jobCount = await countJobsOnDate(dateStr, tenantId);
 
         if (jobCount < warningThreshold) {
           return NextResponse.json({
@@ -101,7 +108,7 @@ export async function GET(request: NextRequest) {
 
     // ── Single date ──
     if (singleDate) {
-      const jobCount = await countJobsOnDate(singleDate);
+      const jobCount = await countJobsOnDate(singleDate, tenantId);
       return NextResponse.json({
         success: true,
         data: {
@@ -128,7 +135,7 @@ export async function GET(request: NextRequest) {
       while (current <= end) {
         if (current.getDay() !== 0 && current.getDay() !== 6) {
           const dateStr = toDateStr(current);
-          const jobCount = await countJobsOnDate(dateStr);
+          const jobCount = await countJobsOnDate(dateStr, tenantId);
           capacityMap[dateStr] = {
             jobCount, maxSlots, warningThreshold,
             availableSlots: maxSlots - jobCount,

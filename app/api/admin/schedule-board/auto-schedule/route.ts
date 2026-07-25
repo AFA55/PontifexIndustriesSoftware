@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { logAuditEvent } from '@/lib/audit';
 
 // ─── Types ──────────────────────────────────────────────────────────────
@@ -210,6 +210,13 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
+    // Scope every read + write to the caller's tenant — supabaseAdmin bypasses
+    // RLS, so this route could otherwise assign another tenant's operators to
+    // another tenant's jobs.
+    const scope = await resolveTenantScope(request, auth);
+    if ('response' in scope) return scope.response;
+    const tenantId = scope.tenantId;
+
     const body = await request.json();
     const { date, options } = body;
 
@@ -224,6 +231,7 @@ export async function POST(request: NextRequest) {
     const { data: rawJobs, error: jobsError } = await supabaseAdmin
       .from('job_orders')
       .select('id, job_number, customer_name, job_type, address, location, difficulty_rating, arrival_time, estimated_hours')
+      .eq('tenant_id', tenantId)
       .eq('scheduled_date', date)
       .is('assigned_to', null)
       .neq('status', 'pending_approval')
@@ -268,7 +276,8 @@ export async function POST(request: NextRequest) {
 
     const { data: rawOperators, error: opError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, skill_level_numeric')
+      .select('id, full_name, skill_level_numeric, tenant_id')
+      .eq('tenant_id', tenantId)
       .eq('role', 'operator')
       .order('full_name');
 
@@ -284,6 +293,7 @@ export async function POST(request: NextRequest) {
     const { data: timeOffData } = await supabaseAdmin
       .from('operator_time_off')
       .select('operator_id, status')
+      .eq('tenant_id', tenantId)
       .lte('date', date)
       .or(`end_date.gte.${date},and(end_date.is.null,date.eq.${date})`);
 
@@ -293,8 +303,11 @@ export async function POST(request: NextRequest) {
         .map((e: any) => e.operator_id)
     );
 
-    // Filter out operators on time-off
-    const availableRawOperators = rawOperators.filter(op => !timeOffOperatorIds.has(op.id));
+    // Filter out operators on time-off. Also re-assert tenant ownership defensively
+    // so we can never assign an operator that belongs to another tenant.
+    const availableRawOperators = rawOperators.filter(
+      op => !timeOffOperatorIds.has(op.id) && (op as any).tenant_id === tenantId
+    );
 
     if (availableRawOperators.length === 0) {
       return NextResponse.json({ error: 'No operators available (all on time-off)' }, { status: 400 });
@@ -303,6 +316,7 @@ export async function POST(request: NextRequest) {
     const { data: existingAssignments } = await supabaseAdmin
       .from('job_orders')
       .select('id, assigned_to, address, location, estimated_hours')
+      .eq('tenant_id', tenantId)
       .eq('scheduled_date', date)
       .not('assigned_to', 'is', null)
       .neq('status', 'cancelled');
@@ -400,7 +414,8 @@ export async function POST(request: NextRequest) {
           assigned_at: now,
           updated_at: now,
         })
-        .eq('id', assignment.jobId);
+        .eq('id', assignment.jobId)
+        .eq('tenant_id', tenantId);
 
       if (updateError) {
         console.error(`Auto-schedule: Failed to assign ${assignment.jobNumber}:`, updateError);
