@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { FileUp, Ruler, FileText, Trash2, Sparkles, Loader2 } from 'lucide-react';
+import { FileUp, Ruler, FileText, Trash2, Sparkles, Loader2, ArrowLeft } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { takeoffsFetch, TakeoffsApiError, TAKEOFF_ROLES_CLIENT } from '@/components/takeoffs/api';
@@ -139,6 +139,12 @@ export default function TakeoffsListPage() {
 
   return (
     <div className="p-4 sm:p-8 max-w-5xl mx-auto">
+      <button
+        onClick={() => router.push('/dashboard')}
+        className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-violet-600 dark:text-white/50 dark:hover:text-violet-400 mb-4 min-h-[44px] font-medium"
+      >
+        <ArrowLeft className="w-4 h-4" /> Back to dashboard
+      </button>
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">

@@ -1327,6 +1327,35 @@ export default function Dashboard() {
             </div>
           </Link>
 
+          {/* Tools — Concrete Calculator + JSA (all users) */}
+          <Link
+            href="/dashboard/tools"
+            className="group relative overflow-hidden rounded-3xl bg-gradient-to-br from-white to-violet-50 dark:from-white/[0.05] dark:to-violet-900/10 p-1.5 shadow-2xl hover:shadow-3xl transition-all duration-500 text-left animate-fade-in-up delay-400 hover:scale-[1.03]"
+          >
+            <div className="absolute inset-0 bg-gradient-to-br from-violet-600 via-fuchsia-500 to-rose-500 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-3xl"></div>
+            <div className="relative bg-white/95 dark:bg-white/[0.05] backdrop-blur-sm rounded-[22px] p-7 group-hover:bg-transparent transition-colors duration-500">
+              <div className="flex items-start justify-between mb-5">
+                <div className="w-16 h-16 bg-gradient-to-br from-violet-600 via-fuchsia-500 to-rose-500 rounded-2xl flex items-center justify-center shadow-xl group-hover:shadow-2xl transform group-hover:rotate-6 transition-all duration-300 ring-4 ring-violet-100 dark:ring-violet-500/20 group-hover:ring-white/30">
+                  <svg className="w-8 h-8 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 7h6m-6 4h6m-4 4h4M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2z" />
+                  </svg>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-white mb-2 transition-colors duration-300">
+                Tools
+              </h3>
+              <p className="text-gray-700 dark:text-white/70 group-hover:text-white/95 font-semibold transition-colors duration-300">
+                Concrete weight calculator &amp; job safety form
+              </p>
+              <div className="mt-5 flex items-center text-violet-600 dark:text-violet-400 group-hover:text-white font-bold transition-colors duration-300">
+                <span>Open Tools</span>
+                <svg className="w-5 h-5 ml-2 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                </svg>
+              </div>
+            </div>
+          </Link>
+
           {/* My Profile — Premium Cyan/Blue Card */}
           <Link
             href="/dashboard/my-profile"
