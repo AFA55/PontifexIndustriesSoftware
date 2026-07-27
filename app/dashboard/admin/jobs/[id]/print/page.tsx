@@ -26,6 +26,60 @@ interface PrintJob {
   permit_required: boolean;
   operator_name: string | null;
   project_name?: string | null;
+  // Added to the printed ticket (founder: missing jobsite/equipment/details)
+  helper_name?: string | null;
+  project_manager_name?: string | null;
+  difficulty_rating?: number | null;
+  additional_notes?: string | null;
+  ppe_required?: string[] | null;
+  additional_safety_requirements?: string[] | null;
+  equipment_needed?: string[] | null;
+  equipment_selections?: Record<string, Record<string, unknown>> | null;
+  jobsite_conditions?: Record<string, unknown> | null;
+  site_compliance?: Record<string, unknown> | null;
+}
+
+// Human labels for the jobsite_conditions jsonb (+ optional footage keys).
+const CONDITION_FIELDS: { key: string; label: string; ftKey?: string }[] = [
+  { key: 'water_available', label: 'Water available', ftKey: 'water_available_ft' },
+  { key: 'electricity_available', label: 'Power available', ftKey: 'electricity_available_ft' },
+  { key: 'cord_480', label: '480 cord req’d', ftKey: 'cord_480_ft' },
+  { key: 'hyd_hose', label: 'Hyd hose', ftKey: 'hyd_hose_ft' },
+  { key: 'water_control', label: 'Vac water' },
+  { key: 'plastic_needed', label: 'Hang poly' },
+  { key: 'clean_up_required', label: 'Cleanup required' },
+  { key: 'overcutting_allowed', label: 'Overcutting OK' },
+  { key: 'high_work', label: 'High work', ftKey: 'high_work_ft' },
+  { key: 'scaffolding_provided', label: 'Scaffold/lift avail' },
+  { key: 'manpower_provided', label: 'Manpower provided' },
+  { key: 'proper_ventilation', label: 'Proper ventilation' },
+];
+
+function activeConditions(jc: Record<string, unknown> | null | undefined): string[] {
+  if (!jc) return [];
+  const out: string[] = [];
+  for (const { key, label, ftKey } of CONDITION_FIELDS) {
+    if (jc[key]) {
+      const ft = ftKey ? jc[ftKey] : null;
+      out.push(ft ? `${label} (${ft}ft)` : label);
+    }
+  }
+  return out;
+}
+
+function activeEquipmentSelections(sel: Record<string, Record<string, unknown>> | null | undefined): string[] {
+  if (!sel) return [];
+  const out: string[] = [];
+  for (const group of Object.values(sel)) {
+    if (!group || typeof group !== 'object') continue;
+    for (const [key, val] of Object.entries(group)) {
+      if (val && val !== 'no' && val !== 'false' && val !== '0' && val !== false) {
+        const label = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+        out.push(typeof val === 'string' && val !== 'yes' && val !== 'true' ? `${label}: ${val}` : label);
+      }
+    }
+  }
+  return out;
 }
 
 interface PrintScopeItem {
@@ -106,13 +160,23 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
   const arrival = formatTime(job.arrival_time);
   const siteAddress = job.address || job.location || '—';
   const scopeText = job.scope_of_work || job.description;
+  const conditions = activeConditions(job.jobsite_conditions);
+  const insideOutside = (job.jobsite_conditions?.inside_outside as string | undefined) || null;
+  const equipmentNeeded = (job.equipment_needed || []).filter(Boolean);
+  const equipmentSelections = activeEquipmentSelections(job.equipment_selections);
+  const ppe = (job.ppe_required || []).filter(Boolean);
+  const safety = (job.additional_safety_requirements || []).filter(Boolean);
+  const compliance = job.site_compliance || {};
+  const orientationReq = !!compliance.orientation_required;
+  const badgingReq = !!compliance.badging_required;
+  const specialInstructions = (compliance.special_instructions as string | undefined) || null;
 
   return (
     <div className="print-ticket bg-white text-black min-h-screen">
-      {/* Print-only styles: hide everything else, show only the ticket */}
+      {/* Print-only styles: LANDSCAPE + hide everything else, show only the ticket */}
       <style>{`
         @media print {
-          @page { margin: 0.6in; }
+          @page { size: landscape; margin: 0.4in; }
           body * { visibility: hidden; }
           .print-ticket, .print-ticket * { visibility: visible; }
           .print-ticket { position: absolute; left: 0; top: 0; width: 100%; }
@@ -131,89 +195,131 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
         </button>
       </div>
 
-      <div className="max-w-2xl mx-auto px-8 py-8">
+      <div className="max-w-6xl mx-auto px-8 py-6">
         {/* Header */}
-        <div className="border-b-2 border-black pb-4 mb-6">
-          <h1 className="text-2xl font-bold tracking-wide">PATRIOT CONCRETE CUTTING</h1>
-          <div className="flex items-baseline justify-between mt-1">
-            <p className="text-sm uppercase tracking-wide text-gray-700">Job Ticket</p>
+        <div className="border-b-2 border-black pb-3 mb-4">
+          <div className="flex items-baseline justify-between">
+            <h1 className="text-2xl font-bold tracking-wide">PATRIOT CONCRETE CUTTING</h1>
             <p className="text-xl font-bold font-mono">{job.job_number}</p>
+          </div>
+          <p className="text-sm uppercase tracking-wide text-gray-700 mt-0.5">Job Ticket</p>
+        </div>
+
+        {/* Two-column body so more fits in landscape */}
+        <div className="grid grid-cols-2 gap-x-10 gap-y-0 items-start">
+          {/* LEFT column */}
+          <div>
+            <Section title="Schedule">
+              <Field label="Date" value={formatDate(job.scheduled_date)} />
+              {job.end_date && job.end_date !== job.scheduled_date && (
+                <Field label="End Date" value={formatDate(job.end_date)} />
+              )}
+              <Field label="Arrival Time" value={job.is_will_call ? 'Will Call' : arrival || '—'} />
+              {job.operator_name && <Field label="Operator" value={job.helper_name ? `${job.operator_name} + ${job.helper_name}` : job.operator_name} />}
+              {job.project_manager_name && <Field label="Project Manager" value={job.project_manager_name} />}
+              {job.difficulty_rating ? <Field label="Difficulty" value={`${job.difficulty_rating} / 10`} /> : null}
+            </Section>
+
+            <Section title="Customer">
+              <Field label="Customer" value={job.customer_name || '—'} />
+              {job.project_name && <Field label="Project" value={job.project_name} />}
+              {job.contact_name && <Field label="Site Contact" value={job.contact_name} />}
+              {job.customer_phone && <Field label="Phone" value={job.customer_phone} />}
+            </Section>
+
+            <Section title="Site">
+              <Field label="Address" value={siteAddress} />
+              {job.job_type && <Field label="Job Type" value={job.job_type} />}
+              {job.po_number && <Field label="PO Number" value={job.po_number} />}
+            </Section>
+
+            <Section title="Compliance & Permits">
+              <Field label="Permit Required" value={job.permit_required ? 'Yes' : 'No'} />
+              {job.permit_number && <Field label="Permit #" value={job.permit_number} />}
+              {orientationReq && <Field label="Orientation" value="Required" />}
+              {badgingReq && <Field label="Badging" value={(compliance.badging_type as string) || 'Required'} />}
+              {specialInstructions && <Field label="Instructions" value={specialInstructions} />}
+            </Section>
+          </div>
+
+          {/* RIGHT column */}
+          <div>
+            <Section title="Scope of Work">
+              {scopeText ? (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{scopeText}</p>
+              ) : (
+                <p className="text-sm text-gray-600 italic">No scope description provided.</p>
+              )}
+            </Section>
+
+            {scope.length > 0 && (
+              <Section title="Service Items">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="border-b border-black">
+                      <th className="text-left py-1 pr-2 font-semibold">Type</th>
+                      <th className="text-left py-1 pr-2 font-semibold">Description</th>
+                      <th className="text-right py-1 font-semibold">Target Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scope.map((item) => (
+                      <tr key={item.id} className="border-b border-gray-300">
+                        <td className="py-1.5 pr-2 align-top font-medium">{item.work_type}</td>
+                        <td className="py-1.5 pr-2 align-top">{item.description || '—'}</td>
+                        <td className="py-1.5 align-top text-right whitespace-nowrap">
+                          {item.target_quantity} {item.unit}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </Section>
+            )}
+
+            {(equipmentNeeded.length > 0 || equipmentSelections.length > 0) && (
+              <Section title="Equipment">
+                <div className="flex flex-wrap gap-1.5">
+                  {[...equipmentNeeded, ...equipmentSelections].map((e, i) => (
+                    <span key={i} className="text-xs border border-gray-400 rounded px-2 py-0.5">{e}</span>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {(conditions.length > 0 || insideOutside) && (
+              <Section title="Jobsite Conditions">
+                {insideOutside && <Field label="Location" value={insideOutside === 'inside' ? 'Inside' : 'Outside'} />}
+                <div className="flex flex-wrap gap-1.5 mt-1">
+                  {conditions.map((c, i) => (
+                    <span key={i} className="text-xs border border-gray-400 rounded px-2 py-0.5">{c}</span>
+                  ))}
+                </div>
+              </Section>
+            )}
+
+            {(ppe.length > 0 || safety.length > 0) && (
+              <Section title="PPE & Safety">
+                <div className="flex flex-wrap gap-1.5">
+                  {[...ppe, ...safety].map((p, i) => (
+                    <span key={i} className="text-xs border border-gray-400 rounded px-2 py-0.5">{p}</span>
+                  ))}
+                </div>
+              </Section>
+            )}
           </div>
         </div>
 
-        {/* Schedule */}
-        <Section title="Schedule">
-          <Field label="Date" value={formatDate(job.scheduled_date)} />
-          {job.end_date && job.end_date !== job.scheduled_date && (
-            <Field label="End Date" value={formatDate(job.end_date)} />
-          )}
-          <Field label="Arrival Time" value={job.is_will_call ? 'Will Call' : arrival || '—'} />
-          {job.operator_name && <Field label="Operator" value={job.operator_name} />}
-        </Section>
-
-        {/* Customer */}
-        <Section title="Customer">
-          <Field label="Customer" value={job.customer_name || '—'} />
-          {job.project_name && <Field label="Project" value={job.project_name} />}
-          {job.contact_name && <Field label="Site Contact" value={job.contact_name} />}
-          {job.customer_phone && <Field label="Phone" value={job.customer_phone} />}
-        </Section>
-
-        {/* Site */}
-        <Section title="Site">
-          <Field label="Address" value={siteAddress} />
-          {job.job_type && <Field label="Job Type" value={job.job_type} />}
-          {job.po_number && <Field label="PO Number" value={job.po_number} />}
-        </Section>
-
-        {/* Scope of work */}
-        <Section title="Scope of Work">
-          {scopeText ? (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{scopeText}</p>
-          ) : (
-            <p className="text-sm text-gray-600 italic">No scope description provided.</p>
-          )}
-        </Section>
-
-        {/* Service items / equipment needed */}
-        {scope.length > 0 && (
-          <Section title="Service Items">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-black">
-                  <th className="text-left py-1 pr-2 font-semibold">Type</th>
-                  <th className="text-left py-1 pr-2 font-semibold">Description</th>
-                  <th className="text-right py-1 font-semibold">Target Qty</th>
-                </tr>
-              </thead>
-              <tbody>
-                {scope.map((item) => (
-                  <tr key={item.id} className="border-b border-gray-300">
-                    <td className="py-1.5 pr-2 align-top font-medium">{item.work_type}</td>
-                    <td className="py-1.5 pr-2 align-top">{item.description || '—'}</td>
-                    <td className="py-1.5 align-top text-right whitespace-nowrap">
-                      {item.target_quantity} {item.unit}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Section>
-        )}
-
-        {/* Compliance / permits */}
-        <Section title="Compliance & Permits">
-          <Field label="Permit Required" value={job.permit_required ? 'Yes' : 'No'} />
-          {job.permit_number && <Field label="Permit #" value={job.permit_number} />}
-        </Section>
-
-        {/* Notes / signature */}
-        <div className="mt-8">
+        {/* Notes + signatures — full width */}
+        <div className="mt-4">
           <p className="text-xs uppercase tracking-wide font-bold text-gray-700 mb-2">Notes</p>
-          <div className="border border-gray-400 h-24 rounded" />
+          {job.additional_notes && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{job.additional_notes}</p>
+          )}
+          <div className="border border-gray-400 h-16 rounded" />
         </div>
 
-        <div className="mt-8 grid grid-cols-2 gap-8">
+        <div className="mt-6 grid grid-cols-2 gap-8">
           <div>
             <div className="border-b border-black h-10" />
             <p className="text-xs text-gray-700 mt-1">Customer Signature / Date</p>

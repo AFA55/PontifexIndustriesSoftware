@@ -118,6 +118,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       helperProfile = helperProf;
     }
 
+    // Fetch the project manager's name (project_manager_id → profiles).
+    let pmProfile: { full_name: string } | null = null;
+    if ((job as any).project_manager_id) {
+      const { data: pmProf } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', (job as any).project_manager_id)
+        .maybeSingle();
+      pmProfile = pmProf;
+    }
+
     // ── 2. Fetch scope items ────────────────────────────────────────────────
     let scopeQuery = supabaseAdmin
       .from('job_scope_items')
@@ -437,6 +448,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           additional_notes: (job as any).additional_info ?? null,
           // Project manager (office owner of the job).
           project_manager_id: (job as any).project_manager_id ?? null,
+          project_manager_name: pmProfile?.full_name ?? null,
         },
         scope: {
           items: enrichedScopeItems,

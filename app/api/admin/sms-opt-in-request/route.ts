@@ -19,6 +19,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
+import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantEmailBranding, generateNotificationEmail, sendEmail } from '@/lib/email';
 import { formatPhoneNumber, sendSMSAny } from '@/lib/sms';
 import { resolveAppOrigin } from '@/lib/app-url';
@@ -65,6 +66,42 @@ export async function POST(request: NextRequest) {
     const branding = await getTenantEmailBranding(auth.tenantId);
     const company = branding.companyName;
     const greetingName = name || 'there';
+
+    // ── Persist that a request was sent (pending state) ───────────────────────
+    // So the button shows "Request sent" on reload instead of looking un-sent.
+    // Matched by E.164 phone (the public accept route stores tenant_id=null, so
+    // phone is the stable key). Skip if they've already accepted.
+    try {
+      const { data: rows } = await supabaseAdmin
+        .from('sms_consent')
+        .select('id, consented, revoked_at')
+        .eq('phone', phone)
+        .order('created_at', { ascending: false });
+      const alreadyAccepted = (rows || []).some((r: any) => r.consented && !r.revoked_at);
+      if (!alreadyAccepted) {
+        const nowIso = new Date().toISOString();
+        const pending = (rows || []).find((r: any) => !r.consented);
+        if (pending) {
+          await supabaseAdmin
+            .from('sms_consent')
+            .update({ requested_at: nowIso, contact_name: name || null, job_order_id: body.jobId || null })
+            .eq('id', pending.id);
+        } else {
+          await supabaseAdmin.from('sms_consent').insert({
+            tenant_id: auth.tenantId || null,
+            phone,
+            contact_name: name || null,
+            consented: false,
+            consent_method: 'request_sent',
+            requested_at: nowIso,
+            job_order_id: body.jobId || null,
+            captured_by: auth.userId,
+          });
+        }
+      }
+    } catch (e) {
+      console.error('[sms-opt-in-request] pending record failed:', e);
+    }
 
     const channels: string[] = [];
 

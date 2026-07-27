@@ -9,7 +9,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Upload, Trash2, DollarSign, Loader2, ExternalLink } from 'lucide-react';
+import { FileText, Upload, Trash2, DollarSign, Loader2, ExternalLink, Pencil } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 const MANAGEMENT_ROLES = new Set([
@@ -84,6 +84,11 @@ function formatDate(iso: string): string {
 export default function OfficeDocumentsPanel({ jobId, userRole }: { jobId: string; userRole: string }) {
   const [docs, setDocs] = useState<OfficeDocument[]>([]);
   const [totalCost, setTotalCost] = useState(0);
+  const [baseAmount, setBaseAmount] = useState(0);
+  const [changeOrderTotal, setChangeOrderTotal] = useState(0);
+  const [baseInput, setBaseInput] = useState('');
+  const [editingBase, setEditingBase] = useState(false);
+  const [savingBase, setSavingBase] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -109,6 +114,10 @@ export default function OfficeDocumentsPanel({ jobId, userRole }: { jobId: strin
       if (!res.ok) throw new Error(json.error || 'Failed to load documents');
       setDocs(json.data?.documents || []);
       setTotalCost(Number(json.data?.total_cost || 0));
+      const base = Number(json.data?.base_amount || 0);
+      setBaseAmount(base);
+      setChangeOrderTotal(Number(json.data?.change_order_total || 0));
+      setBaseInput(base ? String(base) : '');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load documents');
     } finally {
@@ -119,6 +128,27 @@ export default function OfficeDocumentsPanel({ jobId, userRole }: { jobId: strin
   useEffect(() => {
     if (allowed) fetchDocs();
   }, [allowed, fetchDocs]);
+
+  const saveBase = useCallback(async () => {
+    setSavingBase(true);
+    setError(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/jobs/${jobId}/office-documents`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ base_amount: baseInput === '' ? null : baseInput }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to save project cost');
+      setEditingBase(false);
+      await fetchDocs();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save project cost');
+    } finally {
+      setSavingBase(false);
+    }
+  }, [jobId, baseInput, fetchDocs]);
 
   // Second guard — never render for non-management roles.
   if (!allowed) return null;
@@ -209,19 +239,72 @@ export default function OfficeDocumentsPanel({ jobId, userRole }: { jobId: strin
         Management only — contracts, change orders, signed legal &amp; billing paperwork.
       </p>
 
-      {/* Total project cost summary */}
+      {/* Total project cost — editable base + approved change orders */}
       <div className="
-        flex items-center justify-between rounded-xl px-4 py-3 mb-4
+        rounded-xl px-4 py-3 mb-4 space-y-2
         bg-emerald-50 border border-emerald-200
         dark:bg-emerald-500/10 dark:border-emerald-400/20
       ">
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
-          <DollarSign className="w-4 h-4" />
-          Total project cost
-        </span>
-        <span className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
-          {formatMoney(totalCost)}
-        </span>
+        {/* Base contract amount (editable) */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">
+            <DollarSign className="w-4 h-4" />
+            Project cost
+          </span>
+          {editingBase ? (
+            <div className="flex items-center gap-1.5">
+              <div className="relative">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-sm text-emerald-700 dark:text-emerald-300">$</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  inputMode="decimal"
+                  autoFocus
+                  value={baseInput}
+                  onChange={(e) => setBaseInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveBase(); if (e.key === 'Escape') { setEditingBase(false); setBaseInput(baseAmount ? String(baseAmount) : ''); } }}
+                  placeholder="0.00"
+                  className="w-28 pl-5 pr-2 py-1 text-sm text-right tabular-nums rounded-lg border border-emerald-300 dark:border-emerald-400/30 bg-white dark:bg-white/5 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-300 outline-none"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={saveBase}
+                disabled={savingBase}
+                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50"
+              >
+                {savingBase ? '…' : 'Save'}
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => { setEditingBase(true); setBaseInput(baseAmount ? String(baseAmount) : ''); }}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold tabular-nums text-emerald-800 dark:text-emerald-200 hover:underline"
+              title="Edit project cost"
+            >
+              {formatMoney(baseAmount)}
+              <Pencil className="w-3 h-3 opacity-60" />
+            </button>
+          )}
+        </div>
+
+        {/* Approved change orders add on */}
+        {changeOrderTotal > 0 && (
+          <div className="flex items-center justify-between text-xs text-emerald-700 dark:text-emerald-300/80">
+            <span>+ Approved change orders</span>
+            <span className="tabular-nums font-medium">{formatMoney(changeOrderTotal)}</span>
+          </div>
+        )}
+
+        {/* Grand total */}
+        <div className="flex items-center justify-between border-t border-emerald-200 dark:border-emerald-400/20 pt-2">
+          <span className="text-sm font-bold text-emerald-900 dark:text-emerald-200">Total project cost</span>
+          <span className="text-lg font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+            {formatMoney(totalCost)}
+          </span>
+        </div>
       </div>
 
       {error && (

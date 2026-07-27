@@ -76,14 +76,73 @@ export async function GET(request: NextRequest, context: RouteContext) {
       uploader: d.uploaded_by ? { full_name: nameById[d.uploaded_by] ?? null } : null,
     }));
 
-    const totalCost = docs.reduce((sum, d) => sum + Number(d.total_cost || 0), 0);
+    const documentTotal = docs.reduce((sum, d) => sum + Number(d.total_cost || 0), 0);
+
+    // Base project cost (office-entered contract amount) lives on job_orders.job_quote.
+    let baseQuery = supabaseAdmin.from('job_orders').select('job_quote').eq('id', jobId);
+    if (tenantId) baseQuery = baseQuery.eq('tenant_id', tenantId);
+    const { data: jobRow } = await baseQuery.maybeSingle();
+    const baseAmount = Number(jobRow?.job_quote || 0);
+
+    // Approved change orders add ON to the project cost (founder: "when change
+    // orders are input they get added on"). Sum approved + invoiced price_amount.
+    let coQuery = supabaseAdmin
+      .from('change_orders')
+      .select('price_amount, status')
+      .eq('job_order_id', jobId)
+      .in('status', ['approved', 'invoiced']);
+    if (tenantId) coQuery = coQuery.eq('tenant_id', tenantId);
+    const { data: cos } = await coQuery;
+    const changeOrderTotal = (cos || []).reduce((sum, c) => sum + Number(c.price_amount || 0), 0);
+
+    // Headline total = base contract + approved change orders.
+    const totalCost = baseAmount + changeOrderTotal;
 
     return NextResponse.json({
       success: true,
-      data: { documents, total_cost: totalCost },
+      data: {
+        documents,
+        total_cost: totalCost,
+        base_amount: baseAmount,
+        change_order_total: changeOrderTotal,
+        document_total: documentTotal,
+      },
     });
   } catch (error: unknown) {
     console.error('Unexpected error in GET /office-documents:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// PATCH — set the base project cost (office-entered contract amount → job_quote).
+export async function PATCH(request: NextRequest, context: RouteContext) {
+  try {
+    const auth = await requireSalesStaff(request);
+    if (!auth.authorized) return auth.response;
+
+    const { id: jobId } = await context.params;
+    const tenantId = auth.tenantId;
+    const body = await request.json().catch(() => ({}));
+
+    // Empty / invalid / negative → null (clears the base). Otherwise the number.
+    const raw = body.base_amount;
+    const num = raw === '' || raw == null ? null : Number(raw);
+    const baseAmount = num != null && Number.isFinite(num) && num >= 0 ? num : null;
+
+    let updateQuery = supabaseAdmin
+      .from('job_orders')
+      .update({ job_quote: baseAmount, updated_at: new Date().toISOString() })
+      .eq('id', jobId);
+    if (tenantId) updateQuery = updateQuery.eq('tenant_id', tenantId);
+    const { error } = await updateQuery;
+    if (error) {
+      console.error('Error updating base project cost:', error);
+      return NextResponse.json({ error: 'Failed to save project cost' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, data: { base_amount: baseAmount } });
+  } catch (error: unknown) {
+    console.error('Unexpected error in PATCH /office-documents:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

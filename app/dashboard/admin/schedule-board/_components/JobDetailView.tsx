@@ -7,7 +7,7 @@ import {
   Droplets, Zap, Shield, HardHat, Wind, Scissors, Package, ClipboardList,
   AlertTriangle, Gauge, Phone, DollarSign, ChevronDown, ChevronUp,
   Loader2, ExternalLink, Info, MessageSquare, Send, Save, XCircle, History,
-  Trash2, Plus
+  Trash2, Plus, UserCog
 } from 'lucide-react';
 import { EQUIPMENT_PRESETS } from '@/lib/equipment-map';
 import type { JobCardData } from './JobCard';
@@ -619,6 +619,17 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                         <EditFieldRow label="Quoted By" value={editFields.salesman_name} onChange={(v) => setEditFields(f => ({ ...f, salesman_name: v }))} />
                       ) : (
                         <FieldRow label="Quoted By" value={d?.salesman_name} />
+                      )}
+                      {/* Project Manager badge — who owns this job (read-only here;
+                          set/reassigned in the Edit panel or schedule form). */}
+                      {((d as any)?.project_manager_name as string | undefined) && (
+                        <div className="sm:col-span-2 flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">Project Manager</span>
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-brand/10 text-brand border border-brand/30">
+                            <UserCog className="w-3.5 h-3.5" />
+                            {(d as any).project_manager_name as string}
+                          </span>
+                        </div>
                       )}
                       {isEditing ? (
                         <div className="sm:col-span-2">

@@ -57,12 +57,24 @@ export async function GET(
       helper_name = helpProfile?.full_name || null;
     }
 
+    // Resolve project manager name (project_manager_id → profiles)
+    let project_manager_name: string | null = null;
+    if (job.project_manager_id) {
+      const { data: pmProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', job.project_manager_id)
+        .maybeSingle();
+      project_manager_name = pmProfile?.full_name || null;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         ...job,
         operator_name,
         helper_name,
+        project_manager_name,
       },
     });
   } catch (error: unknown) {
