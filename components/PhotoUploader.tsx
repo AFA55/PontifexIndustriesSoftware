@@ -82,6 +82,41 @@ export default function PhotoUploader({
   // source of truth for onPhotosChange — we only re-sign for rendering.
   const displayPhotos = useSignedPhotos(photos);
 
+  // Downscale a phone photo before upload — a raw camera image is 3–8MB and
+  // slow to upload in the field; ~1800px JPEG @0.82 is a few hundred KB and
+  // looks identical on screen. Non-images (PDFs) pass through untouched.
+  // `imageOrientation: 'from-image'` also bakes in EXIF rotation so photos
+  // aren't sideways.
+  const compressImageFile = async (
+    file: File,
+    maxEdge = 1800,
+    quality = 0.82,
+  ): Promise<{ blob: Blob; ext: string; contentType: string }> => {
+    const origExt = file.name.split('.').pop() || 'jpg';
+    if (!file.type.startsWith('image/')) {
+      return { blob: file, ext: origExt, contentType: file.type };
+    }
+    try {
+      const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+      const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+      const w = Math.max(1, Math.round(bitmap.width * scale));
+      const h = Math.max(1, Math.round(bitmap.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return { blob: file, ext: origExt, contentType: file.type };
+      ctx.drawImage(bitmap, 0, 0, w, h);
+      bitmap.close?.();
+      const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', quality));
+      // Keep the original if compression failed or somehow grew the file.
+      if (!blob || blob.size >= file.size) return { blob: file, ext: origExt, contentType: file.type };
+      return { blob, ext: 'jpg', contentType: 'image/jpeg' };
+    } catch {
+      return { blob: file, ext: origExt, contentType: file.type };
+    }
+  };
+
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     setError('');
@@ -124,13 +159,14 @@ export default function PhotoUploader({
           continue;
         }
 
-        const fileExt = file.name.split('.').pop() || 'jpg';
-        const fileName = `${pathPrefix}-${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+        // Downscale images before upload (big speedup in the field); PDFs pass through.
+        const { blob, ext, contentType } = await compressImageFile(file);
+        const fileName = `${pathPrefix}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
         const filePath = `${pathPrefix}/${fileName}`;
 
         const { error: uploadError } = await supabase.storage
           .from(bucket)
-          .upload(filePath, file);
+          .upload(filePath, blob, { contentType });
 
         if (uploadError) {
           console.error('Upload error details:', {
