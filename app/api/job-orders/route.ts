@@ -9,6 +9,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 
+// OFFICE-ONLY money/estimate fields — operators & helpers must NEVER receive
+// these (founder: cost/quote/hours are office-only). Nulled on every non-admin
+// response so the numbers don't reach the device at all, not just hidden in UI.
+const OFFICE_ONLY_FIELDS = [
+  'estimated_hours', 'estimated_cost', 'job_quote',
+  'equipment_cost', 'material_cost', 'other_cost', 'subcontractor_cost',
+  'mileage_rate', 'drive_distance_miles', 'track_financials',
+  'labor_cost', 'total_cost', 'gross_profit', 'billable_hours',
+];
+function stripOfficeOnly<T extends Record<string, any>>(row: T): T {
+  const c: Record<string, any> = { ...row };
+  for (const f of OFFICE_ONLY_FIELDS) if (f in c) c[f] = null;
+  return c as T;
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get user from Supabase session (server-side)
@@ -118,14 +133,14 @@ export async function GET(request: NextRequest) {
         assignedOperatorProfile = assignedProfile;
       }
 
-      // Operators must not see the PM's time estimate.
-      if (!isAdmin) specificJob.estimated_hours = null;
+      // Operators/helpers must not see office-only money & estimate fields.
+      const safeSpecificJob = isAdmin ? specificJob : stripOfficeOnly(specificJob);
 
       console.log('Returning specific job:', specificJob.job_number);
       return NextResponse.json(
         {
           success: true,
-          data: [specificJob],
+          data: [safeSpecificJob],
           user_role: userRole,
           operator_profile: operatorProfile,
           assigned_operator_profile: assignedOperatorProfile
@@ -221,11 +236,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Operators must not see the PM's time estimate (founder: don't reveal how
-    // much time they "have"). Null estimated_hours for non-admins.
+    // Operators/helpers must not see office-only money & estimate fields
+    // (founder: cost/quote/hours are for the office only). Strip them entirely.
     const safeOrders = isAdmin
       ? filteredOrders
-      : filteredOrders.map((j: any) => ({ ...j, estimated_hours: null }));
+      : filteredOrders.map(stripOfficeOnly);
 
     return NextResponse.json(
       {

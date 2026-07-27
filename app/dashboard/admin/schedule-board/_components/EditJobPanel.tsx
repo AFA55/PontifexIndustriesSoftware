@@ -40,7 +40,7 @@ interface EditJobPanelProps {
   busyOperators: Record<string, string>;
   busyHelpers: Record<string, string>;
   operatorSkillMap?: Record<string, number | null>;
-  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; customer_name?: string; location?: string; address?: string; estimated_cost?: number; salesman_name?: string; jobsite_conditions?: string }) => void;
+  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; customer_name?: string; location?: string; address?: string; estimated_cost?: number | null; salesman_name?: string; jobsite_conditions?: string }) => void;
   onChangeRequestSuccess?: () => void;
   onClose: () => void;
   onViewNotes: () => void;
@@ -967,7 +967,10 @@ export default function EditJobPanel({
                   customer_name: editedCustomerName || undefined,
                   location: editedLocation || undefined,
                   address: editedAddress || undefined,
-                  estimated_cost: editedEstimatedCost ? parseFloat(editedEstimatedCost) : undefined,
+                  // null (not undefined) when cleared — undefined is dropped by
+                  // JSON.stringify, so clearing the cost never reached the API and
+                  // the old value stuck. null persists → the field actually clears.
+                  estimated_cost: editedEstimatedCost ? parseFloat(editedEstimatedCost) : null,
                   salesman_name: editedSalesmanName || undefined,
                   jobsite_conditions: editedJobsiteConditions || undefined,
                 })}

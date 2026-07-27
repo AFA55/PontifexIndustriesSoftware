@@ -14,9 +14,15 @@ import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { sendNotification } from '@/lib/send-reminder';
 
-/** A bad/negative/NaN cost value must never silently corrupt job_pnl's gross-profit math. */
+/**
+ * Numeric fields that must be coerced to a number-or-null. A cleared field
+ * arrives as '' (JobDetailView) or null (EditJobPanel); writing '' to a numeric
+ * column throws and silently fails the whole save — that was the "lets me edit
+ * but doesn't save" bug on the cost field. '' / NaN / negative → null.
+ */
 const NON_NEGATIVE_NUMERIC_FIELDS = [
   'drive_distance_miles', 'mileage_rate', 'equipment_cost', 'material_cost', 'other_cost', 'subcontractor_cost',
+  'estimated_cost', 'estimated_hours',
 ];
 function nonNegativeNumberOrNull(value: unknown): number | null {
   if (value === null || value === undefined || value === '') return null;

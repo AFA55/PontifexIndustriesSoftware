@@ -1220,7 +1220,7 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Edit Job: Save ---
-  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number; jobsite_conditions?: string }) => {
+  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number | null; jobsite_conditions?: string }) => {
     if (!editTarget) return;
     const { job, rowIndex: currentRowIdx } = editTarget;
     const newOpName = updates.newOperatorName;
