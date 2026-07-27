@@ -77,7 +77,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         site_compliance,
         jobsite_conditions,
         equipment_needed,
-        equipment_selections
+        equipment_selections,
+        equipment_rental_flags,
+        scope_photo_urls,
+        difficulty_rating,
+        additional_info,
+        project_manager_id
       `)
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
@@ -423,6 +428,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
           jobsite_conditions: (job as any).jobsite_conditions ?? {},
           equipment_needed: Array.isArray((job as any).equipment_needed) ? (job as any).equipment_needed : [],
           equipment_selections: (job as any).equipment_selections ?? {},
+          // Additional fields the schedule-form edit-load reads. Without these
+          // the edit form loaded blanks and a re-save WIPED the stored values
+          // (scope photos, rental flags, difficulty, notes). Now they round-trip.
+          equipment_rental_flags: (job as any).equipment_rental_flags ?? {},
+          scope_photo_urls: Array.isArray((job as any).scope_photo_urls) ? (job as any).scope_photo_urls : [],
+          difficulty_rating: (job as any).difficulty_rating ?? null,
+          additional_notes: (job as any).additional_info ?? null,
+          // Project manager (office owner of the job).
+          project_manager_id: (job as any).project_manager_id ?? null,
         },
         scope: {
           items: enrichedScopeItems,

@@ -40,7 +40,7 @@ interface EditJobPanelProps {
   busyOperators: Record<string, string>;
   busyHelpers: Record<string, string>;
   operatorSkillMap?: Record<string, number | null>;
-  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; customer_name?: string; location?: string; address?: string; estimated_cost?: number | null; salesman_name?: string; jobsite_conditions?: string }) => void;
+  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; customer_name?: string; location?: string; address?: string; estimated_cost?: number | null; salesman_name?: string; jobsite_conditions?: string; project_manager_id?: string | null }) => void;
   onChangeRequestSuccess?: () => void;
   onClose: () => void;
   onViewNotes: () => void;
@@ -78,6 +78,8 @@ export default function EditJobPanel({
   const [editedEstimatedCost, setEditedEstimatedCost] = useState<string>('');
   const [editedJobsiteConditions, setEditedJobsiteConditions] = useState('');
   const [editedSalesmanName, setEditedSalesmanName] = useState('');
+  const [editedProjectManagerId, setEditedProjectManagerId] = useState('');
+  const [projectManagers, setProjectManagers] = useState<{ id: string; name: string; role: string }[]>([]);
 
   // ─── Contact state ───
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -193,6 +195,7 @@ export default function EditJobPanel({
           setEditedAddress(json.data.site_address || json.data.address || job.address || '');
           if (json.data.estimated_cost != null) setEditedEstimatedCost(String(json.data.estimated_cost));
           if (json.data.salesman_name) setEditedSalesmanName(json.data.salesman_name);
+          setEditedProjectManagerId(json.data.project_manager_id || '');
           if (json.data.jobsite_conditions) {
             const jc = json.data.jobsite_conditions;
             setEditedJobsiteConditions(typeof jc === 'string' ? jc : JSON.stringify(jc, null, 2));
@@ -210,6 +213,24 @@ export default function EditJobPanel({
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job.id]);
+
+  // ─── Load eligible project managers (managers & admins) for reassignment ───
+  useEffect(() => {
+    (async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/admin/project-managers', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setProjectManagers(json.data || []);
+        }
+      } catch { /* non-fatal — picker shows no options */ }
+    })();
+  }, []);
 
   // ─── Load contacts when we have customer_id ───
   useEffect(() => {
@@ -789,6 +810,18 @@ export default function EditJobPanel({
                           className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand" />
                       </div>
 
+                      {/* Project Manager — office owner of the job (managers & admins) */}
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">PROJECT MANAGER</label>
+                        <select value={editedProjectManagerId} onChange={e => { setEditedProjectManagerId(e.target.value); markChanged(); }}
+                          className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand">
+                          <option value="">Unassigned</option>
+                          {projectManagers.map(pm => (
+                            <option key={pm.id} value={pm.id}>{pm.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
                       {/* Operator */}
                       <div>
                         <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">OPERATOR</label>
@@ -973,6 +1006,8 @@ export default function EditJobPanel({
                   estimated_cost: editedEstimatedCost ? parseFloat(editedEstimatedCost) : null,
                   salesman_name: editedSalesmanName || undefined,
                   jobsite_conditions: editedJobsiteConditions || undefined,
+                  // null (not undefined) when unassigned so the PM can be cleared.
+                  project_manager_id: editedProjectManagerId || null,
                 })}
                 disabled={!hasChanges}
                 className="px-8 py-2.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand-accent text-white rounded-xl font-bold text-sm transition-all shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2">

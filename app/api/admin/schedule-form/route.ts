@@ -97,6 +97,9 @@ export async function POST(request: NextRequest) {
 
       // ── Step 1: Request Information ─────────────────────────
       salesman_name: body.submitted_by || null,
+      // Project manager (office owner of the job) — chosen by the dispatcher,
+      // distinct from created_by (the person who filled the form).
+      project_manager_id: body.project_manager_id || null,
       po_number: body.po_number || null,
       date_submitted: body.date_submitted || new Date().toISOString().split('T')[0],
 
@@ -153,7 +156,12 @@ export async function POST(request: NextRequest) {
       require_completion_signature: body.require_completion_signature || false,
 
       // ── Step 7: Job Difficulty & Notes ──────────────────────
+      // Write BOTH difficulty columns to the same value — legacy readers use
+      // job_difficulty_rating (dispatch PDF, JobDetailView, capacity) while the
+      // schedule-form editor + summary read difficulty_rating. Keeping them in
+      // sync stops the two from diverging (guardian finding).
       job_difficulty_rating: body.difficulty_rating || null,
+      difficulty_rating: body.difficulty_rating || null,
       additional_info: body.additional_notes || null,
 
       // ── Step 8: Jobsite Conditions ──────────────────────────

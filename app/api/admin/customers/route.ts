@@ -139,10 +139,15 @@ export async function POST(request: NextRequest) {
           tenant_id: tenantId || null,
         }));
       if (contactRows.length > 0) {
-        // Fire-and-forget — don't fail the whole request if contacts insert fails
-        Promise.resolve(
-          supabaseAdmin.from('customer_contacts').insert(contactRows)
-        ).catch(() => {});
+        // Awaited (not fire-and-forget): the schedule form re-fetches the
+        // customer's contacts immediately after this returns to populate the
+        // on-site contact dropdown. A racing insert meant the just-added
+        // contacts were missing from that list. A failed insert still must not
+        // fail the whole customer create, so swallow the error.
+        const { error: contactErr } = await supabaseAdmin
+          .from('customer_contacts')
+          .insert(contactRows);
+        if (contactErr) console.error('Error inserting customer contacts:', contactErr);
       }
     }
 

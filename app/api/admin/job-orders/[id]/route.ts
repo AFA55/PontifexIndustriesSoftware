@@ -118,6 +118,10 @@ export async function PATCH(
       // Direct column names that the schedule-form + schedule-board edit panels
       // send and previously had silently dropped on save.
       'po_number', 'customer_id', 'customer_contact', 'site_contact_phone',
+      // More columns the full-job editor sends that were being dropped on save
+      // (the "edits don't stick" bug): project name, job type, scope photos,
+      // and the project-manager owner.
+      'project_name', 'job_type', 'scope_photo_urls', 'project_manager_id',
       // Optional job financials (opt-in via track_financials) — schema-only
       // until this route's PATCH wired them through.
       'track_financials', 'drive_distance_miles', 'mileage_rate',
@@ -143,10 +147,16 @@ export async function PATCH(
       'site_compliance',
       'jobsite_conditions',
       'equipment_selections',
+      'equipment_rental_flags',
     ];
     for (const f of jsonbPassthrough) {
       if (f in updates) updateFields[f] = updates[f];
     }
+    // The full-job editor's "Additional Notes" maps onto the additional_info column.
+    if ('additional_notes' in updates) updateFields.additional_info = updates.additional_notes;
+    // Keep the two difficulty columns in sync — legacy readers use
+    // job_difficulty_rating; the editor + summary use difficulty_rating.
+    if ('difficulty_rating' in updates) updateFields.job_difficulty_rating = updates.difficulty_rating;
     if ('location_name' in updates) updateFields.location = updates.location_name;
     if ('site_address' in updates) updateFields.address = updates.site_address;
     if ('site_contact' in updates) updateFields.customer_contact = updates.site_contact;

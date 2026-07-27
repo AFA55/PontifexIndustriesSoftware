@@ -1220,7 +1220,7 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Edit Job: Save ---
-  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number | null; jobsite_conditions?: string }) => {
+  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number | null; jobsite_conditions?: string; project_manager_id?: string | null }) => {
     if (!editTarget) return;
     const { job, rowIndex: currentRowIdx } = editTarget;
     const newOpName = updates.newOperatorName;
@@ -1244,6 +1244,7 @@ export default function ScheduleBoardPage() {
     if (updates.site_contact_phone !== undefined) apiPayload.site_contact_phone = updates.site_contact_phone;
     if (updates.estimated_cost !== undefined) apiPayload.estimated_cost = updates.estimated_cost;
     if (updates.jobsite_conditions !== undefined) apiPayload.jobsite_conditions = updates.jobsite_conditions;
+    if (updates.project_manager_id !== undefined) apiPayload.project_manager_id = updates.project_manager_id;
 
     const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
     const operatorChanged = newOpName !== undefined && newOpName !== currentOp;

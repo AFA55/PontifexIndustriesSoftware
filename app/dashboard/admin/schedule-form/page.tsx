@@ -398,6 +398,7 @@ const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
 interface FormData {
   // Step 1
   submitted_by: string;
+  project_manager_id: string;
   date_submitted: string;
   po_number: string;
   // Step 1 (Customer)
@@ -498,6 +499,7 @@ interface FormData {
 
 const initialFormData: FormData = {
   submitted_by: '',
+  project_manager_id: '',
   date_submitted: new Date().toISOString().split('T')[0],
   po_number: '',
   contractor_name: '',
@@ -866,6 +868,8 @@ export default function ScheduleFormPage() {
   const [showCreateFacility, setShowCreateFacility] = useState(false);
   // Form templates for step 6
   const [formTemplates, setFormTemplates] = useState<{ id: string; name: string; form_type: string; description: string }[]>([]);
+  // Project managers (managers & admins) for the Step 1 owner picker
+  const [projectManagers, setProjectManagers] = useState<{ id: string; name: string; role: string }[]>([]);
 
   // Draft state
   const [draftId, setDraftId] = useState<string | null>(null);
@@ -980,6 +984,23 @@ export default function ScheduleFormPage() {
     // Auto-fill submitted_by with logged-in user's name
     setForm(f => ({ ...f, submitted_by: currentUser.name }));
 
+    // Load eligible project managers (managers & admins) for the owner picker.
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/admin/project-managers', {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const json = await res.json();
+          setProjectManagers(json.data || []);
+        }
+      } catch {
+        // Non-fatal — the picker just shows no options.
+      }
+    })();
+
     // Edit mode — load existing job data and prefill the form
     if (editJobId && !editLoadAttempted) {
       setEditLoadAttempted(true);
@@ -1057,6 +1078,7 @@ export default function ScheduleFormPage() {
             hotel_directions: sched.hotel_directions || '',
             difficulty_rating: j.difficulty_rating || (f as any).difficulty_rating,
             additional_notes: j.additional_notes || '',
+            project_manager_id: j.project_manager_id || '',
             // Booleans / nested
             overcutting_allowed: typeof jc.overcutting_allowed === 'boolean' ? jc.overcutting_allowed : (f as any).overcutting_allowed,
           }));
@@ -1485,10 +1507,13 @@ export default function ScheduleFormPage() {
         contact_phone: data.primary_contact_phone || '',
       });
       setCustomerPONumbers([]);
-      setCustomerContacts([]);
       setCustomerSiteAddresses([]);
       setCustomerProjectNames([]);
       setShowNewCustomerModal(false);
+      // Re-fetch the new customer's contacts so the on-site contact dropdown is
+      // populated with the primary + any additional contacts just entered
+      // (previously this was blanked and never reloaded → empty dropdown).
+      fetchCustomerHistory(created.id);
     } catch (err: any) {
       clearTimeout(abortTimer);
       const msg = err?.name === 'AbortError'
@@ -1722,6 +1747,7 @@ export default function ScheduleFormPage() {
       const payload = {
         // Step 1 (Customer)
         submitted_by: form.submitted_by || null,
+        project_manager_id: form.project_manager_id || null,
         date_submitted: form.date_submitted,
         customer_name: form.contractor_name.trim(),
         customer_id: form.customer_id || null,
@@ -1821,8 +1847,15 @@ export default function ScheduleFormPage() {
       };
 
       // Edit-mode: PATCH the existing job instead of creating a new one.
-      // Send only the fields that map cleanly onto job_orders columns; the
-      // PATCH route will ignore anything it doesn't recognize.
+      // Send every field the edit-mode LOAD reliably re-populates, so an admin's
+      // changes actually persist (this was the "lets me edit but doesn't save"
+      // bug — the old payload sent only scope/equipment/financials and silently
+      // dropped customer, contact, address, location, project, dates, cost, PM).
+      // We deliberately do NOT send jobsite_conditions / site_compliance /
+      // permits / arrival_time / estimated_hours here: the edit-mode load does
+      // not fully re-populate them, so sending form defaults would WIPE the real
+      // values. Those are edited in the schedule board's structured Job Detail
+      // editor (which loads and saves them correctly).
       let res: Response;
       let result: any;
       if (isEditMode && editJobId) {
@@ -1833,18 +1866,37 @@ export default function ScheduleFormPage() {
             'Authorization': `Bearer ${sessionData.session.access_token}`,
           },
           body: JSON.stringify({
+            // Customer / contact / location (Step 1–2)
+            customer_name: payload.customer_name,
+            customer_id: payload.customer_id,
+            project_name: payload.project_name,
+            po_number: payload.po_number,
+            site_contact: payload.site_contact,       // → customer_contact
+            contact_phone: payload.contact_phone,     // → site_contact_phone + foreman_phone
+            site_address: payload.address,            // → address
+            location_name: payload.location_name,     // → location
+            // Project manager (owner of the job)
+            project_manager_id: form.project_manager_id || null,
+            // Scope / equipment (Step 3–4)
             description: payload.description,
             job_type: payload.job_type,
             scope_details: payload.scope_details,
             scope_photo_urls: payload.scope_photo_urls,
             equipment_needed: payload.equipment_needed,
             equipment_rental_flags: payload.equipment_rental_flags,
-            equipment_details: payload.equipment_details,
             equipment_selections: payload.equipment_selections,
-            special_equipment: payload.special_equipment,
             ppe_required: payload.ppe_required,
             additional_safety_requirements: payload.additional_safety_requirements,
-            arrival_time: form.arrival_time || form.special_arrival_time || null,
+            // Schedule (Step 5) — guard scheduled_date: a will-call/unscheduled
+            // job loads start_date as '' and '' → a date column throws, failing
+            // the whole all-or-nothing update.
+            scheduled_date: payload.scheduled_date || null,
+            end_date: payload.end_date,
+            // Difficulty / notes / cost
+            difficulty_rating: payload.difficulty_rating,
+            additional_notes: payload.additional_notes,  // → additional_info
+            estimated_cost: payload.estimated_cost,
+            // Financials (opt-in)
             track_financials: payload.track_financials,
             drive_distance_miles: payload.drive_distance_miles,
             mileage_rate: payload.mileage_rate,
@@ -2081,6 +2133,27 @@ export default function ScheduleFormPage() {
                 {(user?.name || '').split(' ').map(n => n[0]).join('')}
               </div>
               <span className="text-sm text-slate-600 dark:text-white/60">Submitted by <span className="font-semibold text-slate-800 dark:text-white">{user?.name}</span> on {new Date().toLocaleDateString()}</span>
+            </div>
+
+            {/* Project Manager — who owns this job (defaults to unassigned; the
+                dispatcher picks the office PM responsible for it). */}
+            <div>
+              <label className="block text-sm font-semibold text-slate-700 dark:text-white/80 mb-1.5">
+                Project Manager
+              </label>
+              <select
+                value={form.project_manager_id}
+                onChange={e => updateForm({ project_manager_id: e.target.value })}
+                className="w-full px-4 py-3 text-base rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-800 dark:text-white focus:border-blue-400 focus:ring-2 focus:ring-blue-100 dark:focus:ring-blue-500/20 outline-none transition-all"
+              >
+                <option value="">Unassigned — choose who runs this job</option>
+                {projectManagers.map(pm => (
+                  <option key={pm.id} value={pm.id}>{pm.name}</option>
+                ))}
+              </select>
+              <p className="mt-1 text-xs text-slate-500 dark:text-white/40">
+                The office manager responsible for this job — separate from who dispatched it.
+              </p>
             </div>
 
             {/* Selected customer badge */}

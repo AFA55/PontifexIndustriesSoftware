@@ -37,6 +37,30 @@ export async function GET(
     // contact name → aggregated data map (keyed by lowercased name for deduplication)
     const contactMap = new Map<string, SiteContact>();
 
+    // --- Source 0: the customer's own primary contact ---
+    // The primary contact lives in a column on `customers`, not in
+    // `customer_contacts`, so without this it never appeared in the site-contact
+    // dropdown — a just-created customer's contact was un-selectable. Seed it
+    // first so it's always an option (this also fixes every existing customer).
+    const { data: customerRow } = await supabaseAdmin
+      .from('customers')
+      .select('primary_contact_name, primary_contact_phone, primary_contact_email')
+      .eq('id', customerId)
+      .eq('tenant_id', auth.tenantId)
+      .maybeSingle();
+
+    if (customerRow?.primary_contact_name?.trim()) {
+      const name = (customerRow.primary_contact_name as string).trim();
+      contactMap.set(name.toLowerCase(), {
+        name,
+        phone: (customerRow.primary_contact_phone as string | null) || null,
+        email: (customerRow.primary_contact_email as string | null) || null,
+        title: 'Primary Contact',
+        last_used: new Date().toISOString(),
+        job_count: 0,
+      });
+    }
+
     // --- Source 1: customer_contacts table ---
     const { data: savedContacts } = await supabaseAdmin
       .from('customer_contacts')

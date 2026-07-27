@@ -93,7 +93,13 @@ export default function PhotoUploader({
     quality = 0.82,
   ): Promise<{ blob: Blob; ext: string; contentType: string }> => {
     const origExt = file.name.split('.').pop() || 'jpg';
-    if (!file.type.startsWith('image/')) {
+    // Treat as an image by MIME OR extension — iPhone photos sometimes arrive
+    // with an empty/absent MIME type, and we still want to decode+convert them
+    // (esp. HEIC) to a JPEG the storage bucket accepts.
+    const looksImage =
+      file.type.startsWith('image/') ||
+      /\.(heic|heif|jpe?g|png|webp|gif)$/i.test(file.name);
+    if (!looksImage) {
       return { blob: file, ext: origExt, contentType: file.type };
     }
     try {
@@ -147,20 +153,35 @@ export default function PhotoUploader({
 
     try {
       for (const file of files) {
-        // Validate file type
-        if (!file.type.startsWith('image/') && !file.type.startsWith('application/pdf')) {
-          setError('Only images and PDFs are supported');
-          continue;
-        }
-
-        // Validate file size (10MB max)
-        if (file.size > 10 * 1024 * 1024) {
-          setError('Files must be under 10MB');
+        // Accept by MIME OR extension (iPhone files can have an empty MIME type).
+        const isImage =
+          file.type.startsWith('image/') ||
+          /\.(heic|heif|jpe?g|png|webp|gif)$/i.test(file.name);
+        const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+        if (!isImage && !isPdf) {
+          setError('Only photos and PDFs can be uploaded.');
           continue;
         }
 
         // Downscale images before upload (big speedup in the field); PDFs pass through.
         const { blob, ext, contentType } = await compressImageFile(file);
+
+        // Size check runs AFTER compression — a 12MB camera photo shrinks to a
+        // few hundred KB, so checking the original wrongly rejected good photos.
+        if (blob.size > 10 * 1024 * 1024) {
+          setError('This file is too large (over 10MB even after shrinking). Try a smaller photo or a PDF.');
+          continue;
+        }
+
+        // A photo that couldn't be converted to an uploadable format (e.g. an
+        // iPhone HEIC that this device/browser can't decode) would be rejected
+        // by storage with a cryptic error — tell the user plainly instead.
+        const uploadableImage = /^image\/(jpeg|png|webp|gif)$/.test(contentType);
+        if (isImage && !isPdf && !uploadableImage) {
+          setError("This looks like an iPhone HEIC photo that couldn't be converted here. Upload it from your phone, or save it as a JPEG first.");
+          continue;
+        }
+
         const fileName = `${pathPrefix}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
         const filePath = `${pathPrefix}/${fileName}`;
 
@@ -311,9 +332,12 @@ export default function PhotoUploader({
         </p>
       )}
 
-      {/* Error message */}
+      {/* Error message — prominent so it isn't missed on a phone in the field */}
       {error && (
-        <p className="text-xs text-red-400 font-medium">{error}</p>
+        <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 px-3 py-2">
+          <X className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-red-700 font-medium leading-snug">{error}</p>
+        </div>
       )}
     </div>
   );
