@@ -825,22 +825,22 @@ export default function CompletedJobSummaryPage() {
               {summary.customer_overall_rating != null && (
                 <div className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
                   <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-2">Overall</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_overall_rating}/10</p>
-                  <StarDisplay rating={summary.customer_overall_rating} max={10} />
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_overall_rating}/5</p>
+                  <StarDisplay rating={summary.customer_overall_rating} max={5} />
                 </div>
               )}
               {summary.customer_cleanliness_rating != null && (
                 <div className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
                   <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-2">Cleanliness</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_cleanliness_rating}/10</p>
-                  <StarDisplay rating={summary.customer_cleanliness_rating} max={10} />
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_cleanliness_rating}/5</p>
+                  <StarDisplay rating={summary.customer_cleanliness_rating} max={5} />
                 </div>
               )}
               {summary.customer_communication_rating != null && (
                 <div className="rounded-xl p-4 text-center bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
                   <p className="text-xs font-semibold text-slate-500 dark:text-white/50 uppercase mb-2">Communication</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_communication_rating}/10</p>
-                  <StarDisplay rating={summary.customer_communication_rating} max={10} />
+                  <p className="text-3xl font-bold text-slate-900 dark:text-white mb-2 tabular-nums">{summary.customer_communication_rating}/5</p>
+                  <StarDisplay rating={summary.customer_communication_rating} max={5} />
                 </div>
               )}
             </div>

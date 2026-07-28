@@ -162,9 +162,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // reviews were stored but never shown on the per-job screen).
     const { data: reviewRows } = await supabaseAdmin
       .from('customer_surveys')
-      .select('overall_rating, cleanliness_rating, communication_rating, likely_to_use_again_rating, operator_feedback_notes, feedback_text, created_at')
+      .select('overall_rating, cleanliness_rating, communication_rating, likely_to_use_again_rating, operator_feedback_notes, feedback_text, submitted_at')
       .eq('job_order_id', (job as any).id)
-      .order('created_at', { ascending: false })
+      .order('submitted_at', { ascending: false, nullsFirst: false })
       .limit(1);
     const review = reviewRows?.[0] as any || null;
 
@@ -184,7 +184,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
           customer_communication_rating: review?.communication_rating ?? null,
           customer_likely_again_rating: review?.likely_to_use_again_rating ?? null,
           customer_feedback_comments: review?.feedback_text || review?.operator_feedback_notes || null,
-          customer_review_at: review?.created_at ?? null,
+          customer_review_at: review?.submitted_at ?? null,
           completed_at: (job as any).actual_end_date ?? (job as any).completion_submitted_at ?? null,
           salesperson_id: null,
         },

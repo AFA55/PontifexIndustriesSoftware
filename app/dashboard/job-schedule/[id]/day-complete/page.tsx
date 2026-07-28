@@ -205,6 +205,15 @@ export default function DayCompletePage() {
   };
 
   const handleSubmitCompletion = async () => {
+    // Same completion requirements — work log + photos (unless prohibited).
+    if (workPerformedItems.length === 0) {
+      setNotification({ message: 'Add what work was performed before submitting.', type: 'error' });
+      return;
+    }
+    if (completionPhotos.length === 0 && !photosProhibited) {
+      setNotification({ message: 'Add at least one job photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+      return;
+    }
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -463,8 +472,9 @@ export default function DayCompletePage() {
         // The REVIEW goes to the CUSTOMER's phone — never the operator's device
         // (so the operator can't fill it out for them). The customer signs + rates
         // on their own phone via the texted link. Best-effort; completion still
-        // succeeds if the text can't send.
-        await sendReviewToContact(session.access_token);
+        // succeeds if the text can't send. Fire-and-forget so it never stalls
+        // the success screen.
+        void sendReviewToContact(session.access_token);
         setSuccessMode('complete');
       } else {
         const data = await statusRes.json();
@@ -538,9 +548,31 @@ export default function DayCompletePage() {
 
   // ─── REMOTE SIGNATURE — Send link & finish ────────────────────────────────
   const handleSendRemoteLink = async () => {
+    // Same completion requirements as the on-site path — no skipping work/photos.
+    if (workPerformedItems.length === 0) {
+      setNotification({ message: 'Add what work was performed before finishing the job.', type: 'error' });
+      return;
+    }
+    if (completionPhotos.length === 0 && !photosProhibited) {
+      setNotification({ message: 'Add at least one job photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+      return;
+    }
     if (!remotePhone.trim()) {
       showNotif('Please enter a phone number', 'warning');
       return;
+    }
+    // Persist the photos on this path too (it previously never saved them).
+    if (completionPhotos.length > 0) {
+      try {
+        const { data: { session: photoSession } } = await supabase.auth.getSession();
+        if (photoSession) {
+          await fetch(`/api/job-orders/${jobId}/photos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${photoSession.access_token}` },
+            body: JSON.stringify({ photo_urls: completionPhotos }),
+          });
+        }
+      } catch { /* best-effort */ }
     }
     setRemoteSending(true);
     try {
