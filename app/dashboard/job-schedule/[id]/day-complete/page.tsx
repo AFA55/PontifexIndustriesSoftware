@@ -66,6 +66,7 @@ export default function DayCompletePage() {
   const [surveySubmitted, setSurveySubmitted] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
+  const [photosProhibited, setPhotosProhibited] = useState(false);
   const [esignConsented, setEsignConsented] = useState(false);
   const [pdfSaved, setPdfSaved] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -289,6 +290,15 @@ export default function DayCompletePage() {
 
   // ─── DONE FOR TODAY (Continue Tomorrow) ───────────────────────────────────
   const handleDoneForToday = async () => {
+    // Required: today's work + photos (unless prohibited on this site).
+    if (workPerformedItems.length === 0) {
+      setNotification({ message: 'Log what you did today before finishing for the day.', type: 'error' });
+      return;
+    }
+    if (completionPhotos.length === 0 && !photosProhibited) {
+      setNotification({ message: 'Add at least one photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+      return;
+    }
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -346,6 +356,16 @@ export default function DayCompletePage() {
 
   // ─── JOB FULLY COMPLETE (on-site signature path) ──────────────────────────
   const handleJobComplete = async () => {
+    // Required to complete: what work was performed, and job photos (unless the
+    // site prohibits photos — the operator can mark that to skip).
+    if (workPerformedItems.length === 0) {
+      setNotification({ message: 'Add what work was performed before completing the job.', type: 'error' });
+      return;
+    }
+    if (completionPhotos.length === 0 && !photosProhibited) {
+      setNotification({ message: 'Add at least one job photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+      return;
+    }
     setSubmitting(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -440,8 +460,12 @@ export default function DayCompletePage() {
       if (statusRes.ok) {
         localStorage.removeItem(`work-performed-${jobId}`);
         localStorage.removeItem(`work-draft-${jobId}`);
-        // Route through customer satisfaction survey before showing success card
-        setSurveyMode(true);
+        // The REVIEW goes to the CUSTOMER's phone — never the operator's device
+        // (so the operator can't fill it out for them). The customer signs + rates
+        // on their own phone via the texted link. Best-effort; completion still
+        // succeeds if the text can't send.
+        await sendReviewToContact(session.access_token);
+        setSuccessMode('complete');
       } else {
         const data = await statusRes.json();
         showNotif(data.error || 'Failed to complete job', 'error');
@@ -487,6 +511,29 @@ export default function DayCompletePage() {
   const handleSkipSurvey = () => {
     setSurveyMode(false);
     setSuccessMode('complete');
+  };
+
+  // Text the customer a review/sign link to the on-site contact number so THEY
+  // fill out the satisfaction review on their own phone (not the operator's).
+  const sendReviewToContact = async (accessToken: string) => {
+    const phone = job?.site_contact_phone || job?.foreman_phone || '';
+    if (!phone) return; // no contact phone on file — nothing to send
+    try {
+      const sigRes = await fetch(`/api/job-orders/${jobId}/request-signature`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ request_type: 'completion', contact_name: job?.customer_name || undefined, contact_phone: phone }),
+      });
+      if (!sigRes.ok) return;
+      const sigData = await sigRes.json();
+      const signUrl: string | undefined = sigData.data?.sign_url;
+      if (!signUrl) return;
+      await fetch(`/api/job-orders/${jobId}/send-completion-sms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ phoneNumber: phone, signUrl, jobNumber: job?.job_number, customerName: job?.customer_name }),
+      });
+    } catch { /* best-effort — completion already succeeded */ }
   };
 
   // ─── REMOTE SIGNATURE — Send link & finish ────────────────────────────────
@@ -999,21 +1046,33 @@ export default function DayCompletePage() {
               <Camera className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Completion Photos</h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Before/after photos, site conditions</p>
+              <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Completion Photos <span className="text-red-500">*</span></h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Required — before/after photos, site conditions</p>
             </div>
           </div>
-          <PhotoUploader
-            bucket="job-photos"
-            pathPrefix={`${jobId}/completion`}
-            photos={completionPhotos}
-            onPhotosChange={setCompletionPhotos}
-            maxPhotos={10}
-            label="Add Completion Photos"
-            lightMode={true}
-            captureLocation
-            jobId={jobId}
-          />
+          {!photosProhibited && (
+            <PhotoUploader
+              bucket="job-photos"
+              pathPrefix={`${jobId}/completion`}
+              photos={completionPhotos}
+              onPhotosChange={setCompletionPhotos}
+              maxPhotos={10}
+              label="Add Completion Photos"
+              lightMode={true}
+              captureLocation
+              jobId={jobId}
+            />
+          )}
+          {/* Escape hatch: some sites (secure facilities) prohibit photos. */}
+          <label className="mt-3 flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={photosProhibited}
+              onChange={(e) => { setPhotosProhibited(e.target.checked); if (e.target.checked) setCompletionPhotos([]); }}
+              className="w-5 h-5 rounded border-gray-300 text-brand focus:ring-brand"
+            />
+            <span className="text-sm text-gray-600 dark:text-gray-300">Photos prohibited on this site (no photos allowed)</span>
+          </label>
         </div>
 
         {/* ── Subsistence (out-of-town overnight) ───────────────────────────── */}
