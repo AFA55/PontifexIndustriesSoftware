@@ -174,16 +174,22 @@ export async function POST(request: NextRequest) {
       // job — they do NOT fill the operator's work-performed ticket. Require that log
       // before clock-out so the helper's contribution is captured.
       if (userRole === 'apprentice') {
+        // Mirror the operator gate: multi-day aware, and EXCLUDE parked/terminal
+        // states. A job parked to Pending (on_hold) — or completed/pending — must
+        // NOT count as an outstanding helper ticket (that left helpers hard-stuck
+        // with "no ticket to complete"). Also make this a SOFT warning with a
+        // "clock out anyway" escape, like the operator's, instead of a hard 403.
         const { data: helperJobs } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name')
           .eq('helper_assigned_to', auth.userId)
-          .eq('scheduled_date', today)
+          .lte('scheduled_date', today)
+          .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
           .not('dispatched_at', 'is', null)
-          .neq('status', 'cancelled');
+          .not('status', 'in', '("cancelled","on_hold","pending_completion","completed")');
 
+        let missingLogs: any[] = [];
         if (helperJobs && helperJobs.length > 0) {
-          // Check which jobs have work logs
           const jobIds = helperJobs.map((j: any) => j.id);
           const { data: workLogs } = await supabaseAdmin
             .from('helper_work_logs')
@@ -191,24 +197,40 @@ export async function POST(request: NextRequest) {
             .eq('helper_id', auth.userId)
             .eq('log_date', today)
             .in('job_order_id', jobIds);
-
           const loggedJobIds = new Set((workLogs || []).map((l: any) => l.job_order_id));
-          const missingLogs = helperJobs.filter((j: any) => !loggedJobIds.has(j.id));
+          missingLogs = helperJobs.filter((j: any) => !loggedJobIds.has(j.id));
+        }
 
-          if (missingLogs.length > 0) {
-            return NextResponse.json(
-              {
-                error: 'You must submit a work log for all dispatched jobs before clocking out.',
-                block_type: 'helper_work_log_required',
-                incomplete_jobs: missingLogs.map((j: any) => ({
-                  id: j.id,
-                  job_number: j.job_number,
-                  customer_name: j.customer_name,
-                })),
-              },
-              { status: 403 }
-            );
-          }
+        if (missingLogs.length > 0 && !acknowledgeIncomplete) {
+          // Soft gate: client shows "Add your log now / Clock out anyway".
+          return NextResponse.json(
+            {
+              error: 'You have jobs without a work log for today.',
+              block_type: 'helper_work_log_warning',
+              incomplete_jobs: missingLogs.map((j: any) => ({
+                id: j.id,
+                job_number: j.job_number,
+                customer_name: j.customer_name,
+              })),
+            },
+            { status: 409 }
+          );
+        }
+
+        if (missingLogs.length > 0 && acknowledgeIncomplete) {
+          // They chose "clock out anyway" — leave a reminder to add the log later.
+          Promise.resolve(
+            supabaseAdmin.from('notifications').insert(
+              missingLogs.map((j: any) => ({
+                user_id: auth.userId,
+                type: 'ticket_incomplete_reminder',
+                title: 'Work log needed',
+                message: `You clocked out without a work log for ${j.customer_name} (${j.job_number}). Open it in My Jobs to add what you did.`,
+                job_id: j.id,
+                action_url: `/dashboard/my-jobs/${j.id}`,
+              }))
+            )
+          ).then(() => {}).catch(() => {});
         }
       }
     }

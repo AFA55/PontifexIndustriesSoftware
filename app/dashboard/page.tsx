@@ -587,17 +587,17 @@ export default function Dashboard() {
         // SOFT gate (founder Jul 20): unfinished tickets warn with a choice —
         // complete now, or clock out anyway and get a reminder. Stash the
         // clock-out payload so "clock out anyway" retries with the ack flag.
-        if (result.block_type === 'incomplete_tickets_warning') {
+        if (result.block_type === 'incomplete_tickets_warning' || result.block_type === 'helper_work_log_warning') {
           pendingClockOutRef.current = data;
           setClockOutBlock({
             show: true,
-            blockType: 'incomplete_tickets_warning',
+            blockType: result.block_type,
             incompleteJobs: result.incomplete_jobs || [],
           });
           setShowNfcClockInModal(false);
           return;
         }
-        // Helper-log gate / rate limit still hard-block — surface the reason.
+        // Rate limit / other hard blocks — surface the reason.
         const msg = (result.error || 'Failed to clock out') + (result.details ? `\n${result.details}` : '');
         setClockMessage({ type: 'error', text: msg });
         throw new Error(msg);
@@ -653,11 +653,15 @@ export default function Dashboard() {
                 </svg>
               </div>
               <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Finish your ticket?' : 'Cannot Clock Out'}
+                {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Finish your ticket?'
+                  : clockOutBlock.blockType === 'helper_work_log_warning' ? 'Add your work log?'
+                  : 'Cannot Clock Out'}
               </h3>
               <p className="text-gray-600 text-sm">
                 {clockOutBlock.blockType === 'incomplete_tickets_warning'
                   ? "You haven't completed today's job ticket. Finish it now, or clock out and we'll remind you — your work will be logged to the day it was scheduled."
+                  : clockOutBlock.blockType === 'helper_work_log_warning'
+                  ? "You haven't added a work log for today's job. Add what you did now, or clock out and we'll remind you."
                   : clockOutBlock.blockType === 'work_performed_required'
                   ? 'You must complete work performed for all dispatched jobs before clocking out.'
                   : 'You must submit a work log for all dispatched jobs before clocking out.'}
@@ -671,7 +675,7 @@ export default function Dashboard() {
                   key={job.id}
                   onClick={() => {
                     setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
-                    if (clockOutBlock.blockType === 'incomplete_tickets_warning') {
+                    if (clockOutBlock.blockType === 'incomplete_tickets_warning' || clockOutBlock.blockType === 'helper_work_log_warning') {
                       router.push(`/dashboard/my-jobs/${job.id}`);
                     } else if (clockOutBlock.blockType === 'work_performed_required') {
                       router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
@@ -692,7 +696,7 @@ export default function Dashboard() {
               ))}
             </div>
 
-            {clockOutBlock.blockType === 'incomplete_tickets_warning' && (
+            {(clockOutBlock.blockType === 'incomplete_tickets_warning' || clockOutBlock.blockType === 'helper_work_log_warning') && (
               <button
                 onClick={async () => {
                   setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
@@ -711,7 +715,7 @@ export default function Dashboard() {
               onClick={() => setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] })}
               className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
             >
-              {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Go back — I\'ll finish it now' : 'Close'}
+              {(clockOutBlock.blockType === 'incomplete_tickets_warning' || clockOutBlock.blockType === 'helper_work_log_warning') ? 'Go back — I\'ll add it now' : 'Close'}
             </button>
           </div>
         </div>
