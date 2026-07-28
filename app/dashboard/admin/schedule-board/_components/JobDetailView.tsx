@@ -187,6 +187,11 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [printingPdf, setPrintingPdf] = useState(false);
+  // Move-to-Pending flow
+  const [showParkConfirm, setShowParkConfirm] = useState(false);
+  const [parkReason, setParkReason] = useState('');
+  const [parking, setParking] = useState(false);
+  const [suggestedDates, setSuggestedDates] = useState<{ date: string; free_operators: string[] }[] | null>(null);
   const [activeTab, setActiveTab] = useState<'details' | 'history'>('details');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     jobInfo: true,
@@ -390,6 +395,42 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
     }
   };
 
+  // Open the Move-to-Pending confirm and load recommended next dates.
+  const openParkConfirm = async () => {
+    setShowParkConfirm(true);
+    setSuggestedDates(null);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/pending-jobs/${job.id}/suggest-dates`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setSuggestedDates(json.data || []);
+      }
+    } catch { /* suggestions are best-effort */ }
+  };
+
+  const handleMoveToPending = async () => {
+    setParking(true);
+    try {
+      const token = await getToken();
+      const res = await fetch(`/api/admin/pending-jobs/${job.id}/park`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ reason: parkReason.trim() || null }),
+      });
+      if (res.ok) {
+        setShowParkConfirm(false);
+        onClose(); // board refetches on close → job leaves the active board
+      }
+    } catch (err) {
+      console.error('Error moving job to Pending:', err);
+    } finally {
+      setParking(false);
+    }
+  };
+
   const d = fullData;
   const conditions = d?.jobsite_conditions as Record<string, any> | undefined;
   const compliance = d?.site_compliance as Record<string, any> | undefined;
@@ -492,6 +533,16 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   >
                     <Edit3 className="w-4 h-4" />
                     <span className="hidden sm:inline">Edit</span>
+                  </button>
+                )}
+                {!isEditing && job.status !== 'completed' && job.status !== 'on_hold' && (
+                  <button
+                    onClick={openParkConfirm}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-400/90 hover:bg-amber-500 text-amber-950 rounded-xl text-sm font-bold transition-colors"
+                    title="Move to Pending Jobs"
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span className="hidden sm:inline">Pending</span>
                   </button>
                 )}
                 {onRemove && !isEditing && job.status !== 'completed' && (
@@ -1358,6 +1409,63 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
           </div>
         </div>
       </div>
+
+      {/* Move-to-Pending confirm + recommended dates */}
+      {showParkConfirm && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => !parking && setShowParkConfirm(false)}>
+          <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-5 py-4 flex items-center gap-2">
+              <Clock className="w-5 h-5" />
+              <h3 className="text-base font-bold">Move to Pending Jobs</h3>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-slate-600 dark:text-white/60">
+                This takes the job off the active board and into <b>Pending Jobs</b>. You can push it back up (with a new date) anytime.
+              </p>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-white/50 mb-1">Reason (optional)</label>
+                <textarea
+                  value={parkReason}
+                  onChange={(e) => setParkReason(e.target.value)}
+                  rows={2}
+                  placeholder="e.g. Contractor pushed the start; waiting on rebar."
+                  className="w-full px-3 py-2 text-sm rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white outline-none focus:border-amber-400"
+                />
+              </div>
+
+              {/* Recommended next dates (people + talent aware) */}
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wide text-slate-500 dark:text-white/50 mb-1.5">Recommended next dates</p>
+                {suggestedDates === null ? (
+                  <p className="text-xs text-slate-400 flex items-center gap-1.5"><Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking who&apos;s available…</p>
+                ) : suggestedDates.length === 0 ? (
+                  <p className="text-xs text-slate-400">No skill-matched operator is free in the next 3 weeks.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {suggestedDates.map((s) => (
+                      <div key={s.date} className="flex items-center justify-between px-3 py-2 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20">
+                        <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                          {new Date(s.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </span>
+                        <span className="text-xs text-emerald-700 dark:text-emerald-400 truncate ml-2">{s.free_operators.join(', ')} free</span>
+                      </div>
+                    ))}
+                    <p className="text-[11px] text-slate-400 mt-1">Based on who&apos;s not booked and skill-matched to this job. Set the actual date when you push it back up.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setShowParkConfirm(false)} disabled={parking} className="flex-1 py-2.5 rounded-xl font-semibold text-sm border border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/70">Cancel</button>
+                <button onClick={handleMoveToPending} disabled={parking} className="flex-[2] py-2.5 rounded-xl font-bold text-sm text-white bg-gradient-to-r from-amber-500 to-orange-500 flex items-center justify-center gap-2 disabled:opacity-50">
+                  {parking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Clock className="w-4 h-4" />}
+                  Move to Pending
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
