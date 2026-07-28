@@ -35,7 +35,7 @@ export async function POST(
     }
 
     const nowIso = new Date().toISOString();
-    const { error: updErr } = await supabaseAdmin
+    let updateQuery = supabaseAdmin
       .from('job_orders')
       .update({
         status: 'on_hold',
@@ -46,6 +46,8 @@ export async function POST(
         updated_at: nowIso,
       })
       .eq('id', id);
+    if (auth.tenantId) updateQuery = updateQuery.eq('tenant_id', auth.tenantId); // defense-in-depth
+    const { error: updErr } = await updateQuery;
     if (updErr) {
       console.error('Error parking job:', updErr);
       return NextResponse.json({ error: 'Failed to move the job to Pending' }, { status: 500 });
