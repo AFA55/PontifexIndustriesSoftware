@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, CalendarDays, Trash2, AlertTriangle, ChevronRight, Loader2 } from 'lucide-react';
+import { X, CalendarDays, Trash2, AlertTriangle, ChevronRight, Loader2, Clock } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 
 interface CancelJobModalProps {
@@ -9,11 +9,13 @@ interface CancelJobModalProps {
   onClose: () => void;
   onReschedule: (jobId: string, newDate: string, reason?: string) => Promise<void>;
   onDelete: (jobId: string) => Promise<void>;
+  /** "Just put it in Pending" — park with no date. */
+  onPark?: (jobId: string) => Promise<void>;
 }
 
 type Step = 'choose' | 'reschedule' | 'delete-confirm';
 
-export default function CancelJobModal({ job, onClose, onReschedule, onDelete }: CancelJobModalProps) {
+export default function CancelJobModal({ job, onClose, onReschedule, onDelete, onPark }: CancelJobModalProps) {
   const [step, setStep] = useState<Step>('choose');
   const [newDate, setNewDate] = useState('');
   const [reason, setReason] = useState('');
@@ -47,6 +49,20 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
     }
   };
 
+  const handlePark = async () => {
+    if (!onPark) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await onPark(job.id);
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to move to Pending. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Minimum date = tomorrow
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -74,8 +90,26 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
           <div className="p-6 space-y-4">
             <p className="text-sm text-gray-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-              Before removing this job, let us know what happened — was it postponed or fully cancelled?
+              What happened with this job — postponed to a date, parked with no date yet, or fully cancelled?
             </p>
+
+            {/* Option: Just put it in Pending (no date) */}
+            {onPark && (
+              <button
+                onClick={handlePark}
+                disabled={loading}
+                className="w-full flex items-center gap-4 p-4 rounded-xl border-2 border-amber-200 bg-amber-50 hover:bg-amber-100 hover:border-amber-400 transition-all text-left group disabled:opacity-60"
+              >
+                <div className="w-11 h-11 rounded-xl bg-amber-500 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                  {loading ? <Loader2 className="w-6 h-6 text-white animate-spin" /> : <Clock className="w-6 h-6 text-white" />}
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-amber-900">Just Put it in Pending</p>
+                  <p className="text-sm text-amber-700 mt-0.5">Contractor doesn&apos;t know the new date yet — park it, no date needed</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-amber-400 group-hover:text-amber-600" />
+              </button>
+            )}
 
             {/* Option A: Reschedule */}
             <button
@@ -106,6 +140,10 @@ export default function CancelJobModal({ job, onClose, onReschedule, onDelete }:
               </div>
               <ChevronRight className="w-5 h-5 text-red-400 group-hover:text-red-600" />
             </button>
+
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>
+            )}
           </div>
         )}
 

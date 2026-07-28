@@ -1521,6 +1521,21 @@ export default function ScheduleBoardPage() {
     fetchScheduleData(selectedDate);
   };
 
+  // "Just put it in Pending" — park with no date (contractor doesn't know when
+  // they'll want it). Lands in the Pending Jobs page to push back up later.
+  const handleParkJob = async (jobId: string) => {
+    const res = await apiFetch(`/api/admin/pending-jobs/${jobId}/park`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: 'Parked — contractor hasn’t set a new date' }),
+    });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      throw new Error(d?.error || 'Failed to move to Pending');
+    }
+    addToast('success', 'Moved to Pending', 'Saved to Pending Jobs — no date needed.');
+    fetchScheduleData(selectedDate);
+  };
+
   const handleDeleteJob = async (jobId: string) => {
     const res = await apiFetch(`/api/admin/job-orders/${jobId}`, { method: 'DELETE' });
     if (!res.ok) {
@@ -2034,6 +2049,7 @@ export default function ScheduleBoardPage() {
           onClose={() => setCancelJobTarget(null)}
           onReschedule={handleRescheduleJob}
           onDelete={handleDeleteJob}
+          onPark={handleParkJob}
         />
       )}
       {notesTarget && <NotesDrawer job={notesTarget} notes={jobNotes[notesTarget.id] || []} onAddNote={handleAddNote} onClose={() => setNotesTarget(null)} />}
