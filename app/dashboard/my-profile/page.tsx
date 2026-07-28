@@ -20,6 +20,7 @@ import Avatar from '@/components/Avatar';
 interface MyProfile {
   id: string;
   full_name: string;
+  job_title: string | null;
   nickname: string | null;
   email: string;
   phone: string | null;
@@ -54,6 +55,7 @@ export default function MyProfilePage() {
 
   // Editable fields
   const [fullName, setFullName] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
   const [nickname, setNickname] = useState('');
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
@@ -186,6 +188,7 @@ export default function MyProfilePage() {
           const p = json.data;
           setProfile(p);
           setFullName(p.full_name || '');
+          setJobTitle(p.job_title || '');
           setNickname(p.nickname || '');
           setPhone(p.phone_number || p.phone || '');
           setDob(p.date_of_birth || '');
@@ -271,6 +274,7 @@ export default function MyProfilePage() {
         method: 'PATCH',
         body: JSON.stringify({
           full_name: fullName.trim() || undefined,
+          job_title: jobTitle.trim() || null,
           nickname: nickname || null,
           phone_number: phone || null,
           date_of_birth: dob || null,
@@ -307,7 +311,9 @@ export default function MyProfilePage() {
     }
   };
 
-  const roleName = profile?.role === 'apprentice' ? 'Helper' : profile?.role === 'operator' ? 'Operator' : profile?.role || '';
+  const roleLabel = profile?.role === 'apprentice' ? 'Helper' : profile?.role === 'operator' ? 'Operator' : profile?.role || '';
+  // Prefer a custom title (e.g. "Ops Dispatch") over the raw role label.
+  const roleName = (profile?.job_title || '').trim() || roleLabel;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0b0618] dark:from-[#0b0618] dark:via-[#0b0618] dark:to-[#0b0618]">
@@ -400,6 +406,18 @@ export default function MyProfilePage() {
                   className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
                 />
                 <p className="mt-1 text-xs text-gray-400 dark:text-white/40">This is the name shown across the app. Fix it here if it&apos;s wrong.</p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">Title</label>
+                <input
+                  type="text"
+                  value={jobTitle}
+                  onChange={(e) => setJobTitle(e.target.value)}
+                  placeholder="e.g. Ops Dispatch"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
+                />
+                <p className="mt-1 text-xs text-gray-400 dark:text-white/40">Shown as your title. Doesn&apos;t change your permissions.</p>
               </div>
 
               <div>
