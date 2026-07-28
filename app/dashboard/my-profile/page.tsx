@@ -283,6 +283,20 @@ export default function MyProfilePage() {
       if (res.ok) {
         const json = await res.json().catch(() => null);
         if (json?.data) setProfile(json.data); // reflect the new name in the header immediately
+        // Refresh the cached user (getCurrentUser/useAuthUser read this) so the
+        // global header + sidebar show the new name after navigation, not the
+        // stale login-time value.
+        const newName = json?.data?.full_name || fullName.trim();
+        if (typeof window !== 'undefined' && newName) {
+          try {
+            const cachedStr = localStorage.getItem('supabase-user');
+            if (cachedStr) {
+              const cached = JSON.parse(cachedStr);
+              cached.name = newName;
+              localStorage.setItem('supabase-user', JSON.stringify(cached));
+            }
+          } catch { /* non-fatal */ }
+        }
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       }

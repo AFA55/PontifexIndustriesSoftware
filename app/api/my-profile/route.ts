@@ -73,6 +73,15 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
     }
 
+    // Keep the auth user's metadata name in sync — the header/sidebar cache the
+    // name at login from here, so without this a name change shows everywhere
+    // that reads profiles (Team Status) but NOT in the cached header. Best-effort.
+    if (updateData.full_name) {
+      supabaseAdmin.auth.admin
+        .updateUserById(auth.userId, { user_metadata: { full_name: updateData.full_name } })
+        .catch((e) => console.error('Failed to sync auth metadata name:', e));
+    }
+
     // ------------------------------------------------------------------
     // Fire-and-forget: notify management in the SAME tenant that this
     // user edited their own profile, so they can review it in Team
