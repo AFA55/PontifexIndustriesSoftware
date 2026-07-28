@@ -36,6 +36,10 @@ interface ReportData {
     count: number; averageRating: number | null;
     items: Array<{ submittedAt: string; overall: number | null; communication: number | null; cleanliness: number | null; wouldRecommend: boolean | null; feedback: string | null; jobNumber?: string; customer?: string }>;
   };
+  helperReviews?: {
+    count: number; averageRating: number | null;
+    items: Array<{ createdAt: string; rating: number | null; comment: string | null; reviewer: string; jobNumber?: string; customer?: string }>;
+  };
 }
 
 export default function OperatorAnnualReportPage() {
@@ -238,6 +242,42 @@ export default function OperatorAnnualReportPage() {
                       </div>
                     </div>
                     {s.feedback && <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-white/60">“{s.feedback}”</p>}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Helper → operator reviews (crew feedback) */}
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03] print:border-slate-300">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">Crew Reviews ({data.helperReviews?.count ?? 0})</h3>
+              {data.helperReviews?.averageRating != null && (
+                <span className="flex items-center gap-1 rounded-full bg-indigo-50 px-3 py-1 text-sm font-bold text-indigo-700">
+                  <Star className="h-4 w-4 fill-indigo-400 text-indigo-400" /> {data.helperReviews.averageRating} / 5 average
+                </span>
+              )}
+            </div>
+            {!data.helperReviews || data.helperReviews.items.length === 0 ? (
+              <p className="text-sm text-slate-400">No crew reviews for {data.year} yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {data.helperReviews.items.map((r, i) => (
+                  <li key={i} className="rounded-xl border border-slate-100 p-3.5 dark:border-white/5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white/85">
+                        {r.reviewer}{r.jobNumber ? ` · ${r.jobNumber}` : ''}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-slate-400">
+                        {r.rating != null && (
+                          <span className="flex items-center gap-0.5 font-bold text-indigo-600">
+                            <Star className="h-3.5 w-3.5 fill-indigo-400 text-indigo-400" />{r.rating}/5
+                          </span>
+                        )}
+                        {new Date(r.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    </div>
+                    {r.comment && <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-white/60">“{r.comment}”</p>}
                   </li>
                 ))}
               </ul>

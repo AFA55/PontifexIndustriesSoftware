@@ -659,14 +659,15 @@ export default function JobDetailPage() {
               </div>
             )}
 
-            {/* Arrived CTA — operators only; helpers ride along and don't control job status */}
+            {/* Continue CTA — operators only; helpers ride along and don't control job status.
+                No "Arrived" step: the jobsite screen advances status to in_progress on load. */}
             {!jobIsHelper && (
               <div className="pt-2 pb-2 space-y-3">
                 <button
                   onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
                   className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
                 >
-                  <CheckCircle2 className="w-6 h-6" /> Arrived — Start In Progress
+                  <CheckCircle2 className="w-6 h-6" /> Continue to Job Site
                 </button>
                 <button
                   onClick={() => setShowNotReady(true)}

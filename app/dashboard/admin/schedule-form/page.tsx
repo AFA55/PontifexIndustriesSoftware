@@ -282,6 +282,76 @@ function computeSawingAreaLinearFt(area: {
   };
 }
 
+// Normalized scope target sent to the API at job creation → seeds job_scope_items
+// so "Job Scope & Progress" + the Progress Chart are populated automatically
+// (and operators can log completion against a real target). Computed CLIENT-side
+// with the SAME math the form displays, so the operator's target == the office's
+// number (no server-side re-derivation divergence).
+type ScopeItemPayload = { work_type: string; unit: string; target_quantity: number; description: string | null };
+
+function buildScopeItemsFromScope(
+  serviceTypes: string[],
+  scopeDetails: Record<string, Record<string, string>>,
+  overcutDefault: boolean,
+): ScopeItemPayload[] {
+  const items: ScopeItemPayload[] = [];
+  const sd = scopeDetails || {};
+  // Union of explicitly-selected services + any that carry measurements.
+  const codes = [...new Set([...(serviceTypes || []), ...Object.keys(sd)])].filter(
+    (c) => c && !c.startsWith('_'), // skip synthetic keys like `_removal`
+  );
+  const parseArr = (raw?: string): any[] => {
+    if (!raw) return [];
+    try { const v = JSON.parse(raw); return Array.isArray(v) ? v : []; } catch { return []; }
+  };
+  const resolveOvercut = (o: unknown): boolean => (typeof o === 'boolean' ? o : overcutDefault);
+
+  for (const code of codes) {
+    const svc = SERVICE_TYPES.find((s) => s.code === code);
+    const label = svc?.label || code;
+    const detail = sd[code] || {};
+
+    let lf = 0;
+    for (const c of parseArr(detail.cuts)) {
+      if (c.length && c.width) {
+        const r = computeSawingAreaLinearFt({
+          length: c.length, width: c.width, qty: '1',
+          cross_cut_lengthwise_ft: c.cross_cut_lengthwise_ft,
+          cross_cut_widthwise_ft: c.cross_cut_widthwise_ft,
+          overcut_allowed: resolveOvercut(c.overcut_allowed),
+        });
+        lf += r ? r.totalLF : 0;
+      } else {
+        lf += parseFloat(c.linear_feet || '0') || 0;
+      }
+    }
+    for (const a of parseArr(detail.areas)) {
+      const r = computeSawingAreaLinearFt({
+        length: a.length, width: a.width, qty: a.qty,
+        cross_cut_lengthwise_ft: a.cross_cut_lengthwise_ft,
+        cross_cut_widthwise_ft: a.cross_cut_widthwise_ft,
+        overcut_allowed: resolveOvercut(a.overcut_allowed),
+      });
+      lf += r ? r.totalLF : 0;
+    }
+    let holes = 0;
+    for (const h of parseArr(detail.holes)) holes += parseInt(h.qty) || 0;
+
+    if (lf > 0) {
+      items.push({ work_type: label, unit: 'linear_ft', target_quantity: Math.round(lf * 10) / 10, description: `${label} — linear ft` });
+    }
+    if (holes > 0) {
+      items.push({ work_type: label, unit: 'holes', target_quantity: holes, description: `${label} — holes` });
+    }
+    // Selected service with no measurable target (Demo, Brokk, GPR, Other, …) →
+    // a manual-percent item so the operator logs % complete directly.
+    if (lf === 0 && holes === 0 && (serviceTypes || []).includes(code)) {
+      items.push({ work_type: label, unit: 'percent', target_quantity: 100, description: `${label} — % complete` });
+    }
+  }
+  return items;
+}
+
 const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
   'ECD': {
     items: [
@@ -1777,6 +1847,9 @@ export default function ScheduleFormPage() {
           ...(form.scope_details || {}),
           ...(form.removal_needed ? { _removal: { needed: 'true', method: form.removal_method, equipment: form.removal_equipment } } : {}),
         },
+        // Normalized progress targets (seeds job_scope_items on CREATE only; edits
+        // manage scope via the Job Scope panel so manual target tweaks aren't wiped).
+        scope_items: buildScopeItemsFromScope(form.service_types, form.scope_details, form.overcutting_allowed),
         scope_photo_urls: form.scope_photo_urls.length > 0 ? form.scope_photo_urls : [],
         // Step 4
         equipment_needed: form.equipment_needed,

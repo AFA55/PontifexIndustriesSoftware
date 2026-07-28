@@ -33,6 +33,7 @@ import {
 import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey';
+import JobProgressLogger from '@/components/JobProgressLogger';
 
 // Shop location for "Directions back to shop". Hardcoded for now — Patriot's
 // verified shop coordinates. TODO: make tenant-configurable (e.g. read from
@@ -1106,6 +1107,9 @@ export default function DayCompletePage() {
             <span className="text-sm text-gray-600 dark:text-gray-300">Photos prohibited on this site (no photos allowed)</span>
           </label>
         </div>
+
+        {/* ── Job Progress (against office-set targets; renders only if targets exist) ── */}
+        <JobProgressLogger jobId={jobId} />
 
         {/* ── Subsistence (out-of-town overnight) ───────────────────────────── */}
         {isOutOfTown && (

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .maybeSingle();
   if (!person) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
 
-  const [cardsRes, timeOffRes, surveysRes, attendanceRes] = await Promise.all([
+  const [cardsRes, timeOffRes, surveysRes, attendanceRes, helperReviewsRes] = await Promise.all([
     supabaseAdmin
       .from('timecards')
       .select('date, net_hours, total_hours, regular_hours, overtime_hours, is_late, late_minutes, out_of_town, is_shop_hours')
@@ -64,6 +64,15 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .eq('user_id', id)
       .gte('date', start)
       .lte('date', end),
+    // Helper → operator reviews (crew feedback) left for THIS operator this year.
+    supabaseAdmin
+      .from('job_helper_reviews')
+      .select('job_order_id, reviewer_id, rating, comment, created_at')
+      .eq('tenant_id', auth.tenantId)
+      .eq('operator_id', id)
+      .gte('created_at', `${year}-01-01T00:00:00Z`)
+      .lt('created_at', `${year + 1}-01-01T00:00:00Z`)
+      .order('created_at', { ascending: false }),
   ]);
   if (cardsRes.error) return NextResponse.json({ error: cardsRes.error.message }, { status: 500 });
 
@@ -153,6 +162,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const ratings = surveys.map((s: any) => Number(s.overall_rating)).filter((n) => Number.isFinite(n) && n > 0);
   const avgRating = ratings.length ? round(ratings.reduce((a, b) => a + b, 0) / ratings.length) : null;
 
+  // Helper → operator reviews: resolve reviewer names + job numbers for display.
+  const helperReviews = helperReviewsRes?.data ?? [];
+  const reviewerIds = [...new Set(helperReviews.map((r: any) => r.reviewer_id).filter(Boolean))];
+  const reviewJobIds = [...new Set(helperReviews.map((r: any) => r.job_order_id).filter(Boolean))];
+  const reviewerNames = reviewerIds.length
+    ? new Map(
+        ((await supabaseAdmin.from('profiles').select('id, full_name').eq('tenant_id', auth.tenantId).in('id', reviewerIds)).data ?? [])
+          .map((p: any) => [p.id, p.full_name])
+      )
+    : new Map();
+  const reviewJobNumbers = reviewJobIds.length
+    ? new Map(
+        ((await supabaseAdmin.from('job_orders').select('id, job_number, customer_name').eq('tenant_id', auth.tenantId).in('id', reviewJobIds)).data ?? [])
+          .map((j: any) => [j.id, { jobNumber: j.job_number, customer: j.customer_name }])
+      )
+    : new Map();
+  const helperRatings = helperReviews.map((r: any) => Number(r.rating)).filter((n) => Number.isFinite(n) && n > 0);
+  const helperAvg = helperRatings.length ? round(helperRatings.reduce((a, b) => a + b, 0) / helperRatings.length) : null;
+
   return NextResponse.json({
     success: true,
     data: {
@@ -171,6 +199,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           wouldRecommend: s.would_recommend,
           feedback: s.feedback_text,
           ...(jobNumbers.get(s.job_order_id) ?? {}),
+        })),
+      },
+      helperReviews: {
+        count: helperReviews.length,
+        averageRating: helperAvg,
+        items: helperReviews.map((r: any) => ({
+          createdAt: r.created_at,
+          rating: r.rating,
+          comment: r.comment,
+          reviewer: reviewerNames.get(r.reviewer_id) ?? 'Helper',
+          ...(reviewJobNumbers.get(r.job_order_id) ?? {}),
         })),
       },
     },

@@ -53,6 +53,7 @@ const UNIT_OPTIONS = [
   { value: 'holes', label: 'Holes' },
   { value: 'hours', label: 'Hours' },
   { value: 'items', label: 'Items' },
+  { value: 'percent', label: '% Complete (demo/manual)' },
 ];
 
 const WORK_TYPE_LABELS: Record<string, string> = Object.fromEntries(

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
 import {
   CheckCircle2, Send, FileText, ArrowRight, Wrench,
-  Clock, Loader2, ChevronDown, ChevronUp, Building2, Mic, Square
+  Clock, Loader2, ChevronDown, ChevronUp, Building2, Mic, Square, Star
 } from 'lucide-react';
 
 interface HelperWorkLogProps {
@@ -27,7 +27,7 @@ interface OtherJob {
   status: string;
 }
 
-type Step = 'work_log' | 'submitting' | 'transition' | 'completed';
+type Step = 'work_log' | 'rate_operator' | 'submitting' | 'transition' | 'completed';
 
 function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -46,6 +46,12 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
   const [showScopeDetails, setShowScopeDetails] = useState(false);
   const [startingShop, setStartingShop] = useState(false);
   const [hoursOnThisJob, setHoursOnThisJob] = useState<string | null>(null);
+
+  // Helper → operator review (feeds the operator's performance/raise review).
+  const operatorName: string | null = job?.operator_name || null;
+  const canRateOperator = Boolean(operatorName && job?.assigned_to);
+  const [operatorRating, setOperatorRating] = useState<number | null>(null);
+  const [operatorComment, setOperatorComment] = useState('');
 
   // Voice-to-text: dictate what you did; transcript is appended to the work log.
   const handleVoiceResult = useCallback((transcript: string) => {
@@ -98,8 +104,21 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
     }
   };
 
-  // Submit work log AND complete the day for this job
-  const handleCompleteDay = async () => {
+  // Step 1 of Complete Day: log the work, then ask the helper to rate the operator
+  // (if there is one) before finishing. Skips straight to submit if no operator.
+  const handleCompleteDayPressed = () => {
+    if (!workDescription.trim()) return;
+    if (canRateOperator) {
+      setStep('rate_operator');
+    } else {
+      void handleCompleteDay();
+    }
+  };
+
+  // Submit work log AND complete the day for this job.
+  // opts.skipReview forces NO review even if a star was tapped — state updates are
+  // async, so Skip must pass this explicitly rather than relying on setOperatorRating(null).
+  const handleCompleteDay = async (opts?: { skipReview?: boolean }) => {
     if (!workDescription.trim()) return;
     setSubmitting(true);
     setStep('submitting');
@@ -107,6 +126,8 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+
+      const includeReview = !opts?.skipReview;
 
       // Submit work log with completed_at timestamp
       const response = await fetch('/api/helper-work-log', {
@@ -119,6 +140,10 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
           job_order_id: jobId,
           work_description: workDescription.trim(),
           complete: true, // Signal to set completed_at and calculate hours
+          // Helper → operator review (optional). Server ignores if out of range /
+          // self-review; only recorded on this completion.
+          operator_rating: includeReview ? (operatorRating ?? undefined) : undefined,
+          operator_review_comment: includeReview ? (operatorComment.trim() || undefined) : undefined,
         }),
       });
 
@@ -409,6 +434,71 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
     );
   }
 
+  // ── RATE OPERATOR STATE ──
+  // Helper rates the operator they worked under. Private to management (feeds the
+  // operator's performance/raise review). Skippable.
+  if (step === 'rate_operator') {
+    return (
+      <div className="bg-white/95 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 p-6">
+        <div className="text-center mb-5">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center mx-auto mb-3">
+            <Star className="w-6 h-6 text-white" />
+          </div>
+          <h3 className="text-lg font-bold text-gray-900">How was working with {operatorName}?</h3>
+          <p className="text-xs text-gray-500 mt-1">Private to management — it&apos;s part of their review.</p>
+        </div>
+
+        <div className="flex items-center justify-center gap-2 mb-4">
+          {[1, 2, 3, 4, 5].map((n) => (
+            <button
+              key={n}
+              type="button"
+              onClick={() => setOperatorRating(n)}
+              aria-label={`${n} star${n > 1 ? 's' : ''}`}
+              className="p-1"
+            >
+              <Star
+                className={`w-9 h-9 transition-colors ${
+                  operatorRating && n <= operatorRating
+                    ? 'text-amber-400 fill-amber-400'
+                    : 'text-gray-300'
+                }`}
+              />
+            </button>
+          ))}
+        </div>
+
+        <textarea
+          value={operatorComment}
+          onChange={(e) => setOperatorComment(e.target.value)}
+          placeholder="Anything to add? (optional)"
+          rows={3}
+          className="w-full px-3 py-2.5 rounded-xl border-2 border-gray-200 text-base text-gray-900 focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none resize-none"
+        />
+
+        <div className="mt-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => void handleCompleteDay({ skipReview: true })}
+            disabled={submitting}
+            className="flex-1 px-3 py-2.5 rounded-xl font-semibold text-sm border-2 border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40"
+          >
+            Skip
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleCompleteDay()}
+            disabled={submitting || !operatorRating}
+            className="flex-[2] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <CheckCircle2 className="w-4 h-4" />
+            Submit &amp; Finish
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ── WORK LOG ENTRY STATE (default) ──
   return (
     <div className="space-y-4">
@@ -537,7 +627,7 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, jobTitle
             Save Draft
           </button>
           <button
-            onClick={handleCompleteDay}
+            onClick={handleCompleteDayPressed}
             disabled={submitting || !workDescription.trim()}
             className="flex-[2] flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-bold text-sm transition-all bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg hover:shadow-xl disabled:opacity-40 disabled:cursor-not-allowed"
           >

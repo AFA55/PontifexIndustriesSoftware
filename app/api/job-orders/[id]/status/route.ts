@@ -231,6 +231,12 @@ async function updateJobStatus(
       updateData.work_started_at = now;
       updateData.work_start_latitude = latitude;
       updateData.work_start_longitude = longitude;
+      // The operator flow no longer has a separate "Arrived" (on_site) tap — it
+      // goes in_route → in_progress directly. Stamp arrival = work start so the
+      // admin/portal/signature timelines still show a real arrival time.
+      if (!existingJob.arrived_at_jobsite_at) {
+        updateData.arrived_at_jobsite_at = now;
+      }
     }
 
     // ─────────────────────────────────────────────────────────────────────

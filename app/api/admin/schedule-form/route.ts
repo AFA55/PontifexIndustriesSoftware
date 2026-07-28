@@ -188,6 +188,42 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Schedule Form job created: ${jobNumber} by ${profile?.full_name}`);
 
+    // ── Seed job_scope_items (progress targets) ────────────────
+    // The form computes normalized targets client-side (same math it displays) and
+    // sends them as scope_items[]. Insert them so "Job Scope & Progress" + the
+    // Progress Chart are populated and operators can log completion against a real
+    // target. Best-effort: never fail job creation over this.
+    try {
+      const rawScopeItems = Array.isArray(body.scope_items) ? body.scope_items : [];
+      const ALLOWED_UNITS = new Set(['linear_ft', 'holes', 'percent', 'sq_ft', 'items', 'each', 'hours']);
+      const scopeRows = rawScopeItems
+        .map((it: any, idx: number) => {
+          const work_type = typeof it?.work_type === 'string' ? it.work_type.trim() : '';
+          const target = Number(it?.target_quantity);
+          if (!work_type || !Number.isFinite(target) || target < 0) return null;
+          const unit = typeof it?.unit === 'string' && ALLOWED_UNITS.has(it.unit) ? it.unit : 'linear_ft';
+          return {
+            tenant_id: resolvedTenantId,
+            job_order_id: jobOrder.id,
+            work_type,
+            description: typeof it?.description === 'string' ? it.description : null,
+            unit,
+            target_quantity: target,
+            sort_order: idx,
+            added_by: auth.userId,
+            added_at: new Date().toISOString(),
+          };
+        })
+        .filter(Boolean);
+
+      if (scopeRows.length > 0) {
+        const { error: scopeErr } = await supabaseAdmin.from('job_scope_items').insert(scopeRows);
+        if (scopeErr) console.error('Error seeding job_scope_items:', scopeErr);
+      }
+    } catch (scopeSeedErr) {
+      console.warn('Scope-item seeding failed (non-critical):', scopeSeedErr);
+    }
+
     // ── Track submission in schedule_form_submissions ──────────
     Promise.resolve(
       supabaseAdmin.from('schedule_form_submissions').insert({

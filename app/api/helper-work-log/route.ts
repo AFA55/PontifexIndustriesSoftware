@@ -29,7 +29,9 @@ export async function POST(request: NextRequest) {
       log_date,
       complete,      // boolean: mark as completed (sets completed_at + hours)
       start_now,     // boolean: set started_at to now
-      is_shop_ticket // boolean: this is an in-shop work log
+      is_shop_ticket, // boolean: this is an in-shop work log
+      operator_rating,          // optional 1-5: helper rates the operator (end of day)
+      operator_review_comment,  // optional text
     } = body;
 
     const today = log_date || new Date().toISOString().split('T')[0];
@@ -128,6 +130,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not assigned to this job' }, { status: 403 });
     }
 
+    // Helper → operator review (optional, on the end-of-day completion). Feeds the
+    // operator's performance/raise review. Best-effort: never fail the work log
+    // over a review write. Requires a distinct operator (skip if the caller is the
+    // operator on the ticket). Upserts on (job_order_id, reviewer_id).
+    const maybeRecordOperatorReview = async () => {
+      if (!complete || operator_rating == null) return;
+      const rating = Math.round(Number(operator_rating));
+      if (!Number.isFinite(rating) || rating < 1 || rating > 5) return;
+      const operatorId = job.assigned_to;
+      if (!operatorId || operatorId === auth.userId) return; // no self-review
+      if (!tenantId) return;
+      const comment =
+        typeof operator_review_comment === 'string' && operator_review_comment.trim()
+          ? operator_review_comment.trim().slice(0, 2000)
+          : null;
+      const { error: reviewErr } = await supabaseAdmin
+        .from('job_helper_reviews')
+        .upsert(
+          {
+            tenant_id: tenantId,
+            job_order_id,
+            reviewer_id: auth.userId,
+            operator_id: operatorId,
+            rating,
+            comment,
+          },
+          { onConflict: 'job_order_id,reviewer_id' },
+        );
+      if (reviewErr) console.error('Error saving helper→operator review:', reviewErr);
+    };
+
     // Check for existing log
     let existingQuery = supabaseAdmin
       .from('helper_work_logs')
@@ -163,6 +196,8 @@ export async function POST(request: NextRequest) {
         console.error('Error updating helper work log:', updateError);
         return NextResponse.json({ error: 'Failed to update work log' }, { status: 500 });
       }
+
+      await maybeRecordOperatorReview();
 
       return NextResponse.json({
         success: true,
@@ -231,6 +266,8 @@ export async function POST(request: NextRequest) {
         console.error('Error inserting helper work log:', insertError);
         return NextResponse.json({ error: 'Failed to create work log' }, { status: 500 });
       }
+
+      await maybeRecordOperatorReview();
 
       return NextResponse.json({
         success: true,

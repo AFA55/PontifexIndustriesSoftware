@@ -526,7 +526,10 @@ export default function AdminJobDetailPage({
       const res = await apiFetch(`/api/admin/jobs/${jobId}/scope`);
       if (res.ok) {
         const json = await res.json();
-        setScopeItems(json.data?.scope_items || []);
+        // The scope route returns the array under `data` (and a mirror under
+        // `meta.scope_items`). Reading json.data.scope_items was always undefined
+        // → the Progress Chart's bar colors never got their scope list.
+        setScopeItems(Array.isArray(json.data) ? json.data : (json.meta?.scope_items || []));
       }
     } catch { /* ignore */ }
   }, [jobId]);

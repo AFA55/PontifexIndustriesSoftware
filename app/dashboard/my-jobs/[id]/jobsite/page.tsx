@@ -98,7 +98,7 @@ export default function JobsitePage() {
     fetchDocuments();
   }, [fetchJob, fetchDocuments]);
 
-  const handleArrivedOnJobSite = () => {
+  const handleStartWork = () => {
     router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
   };
 
@@ -419,14 +419,15 @@ export default function JobsitePage() {
           </div>
         )}
 
-        {/* Arrived on Job Site Button */}
+        {/* Start Work — advances to the work-performed log (status already moved to
+            in_progress on load; no separate "Arrived" step). */}
         <div className="pt-2 pb-safe">
           <button
-            onClick={handleArrivedOnJobSite}
+            onClick={handleStartWork}
             className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
           >
             <CheckCircle className="w-6 h-6" />
-            Arrived on Job Site
+            Start Work
           </button>
         </div>
 
