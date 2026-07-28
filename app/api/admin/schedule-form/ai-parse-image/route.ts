@@ -140,7 +140,27 @@ This is a first-pass draft the estimator will review and correct, so be accurate
       },
     });
   } catch (error: any) {
-    console.error('Error in AI image parse:', error?.message);
-    return NextResponse.json({ error: 'Could not read the ticket photo. Try a clearer, well-lit, straight-on picture.' }, { status: 500 });
+    const msg = error?.message || String(error);
+    // Log full detail server-side to diagnose "worked before, broke today".
+    console.error('Error in AI image parse:', msg, error?.statusCode ?? '', error?.cause ?? '');
+    // The common failure isn't a bad photo — it's the AI Gateway losing its key
+    // or running out of credits. Detect that and tell the estimator plainly so
+    // they fall back to manual entry instead of retaking photos forever.
+    const lc = msg.toLowerCase();
+    const gatewayIssue =
+      lc.includes('api key') || lc.includes('unauthorized') || lc.includes('forbidden') ||
+      lc.includes('401') || lc.includes('402') || lc.includes('403') ||
+      lc.includes('credit') || lc.includes('quota') || lc.includes('insufficient') ||
+      lc.includes('billing') || lc.includes('gateway') || lc.includes('payment');
+    return NextResponse.json(
+      {
+        error: gatewayIssue
+          ? 'The ticket scanner is temporarily unavailable (AI service). Please enter the ticket details manually for now.'
+          : 'Could not read the ticket photo. Try a clearer, well-lit, straight-on picture — or enter the details manually.',
+        // Non-secret hint to help diagnosis; safe to show (no keys/PII).
+        detail: msg.slice(0, 300),
+      },
+      { status: 500 },
+    );
   }
 }

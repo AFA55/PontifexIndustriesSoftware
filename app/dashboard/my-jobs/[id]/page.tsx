@@ -24,6 +24,7 @@ import { PhotoViewer } from '@/components/PhotoUploader';
 // HelperWorkLog only renders when the user is in the helper slot on this job.
 // Whoever is assigned as `assigned_to` gets the full operator flow regardless of their profile role.
 const HelperWorkLog = nextDynamic(() => import('../_components/HelperWorkLog'), { ssr: false });
+const JobNotReadyModal = nextDynamic(() => import('../_components/JobNotReadyModal'), { ssr: false });
 
 function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -64,6 +65,7 @@ export default function JobDetailPage() {
   const [userId, setUserId] = useState<string>('');
   const [startingRoute, setStartingRoute] = useState(false);
   const [dayNumber, setDayNumber] = useState<number>(1);
+  const [showNotReady, setShowNotReady] = useState(false);
 
   // Equipment checklist state
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -659,12 +661,18 @@ export default function JobDetailPage() {
 
             {/* Arrived CTA — operators only; helpers ride along and don't control job status */}
             {!jobIsHelper && (
-              <div className="pt-2 pb-6">
+              <div className="pt-2 pb-2 space-y-3">
                 <button
                   onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
                   className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
                 >
                   <CheckCircle2 className="w-6 h-6" /> Arrived — Start In Progress
+                </button>
+                <button
+                  onClick={() => setShowNotReady(true)}
+                  className="w-full py-4 rounded-2xl font-bold text-base transition-all border-2 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 flex items-center justify-center gap-2"
+                >
+                  <AlertTriangle className="w-5 h-5" /> Job Not Ready
                 </button>
               </div>
             )}
@@ -1384,6 +1392,18 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* Job Not Ready — arrived on-site but the contractor/site wasn't ready */}
+        {!isCompleted && !isOnHold && !jobIsHelper && (
+          <div className="pt-2">
+            <button
+              onClick={() => setShowNotReady(true)}
+              className="w-full py-4 rounded-2xl font-bold text-base transition-all border-2 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 flex items-center justify-center gap-2"
+            >
+              <AlertTriangle className="w-5 h-5" /> Job Not Ready
+            </button>
+          </div>
+        )}
+
         {/* Resume On-Hold Job */}
         {isOnHold && !jobIsHelper && (
           <div className="pt-2">
@@ -1412,6 +1432,14 @@ export default function JobDetailPage() {
         </> /* end full job view */}
 
       </div>
+
+      {showNotReady && job && (
+        <JobNotReadyModal
+          jobId={job.id}
+          jobNumber={job.job_number}
+          onClose={() => setShowNotReady(false)}
+        />
+      )}
     </div>
   );
 }

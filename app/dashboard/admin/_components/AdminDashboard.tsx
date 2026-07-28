@@ -17,6 +17,7 @@ import Link from 'next/link';
 import {
   Activity, Clock, Umbrella, DollarSign, Receipt, ClipboardList,
   CheckCircle2, ChevronRight, AlertCircle, Briefcase, CalendarDays, ListChecks, Calculator,
+  AlertTriangle,
 } from 'lucide-react';
 import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
@@ -96,6 +97,7 @@ export default function AdminDashboard({ user, dashData, dashLoading, activeJobs
     { label: 'Timecards',      href: '/dashboard/admin/timecards',       Icon: Clock,        cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40' },
     { label: 'Time Off',       href: '/dashboard/admin/time-off',        Icon: Umbrella,     cls: 'bg-sky-50 dark:bg-sky-900/20 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-800/40' },
     { label: 'Active Jobs',    href: '/dashboard/admin/active-jobs',     Icon: Briefcase,    cls: 'bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-800/40' },
+    { label: 'Pending Jobs',   href: '/dashboard/admin/pending-jobs',    Icon: AlertTriangle, cls: 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800/40' },
     { label: 'Completed Jobs', href: '/dashboard/admin/completed-jobs',  Icon: CheckCircle2, cls: 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/40' },
     { label: 'Billing',        href: '/dashboard/admin/billing',         Icon: Receipt,      cls: 'bg-fuchsia-50 dark:bg-fuchsia-900/20 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-800/40' },
     { label: 'Tools',          href: '/dashboard/tools',                 Icon: Calculator,   cls: 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/40' },

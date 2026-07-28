@@ -1,5 +1,12 @@
 # Twilio Toll-Free Verification — Resubmission Fix
 
+> ## ✅ RESOLVED — APPROVED (Jul 27, 2026)
+> Toll-free `+18336954288` verification is **Approved** in Twilio (Compliance registration →
+> Toll-free registration → *Approved*, registration `HHe2d58ddd57b644f50a7dac05706e9ffd`). SMS +
+> MMS + Voice are enabled and the platform is delivering (Patriot sent 6+ texts via Twilio incl.
+> Jul 27). **No further action, no code changes.** The resubmit fix below worked — kept for history.
+> (The dashboard's "Continue set up" nudge is stale UI, not a real pending step.)
+
 **Rejection:** Error 30530 — "Entity Misclassification (Legal Entity Type Mismatch)" (internal
 reason code 1104). Number: `+18336954288`. Deadline to resubmit into the PRIORITY queue: **Jul 9,
 2026** (after that it still resubmits, just at normal/non-prioritized turnaround).
