@@ -96,6 +96,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Schedule Board', href: '/dashboard/admin/schedule-board', icon: Calendar, flagKey: 'can_view_schedule_board', moduleKey: 'scheduling' },
       // Active Jobs is CORE (operator/job spine) — never gated.
       { label: 'Active Jobs', href: '/dashboard/admin/active-jobs', icon: Briefcase, flagKey: 'can_view_active_jobs' },
+      { label: 'Pending Jobs', href: '/dashboard/admin/pending-jobs', icon: Clock, roles: ['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'] },
       { label: 'Schedule Form', href: '/dashboard/admin/schedule-form', icon: FileEdit, flagKey: 'can_create_schedule_forms', moduleKey: 'scheduling' },
       // Job board (hiring module) — shows only for tenants with features.hiring = true.
       // Takeoffs (estimating) — shows only for tenants with features.takeoffs = true.

@@ -39,7 +39,8 @@ export async function GET(request: NextRequest) {
         priority
       `)
       .eq('tenant_id', auth.tenantId)
-      .not('status', 'in', '("completed","cancelled","archived","pending_approval")')
+      // Exclude on_hold too — parked jobs live in the Pending Jobs page, not here.
+      .not('status', 'in', '("completed","cancelled","archived","pending_approval","on_hold")')
       .order('scheduled_date', { ascending: true });
 
     if (shouldScope) {

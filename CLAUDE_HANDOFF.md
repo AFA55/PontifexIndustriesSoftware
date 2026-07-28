@@ -1,6 +1,60 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 21, 2026 | **Branch:** `main` | **Prod:** ✅ LIVE through `9d133b5f`; **1 UNPUSHED commit** (privacy policy v1.2 + compliance batch 4 — push with next batch).
+**Last updated:** Jul 28, 2026 (Opus 4.8) | **Branch:** `main` | **Prod:** ✅ LIVE, all pushed through `27dafa37` + the Active-Jobs/Pending-nav batch. Clean tree except that last batch (commit + push it).
+
+> ## 📌 Jul 27–28 session (Opus 4.8) — big field-ops batch, all shipped
+> Long session, many founder requests, each guardian-reviewed + pushed. All LIVE on prod.
+> - **Operator cost security + editable project cost** (`11e9886a`, `fded7c9b`): operator API
+>   `/api/job-orders` now strips ALL office-only money fields (`stripOfficeOnly`: estimated_cost,
+>   job_quote, hours, P&L) for non-admins — they never reach the device. Office "Total project
+>   cost" is editable (→ `job_orders.job_quote`) and **approved change orders roll into the total**
+>   (base + approved COs; pending excluded). Panel: `components/admin/OfficeDocumentsPanel.tsx`;
+>   route `/api/admin/jobs/[id]/office-documents` (GET base+CO total, new PATCH sets job_quote).
+> - **Edit-save bug fixed** (`11e9886a`): EditJobPanel sent `undefined` on cleared fields → JSON
+>   dropped them → PATCH never cleared. Now sends `null`; admin PATCH coerces estimated_cost/hours
+>   to number-or-null (empty '' was crashing the numeric column). Full-job editor (schedule-form
+>   `?editJobId`) now SAVES everything it loads (was silently dropping most fields); summary route
+>   extended so the round-trip can't wipe data.
+> - **Project Manager** (`81aec7c1`): new `job_orders.project_manager_id` (managers & admins only,
+>   `/api/admin/project-managers`). Picker in schedule-form + EditJobPanel + PM badge on
+>   JobDetailView. PM notified on "Job Not Ready".
+> - **Landscape dispatch ticket** (`fded7c9b`): the PRINTED ticket is `app/dashboard/admin/jobs/[id]/print/page.tsx`
+>   (HTML `window.print()`, NOT the @react-pdf one). Now landscape + adds jobsite conditions,
+>   equipment, PPE, PM, difficulty, compliance. Data was already in the summary route.
+> - **SMS opt-in button state** (`fded7c9b`): `sms_consent.requested_at` added; button shows
+>   Send → Request sent → Opted in (was in-memory only). `/api/admin/sms-opt-in-status`.
+> - **Job Not Ready → Pending Jobs** (`4bd9d6d5`?/`5a4c31b2`/`27dafa37`): operator red "Job Not
+>   Ready" button (my-jobs/[id]) → reason + GPS photos + on-site signature → `job_not_ready_reports`
+>   table → job parks to `on_hold` + PM notified. **Pending Jobs page** `/dashboard/admin/pending-jobs`
+>   (list + reschedule/push-up + `suggest-dates` = next weekdays a skill-matched, free operator).
+>   "Move to Pending" button on JobDetailView + a **third "Just put it in Pending" option** on the
+>   Remove-from-Schedule dialog (no date needed). Routes under `/api/admin/pending-jobs/[id]/{park,reactivate,suggest-dates}`.
+> - **Helper clock-out bug FIXED** (`c9df6e18`): apprentice clock-out gate treated a parked
+>   (on_hold) job as an outstanding ticket + hard-blocked 403 with no escape → helper stuck.
+>   Now excludes cancelled/on_hold/pending/completed, multi-day aware, and is a SOFT 409 with
+>   "clock out anyway" (mirrors operator). File `app/api/timecard/clock-out/route.ts` + dashboard modal.
+> - **Name/title propagation** (`91657406`,`74bdcaff`,`bfe3827c`,`10231609`): My Profile now edits
+>   Full Name + a **Title** (`profiles.job_title`, display-only, shown as the badge instead of raw
+>   role — Andres's = "Ops Dispatch"). Name change syncs auth metadata + refreshes the cached
+>   sidebar name (DashboardSidebar self-heals from DB on load — no re-login needed).
+> - **Contact dropdown + photo upload** (`006830cb`/`11e9886a`): on-site contact now appears
+>   (create route awaits the insert; read route surfaces primary contact; form re-fetches).
+>   PhotoUploader: compress-before-size-check, HEIC-aware, clear error box.
+> - **Concrete weight calculator** + **Tools hub** (`/dashboard/tools`) for all users; Takeoffs back button.
+> - **DB/account:** gmail `andres.altamirano1280@gmail.com` MOVED Pontifex super_admin → **Patriot
+>   operations_manager** (founder wanted his gmail on Patriot; kept andres@pontifexindustries.com as
+>   Pontifex super_admin). One-email-one-tenant enforced. **Twilio toll-free +18336954288 = APPROVED/LIVE**
+>   (see memory `twilio-sms-live`). Active-Jobs API now excludes `on_hold`; **Pending Jobs added to
+>   sidebar nav**. Pinnacle (JOB-2026-815303) parked to Pending per founder.
+> - **Test data:** deleted TEST01/TEST02/DEMO01. **`JOB-2026-MYTEST` KEPT** — assigned to Demo
+>   Operator (`demo@pontifex.com`/PontifexDemo2026!), site contact = founder's +14706586313, so
+>   walking it to completion + "send signature link" texts the founder to demo the customer flow.
+> - **NEXT:** founder to walk MYTEST as demo operator (customer SMS/sign/survey); then crew plan /
+>   shop tickets; takeoffs T3 (exports/quote handoff). Migrations this session (all additive, applied):
+>   project_manager_id, sms_consent.requested_at + method CHECK, job_not_ready_reports, on_hold_* cols,
+>   profiles.job_title.
+
+**Prior — Last updated:** Jul 21, 2026 | **Prod:** ✅ LIVE through `9d133b5f`.
 
 > ## 📌 Jul 22 session (Fable 5) — TAKEOFFS MODULE SHIPPED
 > - **Takeoffs live for Patriot** (`10c7b1ec`): /dashboard/takeoffs — upload PDF plan sets
