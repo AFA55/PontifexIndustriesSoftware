@@ -199,6 +199,8 @@ export default function OperatorProfilesPage() {
   // Skill summary state (top-3 rated skills for the selected operator)
   const [skillSummary, setSkillSummary] = useState<{ name: string; rating: number }[]>([]);
   const [history, setHistory] = useState<OperatorHistory | null>(null);
+  const [rateInput, setRateInput] = useState('');
+  const [savingRate, setSavingRate] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [notes, setNotes] = useState<OperatorNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
@@ -386,6 +388,27 @@ export default function OperatorProfilesPage() {
     const res = await apiFetch(`/api/admin/operators/${selectedId}/notes?noteId=${noteId}`, { method: 'DELETE' });
     if (res.ok) {
       fetchNotes(selectedId);
+    }
+  };
+
+  // Save an operator's hourly (labor) rate — feeds P&L labor cost = rate × hours.
+  const saveRate = async () => {
+    if (!selectedId) return;
+    const val = rateInput.trim();
+    const num = val === '' ? null : Number(val);
+    if (num !== null && (!Number.isFinite(num) || num <= 0)) return;
+    setSavingRate(true);
+    try {
+      const res = await apiFetch(`/api/admin/operator-profiles/${selectedId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ hourly_rate: num }),
+      });
+      if (res.ok) {
+        setRateInput('');
+        fetchDetail(selectedId);
+      }
+    } finally {
+      setSavingRate(false);
     }
   };
 
@@ -632,7 +655,7 @@ export default function OperatorProfilesPage() {
                     { key: 'timecards', label: 'Timecards', icon: Clock },
                     { key: 'notes', label: 'Notes & Reviews', icon: MessageSquare },
                     { key: 'skills', label: 'Skills', icon: Zap },
-                    ...(currentUserRole === 'super_admin' ? [{ key: 'pay', label: 'Pay & Comp', icon: DollarSign }] : []),
+                    ...(['super_admin', 'operations_manager', 'admin'].includes(currentUserRole) ? [{ key: 'pay', label: 'Pay & Comp', icon: DollarSign }] : []),
                   ] as { key: typeof detailTab; label: string; icon: typeof Star }[]).map(({ key, label, icon: Icon }) => (
                     <button
                       key={key}
@@ -1072,8 +1095,8 @@ export default function OperatorProfilesPage() {
                   </div>
                 )}
 
-                {/* ── Pay & Compensation Tab (super_admin only) ─ */}
-                {detailTab === 'pay' && currentUserRole === 'super_admin' && (
+                {/* ── Pay & Compensation Tab (management only) ─ */}
+                {detailTab === 'pay' && ['super_admin', 'operations_manager', 'admin'].includes(currentUserRole) && (
                   <div className="space-y-4">
                     {/* Current Rate */}
                     {(history.profile as any).hourly_rate && (
@@ -1101,15 +1124,26 @@ export default function OperatorProfilesPage() {
                       </div>
                     ) : (
                       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-4">Compensation</h3>
-                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3">
-                          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-sm font-semibold text-amber-800">Pay tracking coming soon</p>
-                            <p className="text-xs text-amber-700 mt-1">
-                              Hourly rate management, pay history timeline, and rate change tracking will be available in a future update.
-                            </p>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Set Hourly (Labor) Rate</h3>
+                        <p className="text-xs text-gray-500 mb-3">Drives labor cost on job P&amp;L (rate × hours worked). Admin-only; operators can&apos;t see or set this.</p>
+                        <div className="flex items-center gap-2">
+                          <div className="relative flex-1 max-w-[180px]">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">$</span>
+                            <input
+                              type="number" min="0" step="0.01" inputMode="decimal"
+                              value={rateInput}
+                              onChange={(e) => setRateInput(e.target.value)}
+                              placeholder={(history.profile as any).hourly_rate ? String((history.profile as any).hourly_rate) : '0.00'}
+                              className="w-full pl-7 pr-3 py-2.5 rounded-lg border border-gray-300 text-gray-900 focus:border-brand focus:ring-2 focus:ring-brand/20 outline-none"
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">/hr</span>
                           </div>
+                          <button
+                            type="button" onClick={saveRate} disabled={savingRate || !rateInput.trim()}
+                            className="px-4 py-2.5 rounded-lg bg-brand text-white font-semibold text-sm hover:bg-brand-dark disabled:opacity-50"
+                          >
+                            {savingRate ? 'Saving…' : 'Save Rate'}
+                          </button>
                         </div>
                       </div>
                     )}

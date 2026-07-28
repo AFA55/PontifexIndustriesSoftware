@@ -384,6 +384,27 @@ export async function POST(request: NextRequest) {
       insertData.remote_verified = null; // null = pending review
     }
 
+    // Associate the job the operator is on today so the timecard shows WHERE
+    // they were (job) and WHO they're with (crew is derived from same job+date).
+    // Best-effort — never blocks the clock-in.
+    if (tenantId) {
+      try {
+        const { data: todaysJob } = await supabaseAdmin
+          .from('job_orders')
+          .select('id')
+          .eq('tenant_id', tenantId)
+          .or(`assigned_to.eq.${user.id},helper_assigned_to.eq.${user.id}`)
+          .lte('scheduled_date', todayDate)
+          .or(`scheduled_date.eq.${todayDate},end_date.gte.${todayDate}`)
+          .not('status', 'in', '("completed","cancelled","archived","on_hold")')
+          .not('dispatched_at', 'is', null)
+          .order('scheduled_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (todaysJob?.id) insertData.job_order_id = todaysJob.id;
+      } catch { /* job link is best-effort */ }
+    }
+
     const { data: timecard, error: insertError } = await supabaseAdmin
       .from('timecards')
       .insert([insertData])

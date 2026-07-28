@@ -317,8 +317,34 @@ export default function CompletedJobsArchivePage() {
         documents = data || [];
       } catch (_) {}
 
+      // Sign private-bucket URLs (job-photos, completion-pdfs, contracts) so the
+      // completion PDF, signature, photos and documents actually load/download.
+      // Raw stored URLs are `/public/` links that 404 for private buckets.
+      const signMany = async (arr: (string | null)[]): Promise<(string | null)[]> => {
+        try {
+          const res = await fetch('/api/admin/sign-urls', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+            body: JSON.stringify({ urls: arr }),
+          });
+          if (res.ok) { const j = await res.json(); return j.signed || arr; }
+        } catch { /* fall back to raw */ }
+        return arr;
+      };
+      const jobUrlFields = ['completion_pdf_url', 'completion_signature', 'agreement_pdf', 'liability_release_pdf', 'silica_form_pdf'] as const;
+      const scalarVals = jobUrlFields.map((f) => ((job as any)[f] ?? null) as string | null);
+      const photoArr: string[] = Array.isArray((job as any).photo_urls) ? (job as any).photo_urls : [];
+      const docUrls = documents.map((d: any) => (d.file_url ?? null) as string | null);
+      const signedAll = await signMany([...scalarVals, ...photoArr, ...docUrls]);
+      let _i = 0;
+      const signedScalars: Record<string, string | null> = {};
+      jobUrlFields.forEach((f) => { signedScalars[f] = signedAll[_i++]; });
+      const signedPhotos = photoArr.map(() => signedAll[_i++]).filter((u): u is string => u != null);
+      const signedDocs = documents.map((d: any) => ({ ...d, file_url: signedAll[_i++] }));
+      const signedJob = { ...job, ...signedScalars, photo_urls: signedPhotos };
+
       setSelectedJobDetails({
-        job,
+        job: signedJob,
         operatorName,
         helperName,
         workPerformed,
@@ -327,7 +353,7 @@ export default function CompletedJobsArchivePage() {
         totalStandbyCost,
         totalJobHours,
         laborCost,
-        documents,
+        documents: signedDocs,
         dailyLogs,
         totalDaysWorked,
         totalHoursWorked,
@@ -806,8 +832,8 @@ export default function CompletedJobsArchivePage() {
                                   <li key={idx} className="flex items-start gap-2">
                                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
                                     <span>
-                                      {item.name}{' '}
-                                      {item.quantity > 1 ? `(x${item.quantity})` : ''}
+                                      {item.name || item.work_type || 'Work item'}{' '}
+                                      {(item.quantity ?? item.linear_feet_cut ?? 0) > 1 ? `(x${item.quantity ?? item.linear_feet_cut})` : ''}
                                     </span>
                                   </li>
                                 ))}
