@@ -55,6 +55,12 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    // Full name is self-editable (fix a typo) but must never be blanked —
+    // only apply a non-empty, trimmed value.
+    if (typeof body.full_name === 'string' && body.full_name.trim()) {
+      updateData.full_name = body.full_name.trim().slice(0, 120);
+    }
+
     const { data: profile, error } = await supabaseAdmin
       .from('profiles')
       .update(updateData)

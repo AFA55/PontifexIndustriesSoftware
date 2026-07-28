@@ -53,6 +53,7 @@ export default function MyProfilePage() {
   const [saved, setSaved] = useState(false);
 
   // Editable fields
+  const [fullName, setFullName] = useState('');
   const [nickname, setNickname] = useState('');
   const [phone, setPhone] = useState('');
   const [dob, setDob] = useState('');
@@ -184,6 +185,7 @@ export default function MyProfilePage() {
           const json = await res.json();
           const p = json.data;
           setProfile(p);
+          setFullName(p.full_name || '');
           setNickname(p.nickname || '');
           setPhone(p.phone_number || p.phone || '');
           setDob(p.date_of_birth || '');
@@ -268,6 +270,7 @@ export default function MyProfilePage() {
       const res = await apiFetch('/api/my-profile', {
         method: 'PATCH',
         body: JSON.stringify({
+          full_name: fullName.trim() || undefined,
           nickname: nickname || null,
           phone_number: phone || null,
           date_of_birth: dob || null,
@@ -278,6 +281,8 @@ export default function MyProfilePage() {
         }),
       });
       if (res.ok) {
+        const json = await res.json().catch(() => null);
+        if (json?.data) setProfile(json.data); // reflect the new name in the header immediately
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       }
@@ -370,6 +375,18 @@ export default function MyProfilePage() {
             {/* Editable Fields */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 space-y-5 shadow-sm">
               <h3 className="text-sm font-bold text-gray-600 dark:text-gray-200 uppercase tracking-wider">Personal Info</h3>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="Your full name"
+                  className="w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.07] border border-gray-200 dark:border-white/20 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:border-brand focus:ring-2 focus:ring-brand/20 transition-all"
+                />
+                <p className="mt-1 text-xs text-gray-400 dark:text-white/40">This is the name shown across the app. Fix it here if it&apos;s wrong.</p>
+              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-600 dark:text-gray-200 mb-1">Nickname</label>
