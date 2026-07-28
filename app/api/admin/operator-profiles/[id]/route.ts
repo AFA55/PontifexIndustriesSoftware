@@ -191,6 +191,21 @@ export async function PATCH(
       }
     }
 
+    // hourly_rate feeds P&L math — never store a bad value. '' / null clears it;
+    // otherwise require a positive finite number (mirrors the DB CHECK).
+    if ('hourly_rate' in sanitizedUpdates) {
+      const raw = sanitizedUpdates.hourly_rate;
+      if (raw === null || raw === '') {
+        sanitizedUpdates.hourly_rate = null;
+      } else {
+        const n = Number(raw);
+        if (!Number.isFinite(n) || n <= 0) {
+          return NextResponse.json({ error: 'Hourly rate must be a positive number.' }, { status: 400 });
+        }
+        sanitizedUpdates.hourly_rate = n;
+      }
+    }
+
     sanitizedUpdates.updated_at = new Date().toISOString();
 
     // Resolve tenant scope

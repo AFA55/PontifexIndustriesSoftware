@@ -10,12 +10,13 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireScheduleBoardAccess } from '@/lib/api-auth';
+import { requireAdmin } from '@/lib/api-auth';
 import { signStoredUrl } from '@/lib/storage-url-server';
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireScheduleBoardAccess(request);
+    // Admin-only — it can mint signed URLs for contracts/completion PDFs.
+    const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json().catch(() => ({}));
