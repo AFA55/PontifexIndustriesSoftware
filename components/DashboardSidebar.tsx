@@ -600,9 +600,35 @@ export default function DashboardSidebar() {
     if (stored === 'true') setCollapsed(true);
   }, []);
 
-  // Load user
+  // Load user — cache for instant render, then refresh name/role from the DB so
+  // a changed name (or role) shows in the header/sidebar without a re-login.
+  // The cache ('supabase-user') is seeded at login and would otherwise stay stale.
   useEffect(() => {
-    setUser(getCurrentUser());
+    const cached = getCurrentUser();
+    setUser(cached);
+    if (!cached?.id) return;
+    let alive = true;
+    (async () => {
+      try {
+        const { data: fresh } = await supabase
+          .from('profiles')
+          .select('id, full_name, email, role')
+          .eq('id', cached.id)
+          .maybeSingle();
+        if (!alive || !fresh) return;
+        if (fresh.full_name !== cached.name || fresh.role !== cached.role) {
+          const updated = {
+            id: fresh.id,
+            name: fresh.full_name ?? cached.name,
+            email: fresh.email ?? cached.email,
+            role: fresh.role ?? cached.role,
+          };
+          setUser(updated);
+          try { localStorage.setItem('supabase-user', JSON.stringify(updated)); } catch { /* non-fatal */ }
+        }
+      } catch { /* keep the cached value */ }
+    })();
+    return () => { alive = false; };
   }, []);
 
   // Feature flags — gated nav items hide/show per user permissions.
