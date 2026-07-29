@@ -27,6 +27,9 @@ interface JobDetailViewProps {
   onClose: () => void;
   onEdit: () => void;
   onRemove?: () => void;
+  /** Called after a successful inline edit save so the parent board refetches
+   *  (otherwise a saved date/equipment change never appears on the board). */
+  onSaved?: () => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -183,7 +186,7 @@ function StatusTimeline({ data }: { data: FullJobData }) {
   );
 }
 
-export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, onClose, onEdit, onRemove }: JobDetailViewProps) {
+export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, onClose, onEdit, onRemove, onSaved }: JobDetailViewProps) {
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [printingPdf, setPrintingPdf] = useState(false);
@@ -213,6 +216,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
   const [isEditing, setIsEditing] = useState(false);
   const [editFields, setEditFields] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggleSection = (key: string) => {
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -341,6 +345,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
 
   const handleSaveEdit = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const token = await getToken();
 
@@ -361,16 +366,24 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && json.data) {
-          setFullData(prev => prev ? { ...prev, ...json.data } : prev);
-        }
-        setIsEditing(false);
-        setEditFields({});
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        // Surface the failure instead of silently swallowing it (the old code
+        // only reacted to success, so a failed save looked like nothing happened).
+        setSaveError(json.error || 'Could not save changes. Please try again.');
+        return;
       }
+      if (json.data) {
+        setFullData(prev => prev ? { ...prev, ...json.data } : prev);
+      }
+      setIsEditing(false);
+      setEditFields({});
+      // Tell the board to refetch so the saved change (date move, equipment, …)
+      // actually shows on the cards — without this the edit looked broken.
+      onSaved?.();
     } catch (err) {
       console.error('Failed to save edit:', err);
+      setSaveError('Could not save changes. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -579,6 +592,14 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
               )}
             </div>
           </div>
+
+          {/* Save error banner — the edit save used to fail silently */}
+          {saveError && (
+            <div className="flex-shrink-0 px-5 py-2.5 bg-rose-50 dark:bg-rose-500/15 border-b border-rose-200 dark:border-rose-500/30 flex items-center gap-2">
+              <XCircle className="w-4 h-4 text-rose-600 dark:text-rose-400 flex-shrink-0" />
+              <span className="text-sm font-medium text-rose-700 dark:text-rose-300">{saveError}</span>
+            </div>
+          )}
 
           {/* Tab Bar */}
           <div className="flex border-b border-gray-200 dark:border-white/10 px-5 bg-gray-50 dark:bg-white/5 flex-shrink-0">

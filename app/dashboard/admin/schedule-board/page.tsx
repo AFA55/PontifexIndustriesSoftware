@@ -2121,6 +2121,13 @@ export default function ScheduleBoardPage() {
             setJobDetailTarget(null);
             setCancelJobTarget(target.job);
           } : undefined}
+          onSaved={() => {
+            // Refetch so an inline edit (date move, equipment, scope, …) actually
+            // shows on the board instead of appearing to do nothing.
+            fetchScheduleData(selectedDate);
+            fetchDispatchStatus(selectedDate);
+            if (viewMode === 'week') fetchWeekData(selectedDate);
+          }}
         />
       )}
 

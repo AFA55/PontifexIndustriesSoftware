@@ -84,6 +84,18 @@ export async function PATCH(
       updateData.estimated_cost = null;
     }
 
+    // Empty date strings must become NULL (a '' would throw on a date column and
+    // fail the whole all-or-nothing update — the classic "edit doesn't save").
+    if ('scheduled_date' in updateData && !updateData.scheduled_date) updateData.scheduled_date = null;
+    if ('end_date' in updateData && !updateData.end_date) updateData.end_date = null;
+
+    // Keep scheduled_end_date in sync with end_date so a date change from the
+    // board propagates to capacity / skill-match / multi-day surfaces that read
+    // scheduled_end_date (the dedicated /schedule route already does this).
+    if ('end_date' in updateData) {
+      updateData.scheduled_end_date = updateData.end_date || null;
+    }
+
     updateData.updated_at = new Date().toISOString();
 
     const { data, error } = await supabaseAdmin
