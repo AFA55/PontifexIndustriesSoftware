@@ -34,6 +34,8 @@ interface JobTarget { id: string; lat: number; lng: number; inRoute: boolean }
 interface Targets { jobs: JobTarget[]; shop: { lat: number; lng: number } | null; clockedIn: boolean }
 
 let watcherId: string | null = null;
+let starting = false;   // synchronous guard against a start/stop race (watcher leak)
+let stopRequested = false;
 let targets: Targets = { jobs: [], shop: null, clockedIn: false };
 let lastTargetFetch = 0;
 let leftShop = false;                       // hysteresis for the shop reminder
@@ -96,6 +98,10 @@ async function onLocation(loc?: Location): Promise<void> {
   const { latitude: lat, longitude: lng } = loc;
 
   // 1. Auto-arrival at a jobsite for an in_route job.
+  // NOTE (v1): the /status POST authorizes assigned_to / helper_assigned_to / admin
+  // only — a job_crew helper's auto-arrival POST 403s (swallowed). Auto-arrival is
+  // effectively lead/helper-slot only for now; extend /status to accept job_crew if
+  // crew auto-arrival is wanted.
   for (const job of targets.jobs) {
     if (!job.inRoute || arrivedJobs.has(job.id)) continue;
     if (milesBetween(lat, lng, job.lat, job.lng) <= ARRIVAL_RADIUS_MI) {
@@ -133,10 +139,15 @@ async function onLocation(loc?: Location): Promise<void> {
 
 /** Start background geofencing (native only). Safe to call repeatedly. */
 export async function startGeofencing(): Promise<void> {
-  if (!isNativeApp() || watcherId) return;
+  // `starting` is set SYNCHRONOUSLY so a stop that races the addWatcher await
+  // can't slip past (which would leak a watcher that keeps GPS running after
+  // logout). Guard on both the existing watcher and an in-flight start.
+  if (!isNativeApp() || watcherId || starting) return;
+  starting = true;
+  stopRequested = false;
   await refreshTargets();
   try {
-    watcherId = await BackgroundGeolocation.addWatcher(
+    const id = await BackgroundGeolocation.addWatcher(
       {
         backgroundMessage: 'Tracking your location for auto clock-in/out at the jobsite.',
         backgroundTitle: 'Pontifex — on the clock',
@@ -149,18 +160,29 @@ export async function startGeofencing(): Promise<void> {
         void onLocation(location);
       },
     );
+    // If a stop was requested while addWatcher was resolving, tear it down now.
+    if (stopRequested) {
+      try { await BackgroundGeolocation.removeWatcher({ id }); } catch { /* ignore */ }
+      watcherId = null;
+    } else {
+      watcherId = id;
+    }
   } catch {
     watcherId = null;
+  } finally {
+    starting = false;
   }
 }
 
 /** Stop background geofencing. */
 export async function stopGeofencing(): Promise<void> {
-  if (!watcherId) return;
-  try {
-    await BackgroundGeolocation.removeWatcher({ id: watcherId });
-  } catch { /* ignore */ }
-  watcherId = null;
+  stopRequested = true; // covers a stop that races an in-flight start()
   leftShop = false;
   arrivedJobs.clear();
+  if (!watcherId) return;
+  const id = watcherId;
+  watcherId = null;
+  try {
+    await BackgroundGeolocation.removeWatcher({ id });
+  } catch { /* ignore */ }
 }

@@ -97,6 +97,13 @@ Done + pushed (web build verified safe — native code is `isNativeApp`-gated + 
    radius, hysteresis, and battery. The geofence logic is v1 and CANNOT be validated without a device.
 3. **C2 privacy + consent (founder approval required)** — the live `lib/legal/privacy-policy.ts` +
    `gps-consent.ts` still say "never in the background" and were intentionally NOT changed yet.
+4. **Multi-tenant shop fallback** — the back-at-shop reminder uses `getTenantShopLocationOrDefault`,
+   which falls back to hardcoded **Patriot** coords when a tenant has no `shop_latitude`. Fine while
+   only Patriot is native; set per-tenant shop coords before a 2nd tenant goes native.
+
+Guardian SHOULD-FIX applied (Jul 30): synchronous start/stop race guard (no watcher leak after
+logout), cold-start user-readiness retry, roles narrowed to operator/apprentice (no all-day GPS for
+shop staff), crew-helper auto-arrival limitation documented.
 
 ## C2 — proposed privacy language (DRAFT for founder approval — not yet applied)
 > **Background location (while on the clock).** When you are clocked in or have an assigned job, the

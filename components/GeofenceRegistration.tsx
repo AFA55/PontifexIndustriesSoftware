@@ -16,8 +16,9 @@ import { getCurrentUser } from '@/lib/auth';
 import { isNativeApp } from '@/lib/is-native';
 import { startGeofencing, stopGeofencing } from '@/lib/native/geofence-service';
 
-// Field roles that go to jobsites — only these get background location.
-const FIELD_ROLES = new Set(['operator', 'apprentice', 'shop_manager', 'shop_help']);
+// Only field operators go to jobsites — shop staff would run an all-day background
+// watcher for no benefit (battery), so they're excluded.
+const FIELD_ROLES = new Set(['operator', 'apprentice']);
 
 export default function GeofenceRegistration() {
   useEffect(() => {
@@ -27,9 +28,17 @@ export default function GeofenceRegistration() {
     (async () => {
       const { data } = await supabase.auth.getSession();
       if (!data.session || cancelled) return;
-      const user = getCurrentUser();
-      if (!user || !FIELD_ROLES.has(user.role || '')) return;
-      await startGeofencing();
+      // On a native cold-start the cached user (getCurrentUser) may not be
+      // populated yet even though the session resumed — retry briefly so
+      // geofencing still starts instead of silently no-op'ing.
+      for (let i = 0; i < 8 && !cancelled; i++) {
+        const user = getCurrentUser();
+        if (user) {
+          if (FIELD_ROLES.has(user.role || '')) await startGeofencing();
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 1000));
+      }
     })();
 
     return () => {
