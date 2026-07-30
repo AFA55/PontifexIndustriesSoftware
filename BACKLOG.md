@@ -36,7 +36,11 @@ Founder's payroll "final touches." Phased (payroll = highest scrutiny). Decision
 - [x] ~~**Holidays on the schedule board**~~ — ✅ BUILT (Phase B). Amber "★ Paid Holiday" badge in the week view + a "Mark Paid Holiday" day action (prompt hours → create + apply pay via the existing endpoints, carries `applies_to`, toasts applied/skipped/tenure_skipped).
 - [x] ~~**60-day tenure eligibility**~~ — ✅ BUILT (Phase B). Holiday apply gates on `holiday_date − hire_date ≥ 60` (null hire_date grandfathered); read-only eligibility list on the Holidays settings page + `/api/admin/tenure-eligibility`.
 - [ ] **P3 — `update/route.ts` fetchSettings reads `weekly_ot_threshold_hours` (nonexistent col; actual = `overtime_threshold_weekly`)** — pre-existing; the bad select nulls out → falls back to correct defaults (40/1.5/2.0), so a tenant that configured a non-40 weekly OT threshold is ignored on admin timecard edits. Low impact (Patriot uses 40). Fix the column name when touching that route.
-- [ ] **Continuous GPS + geofence auto-arrival + app-closed shop reminder** — Phase C (NATIVE, founder-greenlit). Needs a background-geolocation plugin + iOS "Always" review + privacy-policy rewrite + re-consent + iOS/Android builds + stored jobsite lat/lng. Interim: a time-based clock-out reminder ships in an earlier phase.
+- [~] **Continuous GPS + geofence auto-arrival + app-closed shop reminder** — Phase C (plan: docs/plans/PHASE_C_NATIVE_GPS.md).
+  - [x] ~~C0 groundwork~~ ✅ LIVE — jobsite coords persisted (Google Places on create + Nominatim backfill cron); interim time-based clock-out reminder live.
+  - [x] ~~C1 native foundation~~ ✅ BUILT + guardian-clean, STAGED (pushed `a9d71b64`) — `@capacitor-community/background-geolocation` + geofence service (auto-arrival + back-at-shop reminder) + provider + iOS/Android permission config. Inert until a native build; live web verified unaffected.
+  - [ ] **C1 finish (needs founder + device):** cut a native build (`ios-release`/`android-release` skills: version bump → `cap sync` → archive → TestFlight/Play internal) → ON-DEVICE test + tune (permission flow, 0.5-mi radius, battery). Geofence logic is v1, un-tested on a device.
+  - [ ] **C2 privacy (founder approval):** apply the drafted background-location wording to `privacy-policy.ts` + `gps-consent.ts` + a one-time re-consent prompt BEFORE the background build reaches users; Apple "Always"-location review.
 
 ## 🚀 PATRIOT LAUNCH EPIC (the path to first revenue — Jun 27 founder-defined "done")
 
