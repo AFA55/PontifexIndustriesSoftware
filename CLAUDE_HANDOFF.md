@@ -1,6 +1,19 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 28, 2026 (Opus 4.8) | **Branch:** `main` | **Prod:** ✅ LIVE through `854bd955`. Batches 1 & 2 of the "Zack first-job" fixes shipped; **Batch 3 BUILT + fully verified, awaiting the one billed push** (Arrived removed · progress targets · helper→operator reviews — see below).
+**Last updated:** Jul 30, 2026 (Opus 4.8) | **Branch:** `main` | **Prod:** ✅ LIVE through `dafb852c`.
+
+> ## 📌 Jul 30 session (Opus 4.8) — huge field-ops + timecard sprint, all shipped + verified
+> Every feature guardian-reviewed; several real BLOCKING bugs caught + fixed before push. All LIVE.
+> - **Multi-operator crew (`8f7e29dc`)** — `job_crew` table; LEAD (assigned_to) does full completion, additional operators are crew (light helper ticket + clock-in), crew notes on the completed ticket; duplicated jobs stay independent. **Guardian caught a pre-existing BLOCKER: the helper work-log was mounted inside the operator-only fragment → unreachable since ~Jul 14** (apprentice helpers couldn't log field work AND the Batch-3 helper→operator reviews never rendered) — fixed by moving it into the helper view.
+> - **Printable completed ticket (`4e4911fe`)** — `app/dashboard/admin/jobs/[id]/completed-print/page.tsx` mirrors Patriot's paper ticket (logo + red job# top-right, times, work performed, footage, subsistence, signature, crew notes) for the paper billing hand-off.
+> - **Schedule-board Edit actually saves (`35b52036`)** — inline job Edit silently 500'd (single-day jobs sent `end_date:''` → PG rejects) + never refreshed the board. Now saves + refreshes + surfaces errors + syncs scheduled_end_date.
+> - **Timecard Phase A (`3ce910e0`)** — notifications scroll fix · configurable auto-clockout (time picker default 6pm; cron reworked hourly, tenant-local, night shifts keep noon) · out-of-town subsistence prompt at clock-out (idempotent; annual report reads `subsistence_nights` as source of truth). Guardian fixed a midnight-crossing subsistence double-count.
+> - **Timecard Phase B (`dafb852c`)** — double-time tag (hours × 2, OT-exempt via single-classification in calculateWeekSummary + team-summary; override populates double_time_hours; bulk apply-double-time endpoint) · 60-day tenure gate on holiday pay (grandfather null hire_date) + eligibility view · holidays on the schedule board (badge + "Mark Paid Holiday"). **Guardian caught a BLOCKING double-subtract (negative payroll hours)** — fixed.
+> - **REMAINING — Phase C (native GPS, founder-greenlit, NOT started):** background geofencing for auto-arrival + app-closed clock-out reminder. Needs a native background-geolocation plugin + iOS "Always" review + **privacy-policy rewrite + re-consent** + iOS/Android builds + stored jobsite lat/lng. Separate native initiative — scope in `docs/plans/TIMECARD_FINISHING_BATCH.md`.
+
+---
+
+**(older) Jul 28:** Batches 1 & 2 of the "Zack first-job" fixes shipped; Batch 3 (Arrived removed · progress targets · helper→operator reviews) — see below.
 
 > ## 📌 Jul 28 PT2 — Zack's first completed job surfaced ~10 issues; fixing in 3 batches
 > The founder ran a full job to completion with Zack (operator) + Lucas (helper) and found data-capture/visibility bugs. Guardian caught real blockers each batch (a wrong-column review query that silently hid reviews; un-gated finish paths) — all fixed before shipping.
