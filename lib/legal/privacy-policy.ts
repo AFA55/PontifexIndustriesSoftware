@@ -2,12 +2,12 @@
  * Pontifex Industries — Privacy Policy
  */
 
-export const PRIVACY_POLICY_VERSION = 'v1.2';
+export const PRIVACY_POLICY_VERSION = 'v1.3';
 
 export const PRIVACY_POLICY_FULL = `
 # Privacy Policy
 
-**Effective Date:** July 21, 2026
+**Effective Date:** July 30, 2026
 **Version:** ${PRIVACY_POLICY_VERSION}
 
 Pontifex Industries ("Company," "we," "us," or "our") operates a multi-tenant field operations management platform (the "Platform") used by field-services and construction companies. This Privacy Policy explains how we collect, use, store, and protect personal information across our web application and iOS mobile app.
@@ -29,11 +29,12 @@ We collect your precise GPS location at specific work events, with your consent,
 - **Job workflow milestones:** a GPS point is recorded when you mark yourself In Route, On Site, Working, or Complete on a job ticket.
 - **Live location while In Route:** after you tap "In Route" on a job, the app shares your location with your company's dispatchers (approximately every 35 seconds) so they can see your progress toward the job site. This sharing is **foreground-only** — it stops when you arrive, complete the workflow step, or close the app.
 - **Job photos:** when you upload a job-site photo, a GPS point is recorded with the photo to document where the work occurred.
+- **Background location while on the clock (mobile app):** while you are **clocked in or have an assigned job**, the app collects your location in the **background — even when the app is closed or not in use** — to automatically record when you arrive at a job site and to remind you to clock out when you return to the shop. This is active **only while you are on the clock** and stops when you clock out. You consent to it via a separate in-app prompt shown before the device permission request, and you can turn it off anytime in Settings.
 
 What we do NOT do:
-- We do **not** track your location in the background or when the app is closed
-- We do **not** collect location outside of the work events listed above
-- We do **not** sell or share your location with third parties — it is visible only to your company's authorized personnel
+- We do **not** collect background location when you are off the clock
+- We do **not** collect location outside of the work events and on-the-clock features listed above
+- We do **not** use your location to track you across other apps or companies, and we do **not** sell or share it with third parties or advertisers — it is visible only to your company's authorized personnel
 - Location features require your explicit consent, requested in-app before first use
 
 ### 1.3 NFC Badge Data
@@ -175,7 +176,8 @@ The Platform is intended for use by adults in a professional employment context.
 ## 9. iOS App — Apple App Store
 
 This Platform is available as mobile apps distributed through the Apple App Store and Google Play. The apps operate as a wrapper around our web-based Platform and do not collect any data beyond what is described in this policy. The apps request access to:
-- **Location (When In Use):** GPS checks at clock-in/out, job workflow milestones, and live In-Route sharing as described in Section 1.2 — never in the background
+- **Location (When In Use):** GPS checks at clock-in/out, job workflow milestones, and live In-Route sharing (Section 1.2)
+- **Location (Always / background):** only while you are clocked in or have an assigned job, for automatic jobsite arrival and the back-at-shop clock-out reminder (Section 1.2). Stops when you clock out; off by default until you agree to the in-app prompt.
 - **Camera:** Job site photo documentation
 - **Microphone:** Voice-activated equipment checkout and assistant
 - **Face ID / Biometrics:** Optional sign-in, verified on-device only (Section 1.9)
@@ -204,7 +206,7 @@ export function getPrivacyPolicySummaryHTML(): string {
   return `
     <p><strong>Privacy Policy Summary</strong></p>
     <ul>
-      <li>GPS location is collected at work events only (clock-in/out, job milestones, live In-Route sharing with dispatch, job photos) — never in the background or when the app is closed</li>
+      <li>GPS location is collected at work events (clock-in/out, job milestones, live In-Route sharing, job photos) and, on the mobile app, in the background <strong>only while you're clocked in</strong> for auto-arrival + the clock-out reminder — it stops when you clock out, is used only for timekeeping, and is never sold or shared</li>
       <li>We collect account info, work data, job photos, and timecard records</li>
       <li>Biometric sign-in is verified on your device — we never receive face or fingerprint data</li>
       <li>Data is encrypted and stored securely on Supabase (AWS infrastructure)</li>

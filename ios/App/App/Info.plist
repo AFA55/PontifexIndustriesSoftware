@@ -61,7 +61,7 @@
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Pontifex uses your location to confirm you're at the job site when you clock in.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pontifex uses your location in the background while you're on the clock to automatically log when you arrive at a job site and to remind you to clock out when you return to the shop. You can turn this off in Settings.</string>
+	<string>Pontifex uses your location in the background only while you're clocked in — to automatically record when you arrive at a job site and to remind you to clock out when you return to the shop. It is not used at any other time. You can turn this off in Settings.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>location</string>

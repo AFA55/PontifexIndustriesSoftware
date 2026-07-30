@@ -114,6 +114,34 @@ shop staff), crew-helper auto-arrival limitation documented.
 Apply this to `privacy-policy.ts` + `gps-consent.ts` AND add a one-time in-app re-consent prompt
 before the native build's background tracking is enabled — this is the founder's call + legal sign-off.
 
+## C2 compliance — review done Jul 30 (privacy pro on the team). Verdict: wording good, artifacts needed.
+**Applied in code (compliance-critical, done):**
+- **Technical-truth fix:** background location now runs ONLY while clocked in — `GeofenceRegistration`
+  polls clock status, starts on clock-in, STOPS on clock-out. (The "only while on the clock" claim
+  must be literally true — it was starting at login before.)
+- **Consent-before-permission:** a `GeofenceConsentModal` (prominent disclosure with Google's
+  "even when the app is closed or not in use" phrasing + retention + **Agree / Not now**) shows
+  BEFORE the OS prompt; geofencing never starts until "Agree" (`bg-location-consent.ts`). "Not now"
+  never triggers the OS prompt. GPS consent version bumped v1.1→**v2.0** to force re-consent.
+- **Privacy docs updated** (`privacy-policy.ts` v1.2→v1.3, `gps-consent.ts` v2.0) to disclose on-the-clock
+  background location, retention (with the timecard, 3 yrs), no-sale, opt-out.
+- **iOS purpose string** tightened ("not used at any other time") + **`PrivacyInfo.xcprivacy`** added
+  (Precise Location → App Functionality, not tracking, not shared).
+
+**FOUNDER TASKS before the store build reaches users (REQUIRED — I can't do these):**
+1. **Google Play (highest rejection risk):** complete the Play Console **background-location Declaration
+   Form** + record a **≤30s demo video** (feature → disclosure dialog → OS prompt) + justify **core
+   functionality** (timesheet accuracy; workers shouldn't keep the app open on-site). Confirm the plugin's
+   Android foreground service declares `foregroundServiceType="location"` with a persistent notification.
+2. **Apple:** in App Store Connect set the **App Privacy label** — Precise Location → App Functionality,
+   "Not used to track you," not shared (must match `PrivacyInfo.xcprivacy` + the disclosure). Add the
+   "Always" justification to **App Review notes** (When-In-Use requested first, escalates to Always).
+3. **Signed employee consent** — a written acknowledgment in onboarding/handbook (SC best practice;
+   stronger evidence than the in-app tap). Make the notice per-tenant configurable before a 2nd tenant.
+4. **SC-licensed employment/privacy counsel** confirms the consent posture before enabling on real
+   employees. (Compliance reviewer is not an attorney; employee-monitoring law is state-specific.)
+5. Confirm Patriot revenue < $25M (documents CCPA non-applicability); a future large-CA tenant flips this.
+
 ## What ships without any of this (already live)
 The **time-based clock-out reminder** (`1f45c924`) already nudges "clock out soon — auto-clockout at
 6 PM" ~30 min before, no rebuild. It covers the "they forget" pain until the geofenced version lands.

@@ -1,36 +1,42 @@
 /**
- * Pontifex Industries — GPS Location Consent (iOS Clock-In Verification)
+ * Pontifex Industries — GPS Location Consent.
+ *
+ * v2.0 (Jul 2026): adds on-the-clock BACKGROUND location for jobsite auto-arrival
+ * + a back-at-shop clock-out reminder (Phase C). The version bump is intentional
+ * so the app re-prompts for consent — background tracking must not be enabled for
+ * a user who only ever consented to the v1 (clock-in-only) terms.
  */
 
-export const GPS_CONSENT_VERSION = 'v1.1';
+export const GPS_CONSENT_VERSION = 'v2.0';
 
 export const GPS_CONSENT_TEXT = `## Location Access Disclosure
 
-Pontifex Industries requests access to your device location **only at the moment you clock in** to verify that you are physically present at the assigned job site. By consenting, you acknowledge and agree to the following:
+Pontifex Industries uses your device location for two things: to verify you're at the job site when you clock in, and — **only while you're clocked in or have an assigned job** — to run background features that save you time. By consenting, you acknowledge and agree to the following:
 
 ### What We Access
-- Your GPS coordinates at the exact moment you tap "Clock In"
-- One location point per clock-in event — no continuous monitoring
+- Your GPS coordinates when you tap "Clock In" (to verify job-site presence)
+- While you are **clocked in or have an assigned job**, your location in the **background — even when the app is closed or not in use** — to automatically record when you arrive at a job site and to remind you to clock out when you return to the shop
 
-### What We Do NOT Do
-- We do **not** track your location continuously or in the background
-- We do **not** access your location when the app is closed
-- We do **not** access your location outside of the single clock-in verification check
-- We do **not** share your location with third parties
+### Scope & Limits
+- Background location is active **only while you are on the clock**. It stops when you clock out.
+- We use your location **solely for timekeeping**. We do **not** use it for any other purpose.
+- We do **not** sell your location or share it with third parties or advertisers.
+- We do **not** use your location to track you across other apps or companies.
 
 ### How We Use This Data
 - To verify you are within the required radius of your assigned job site at clock-in
-- To attach a location record to your timecard for that shift
-- To support dispute resolution for attendance records
+- To automatically log your arrival at a job site so you don't have to
+- To remind you to clock out when you return to the shop
+- To attach location records to your timecard and support attendance dispute resolution
 
 ### Data Storage & Retention
 - Location data is stored securely with encryption at rest and in transit
-- GPS clock-in records are retained for 3 years per company policy
+- Location records are kept **with your timecard record** and retained for 3 years per company/payroll policy, then deleted
 - You may request a copy of your location records at any time
 
 ### Your Rights
-- You may **withdraw this consent at any time** by disabling location access in your iPhone Settings → Privacy & Security → Location Services
-- Withdrawing location access will prevent the GPS clock-in verification feature from working; you may be able to use a PIN-based alternative if your employer has enabled it
+- You may **withdraw this consent at any time** by disabling location access in your device Settings → Privacy → Location Services (or by declining the in-app prompt)
+- Turning off background location will stop the auto-arrival and clock-out reminder features; **clock-in verification will still work**
 - Withdrawing consent will not affect previously collected data`;
 
 export function getGpsConsentHTML(): string {
@@ -38,10 +44,11 @@ export function getGpsConsentHTML(): string {
     <div>
       <p><strong>Location Access</strong></p>
       <ul>
-        <li>Location is accessed <strong>once at clock-in only</strong> to verify job site presence</li>
-        <li>No continuous or background tracking — ever</li>
-        <li>One GPS point stored per clock-in event, encrypted, retained 3 years</li>
-        <li>You can disable location in iPhone Settings at any time</li>
+        <li>Location verifies job-site presence at <strong>clock-in</strong></li>
+        <li>While you're <strong>on the clock</strong>, background location — even when the app is closed — auto-logs arrival and reminds you to clock out; it <strong>stops when you clock out</strong></li>
+        <li>Used <strong>only for timekeeping</strong> — never sold or shared</li>
+        <li>Kept with your timecard record (encrypted, 3 years), then deleted</li>
+        <li>You can turn it off anytime in Settings; clock-in still works</li>
       </ul>
     </div>
   `;

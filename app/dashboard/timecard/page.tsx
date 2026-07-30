@@ -266,6 +266,9 @@ function TimecardPage() {
       if (res.ok) {
         setActiveTimecard(null);
         fetchTimecards();
+        // Compliance: background location must stop the moment they clock out
+        // (not wait for the next status poll). Native-gated + web no-op.
+        void import('@/lib/native/geofence-service').then((m) => m.stopGeofencing()).catch(() => {});
       } else {
         const err = await res.json();
         alert(err.error || 'Clock-out failed');
