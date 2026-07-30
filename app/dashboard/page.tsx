@@ -606,6 +606,9 @@ export default function Dashboard() {
       setIsClockedIn(false);
       setCurrentTimecard(null);
       setCurrentHours(0);
+      // Compliance: background location must stop the instant they clock out
+      // (before the app can be backgrounded). Native-gated + web no-op.
+      void import('@/lib/native/geofence-service').then((m) => m.stopGeofencing()).catch(() => {});
       setClockMessage({
         type: 'success',
         text: `${result.message} — Total hours this entry: ${result.data.totalHours}`,
