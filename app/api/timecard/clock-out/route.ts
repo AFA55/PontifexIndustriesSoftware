@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
     // True when the operator saw the "unfinished ticket" warning and chose
     // "clock out anyway — remind me later" (founder Jul 20: warn, don't wall).
     const acknowledgeIncomplete = body.acknowledge_incomplete === true;
+    // Out-of-town subsistence: the client asks "did you stay overnight?" at clock-out
+    // when the shift is out_of_town; true → record a subsistence night for this week.
+    const stayedOvernight = body.stayed_overnight === true;
     const isRemoteOut = clock_out_method === 'remote';
 
     // Validation — GPS coords are required for a normal clock-out; a REMOTE (photo)
@@ -417,6 +420,27 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to clock out' },
         { status: 500 }
       );
+    }
+
+    // Out-of-town subsistence: if this was an out-of-town shift and the operator
+    // confirmed they stayed overnight, record one subsistence night for this date.
+    // Idempotent on (operator_id, night_date) so it converges with the day-complete
+    // / remote-clock-in writers. Uses the SAME tenant-tz `today` so the row matches.
+    // Best-effort — never blocks clock-out.
+    if (stayedOvernight && activeTimecard.out_of_town && auth.tenantId) {
+      Promise.resolve(
+        supabaseAdmin.from('subsistence_nights').upsert(
+          {
+            tenant_id: auth.tenantId,
+            operator_id: auth.userId,
+            night_date: today,
+            job_order_id: activeTimecard.job_order_id ?? null,
+            source: 'operator',
+            note: 'Confirmed overnight at clock-out',
+          },
+          { onConflict: 'operator_id,night_date' },
+        ),
+      ).catch(() => {});
     }
 
     // Get user's profile for name

@@ -110,6 +110,7 @@ export async function GET(request: NextRequest) {
           jobOrderId: activeTimecard.job_order_id || null,
           jobNumber: jobInfo?.job_number || null,
           jobCustomerName: jobInfo?.customer_name || null,
+          outOfTown: activeTimecard.out_of_town || false,
         },
       },
       { status: 200 }

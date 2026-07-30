@@ -41,7 +41,9 @@ interface TimecardSettings {
 
   // Limits
   maxHoursPerDay: number;
-  autoClockOutAfter: number; // hours
+  autoClockOutAfter: number; // hours (legacy hours-since concept)
+  autoClockoutTime: string;  // 'HH:MM' local wall-clock (default 18:00 = 6pm)
+  autoClockoutEnabled: boolean;
   lockTimecardAfterDays: number;
 
   // Week Configuration
@@ -69,6 +71,8 @@ const DEFAULT_SETTINGS: TimecardSettings = {
   subsistenceRate: 0,
   maxHoursPerDay: 16,
   autoClockOutAfter: 14,
+  autoClockoutTime: '18:00',
+  autoClockoutEnabled: true,
   lockTimecardAfterDays: 7,
   weekStartDay: 'monday',
 };
@@ -164,6 +168,8 @@ export default function TimecardSettingsPage() {
               allowRemoteClockIn: d.allow_remote ?? prev.allowRemoteClockIn,
               weeklyOTThreshold: d.overtime_threshold ?? prev.weeklyOTThreshold,
               autoClockOutAfter: d.auto_clock_out ?? prev.autoClockOutAfter,
+              autoClockoutTime: (d.auto_clockout_time ?? prev.autoClockoutTime).slice(0, 5),
+              autoClockoutEnabled: d.auto_clockout_enabled ?? prev.autoClockoutEnabled,
               lateGraceMinutes: d.late_grace_minutes ?? prev.lateGraceMinutes,
               subsistenceRate: d.subsistence_rate ?? prev.subsistenceRate,
             }));
@@ -204,6 +210,8 @@ export default function TimecardSettingsPage() {
           allow_remote: settings.allowRemoteClockIn,
           overtime_threshold: settings.weeklyOTThreshold,
           auto_clock_out: settings.autoClockOutAfter,
+          auto_clockout_time: settings.autoClockoutTime,
+          auto_clockout_enabled: settings.autoClockoutEnabled,
           late_grace_minutes: settings.lateGraceMinutes,
           subsistence_rate: settings.subsistenceRate,
         }),
@@ -532,15 +540,26 @@ export default function TimecardSettingsPage() {
                 min={8}
                 max={24}
               />
-              <NumberInput
-                label="Auto Clock-Out After"
-                description="Auto clock-out if still active"
-                value={settings.autoClockOutAfter}
-                onChange={(v) => updateSetting('autoClockOutAfter', v)}
-                unit="hours"
-                min={8}
-                max={24}
-              />
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">Auto Clock-Out Time</label>
+                <p className="text-xs text-slate-400 mb-2">Close forgotten clock-ins at this time (day/shop shifts)</p>
+                <input
+                  type="time"
+                  value={settings.autoClockoutTime}
+                  disabled={!settings.autoClockoutEnabled}
+                  onChange={(e) => updateSetting('autoClockoutTime', e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm text-slate-900 focus:ring-2 focus:ring-brand focus:outline-none disabled:opacity-50 disabled:bg-slate-50"
+                />
+                <label className="mt-2 flex items-center gap-2 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={settings.autoClockoutEnabled}
+                    onChange={(e) => updateSetting('autoClockoutEnabled', e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-brand focus:ring-brand"
+                  />
+                  <span className="text-xs text-slate-600">Enable auto clock-out</span>
+                </label>
+              </div>
               <NumberInput
                 label="Lock After"
                 description="Days before timecards are locked"

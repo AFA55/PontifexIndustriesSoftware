@@ -59,7 +59,13 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
       const rect = dropdownRef.current?.getBoundingClientRect();
       if (rect) setAnchor({ top: rect.bottom + 8, right: Math.max(8, window.innerWidth - rect.right) });
     };
-    const onScroll = () => setOpen(false);
+    const onScroll = (e: Event) => {
+      // Scrolling INSIDE the notifications list must NOT close the panel — that
+      // was the "can't scroll down" bug (the capturing listener caught the list's
+      // own scroll). Only close when the PAGE behind the panel scrolls.
+      if (panelRef.current && e.target instanceof Node && panelRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     window.addEventListener('resize', reposition);
     window.addEventListener('scroll', onScroll, true);
     return () => {

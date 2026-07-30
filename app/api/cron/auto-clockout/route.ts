@@ -3,17 +3,20 @@ export const dynamic = 'force-dynamic';
 /**
  * GET /api/cron/auto-clockout
  *
- * Runs twice a day (UTC 00:00 and UTC 12:00) via Vercel Cron.
- * Finds workers who forgot to clock out and auto-closes their timecards.
+ * Runs HOURLY via Vercel Cron. Finds workers who forgot to clock out and
+ * auto-closes their timecards, honoring each tenant's configured clock-out time.
  *
  * Business rules:
- *   - Morning/shop shift (is_night_shift = false OR is_shop_hours = true):
- *       processed at UTC midnight → clock-out set to midnight in tenant's timezone
- *   - Night shift (is_night_shift = true):
- *       processed at UTC noon → clock-out set to noon in tenant's timezone
- *   - Never auto-close a timecard opened in the last 4 hours (just clocked in)
- *   - Records auto_closed = true and a note on the timecard
- *   - Sends in-app notifications to the worker and to all admins/ops_managers in the tenant
+ *   - Day/shop shift (is_night_shift = false OR null): closed at the tenant's
+ *       configured `timecard_settings_v2.auto_clockout_time` (default 18:00 = 6pm
+ *       local), once the tenant-local wall-clock has reached that time. Skipped
+ *       entirely when `auto_clockout_enabled = false`.
+ *   - Night shift (is_night_shift = true): closed at local noon (unchanged).
+ *   - Never auto-close a timecard opened in the last 4 hours (just clocked in).
+ *   - Records auto_closed = true and a note on the timecard.
+ *   - Sends in-app notifications to the worker and to all admins/ops_managers.
+ *   - Idempotent: only OPEN (clock_out_time IS NULL, auto_closed = false) cards
+ *     are touched, so hourly re-runs never double-close.
  *
  * Authorization: Bearer ${CRON_SECRET}
  */
@@ -23,19 +26,21 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Return the current UTC hour (0-23). */
-function utcHour(): number {
-  return new Date().getUTCHours();
+/** Current tenant-local wall-clock time as 'HH:MM' (24h). */
+function tenantLocalHHMM(tenantTz: string): string {
+  return new Intl.DateTimeFormat('en-GB', {
+    timeZone: tenantTz, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date());
 }
 
 /**
  * Given a tenant timezone (IANA string) and a wall-clock time (HH:MM),
- * return the UTC ISO string for that wall-clock time on today's date in that tz.
+ * return the UTC instant for that wall-clock time on today's date in that tz.
  *
- * e.g. tenantTz='America/New_York', wallTime='00:00' →
- *   returns the UTC instant that corresponds to midnight ET today.
+ * e.g. tenantTz='America/New_York', wallTime='18:00' →
+ *   returns the UTC instant that corresponds to 6pm ET today.
  */
-function wallTimeToUTC(tenantTz: string, wallTime: '00:00' | '12:00'): Date {
+function wallTimeToUTC(tenantTz: string, wallTime: string): Date {
   // Get today's date string in the tenant's timezone
   const todayLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tenantTz }).format(new Date());
   // Build a datetime string interpreted as tenant-local time
@@ -145,6 +150,97 @@ async function computeLunchDeduction(
   return { breakMinutesDeducted: 0, autoLunchApplied: false };
 }
 
+// ─── Per-card close (shared by the day-shift + night-shift passes) ────────────
+
+interface StaleCard {
+  id: string;
+  user_id: string;
+  clock_in_time: string;
+  is_night_shift: boolean | null;
+  is_shop_hours: boolean | null;
+  tenant_id: string;
+}
+
+/** Close one stale card to `clockOutTarget`. Returns true if it actually closed. */
+async function closeCard(
+  tc: StaleCard,
+  clockOutTarget: Date,
+  tenantId: string,
+  tenantTz: string,
+  adminIds: string[],
+): Promise<boolean> {
+  const clockInMs = new Date(tc.clock_in_time).getTime();
+  const clockOutMs = clockOutTarget.getTime();
+  // Never set a clock-out before clock-in (e.g. target time is earlier today).
+  if (clockOutMs <= clockInMs) return false;
+
+  const { data: profile } = await supabaseAdmin
+    .from('profiles')
+    .select('full_name, role, default_lunch_minutes')
+    .eq('id', tc.user_id)
+    .maybeSingle();
+
+  const userRole: string = profile?.role || 'operator';
+  const userLunchOverride: number | null = profile?.default_lunch_minutes ?? null;
+  const operatorName: string = profile?.full_name || 'Unknown worker';
+
+  const { breakMinutesDeducted, autoLunchApplied } = await computeLunchDeduction(
+    tenantId, userRole, userLunchOverride, clockInMs, clockOutMs,
+  );
+
+  const rawHours = (clockOutMs - clockInMs) / (1000 * 60 * 60);
+  const netHours = Math.max(0, rawHours - breakMinutesDeducted / 60);
+  const totalHours = parseFloat(netHours.toFixed(2));
+
+  const { error: updateError } = await supabaseAdmin
+    .from('timecards')
+    .update({
+      clock_out_time: clockOutTarget.toISOString(),
+      total_hours: totalHours,
+      break_minutes: breakMinutesDeducted,
+      lunch_duration_minutes: breakMinutesDeducted,
+      auto_lunch_applied: autoLunchApplied,
+      auto_closed: true,
+      notes: 'Auto-closed: forgot to clock out',
+    })
+    .eq('id', tc.id)
+    .is('clock_out_time', null); // race-guard: don't clobber a real clock-out
+
+  if (updateError) {
+    console.error(`[auto-clockout] Failed to close timecard ${tc.id}:`, updateError);
+    return false;
+  }
+
+  const timeStr = formatTime(clockOutTarget, tenantTz);
+  const workerNotif = {
+    recipient_id: tc.user_id,
+    type: 'auto_clock_out',
+    title: 'Clocked Out Automatically',
+    message: `You were automatically clocked out at ${timeStr} because no clock-out was recorded. Please review your timecard and submit a correction if needed.`,
+    tenant_id: tenantId,
+    job_order_id: null as string | null,
+    read: false,
+    metadata: { timecard_id: tc.id, clock_out_time: clockOutTarget.toISOString(), total_hours: totalHours },
+  };
+  const adminNotifs = adminIds
+    .filter((id) => id !== tc.user_id)
+    .map((adminId) => ({
+      recipient_id: adminId,
+      type: 'auto_clock_out_admin',
+      title: 'Auto Clock-Out',
+      message: `${operatorName} was automatically clocked out at ${timeStr} — they may need to submit a time correction.`,
+      tenant_id: tenantId,
+      job_order_id: null as string | null,
+      read: false,
+      metadata: {
+        operator_id: tc.user_id, operator_name: operatorName, timecard_id: tc.id,
+        clock_out_time: clockOutTarget.toISOString(), total_hours: totalHours,
+      },
+    }));
+  Promise.resolve(supabaseAdmin.from('schedule_notifications').insert([workerNotif, ...adminNotifs])).catch(() => {});
+  return true;
+}
+
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -155,20 +251,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  // Determine which shift subset to process based on current UTC hour.
-  // Vercel fires at 00:00 UTC and 12:00 UTC.
-  const hour = utcHour();
-  const isMidnightRun = hour < 6; // midnight UTC fires ≈ 00:xx
-  const isNoonRun = hour >= 6 && hour < 18; // noon UTC fires ≈ 12:xx
-
-  if (!isMidnightRun && !isNoonRun) {
-    // Shouldn't happen given the cron schedule, but guard anyway
-    return NextResponse.json({ success: true, closed_count: 0, message: 'No-op: outside expected run windows' });
-  }
-
   const cutoff4h = new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString();
 
-  // Fetch all tenants so we can process each timezone correctly
   const { data: tenants, error: tenantsError } = await supabaseAdmin
     .from('tenants')
     .select('id, timezone')
@@ -184,164 +268,65 @@ export async function GET(request: NextRequest) {
   for (const tenant of tenants ?? []) {
     const tenantId: string = tenant.id;
     const tenantTz: string = tenant.timezone || 'America/New_York';
+    const localNow = tenantLocalHHMM(tenantTz);
 
-    // Compute the natural clock-out time for this run in this tenant's timezone
-    const wallTime: '00:00' | '12:00' = isMidnightRun ? '00:00' : '12:00';
-    const clockOutTarget = wallTimeToUTC(tenantTz, wallTime);
-
-    // For midnight run → close morning/shop shift timecards (is_night_shift = false OR is_shop_hours = true)
-    // For noon run    → close night shift timecards (is_night_shift = true)
-    let query = supabaseAdmin
-      .from('timecards')
-      .select(`
-        id,
-        user_id,
-        clock_in_time,
-        is_night_shift,
-        is_shop_hours,
-        tenant_id
-      `)
+    // Per-tenant configured day/shop auto-clockout time (default 18:00 = 6pm).
+    const { data: settings } = await supabaseAdmin
+      .from('timecard_settings_v2')
+      .select('auto_clockout_time, auto_clockout_enabled')
       .eq('tenant_id', tenantId)
-      .is('clock_out_time', null)
-      .eq('auto_closed', false)
-      .lt('clock_in_time', cutoff4h); // must have been open for more than 4 hours
+      .limit(1)
+      .maybeSingle();
+    const dayEnabled = settings?.auto_clockout_enabled ?? true;
+    const dayTime = (settings?.auto_clockout_time ?? '18:00').slice(0, 5); // 'HH:MM'
 
-    if (isMidnightRun) {
-      // Morning or shop shift: is_night_shift is false (or null)
-      query = query.or('is_night_shift.is.null,is_night_shift.eq.false');
-    } else {
-      // Night shift only
-      query = query.eq('is_night_shift', true);
-    }
-
-    const { data: staleTimecards, error: tcError } = await query;
-
-    if (tcError) {
-      console.error(`[auto-clockout] Tenant ${tenantId} fetch error:`, tcError);
-      continue;
-    }
-    if (!staleTimecards || staleTimecards.length === 0) continue;
-
-    // Fetch admin/ops profiles for this tenant (for admin notifications)
+    // Admin recipients for notifications (once per tenant).
     const { data: adminProfiles } = await supabaseAdmin
       .from('profiles')
       .select('id')
       .eq('tenant_id', tenantId)
       .in('role', ['super_admin', 'admin', 'operations_manager']);
-
     const adminIds: string[] = (adminProfiles || []).map((p: { id: string }) => p.id);
 
-    for (const tc of staleTimecards) {
-      try {
-        const clockInMs = new Date(tc.clock_in_time).getTime();
-        const clockOutMs = clockOutTarget.getTime();
+    // Pass 1 — DAY / SHOP shifts: close at the configured time, once local wall-clock reaches it.
+    if (dayEnabled && localNow >= dayTime) {
+      const target = wallTimeToUTC(tenantTz, dayTime);
+      const { data: dayCards } = await supabaseAdmin
+        .from('timecards')
+        .select('id, user_id, clock_in_time, is_night_shift, is_shop_hours, tenant_id')
+        .eq('tenant_id', tenantId)
+        .is('clock_out_time', null)
+        .eq('auto_closed', false)
+        .lt('clock_in_time', cutoff4h)
+        .or('is_night_shift.is.null,is_night_shift.eq.false');
+      for (const tc of (dayCards || []) as StaleCard[]) {
+        try { if (await closeCard(tc, target, tenantId, tenantTz, adminIds)) closedCount++; }
+        catch (e) { console.error(`[auto-clockout] day card ${tc.id}:`, e); }
+      }
+    }
 
-        // Safety: if the natural clock-out time is before clock-in (e.g. we're
-        // running ahead of midnight in a western timezone) skip — not stale yet.
-        if (clockOutMs <= clockInMs) continue;
-
-        // Fetch the worker's profile for lunch override and role
-        const { data: profile } = await supabaseAdmin
-          .from('profiles')
-          .select('full_name, role, default_lunch_minutes')
-          .eq('id', tc.user_id)
-          .maybeSingle();
-
-        const userRole: string = profile?.role || 'operator';
-        const userLunchOverride: number | null = profile?.default_lunch_minutes ?? null;
-        const operatorName: string = profile?.full_name || 'Unknown worker';
-
-        // Calculate total hours with lunch deduction
-        const { breakMinutesDeducted, autoLunchApplied } = await computeLunchDeduction(
-          tenantId,
-          userRole,
-          userLunchOverride,
-          clockInMs,
-          clockOutMs
-        );
-
-        const rawHours = (clockOutMs - clockInMs) / (1000 * 60 * 60);
-        const netHours = Math.max(0, rawHours - breakMinutesDeducted / 60);
-        const totalHours = parseFloat(netHours.toFixed(2));
-
-        // Auto-close the timecard
-        const { error: updateError } = await supabaseAdmin
-          .from('timecards')
-          .update({
-            clock_out_time: clockOutTarget.toISOString(),
-            total_hours: totalHours,
-            break_minutes: breakMinutesDeducted,
-            lunch_duration_minutes: breakMinutesDeducted,
-            auto_lunch_applied: autoLunchApplied,
-            auto_closed: true,
-            notes: 'Auto-closed: forgot to clock out',
-          })
-          .eq('id', tc.id);
-
-        if (updateError) {
-          console.error(`[auto-clockout] Failed to close timecard ${tc.id}:`, updateError);
-          continue;
-        }
-
-        closedCount++;
-        const timeStr = formatTime(clockOutTarget, tenantTz);
-
-        // ─── Notifications (fire-and-forget) ─────────────────────────────────
-
-        const workerNotif = {
-          recipient_id: tc.user_id,
-          type: 'auto_clock_out',
-          title: 'Clocked Out Automatically',
-          message: `You were automatically clocked out at ${timeStr} because no clock-out was recorded. Please review your timecard and submit a correction if needed.`,
-          tenant_id: tenantId,
-          job_order_id: null as string | null,
-          read: false,
-          metadata: {
-            timecard_id: tc.id,
-            clock_out_time: clockOutTarget.toISOString(),
-            total_hours: totalHours,
-          },
-        };
-
-        const adminNotifs = adminIds
-          .filter((id) => id !== tc.user_id) // don't double-notify if admin is also the worker
-          .map((adminId) => ({
-            recipient_id: adminId,
-            type: 'auto_clock_out_admin',
-            title: 'Auto Clock-Out',
-            message: `${operatorName} was automatically clocked out at ${timeStr} — they may need to submit a time correction.`,
-            tenant_id: tenantId,
-            job_order_id: null as string | null,
-            read: false,
-            metadata: {
-              operator_id: tc.user_id,
-              operator_name: operatorName,
-              timecard_id: tc.id,
-              clock_out_time: clockOutTarget.toISOString(),
-              total_hours: totalHours,
-            },
-          }));
-
-        const allNotifs = [workerNotif, ...adminNotifs];
-        if (allNotifs.length > 0) {
-          Promise.resolve(
-            supabaseAdmin.from('schedule_notifications').insert(allNotifs)
-          ).catch(() => {});
-        }
-      } catch (perTcErr) {
-        console.error(`[auto-clockout] Error processing timecard ${tc.id}:`, perTcErr);
+    // Pass 2 — NIGHT shifts: close at local noon (unchanged behavior).
+    if (localNow >= '12:00') {
+      const target = wallTimeToUTC(tenantTz, '12:00');
+      const { data: nightCards } = await supabaseAdmin
+        .from('timecards')
+        .select('id, user_id, clock_in_time, is_night_shift, is_shop_hours, tenant_id')
+        .eq('tenant_id', tenantId)
+        .is('clock_out_time', null)
+        .eq('auto_closed', false)
+        .lt('clock_in_time', cutoff4h)
+        .eq('is_night_shift', true);
+      for (const tc of (nightCards || []) as StaleCard[]) {
+        try { if (await closeCard(tc, target, tenantId, tenantTz, adminIds)) closedCount++; }
+        catch (e) { console.error(`[auto-clockout] night card ${tc.id}:`, e); }
       }
     }
   }
 
   console.log(`[auto-clockout] Run complete. Closed ${closedCount} timecard(s) across ${(tenants ?? []).length} tenant(s).`);
-
   return NextResponse.json({
     success: true,
-    run_type: isMidnightRun ? 'midnight' : 'noon',
     closed_count: closedCount,
     tenant_count: (tenants ?? []).length,
-    // Note: per-timecard details omitted from response to avoid leaking PII (user_id, timecard_id).
-    // Closed timecards are visible in the admin timecard review page.
   });
 }

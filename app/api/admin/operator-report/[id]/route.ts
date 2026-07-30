@@ -32,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .maybeSingle();
   if (!person) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
 
-  const [cardsRes, timeOffRes, surveysRes, attendanceRes, helperReviewsRes] = await Promise.all([
+  const [cardsRes, timeOffRes, surveysRes, attendanceRes, helperReviewsRes, subsistenceRes] = await Promise.all([
     supabaseAdmin
       .from('timecards')
       .select('date, net_hours, total_hours, regular_hours, overtime_hours, is_late, late_minutes, out_of_town, is_shop_hours')
@@ -73,6 +73,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .gte('created_at', `${year}-01-01T00:00:00Z`)
       .lt('created_at', `${year + 1}-01-01T00:00:00Z`)
       .order('created_at', { ascending: false }),
+    // Subsistence nights — the source of truth (was double-counting off timecards.out_of_town).
+    supabaseAdmin
+      .from('subsistence_nights')
+      .select('night_date')
+      .eq('tenant_id', auth.tenantId)
+      .eq('operator_id', id)
+      .gte('night_date', start)
+      .lte('night_date', end),
   ]);
   if (cardsRes.error) return NextResponse.json({ error: cardsRes.error.message }, { status: 500 });
 
@@ -96,7 +104,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     b.regularHours += c.regular_hours != null ? Number(c.regular_hours) : Math.max(0, net - ot);
     if (c.is_late) { b.lateDays += 1; b.lateMinutes += Number(c.late_minutes ?? 0); }
     if (c.is_shop_hours) b.shopDays += 1;
-    if (c.out_of_town) b.subsistenceNights += 1;
+  }
+
+  // Subsistence nights from the source-of-truth table, bucketed by month.
+  for (const n of subsistenceRes?.data ?? []) {
+    const m = Number(String(n.night_date).slice(5, 7)) - 1;
+    if (m < 0 || m > 11) continue;
+    months[m].subsistenceNights += 1;
   }
 
   // Manual attendance codes (EA/UA/NCNS/... — the paper tracker's judgment calls).

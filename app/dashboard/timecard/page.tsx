@@ -241,6 +241,14 @@ function TimecardPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
+      // Out-of-town shift → ask whether they stayed overnight (adds a subsistence night).
+      let stayedOvernight = false;
+      if (activeTimecard?.outOfTown) {
+        stayedOvernight = window.confirm(
+          'This is an out-of-town job. Did you stay overnight away from home tonight?\n\nOK = Yes (adds 1 subsistence night)   ·   Cancel = No',
+        );
+      }
+
       let latitude: number | undefined, longitude: number | undefined, accuracy: number | undefined;
       try {
         const loc = await requestLocation();
@@ -252,7 +260,7 @@ function TimecardPage() {
       const res = await fetch('/api/timecard/clock-out', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ latitude, longitude, accuracy }),
+        body: JSON.stringify({ latitude, longitude, accuracy, stayed_overnight: stayedOvernight }),
       });
 
       if (res.ok) {

@@ -25,6 +25,18 @@
 - [x] ~~**P1/P2 — Lead operator vs "helper tickets" on multi-operator jobs.**~~ ✅ BUILT (awaiting push). `job_crew` table (migration `20260730`); lead = existing `assigned_to` (full completion), added operators = crew helpers (light HelperWorkLog + clock-in). Add/remove via the schedule-board job panel (`components/JobCrewPanel.tsx`); crew see the job + get the light view (`viewer_is_helper` from `/api/job-orders`); their notes appear on the completed ticket ("Crew Notes"). Duplicated jobs don't copy crew. **Guardian caught a pre-existing BLOCKING bug**: `HelperWorkLog` was mounted inside the `!jobIsHelper` operator fragment → unreachable since ~Jul 14, so apprentice helpers couldn't log field work AND the Batch-3 helper→operator review step never rendered. Moved it into the helper view — fixes all three. RLS PASS, guardian PASS after fixes, E2E DB test passed.
 - [ ] **P2 — Reminder for crew helper on clock-out.** The apprentice clock-out light-log gate is role-gated (`userRole==='apprentice'`); an OPERATOR crewed as a helper won't get the "submit your ticket" reminder (they can still log, just no nudge). Make that gate slot-based (job_crew helper OR helper_assigned_to). Follow-up, non-blocking.
 
+## 🕒 Jul 30 — Timecard finishing batch (plan: docs/plans/TIMECARD_FINISHING_BATCH.md)
+
+Founder's payroll "final touches." Phased (payroll = highest scrutiny). Decisions locked: GPS→native,
+60-day→grandfather null hire_date, double-time→hours×2 rate, subsistence→`subsistence_nights` is source of truth.
+- [x] ~~Notifications can't scroll~~ — ✅ FIXED (`NotificationBell` capturing scroll listener closed the panel on inner-list scroll).
+- [x] ~~Configurable auto-clockout time (default 6pm)~~ — ✅ BUILT. `timecard_settings_v2.auto_clockout_time`/`_enabled`; cron reworked to run hourly + close day/shop cards at the tenant-local configured time (night shifts keep noon); admin time-picker + toggle replaces the dead "hours" field.
+- [x] ~~Out-of-town subsistence prompt at clock-out~~ — ✅ BUILT. Clock-out asks "stayed overnight?" on out-of-town shifts → idempotent `subsistence_nights` upsert; annual report now counts the table (not `timecards.out_of_town`).
+- [ ] **Double-time tag (hours × 2 rate)** — Phase B. `double_time_hours`/`pay_type_override`/`double_time_multiplier` partly exist; need a bulk "mark these people this day" tool + make DT flow through payroll aggregators (calculateWeekSummary/team-summary/operator-report) + reconcile the legacy >12h/day DB-trigger DT.
+- [ ] **Holidays on the schedule board** — Phase A-rest. Holiday CRUD + apply-pay + settings all exist; add board badge + "Paid Holiday" prompt (reuses the apply endpoint).
+- [ ] **60-day tenure eligibility** — Phase B. Grandfather null hire_date; gate the holiday apply endpoint on `holiday_date − hire_date ≥ 60`; a "who's past 60 days" admin view.
+- [ ] **Continuous GPS + geofence auto-arrival + app-closed shop reminder** — Phase C (NATIVE, founder-greenlit). Needs a background-geolocation plugin + iOS "Always" review + privacy-policy rewrite + re-consent + iOS/Android builds + stored jobsite lat/lng. Interim: a time-based clock-out reminder ships in an earlier phase.
+
 ## 🚀 PATRIOT LAUNCH EPIC (the path to first revenue — Jun 27 founder-defined "done")
 
 > Founder's definition of "Patriot is launchable + they'll pay." Audited Jun 27 (5 parallel scouts) —
