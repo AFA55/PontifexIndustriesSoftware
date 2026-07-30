@@ -25,6 +25,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
 
+// How long before the tenant's auto-clockout time to warn still-clocked-in workers.
+const PRE_AUTOCLOCKOUT_WARN_MINUTES = 30;
+
+/** Tenant-local minutes-since-midnight (0-1439). */
+function tenantLocalMinutes(tz: string): number {
+  const hhmm = new Intl.DateTimeFormat('en-GB', {
+    timeZone: tz, hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(new Date());
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+}
+
+/** '18:00:00' | '18:00' → minutes-since-midnight, or null if unparseable. */
+function timeToMinutes(t: string | null | undefined): number | null {
+  if (!t) return null;
+  const [h, m] = t.slice(0, 5).split(':').map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
+  return h * 60 + m;
+}
+
+function fmt12h(minutes: number): string {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const ampm = h >= 12 ? 'PM' : 'AM';
+  const hr = h % 12 || 12;
+  return `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
 // thresholds in hours → reminder key suffix + copy (plan §4)
 const OUT_THRESHOLDS = [
   {
@@ -71,14 +99,32 @@ export async function GET(request: NextRequest) {
       // night-shift card may belong to yesterday but still be open.
       const { data: open } = await supabaseAdmin
         .from('timecards')
-        .select('user_id, clock_in_time, date')
+        .select('user_id, clock_in_time, date, is_night_shift')
         .eq('tenant_id', tenant.id)
         .not('clock_in_time', 'is', null)
         .is('clock_out_time', null);
 
       if (!open || open.length === 0) continue;
 
-      const openCards = open as Array<{ user_id: string; clock_in_time: string; date: string }>;
+      const openCards = open as Array<{ user_id: string; clock_in_time: string; date: string; is_night_shift: boolean | null }>;
+
+      // Pre-auto-clockout warning window: if this tenant auto-closes day/shop cards
+      // at a configured local time, warn ~30 min before so people can clock out
+      // themselves instead of being auto-closed. Ties into timecard_settings_v2.
+      const tz = tenant.timezone || 'America/New_York';
+      const { data: tcSettings } = await supabaseAdmin
+        .from('timecard_settings_v2')
+        .select('auto_clockout_time, auto_clockout_enabled')
+        .eq('tenant_id', tenant.id)
+        .limit(1)
+        .maybeSingle();
+      const autoEnabled = tcSettings?.auto_clockout_enabled ?? true;
+      const autoMinutes = timeToMinutes(tcSettings?.auto_clockout_time ?? '18:00');
+      const localMinutes = tenantLocalMinutes(tz);
+      const inWarnWindow =
+        autoEnabled && autoMinutes != null &&
+        localMinutes >= autoMinutes - PRE_AUTOCLOCKOUT_WARN_MINUTES &&
+        localMinutes < autoMinutes;
 
       // Phone numbers for SMS fallback (mirrors clock-in-reminders)
       const userIds = Array.from(new Set(openCards.map((t) => t.user_id)));
@@ -91,6 +137,22 @@ export async function GET(request: NextRequest) {
       );
 
       for (const tc of openCards) {
+        // Pre-auto-clockout warning (day/shop cards only — night shifts keep the
+        // noon close). Fires once per shift via reminder_log dedup.
+        if (inWarnWindow && !tc.is_night_shift && autoMinutes != null) {
+          const res = await sendReminderOnce(`clock_out_autowarn:${tc.date}`, {
+            userId: tc.user_id,
+            tenantId: tenant.id,
+            category: 'clock_in_reminder',
+            inAppType: 'reminder',
+            title: 'Clock out soon',
+            message: `You'll be auto-clocked out at ${fmt12h(autoMinutes)}. Clock out now if your day is done.`,
+            actionUrl: '/dashboard/timecard',
+            smsPhone: phoneMap.get(tc.user_id) ?? null,
+          });
+          if (res) remindersSent++;
+        }
+
         const hoursIn = (nowMs - new Date(tc.clock_in_time).getTime()) / 3_600_000;
 
         // Pick the HIGHEST threshold crossed so a late cron tick doesn't fire
