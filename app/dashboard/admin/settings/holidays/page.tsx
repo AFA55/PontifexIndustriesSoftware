@@ -82,6 +82,11 @@ export default function HolidaysSettingsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [applyResult, setApplyResult] = useState<Record<string, string>>({});
 
+  // 60-day tenure eligibility (read-only)
+  interface TenureRow { id: string; fullName: string; role: string; hireDate: string | null; daysEmployed: number | null; eligible: boolean; grandfathered: boolean }
+  const [tenure, setTenure] = useState<{ thresholdDays: number; eligibleCount: number; pendingCount: number; employees: TenureRow[] } | null>(null);
+  const [showTenure, setShowTenure] = useState(false);
+
   const loadHolidays = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/company-holidays', { headers: await authHeaders() });
@@ -98,6 +103,14 @@ export default function HolidaysSettingsPage() {
     }
   }, []);
 
+  const loadTenure = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/tenure-eligibility', { headers: await authHeaders() });
+      const json = await res.json();
+      if (res.ok && json.success) setTenure(json.data);
+    } catch { /* non-critical */ }
+  }, []);
+
   useEffect(() => {
     const user = getCurrentUser();
     if (!user) { router.push('/login'); return; }
@@ -106,7 +119,8 @@ export default function HolidaysSettingsPage() {
       return;
     }
     loadHolidays();
-  }, [router, loadHolidays]);
+    loadTenure();
+  }, [router, loadHolidays, loadTenure]);
 
   const handleAdd = async () => {
     if (!newName.trim() || !newDate) { setError('Date and name are required'); return; }
@@ -449,6 +463,43 @@ export default function HolidaysSettingsPage() {
             </div>
           </div>
         </div>
+
+        {/* 60-day tenure eligibility (read-only) */}
+        {tenure && (
+          <div className="mt-6 bg-white rounded-xl border border-slate-200 p-5">
+            <button
+              type="button"
+              onClick={() => setShowTenure((s) => !s)}
+              className="w-full flex items-center justify-between gap-2"
+            >
+              <div className="text-left">
+                <h3 className="text-sm font-bold text-slate-800">Holiday Pay Eligibility ({tenure.thresholdDays}-day rule)</h3>
+                <p className="text-xs text-slate-500">
+                  {tenure.eligibleCount} eligible · {tenure.pendingCount} under {tenure.thresholdDays} days
+                  {tenure.pendingCount > 0 ? ' (excluded from holiday pay until they qualify)' : ''}
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-brand">{showTenure ? 'Hide' : 'Show'}</span>
+            </button>
+            {showTenure && (
+              <ul className="mt-3 divide-y divide-slate-100">
+                {tenure.employees.map((e) => (
+                  <li key={e.id} className="flex items-center justify-between py-2 text-sm">
+                    <span className="font-medium text-slate-800">{e.fullName}</span>
+                    <span className="flex items-center gap-2">
+                      <span className="text-xs text-slate-400">
+                        {e.grandfathered ? 'no hire date' : e.daysEmployed != null ? `${e.daysEmployed} days` : '—'}
+                      </span>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${e.eligible ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {e.eligible ? 'Eligible' : `Under ${tenure.thresholdDays}d`}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

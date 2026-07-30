@@ -23,6 +23,8 @@ export interface TimecardEntry {
   total_hours: number | null;
   hour_type: string | null;
   entry_type?: string | null;
+  /** Admin per-day override, e.g. 'double_time' → this card's hours paid at 2×. */
+  pay_type_override?: string | null;
   is_shop_hours: boolean;
   is_night_shift: boolean;
   is_approved: boolean;
@@ -37,6 +39,12 @@ export interface WeekSummary {
   nightShiftHours: number;
   shopHours: number;
   holidayHours: number;
+  /**
+   * Hours tagged double-time (pay_type_override='double_time') — paid at 2× the
+   * regular rate. OT-EXEMPT: carved out of the 40-hr weekly base so a double-time
+   * day is never ALSO counted as overtime (that would double-count the premium).
+   */
+  doubleTimeHours: number;
   totalHours: number;
   daysWorked: number;
   /**
@@ -65,6 +73,7 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
   let nightShiftHours = 0;
   let shopHours = 0;
   let holidayHours = 0;
+  let doubleTimeHours = 0;
   let totalHours = 0;
   const daysWorked = new Set(
     entries.filter((e) => e.total_hours && e.total_hours > 0).map((e) => e.date)
@@ -82,6 +91,11 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
       holidayHours += hours;
     }
 
+    // Double-time day (admin-tagged) — paid at 2×, carved out of the OT base below.
+    if (entry.pay_type_override === 'double_time') {
+      doubleTimeHours += hours;
+    }
+
     if (entry.hour_type === 'mandatory_overtime') {
       mandatoryOvertimeHours += hours;
     }
@@ -93,9 +107,18 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
     }
   }
 
-  // Weekly OT = weekday hours (non-mandatory, non-holiday) that exceed 40.
-  // Holiday hours are excluded from the OT base so holiday pay never triggers OT.
-  const weekdayHours = totalHours - mandatoryOvertimeHours - holidayHours;
+  // Weekly OT = weekday hours (non-mandatory, non-holiday, non-double-time) over 40.
+  // Classify each card ONCE via a filter — NOT by subtracting each bucket total,
+  // which would double-subtract a card that falls in two OT-exempt buckets (e.g. a
+  // weekend mandatory-OT card also tagged double-time) and yield negative regular
+  // hours. Holiday + double-time are paid at their own rate and OT-exempt.
+  const weekdayHours = entries.reduce((sum, e) => {
+    const exempt =
+      e.hour_type === 'mandatory_overtime' ||
+      e.entry_type === 'holiday' ||
+      e.pay_type_override === 'double_time';
+    return exempt ? sum : sum + (e.total_hours || 0);
+  }, 0);
   const weeklyOvertimeHours = Math.max(0, weekdayHours - 40);
   const regularHours = Math.min(weekdayHours, 40);
 
@@ -106,6 +129,7 @@ export function calculateWeekSummary(entries: TimecardEntry[]): WeekSummary {
     nightShiftHours: Number(nightShiftHours.toFixed(2)),
     shopHours: Number(shopHours.toFixed(2)),
     holidayHours: Number(holidayHours.toFixed(2)),
+    doubleTimeHours: Number(doubleTimeHours.toFixed(2)),
     totalHours: Number(totalHours.toFixed(2)),
     daysWorked,
     // Surfaced, not derived here: subsistence comes from a separate table and is

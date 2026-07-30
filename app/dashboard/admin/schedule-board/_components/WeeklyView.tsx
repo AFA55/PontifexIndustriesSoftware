@@ -9,6 +9,7 @@ interface WeeklyViewProps {
   capacityMaxSlots: number;
   canEdit: boolean;
   onDayClick: (date: string) => void;
+  holidaysByDate?: Record<string, { id: string; name: string; pay_hours: number }>;
 }
 
 export default function WeeklyView({
@@ -17,6 +18,7 @@ export default function WeeklyView({
   capacityMaxSlots,
   canEdit,
   onDayClick,
+  holidaysByDate = {},
 }: WeeklyViewProps) {
   return (
     <div className="container mx-auto px-4 md:px-6 pb-6">
@@ -29,6 +31,7 @@ export default function WeeklyView({
             const monthName = d.toLocaleDateString('en-US', { month: 'short' });
             const isToday = toDateString(new Date()) === date;
             const isSelected = selectedDate === date;
+            const holiday = holidaysByDate[date];
             return (
               <div key={date} className="min-w-0">
                 {/* Day header */}
@@ -49,6 +52,14 @@ export default function WeeklyView({
                   }`}>
                     {jobs.length} job{jobs.length !== 1 ? 's' : ''}
                   </p>
+                  {holiday && (
+                    <span
+                      title={`${holiday.name} — ${holiday.pay_hours}h paid`}
+                      className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-400/20 text-amber-700 dark:text-amber-300 text-xs font-semibold border border-amber-300 dark:border-amber-400/40"
+                    >
+                      ★ Paid Holiday
+                    </span>
+                  )}
                 </button>
                 {/* Jobs list */}
                 <div className="p-2 space-y-1.5 max-h-[60vh] overflow-y-auto">

@@ -69,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   // 2. Resolve eligible employees: tenant + role membership.
   const { data: eligible, error: pErr } = await supabaseAdmin
     .from('profiles')
-    .select('id, role')
+    .select('id, role, hire_date')
     .eq('tenant_id', tenantId)
     .in('role', roleSet);
   if (pErr) {
@@ -77,9 +77,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: 'Failed to resolve eligible employees', details: pErr.message }, { status: 500 });
   }
 
-  const eligibleUsers = eligible ?? [];
+  // 2b. 60-day tenure gate: must be employed ≥ 60 days as of the holiday.
+  // A NULL hire_date is grandfathered (assumed past 60 days) per founder decision;
+  // only a hire_date that IS set AND < 60 days before the holiday excludes.
+  const TENURE_DAYS = 60;
+  const holidayMs = new Date(`${holidayDate}T00:00:00`).getTime();
+  const tenureEligible = (eligible ?? []).filter((u) => {
+    if (!u.hire_date) return true; // grandfathered
+    const hiredMs = new Date(`${u.hire_date}T00:00:00`).getTime();
+    if (!Number.isFinite(hiredMs)) return true; // unparseable → grandfather
+    const daysEmployed = (holidayMs - hiredMs) / 86_400_000;
+    return daysEmployed >= TENURE_DAYS;
+  });
+  const tenureSkipped = (eligible ?? []).length - tenureEligible.length;
+
+  const eligibleUsers = tenureEligible;
   if (eligibleUsers.length === 0) {
-    return NextResponse.json({ success: true, applied: 0, skipped: 0 });
+    return NextResponse.json({ success: true, applied: 0, skipped: 0, tenure_skipped: tenureSkipped });
   }
 
   // 3. Find which eligible users already have a holiday row for this date (skip them).
@@ -165,10 +179,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         applies_to: holiday.applies_to,
         applied,
         skipped,
+        tenure_skipped: tenureSkipped,
       },
       tenant_id: tenantId,
     })
   ).catch(() => {});
 
-  return NextResponse.json({ success: true, applied, skipped });
+  return NextResponse.json({ success: true, applied, skipped, tenure_skipped: tenureSkipped });
 }

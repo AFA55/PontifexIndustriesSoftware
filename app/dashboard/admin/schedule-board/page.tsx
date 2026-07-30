@@ -81,6 +81,7 @@ export default function ScheduleBoardPage() {
   const [willCallJobs, setWillCallJobs] = useState<JobCardData[]>([]);
   const [jobNotes, setJobNotes] = useState<Record<string, NoteData[]>>({});
   const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
+  const [holidaysByDate, setHolidaysByDate] = useState<Record<string, { id: string; name: string; pay_hours: number; applies_to: string }>>({});
 
   // Crew roster from API
   const [allOperatorsList, setAllOperatorsList] = useState<string[]>([]);
@@ -663,6 +664,69 @@ export default function ScheduleBoardPage() {
     }
     fetchDailyNotes();
   }, [selectedDate]);
+
+  // ═══ FETCH COMPANY HOLIDAYS (year of selectedDate) ═══
+  const fetchHolidays = useCallback(async (dateStr: string) => {
+    const year = dateStr.slice(0, 4);
+    try {
+      const res = await apiFetch(`/api/admin/company-holidays?year=${year}`);
+      if (res.ok) {
+        const json = await res.json();
+        const map: Record<string, { id: string; name: string; pay_hours: number; applies_to: string }> = {};
+        for (const h of json.data || []) {
+          if (h.is_active === false) continue;
+          map[h.holiday_date] = { id: h.id, name: h.name, pay_hours: Number(h.pay_hours ?? 8), applies_to: h.applies_to || 'all' };
+        }
+        setHolidaysByDate(map);
+      }
+    } catch { /* keep prior holidays on transient error */ }
+  }, []);
+
+  useEffect(() => {
+    fetchHolidays(selectedDate);
+  }, [selectedDate, fetchHolidays]);
+
+  // ═══ MARK SELECTED DATE AS A PAID HOLIDAY ═══
+  const handleMarkHoliday = useCallback(async () => {
+    const existing = holidaysByDate[selectedDate];
+    const promptDefault = existing ? String(existing.pay_hours) : '8';
+    const input = window.prompt(
+      `Paid holiday hours to pay eligible field/shop staff on ${selectedDate}:`,
+      promptDefault
+    );
+    if (input === null) return; // cancelled
+    const payHours = Number(input);
+    if (!Number.isFinite(payHours) || payHours < 0 || payHours > 24) {
+      addToast('error', 'Invalid Hours', 'Enter a number of hours between 0 and 24.');
+      return;
+    }
+    try {
+      const res = await apiFetch('/api/admin/company-holidays', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ holiday_date: selectedDate, name: existing?.name || 'Holiday', pay_hours: payHours, applies_to: existing?.applies_to || 'all' }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.data?.id) {
+        addToast('error', 'Save Failed', json.error || 'Could not save holiday');
+        return;
+      }
+      const applyRes = await apiFetch(`/api/admin/company-holidays/${json.data.id}/apply`, { method: 'POST' });
+      const applyJson = await applyRes.json();
+      if (!applyRes.ok) {
+        addToast('error', 'Apply Failed', applyJson.error || 'Holiday saved but pay could not be applied');
+      } else {
+        addToast(
+          'success',
+          'Paid Holiday Applied',
+          `${applyJson.applied} paid · ${applyJson.skipped} already had it · ${applyJson.tenure_skipped} under 60-day tenure`
+        );
+      }
+      fetchHolidays(selectedDate);
+    } catch {
+      addToast('error', 'Save Failed', 'Could not connect to server');
+    }
+  }, [holidaysByDate, selectedDate, addToast, fetchHolidays]);
 
   // ═══ FETCH TIME-OFF DATA ═══
   useEffect(() => {
@@ -1848,6 +1912,7 @@ export default function ScheduleBoardPage() {
           capacityMaxSlots={capacityMaxSlots}
           canEdit={canEdit}
           onDayClick={(date) => { setSelectedDate(date); setViewMode('day'); }}
+          holidaysByDate={holidaysByDate}
         />
       )}
 
@@ -1857,6 +1922,25 @@ export default function ScheduleBoardPage() {
           <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2 text-sm text-amber-300 flex items-center gap-2">
             <span>✏️</span>
             <span>Click any job to edit fields — changes will be submitted for supervisor approval.</span>
+          </div>
+        </div>
+      )}
+
+      {/* ═══ PAID HOLIDAY CONTROL (day view) ═══════════════════════════════ */}
+      {viewMode === 'day' && boardViewMode !== 'crew-grid' && canEdit && (
+        <div className="container mx-auto px-4 md:px-6 pb-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {holidaysByDate[selectedDate] && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-400/20 text-amber-700 dark:text-amber-300 text-xs font-semibold border border-amber-300 dark:border-amber-400/40">
+                ★ Paid Holiday: {holidaysByDate[selectedDate].name} ({holidaysByDate[selectedDate].pay_hours}h)
+              </span>
+            )}
+            <button
+              onClick={handleMarkHoliday}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white transition-colors"
+            >
+              ★ {holidaysByDate[selectedDate] ? 'Edit Paid Holiday' : 'Mark Paid Holiday'}
+            </button>
           </div>
         </div>
       )}

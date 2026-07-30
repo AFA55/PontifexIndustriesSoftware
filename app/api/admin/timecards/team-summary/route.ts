@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
     // 2. Fetch all timecards for this week
     let timecardsQuery = supabaseAdmin
       .from('timecards')
-      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, entry_type, break_minutes, notes, is_late, late_minutes')
+      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, entry_type, pay_type_override, break_minutes, notes, is_late, late_minutes')
       .gte('date', mondayStr)
       .lte('date', sundayStr)
       .order('date', { ascending: true });
@@ -237,9 +237,21 @@ export async function GET(request: NextRequest) {
           }
         });
 
-        // Calculate OT: weekday (non-mandatory) hours > 40 = weekly OT
+        // Double-time (admin-tagged) + holiday hours are paid at their own rate and
+        // are OT-EXEMPT — carve them out of the weekday base so neither is also
+        // counted as overtime.
+        const doubleTimeHours = entries
+          .filter(e => (e as any).pay_type_override === 'double_time')
+          .reduce((s, e) => s + (e.total_hours || 0), 0);
+        const holidayHours = entries
+          .filter(e => (e as any).entry_type === 'holiday')
+          .reduce((s, e) => s + (e.total_hours || 0), 0);
+
+        // Calculate OT: weekday (non-mandatory, non-holiday, non-double-time) > 40 = weekly OT
         const weekdayHours = entries
-          .filter(e => e.hour_type !== 'mandatory_overtime')
+          .filter(e => e.hour_type !== 'mandatory_overtime'
+            && (e as any).entry_type !== 'holiday'
+            && (e as any).pay_type_override !== 'double_time')
           .reduce((s, e) => s + (e.total_hours || 0), 0);
         const regularHours = Math.min(weekdayHours, 40);
         const overtimeHours = Math.max(0, weekdayHours - 40);
@@ -281,6 +293,8 @@ export async function GET(request: NextRequest) {
           weeklyTotal: parseFloat(weeklyTotal.toFixed(2)),
           regularHours: parseFloat(regularHours.toFixed(2)),
           overtimeHours: parseFloat((overtimeHours + mandatoryOT).toFixed(2)),
+          doubleTimeHours: parseFloat(doubleTimeHours.toFixed(2)),
+          holidayHours: parseFloat(holidayHours.toFixed(2)),
           breakMinutesTotal,
           pendingCount,
           approvedCount,

@@ -329,6 +329,24 @@ export async function PUT(
       updateData.pay_type_override = pay_type_override;
     }
 
+    // Double-time tag: the shouldRecalculate path is skipped when an override is
+    // set, so attribute the card's hours to double_time_hours explicitly here —
+    // otherwise the DT-aware payroll aggregators would see 0 DT hours (guardian gap).
+    if (effectivePayTypeOverride === 'double_time' && total_hours > 0) {
+      updateData.double_time_hours = total_hours;
+      updateData.regular_hours = 0;
+      updateData.overtime_hours = 0;
+      updateData.night_shift_premium_hours = 0;
+      // DT-only: clear a mandatory_overtime classification so the card isn't in
+      // both the mandatory-OT and double-time buckets.
+      if (existingTimecard.hour_type === 'mandatory_overtime') updateData.hour_type = 'regular';
+    } else if (pay_type_override === null && !shouldRecalculate && total_hours > 0) {
+      // Explicitly clearing a tag (no full recalc) → return the hours to regular.
+      updateData.double_time_hours = 0;
+      updateData.regular_hours = total_hours;
+      updateData.overtime_hours = 0;
+    }
+
     // Hours breakdown (only update if recalculated)
     if (shouldRecalculate) {
       updateData.regular_hours = regular_hours;
