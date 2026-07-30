@@ -428,12 +428,18 @@ export async function POST(request: NextRequest) {
     // / remote-clock-in writers. Uses the SAME tenant-tz `today` so the row matches.
     // Best-effort — never blocks clock-out.
     if (stayedOvernight && activeTimecard.out_of_town && auth.tenantId) {
+      // Key the night to the timecard's CLOCK-IN date, not "today". A remote
+      // out-of-town shift that crosses local midnight already recorded the night
+      // at clock-in under the clock-in day; using `today` (the clock-out day)
+      // would create a SECOND row = double per-diem. activeTimecard.date is the
+      // tenant-tz clock-in date, so both writers converge on one row.
+      const nightDate = activeTimecard.date || today;
       Promise.resolve(
         supabaseAdmin.from('subsistence_nights').upsert(
           {
             tenant_id: auth.tenantId,
             operator_id: auth.userId,
-            night_date: today,
+            night_date: nightDate,
             job_order_id: activeTimecard.job_order_id ?? null,
             source: 'operator',
             note: 'Confirmed overnight at clock-out',

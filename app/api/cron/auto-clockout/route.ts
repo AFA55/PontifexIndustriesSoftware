@@ -45,12 +45,8 @@ function wallTimeToUTC(tenantTz: string, wallTime: string): Date {
   const todayLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tenantTz }).format(new Date());
   // Build a datetime string interpreted as tenant-local time
   const localDateTimeStr = `${todayLocal}T${wallTime}:00`;
-  // Parse it: JavaScript Date will interpret this as local browser time if we
-  // don't specify a zone. To avoid that, we compute the UTC offset manually.
-  const zoned = new Date(
-    new Date(localDateTimeStr + '+00:00').toLocaleString('en-US', { timeZone: tenantTz })
-  );
-  // Better approach: use Intl to find the offset
+  // Compute the tenant's current UTC offset via Intl, then apply it to the
+  // local wall-clock target to get the UTC instant.
   const referenceEpoch = Date.now();
   const utcStr = new Date(referenceEpoch).toLocaleString('en-US', {
     timeZone: 'UTC',

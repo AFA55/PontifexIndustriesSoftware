@@ -140,6 +140,7 @@ export default function TimecardSettingsPage() {
   const [settings, setSettings] = useState<TimecardSettings>(DEFAULT_SETTINGS);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -194,6 +195,13 @@ export default function TimecardSettingsPage() {
   };
 
   const handleSave = async () => {
+    setSaveError(null);
+    // A blank time would be sent as '' and rejected by the PG `time` column,
+    // 500-ing the whole save — validate before we try.
+    if (settings.autoClockoutEnabled && !/^\d{2}:\d{2}$/.test(settings.autoClockoutTime)) {
+      setSaveError('Enter a valid auto clock-out time (or turn it off).');
+      return;
+    }
     setSaving(true);
     try {
       // Save to API
@@ -217,10 +225,15 @@ export default function TimecardSettingsPage() {
         }),
       });
       if (!res.ok) {
-        console.error('Failed to save settings to API');
+        const j = await res.json().catch(() => ({}));
+        setSaveError(j.error || 'Could not save settings. Please try again.');
+        setSaving(false);
+        return;
       }
     } catch {
-      console.error('Error saving settings');
+      setSaveError('Could not save settings. Please try again.');
+      setSaving(false);
+      return;
     }
     // Also persist to localStorage as backup
     localStorage.setItem('timecard-settings', JSON.stringify(settings));
@@ -277,6 +290,9 @@ export default function TimecardSettingsPage() {
             )}
           </button>
         </div>
+        {saveError && (
+          <p className="mt-2 text-sm font-medium text-rose-600 text-right">{saveError}</p>
+        )}
       </header>
 
       <div className="max-w-[900px] mx-auto px-6 py-8 space-y-6">
