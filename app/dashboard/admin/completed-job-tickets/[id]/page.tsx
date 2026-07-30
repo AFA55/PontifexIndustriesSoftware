@@ -13,7 +13,7 @@ import {
   ArrowLeft, FileText, Star, Clock, DollarSign, User, MapPin,
   CheckCircle, Calendar, AlertCircle, Download, Eye, X, Plus,
   Loader2, Bell, Receipt, TrendingUp, BarChart3, Target,
-  Image as ImageIcon, Milestone, ChevronRight, Send, PenTool, RefreshCw, Globe,
+  Image as ImageIcon, Milestone, ChevronRight, Send, PenTool, RefreshCw, Globe, Printer,
 } from 'lucide-react';
 
 interface CompletionSummary {
@@ -453,6 +453,16 @@ export default function CompletedJobSummaryPage() {
                 <Globe className="w-4 h-4" />
                 Customer Portal
               </button>
+              <Link
+                href={`/dashboard/admin/jobs/${jobId}/completed-print`}
+                target="_blank"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
+                  bg-white border border-slate-200 text-slate-700 hover:bg-slate-50
+                  dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10"
+              >
+                <Printer className="w-4 h-4" />
+                Print Ticket
+              </Link>
               <Link
                 href={`/dashboard/admin/billing/create?job=${jobId}`}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-all

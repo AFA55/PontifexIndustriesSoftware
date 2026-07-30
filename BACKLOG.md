@@ -19,6 +19,11 @@
 | **Unpushed commits** | ✅ none — pushed through `ff40da25` (Jul 1 live-blocker sweep) |
 | **Last groomed** | Jul 1, 2026 |
 
+## 🆕 Jul 30 — founder field requests (from live paper-ticket workflow)
+
+- [ ] **P1 — Print a COMPLETED ticket (paper billing hand-off).** Patriot still runs on paper; PMs need a printed completed ticket to know a job is done + billable. Mirror Patriot's paper work-ticket (founder sent a photo of ticket #9059): **job number top-right**, date, work times, customer name, job/project location + address, and DESCRIPTION OF WORK PERFORMED — plus footage cut (incl. cross cuts), disposal loads, slurry barrels ($45/barrel), subsistence/night-stayed, standby time, and the completion signature. Tenant-branded header (Patriot logo + red/navy). Pull from the existing `completion-summary` data (work_items footage/cores, timecards times, signature, subsistence). Build as a print-optimized page (like `app/dashboard/admin/jobs/[id]/print/page.tsx`) with a "Print Completed Ticket" button on the completed-job view. *(Mapping agent running.)*
+- [ ] **P1/P2 — Lead operator vs "helper tickets" on multi-operator jobs.** When 2+ OPERATORS go to one job, the founder designates ONE **lead** who does the full ticket/completion workflow; the other operator(s) get a light **helper ticket** (just "what I did" description) → ONE full data-entry per job + short notes from the others. MUST NOT break: single-operator + apprentice-helper flow, and **duplicated jobs still each go through the full workflow independently**. Likely needs a crew model (lead vs helper role per user on a job). *(Mapping agent running — pick minimal option that doesn't regress the current flow.)*
+
 ## 🚀 PATRIOT LAUNCH EPIC (the path to first revenue — Jun 27 founder-defined "done")
 
 > Founder's definition of "Patriot is launchable + they'll pay." Audited Jun 27 (5 parallel scouts) —
