@@ -115,16 +115,19 @@ export default function JobDetailPage() {
           if (json.user_role) setUserRole(json.user_role);
           const found = (json.data || [])[0];
           if (found && found.id === jobId) {
+            // Helper detection: prefer the server's viewer_is_helper (covers crew
+            // members, not just the single helper slot); fall back to the slot check.
+            const helperView = found.viewer_is_helper ?? (found.helper_assigned_to === uid && found.assigned_to !== uid);
             setJob({
               ...found,
-              isHelper: found.helper_assigned_to === uid && found.assigned_to !== uid,
+              isHelper: helperView,
             });
             const daysWorked = found?.total_days_worked || 0;
             setDayNumber(daysWorked + 1);
 
             // Resume last position: if operator already visited work-performed today, send them back.
             // Helpers never follow this redirect — they have a separate simplified view.
-            const isHelperJob = found.helper_assigned_to === uid && found.assigned_to !== uid;
+            const isHelperJob = helperView;
             const lastPage = localStorage.getItem(`job_last_page_${jobId}`);
             if (!isHelperJob && lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working', 'pending_completion'].includes(found.status)) {
               router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
@@ -782,6 +785,29 @@ export default function JobDetailPage() {
               </div>
             )}
 
+            {/* Team-member work log — the helper's short "what I did today" entry
+                (+ the operator rating step). This is the crew helper's primary action. */}
+            {!isCompleted && (
+              <HelperWorkLog
+                jobId={job.id}
+                jobNumber={job.job_number}
+                customerName={job.customer_name}
+                jobTitle={job.title}
+                job={job}
+              />
+            )}
+            {isCompleted && (
+              <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 dark:border-white/10 p-4">
+                <HelperWorkLog
+                  jobId={job.id}
+                  jobNumber={job.job_number}
+                  customerName={job.customer_name}
+                  jobTitle={job.title}
+                  job={job}
+                />
+              </div>
+            )}
+
             {/* Quick actions */}
             <div className="space-y-3 pt-2">
               <p className="text-xs font-bold uppercase tracking-wider text-gray-400 dark:text-white/30 px-1">Quick Actions</p>
@@ -1301,29 +1327,8 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Team Member Work Log (for helpers/team members only) */}
-        {jobIsHelper && !isCompleted && (
-          <HelperWorkLog
-            jobId={job.id}
-            jobNumber={job.job_number}
-            customerName={job.customer_name}
-            jobTitle={job.title}
-            job={job}
-          />
-        )}
-
-        {/* Completed job: show helper description as collapsible */}
-        {jobIsHelper && isCompleted && (
-          <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 dark:border-white/10 p-4">
-            <HelperWorkLog
-              jobId={job.id}
-              jobNumber={job.job_number}
-              customerName={job.customer_name}
-              jobTitle={job.title}
-              job={job}
-            />
-          </div>
-        )}
+        {/* (Team-member work log moved into the helper simplified view above — it
+            was unreachable here inside the !jobIsHelper operator fragment.) */}
 
         {/* Admin Documents & Photos - Prominent section */}
         {adminDocs.length > 0 && (

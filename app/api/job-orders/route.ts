@@ -77,6 +77,26 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Multi-operator crew: a non-admin can be crewed on jobs beyond the single
+    // assigned_to / helper_assigned_to slots (job_crew). Resolve their crew jobs
+    // once so access + list inclusion + helper detection all agree.
+    let crewJobIds: string[] = [];
+    const crewHelperJobIds = new Set<string>();
+    if (!isAdmin) {
+      const { data: crewRows } = await supabaseAdmin
+        .from('job_crew')
+        .select('job_order_id, role')
+        .eq('user_id', user.id);
+      for (const r of crewRows || []) {
+        crewJobIds.push(r.job_order_id);
+        if (r.role === 'helper') crewHelperJobIds.add(r.job_order_id);
+      }
+    }
+    // Helper detection for a job the current non-admin user is viewing.
+    const viewerIsHelper = (j: any): boolean =>
+      !isAdmin && j.assigned_to !== user.id &&
+      (j.helper_assigned_to === user.id || crewHelperJobIds.has(j.id));
+
     // If ID is provided, fetch that specific job
     if (id) {
       let specificJobQuery = supabaseAdmin
@@ -101,13 +121,21 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Check if user has access to this job (operator OR helper)
-      if (!isAdmin && specificJob.assigned_to !== user.id && specificJob.helper_assigned_to !== user.id) {
+      // Check if user has access to this job (operator OR helper OR crew member)
+      if (
+        !isAdmin &&
+        specificJob.assigned_to !== user.id &&
+        specificJob.helper_assigned_to !== user.id &&
+        !crewJobIds.includes(specificJob.id)
+      ) {
         return NextResponse.json(
           { error: 'Unauthorized to view this job' },
           { status: 403 }
         );
       }
+      // Tell the client whether the viewer is a helper on this job (drives the
+      // light "Team Member" view vs the full operator flow).
+      if (!isAdmin) (specificJob as any).viewer_is_helper = viewerIsHelper(specificJob);
 
       // Fetch operator profile data for autofilling forms
       let operatorProfile = null;
@@ -162,8 +190,10 @@ export async function GET(request: NextRequest) {
     // If not admin, scope to jobs the user is operator OR helper on
     if (!isAdmin) {
       if (includeHelperJobs) {
-        // Use OR filter: assigned_to = uid OR helper_assigned_to = uid
-        query = query.or(`assigned_to.eq.${user.id},helper_assigned_to.eq.${user.id}`);
+        // assigned_to = uid OR helper_assigned_to = uid OR crewed on the job
+        const ors = [`assigned_to.eq.${user.id}`, `helper_assigned_to.eq.${user.id}`];
+        if (crewJobIds.length) ors.push(`id.in.(${crewJobIds.join(',')})`);
+        query = query.or(ors.join(','));
       } else {
         query = query.eq('assigned_to', user.id);
       }
@@ -230,10 +260,18 @@ export async function GET(request: NextRequest) {
           const dailyOperator = dailyMap.get(j.id);
           // If no daily override exists, fall through (base assignment applies)
           if (dailyOperator === undefined) return true;
+          // A crew helper stays on the job regardless of the operator daily override.
+          if (crewJobIds.includes(j.id)) return true;
           // Daily override exists — only show this job if the override assigns it to THIS user
           return dailyOperator === user.id;
         });
       }
+    }
+
+    // Annotate helper-view flag per job so the client shows the light view for
+    // crew members (not just the helper_assigned_to slot).
+    if (!isAdmin) {
+      for (const j of filteredOrders) (j as any).viewer_is_helper = viewerIsHelper(j);
     }
 
     // Operators/helpers must not see office-only money & estimate fields

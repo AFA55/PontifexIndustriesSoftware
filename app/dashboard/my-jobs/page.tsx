@@ -126,13 +126,17 @@ export default function MyJobsPage() {
           // (founder Jul 14 bug): an operator assigned to the HELPER slot on
           // another crew's job was filtered out and never saw the ticket.
           // If you're in either slot, you're on the crew → you see it.
+          // On-crew = either slot OR crewed on the job (the server already scoped
+          // the list to jobs the user is on, incl. job_crew, and set
+          // viewer_is_helper — so keep every returned row, don't re-filter it out).
           const uidRef = uid;
-          const onCrew = (j: any) => j.assigned_to === uidRef || j.helper_assigned_to === uidRef;
+          const onCrew = (j: any) =>
+            j.assigned_to === uidRef || j.helper_assigned_to === uidRef || j.viewer_is_helper === true;
           const visible = ((json.data || []) as any[]).filter(onCrew);
 
           const enriched = visible.map((j: any) => ({
             ...j,
-            isHelper: j.helper_assigned_to === uid && j.assigned_to !== uid,
+            isHelper: j.viewer_is_helper ?? (j.helper_assigned_to === uid && j.assigned_to !== uid),
           }));
           setJobs(enriched);
           // Fetch done-for-today status when viewing today's schedule
@@ -215,9 +219,10 @@ export default function MyJobsPage() {
 
       // Combine, filter to past dates only (don't double-show today's jobs)
       const uid = session.user.id;
-      // Slot-based, not role-based (see today-list note): on-crew in either slot.
+      // Slot-based, not role-based (see today-list note): on-crew in either slot
+      // OR crewed on the job (viewer_is_helper from the server).
       const isPrimaryOrHelper = (j: any) =>
-        j.assigned_to === uid || j.helper_assigned_to === uid;
+        j.assigned_to === uid || j.helper_assigned_to === uid || j.viewer_is_helper === true;
       const all = [...onHoldData, ...inProgressData, ...pendingCompletionData, ...staleSingles].filter((j: any) => {
         const isPastDate = j.scheduled_date && j.scheduled_date < today;
         return isPrimaryOrHelper(j) && isPastDate;
@@ -261,7 +266,7 @@ export default function MyJobsPage() {
         const json = await res.json();
         const uid = session.user.id;
         const completed = (json.data || []).filter((j: any) => {
-          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid;
+          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid || j.viewer_is_helper === true;
           const isCompletedStatus = j.status === 'completed' || j.status === 'pending_completion';
           return isAssigned && isCompletedStatus;
         });

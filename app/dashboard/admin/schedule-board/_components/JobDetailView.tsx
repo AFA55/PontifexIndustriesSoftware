@@ -12,6 +12,7 @@ import {
 import { EQUIPMENT_PRESETS } from '@/lib/equipment-map';
 import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
+import JobCrewPanel from '@/components/JobCrewPanel';
 
 const WorkHistoryTimeline = lazy(() => import('./WorkHistoryTimeline'));
 const OfficeDocumentsPanel = lazy(() => import('@/components/admin/OfficeDocumentsPanel'));
@@ -764,6 +765,15 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       {job.day_label && <FieldRow label="Multi-Day" value={job.day_label} />}
                     </div>
                   </SectionCard>
+
+                  {/* ---- Crew (additional operators beyond the lead) ---- */}
+                  {!isEditing && (
+                    <JobCrewPanel
+                      jobId={job.id}
+                      leadId={(fullData?.assigned_to as string) || (job as any).assigned_to || null}
+                      leadName={fullData?.operator_name || operatorName || null}
+                    />
+                  )}
 
                   {/* ---- Scope of Work ---- */}
                   <SectionCard

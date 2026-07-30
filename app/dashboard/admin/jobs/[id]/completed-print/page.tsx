@@ -77,6 +77,7 @@ export default function CompletedTicketPrintPage({ params }: { params: Promise<{
   const [signatureUrl, setSignatureUrl] = useState<string | null>(null);
   const [signedAt, setSignedAt] = useState<string | null>(null);
   const [nightStayed, setNightStayed] = useState<boolean>(false);
+  const [crewNotes, setCrewNotes] = useState<{ name: string; note: string; hours: number | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,6 +111,26 @@ export default function CompletedTicketPrintPage({ params }: { params: Promise<{
           setSignedAt(jobRes.data.customer_signed_at || null);
         }
         setNightStayed(!!(nightRes.data && nightRes.data.length > 0));
+
+        // Crew notes — what the additional operators/helpers did (helper_work_logs).
+        const { data: hlogs } = await supabase
+          .from('helper_work_logs')
+          .select('helper_id, work_description, hours_worked')
+          .eq('job_order_id', jobId)
+          .eq('is_shop_ticket', false);
+        const withText = (hlogs || []).filter((h) => (h.work_description || '').trim());
+        if (withText.length) {
+          const hids = [...new Set(withText.map((h) => h.helper_id))];
+          const { data: hprofs } = await supabase.from('profiles').select('id, full_name').in('id', hids);
+          const hmap = new Map((hprofs || []).map((p) => [p.id, p.full_name]));
+          setCrewNotes(
+            withText.map((h) => ({
+              name: hmap.get(h.helper_id) || 'Crew',
+              note: (h.work_description || '').trim(),
+              hours: h.hours_worked != null ? Number(h.hours_worked) : null,
+            })),
+          );
+        }
       } catch {
         setError('Could not load the ticket.');
       } finally {
@@ -267,6 +288,22 @@ export default function CompletedTicketPrintPage({ params }: { params: Promise<{
           {/* Extra write-in room, like the paper form */}
           <div className="border border-gray-400 rounded h-20" />
         </div>
+
+        {/* ── Crew notes (what the additional operators did) ── */}
+        {crewNotes.length > 0 && (
+          <>
+            <SectionTitle accent={accent}>Crew Notes</SectionTitle>
+            <ul className="text-sm space-y-1 mb-4">
+              {crewNotes.map((c, i) => (
+                <li key={i}>
+                  <span className="font-semibold">{c.name}</span>
+                  {c.hours != null ? <span className="text-gray-600"> ({c.hours.toFixed(1)} hrs)</span> : null}
+                  {' — '}{c.note}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
 
         {/* ── Totals / checklist (paper-form fields) ── */}
         <SectionTitle accent={accent}>Job Details</SectionTitle>

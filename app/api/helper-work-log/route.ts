@@ -126,8 +126,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
+    // Access: the lead (assigned_to), the single helper slot, OR a crew member
+    // (additional operator crewed on this job).
+    let onCrew = false;
     if (job.helper_assigned_to !== auth.userId && job.assigned_to !== auth.userId) {
-      return NextResponse.json({ error: 'Not assigned to this job' }, { status: 403 });
+      const { data: crewRow } = await supabaseAdmin
+        .from('job_crew')
+        .select('id')
+        .eq('job_order_id', job_order_id)
+        .eq('user_id', auth.userId)
+        .maybeSingle();
+      onCrew = !!crewRow;
+      if (!onCrew) {
+        return NextResponse.json({ error: 'Not assigned to this job' }, { status: 403 });
+      }
     }
 
     // Helper → operator review (optional, on the end-of-day completion). Feeds the
