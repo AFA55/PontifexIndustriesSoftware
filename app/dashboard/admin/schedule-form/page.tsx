@@ -1850,6 +1850,11 @@ export default function ScheduleFormPage() {
         // Normalized progress targets (seeds job_scope_items on CREATE only; edits
         // manage scope via the Job Scope panel so manual target tweaks aren't wiped).
         scope_items: buildScopeItemsFromScope(form.service_types, form.scope_details, form.overcutting_allowed),
+        // Jobsite coordinates from the Google Places selection (accurate + free) —
+        // persisted for geofence auto-arrival (Phase C) + distance. Null when the
+        // address was typed manually; the geocode backfill cron fills those in.
+        jobsite_latitude: siteCoords?.lat ?? null,
+        jobsite_longitude: siteCoords?.lng ?? null,
         scope_photo_urls: form.scope_photo_urls.length > 0 ? form.scope_photo_urls : [],
         // Step 4
         equipment_needed: form.equipment_needed,

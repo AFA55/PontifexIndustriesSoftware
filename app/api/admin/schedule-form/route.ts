@@ -111,6 +111,12 @@ export async function POST(request: NextRequest) {
       foreman_phone: body.contact_phone || null,  // backward compat
       address: body.address || null,
       location: body.location_name || body.address || null,
+      // Jobsite coordinates from the Google Places selection (Phase C geofencing).
+      // Stamp jobsite_geocoded_at when present so the geocode backfill cron skips it.
+      jobsite_latitude: typeof body.jobsite_latitude === 'number' ? body.jobsite_latitude : null,
+      jobsite_longitude: typeof body.jobsite_longitude === 'number' ? body.jobsite_longitude : null,
+      jobsite_geocoded_at: (typeof body.jobsite_latitude === 'number' && typeof body.jobsite_longitude === 'number')
+        ? new Date().toISOString() : null,
 
       // ── Step 3: Scope of Work ───────────────────────────────
       description: body.description || null,
