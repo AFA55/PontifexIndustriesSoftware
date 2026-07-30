@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
+import { getTenantShopLocationOrDefault } from '@/lib/geolocation-server';
 
 export async function GET(request: NextRequest) {
   try {
@@ -89,6 +90,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Tenant shop coords for the native "back at shop → clock out?" geofence reminder.
+    let shop: { lat: number; lng: number } | null = null;
+    try {
+      const s = await getTenantShopLocationOrDefault(supabaseAdmin, auth.tenantId ?? null);
+      if (s) shop = { lat: s.latitude, lng: s.longitude };
+    } catch { /* non-critical */ }
+
     return NextResponse.json(
       {
         success: true,
@@ -111,6 +119,7 @@ export async function GET(request: NextRequest) {
           jobNumber: jobInfo?.job_number || null,
           jobCustomerName: jobInfo?.customer_name || null,
           outOfTown: activeTimecard.out_of_town || false,
+          shop,
         },
       },
       { status: 200 }

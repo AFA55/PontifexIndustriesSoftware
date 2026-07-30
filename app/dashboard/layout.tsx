@@ -2,6 +2,7 @@
 
 import { Fragment } from 'react';
 import PushRegistration from '@/components/PushRegistration';
+import GeofenceRegistration from '@/components/GeofenceRegistration';
 import SubscriptionGate from '@/components/SubscriptionGate';
 import WelcomeProfileModal from '@/components/WelcomeProfileModal';
 import BiometricEnrollNudge from '@/components/BiometricEnrollNudge';
@@ -35,6 +36,8 @@ export default function DashboardLayout({
   return (
     <GoogleMapsProvider>
       <PushRegistration key="push-registration" />
+      {/* Headless native geofencing (auto-arrival + back-at-shop reminder). Web no-op. */}
+      <GeofenceRegistration key="geofence-registration" />
       <SubscriptionGate key="subscription-gate" />
       {/* One-time "finish your profile" nudge for accounts missing photo/nickname/phone */}
       <WelcomeProfileModal key="welcome-profile-modal" />

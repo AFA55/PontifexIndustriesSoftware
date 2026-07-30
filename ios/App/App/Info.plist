@@ -52,14 +52,20 @@
 	<true/>
 
 	<!-- Privacy usage descriptions — required by App Store -->
-	<!-- Location: used once at clock-in to verify the employee is physically
-	     at the job site. No continuous or background tracking. Apple's
-	     automated checker (90683) requires both keys when any linked SDK
-	     references location APIs, even if "always on" is never requested. -->
+	<!-- Location (Phase C): used to verify you're at the job site at clock-in AND,
+	     for field workers on the clock, in the BACKGROUND to auto-detect arrival at
+	     the job site and remind you to clock out when you return to the shop. Only
+	     active while an operator is clocked in / has an assigned job. ⚠️ The privacy
+	     policy + in-app GPS consent MUST disclose this and users MUST re-consent
+	     before background tracking is enabled in production. -->
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Pontifex verifies you are at the job site when you clock in. Your location is checked once per clock-in event and is not tracked in the background.</string>
+	<string>Pontifex uses your location to confirm you're at the job site when you clock in.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Pontifex verifies you are at the job site when you clock in. Your location is only used during the clock-in check and is never tracked in the background.</string>
+	<string>Pontifex uses your location in the background while you're on the clock to automatically log when you arrive at a job site and to remind you to clock out when you return to the shop. You can turn this off in Settings.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>NSCameraUsageDescription</key>
 	<string>Pontifex uses the camera to capture job site photos and document completed work.</string>
 	<key>NSFaceIDUsageDescription</key>

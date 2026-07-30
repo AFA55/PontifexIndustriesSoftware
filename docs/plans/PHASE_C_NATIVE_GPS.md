@@ -78,6 +78,35 @@ Tested Nominatim against a real Patriot address ("121 Logistics Way, Gaffney SC"
 
 ---
 
+## C1 status (built Jul 30 — staged, needs a native build + on-device testing)
+Done + pushed (web build verified safe — native code is `isNativeApp`-gated + uses
+`registerPlugin`, so nothing native is bundled into the web/SSR build; the live app is unaffected):
+- `@capacitor-community/background-geolocation@1.2.26` installed (compatible with Cap 8).
+- `lib/native/geofence-service.ts` — background watcher → JS geofence math: auto-arrival when
+  within 0.5 mi of an in_route job's stored jobsite coords (POSTs in_progress); back-at-shop
+  reminder (local notification) when re-entering the shop radius while clocked in (hysteresis).
+- `components/GeofenceRegistration.tsx` (headless, native + field-role gated) mounted in the
+  dashboard layout; `/api/timecard/current` now returns tenant `shop` coords for the reminder.
+- iOS `Info.plist`: background-disclosing usage strings + `UIBackgroundModes: location`.
+  Android manifest: `ACCESS_BACKGROUND_LOCATION` + `FOREGROUND_SERVICE(_LOCATION)`.
+
+**⚠️ Not done / blocking before this reaches users:**
+1. **A native build** (bump version → `npx cap sync ios/android` → archive/build → TestFlight/internal)
+   — the plugin + config only take effect in a fresh binary. Use the `ios-release`/`android-release` skills.
+2. **On-device testing + tuning** — permission flow ("Always" grant), `distanceFilter`, the 0.5-mi
+   radius, hysteresis, and battery. The geofence logic is v1 and CANNOT be validated without a device.
+3. **C2 privacy + consent (founder approval required)** — the live `lib/legal/privacy-policy.ts` +
+   `gps-consent.ts` still say "never in the background" and were intentionally NOT changed yet.
+
+## C2 — proposed privacy language (DRAFT for founder approval — not yet applied)
+> **Background location (while on the clock).** When you are clocked in or have an assigned job, the
+> Pontifex app may use your location in the background to automatically record when you arrive at a
+> job site and to remind you to clock out when you return to the shop. Background location is only
+> active while you are on the clock, is used solely for time-keeping, is never sold or shared, and can
+> be turned off at any time in your device Settings (clock-in location verification still works).
+Apply this to `privacy-policy.ts` + `gps-consent.ts` AND add a one-time in-app re-consent prompt
+before the native build's background tracking is enabled — this is the founder's call + legal sign-off.
+
 ## What ships without any of this (already live)
 The **time-based clock-out reminder** (`1f45c924`) already nudges "clock out soon — auto-clockout at
 6 PM" ~30 min before, no rebuild. It covers the "they forget" pain until the geofenced version lands.
