@@ -75,6 +75,7 @@ npm run build      # Production build check (must pass with 0 errors)
 ```
 
 ## Documentation Map (reorganized Jun 9, 2026 — keep it this way)
+- `docs/reference/OPERATING_MANUAL.md` — **NEW-SESSION ORIENTATION: executive summary + all TOOLS (skills, MCP, build loop) + the TEAM (agent types). Read first if new to the project.**
 - `README.md` — front door
 - `ARCHITECTURE.md` — system design + Mermaid diagrams (update when architecture changes)
 - `BACKLOG.md` — **single source of truth for ALL bugs/features/priorities.** New issues go HERE, not into this file or the handoff.
@@ -85,7 +86,7 @@ npm run build      # Production build check (must pass with 0 errors)
 - `docs/playbooks/HOW_WE_BUILD.md` — **the founder+Claude operating model** (director mindset, the loop = build→guardian→verify→fix, browser-eyes/Playwright, prompt patterns + magic phrases, white-label-by-default). Read to understand how work happens here.
 - `docs/TOOLING_EVALUATION.md` — third-party tool verdicts; consult + update BEFORE installing anything
 - `docs/SESSION_LOG.md` — historical sprint log (was in this file)
-- `docs/plans/` (future work) · `docs/playbooks/` (how-tos) · `docs/reference/` (deep context: CLAUDE_CONTEXT, CLAUDE_SESSION_CONTEXT, FEATURE_CATALOG, SCALING, DEV_TOOLING_RECOMMENDATIONS, **UI_CATALOG** = reusable Tailwind component patterns — check BEFORE building a card/button/modal, add to it AFTER shipping a new reusable pattern) · `docs/archive/` (history — don't update)
+- `docs/plans/` (future work) · `docs/playbooks/` (how-tos) · `docs/reference/` (deep context: **OPERATING_MANUAL** = exec summary + tools + team, CLAUDE_CONTEXT, CLAUDE_SESSION_CONTEXT, FEATURE_CATALOG, SCALING, DEV_TOOLING_RECOMMENDATIONS, **UI_CATALOG** = reusable Tailwind component patterns — check BEFORE building a card/button/modal, add to it AFTER shipping a new reusable pattern) · `docs/archive/` (history — don't update)
 - **Do not create new root-level MD files.** Plans → `docs/plans/`, how-tos → `docs/playbooks/`, finished-work reports → `docs/archive/`.
 
 ## Engineering Playbooks → now project SKILLS (don't re-derive, invoke)

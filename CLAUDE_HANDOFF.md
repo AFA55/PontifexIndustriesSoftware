@@ -1,417 +1,73 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 30, 2026 (Opus 4.8) | **Branch:** `main` | **Prod:** ✅ LIVE through `dafb852c`.
+**Last updated:** Jul 31, 2026 (Opus 4.8) | **Branch:** `main` | **Prod:** ✅ LIVE through `4a6d0a56`.
 
-> ## 📌 Jul 30 session (Opus 4.8) — huge field-ops + timecard sprint, all shipped + verified
+> ### 🧭 NEW SESSION START HERE
+> 1. **[docs/reference/OPERATING_MANUAL.md](docs/reference/OPERATING_MANUAL.md)** — the one-page orientation:
+>    what Pontifex is, the **tools** at your disposal (skills, MCP, the build loop), and your **team**
+>    (the agent types). Read it first if you're new to this project.
+> 2. **This file** (below) — what's in flight + how we work.
+> 3. **[BACKLOG.md](BACKLOG.md)** — the prioritized to-do list; work top-down.
+>
+> The founder (Andres, non-technical, typo-heavy, live-tests prod on 3 real Patriot operators) directs;
+> you architect, build, verify, ship. Truth > reassurance. **The loop:** build → guardian-review →
+> LIVE-verify (login `super@pontifex.com` / `super0202!` / code `PATRIOT`) → gate
+> (`rm -rf .next && npm run build` + `tsc --noEmit` + `jest`; 163 pass, 2 email-ESM `TextEncoder`
+> failures are pre-existing noise) → confirm spend → `git push origin main` (~$1–2, ONCE per batch) →
+> watch deploy READY. Every `supabaseAdmin` query needs `.eq('tenant_id', …)` (it bypasses RLS).
+
+> ## 📌 Jul 30–31 session (Opus 4.8) — field-ops + timecard sprint + native GPS foundation, all shipped
 > Every feature guardian-reviewed; several real BLOCKING bugs caught + fixed before push. All LIVE.
 > - **Multi-operator crew (`8f7e29dc`)** — `job_crew` table; LEAD (assigned_to) does full completion, additional operators are crew (light helper ticket + clock-in), crew notes on the completed ticket; duplicated jobs stay independent. **Guardian caught a pre-existing BLOCKER: the helper work-log was mounted inside the operator-only fragment → unreachable since ~Jul 14** (apprentice helpers couldn't log field work AND the Batch-3 helper→operator reviews never rendered) — fixed by moving it into the helper view.
 > - **Printable completed ticket (`4e4911fe`)** — `app/dashboard/admin/jobs/[id]/completed-print/page.tsx` mirrors Patriot's paper ticket (logo + red job# top-right, times, work performed, footage, subsistence, signature, crew notes) for the paper billing hand-off.
 > - **Schedule-board Edit actually saves (`35b52036`)** — inline job Edit silently 500'd (single-day jobs sent `end_date:''` → PG rejects) + never refreshed the board. Now saves + refreshes + surfaces errors + syncs scheduled_end_date.
 > - **Timecard Phase A (`3ce910e0`)** — notifications scroll fix · configurable auto-clockout (time picker default 6pm; cron reworked hourly, tenant-local, night shifts keep noon) · out-of-town subsistence prompt at clock-out (idempotent; annual report reads `subsistence_nights` as source of truth). Guardian fixed a midnight-crossing subsistence double-count.
 > - **Timecard Phase B (`dafb852c`)** — double-time tag (hours × 2, OT-exempt via single-classification in calculateWeekSummary + team-summary; override populates double_time_hours; bulk apply-double-time endpoint) · 60-day tenure gate on holiday pay (grandfather null hire_date) + eligibility view · holidays on the schedule board (badge + "Mark Paid Holiday"). **Guardian caught a BLOCKING double-subtract (negative payroll hours)** — fixed.
-> - **REMAINING — Phase C (native GPS, founder-greenlit, NOT started):** background geofencing for auto-arrival + app-closed clock-out reminder. Needs a native background-geolocation plugin + iOS "Always" review + **privacy-policy rewrite + re-consent** + iOS/Android builds + stored jobsite lat/lng. Separate native initiative — scope in `docs/plans/TIMECARD_FINISHING_BATCH.md`.
+> - **Phase C native GPS — FOUNDATION SHIPPED + LIVE (`f5541609`→`4a6d0a56`), gated for a native build.**
+>   Background geofencing for auto-arrival + app-closed clock-out reminder. What's live in code (web build
+>   verified safe — all native code is `isNativeApp`-gated + `registerPlugin`, so nothing native bundles
+>   into the web/SSR build): jobsite lat/lng persistence (Google Places coords on create + Nominatim
+>   backfill cron) · `@capacitor-community/background-geolocation` watcher (`lib/native/geofence-service.ts`,
+>   0.5-mi auto-arrival + back-at-shop reminder) · consent-before-OS-prompt modal + per-user consent gate ·
+>   privacy-policy v1.3 + gps-consent v2.0 rewritten to disclose on-the-clock background location ·
+>   `stopGeofencing()` wired into BOTH clock-out paths (compliance: "stops when you clock out" is literally
+>   true) · iOS `Info.plist` + `PrivacyInfo.xcprivacy` + Android manifest permissions. Guardian + a
+>   compliance-pro review both ran; every compliance-critical code item is done.
+>   **⚠️ Phase C is NOT in users' hands yet — it needs FOUNDER + native work (see the checklist below).**
+>   Full plan + status + the founder checklist: `docs/plans/PHASE_C_NATIVE_GPS.md`.
+> - **Docs cleanup (this session):** added `docs/reference/OPERATING_MANUAL.md` (exec summary + tools +
+>   team); refreshed this handoff top; pruned dead one-off files from `docs/archive/`.
+>
+> ### 🚧 Phase C — remaining before it reaches operators (FOUNDER-gated; do NOT ship autonomously)
+> 1. **Native builds** — bump version → `npx cap sync ios/android` → archive/build → TestFlight/internal.
+>    The plugin + permissions only take effect in a fresh binary. Use `ios-release` / `android-release`.
+> 2. **On-device testing/tuning** — the "Always" permission flow, `distanceFilter`, the 0.5-mi radius,
+>    hysteresis, battery. The geofence logic is v1 and can't be validated without a device.
+> 3. **Google Play (highest rejection risk)** — background-location Declaration Form + ≤30s demo video +
+>    core-functionality justification. **Apple** — App Privacy label (Precise Location → App Functionality)
+>    + "Always" justification in review notes. **Signed employee consent** in onboarding. **SC counsel**
+>    sign-off on employee location monitoring. (All founder tasks — detailed in the Phase C plan.)
 
 ---
 
-**(older) Jul 28:** Batches 1 & 2 of the "Zack first-job" fixes shipped; Batch 3 (Arrived removed · progress targets · helper→operator reviews) — see below.
-
-> ## 📌 Jul 28 PT2 — Zack's first completed job surfaced ~10 issues; fixing in 3 batches
-> The founder ran a full job to completion with Zack (operator) + Lucas (helper) and found data-capture/visibility bugs. Guardian caught real blockers each batch (a wrong-column review query that silently hid reviews; un-gated finish paths) — all fixed before shipping.
-> - **BATCH 1 (LIVE `84fb1834`) — visibility:** Completed-Jobs page now signs private-bucket URLs (job-photos/completion-pdfs/contracts) via `POST /api/admin/sign-urls` (was serving `/public/` links that 404) → photos + signature PDF + docs load/download. Clock-in now saves `timecards.job_order_id` (operator's dispatched job for today) → timecard shows WHERE + WHO (crew derived same job+date; admin view already rendered it). Operator **hourly_rate** now settable by management in operator-profiles → Pay & Comp tab (PATCH `/api/admin/operator-profiles/[id]`, server-validated >0) → P&L labor cost = rate × hours (column already existed; just no UI). Work-log render read item.name; now item.work_type.
-> - **BATCH 2 (LIVE `854bd955`) — capture gates + review:** Completion now REQUIRES a work-performed entry AND ≥1 photo on EVERY finish path (handleJobComplete/handleDoneForToday/handleSendRemoteLink/handleSubmitCompletion) — only skip for photos is the **"Photos prohibited on this site"** checkbox. The customer REVIEW no longer shows on the operator's phone — after on-site signature it's texted (fire-and-forget) to the site contact so the CUSTOMER rates on their own device. Per-job admin view now SHOWS the review: `completion-summary` queries `customer_surveys` by **submitted_at** (created_at doesn't exist → 42703 → was silently null). Ratings render /5 (were shown /10).
-> - **BATCH 3 (BUILT + verified; awaiting the one push):**
->   - **(a) "Arrived" step REMOVED entirely** — the buttons were pure navigation (jobsite page already auto-advances in_route→in_progress on load), so removing them strands nothing. Relabeled "Arrived on Job Site"→**"Start Work"** (jobsite page) and "Arrived — Start In Progress"→**"Continue to Job Site"** (my-jobs in_route view). `arrived_at_jobsite_at` now auto-stamped on the in_progress transition (`status/route.ts`) so admin/portal/signature timelines keep a real arrival time. Deleted the two DEAD legacy files that still held the old "Start In Process" arrival UI: `_components/JobTicketDetail.tsx` (zero importers) + `job-schedule/[id]/in-route/` route (only linked from that dead component).
->   - **(b) Progress targets** — the schedule form now computes normalized targets CLIENT-side (reusing its own `computeSawingAreaLinearFt`/hole math so the operator's target == the office's displayed number) and sends `scope_items[]`; the create route seeds `job_scope_items` (tenant-scoped, validated, best-effort — can't abort job creation). Operators log completion on a new **`components/JobProgressLogger.tsx`** panel on the day-complete page (footage accumulates; demo/`percent` items take "% now" and post the delta). Fixed the admin Job page reading `json.data.scope_items` (always undefined) → `Array.isArray(json.data) ? json.data : json.meta.scope_items`. Added a `percent` unit option to the office Add-Work-Item modal. NOTE: seeding is **CREATE-only** — edits manage scope via the Job Scope panel so manual target tweaks aren't wiped. Root cause confirmed: prod had **0 scope_items and 0 progress_entries ever** (the progress POST had no caller) — that's why every chart was empty.
->   - **(c) Helper→operator reviews** — new `job_helper_reviews` table (migration `20260728`, RLS mgmt-only SELECT via SECURITY DEFINER helpers, UNIQUE(job_order_id,reviewer_id); RLS audit PASS). Helper's Complete Day flow gained a **star-rating step** (`rate_operator`) rating the operator they worked under; `/api/helper-work-log` upserts the review on completion (self-review guarded, best-effort). Management sees a **"Crew Reviews"** card on the operator annual report (`operator-report` route + report page).
->   - **Verification:** clean `npm run build`, `tsc` 0, jest 163 pass (2 pre-existing email-ESM `TextEncoder` failures unrelated). Code guardian PASS (1 real bug fixed — Skip button stale-closure that would record an unwanted rating; + 2 nits fixed: progress POST `res.ok` check + local-date to avoid UTC off-by-one). RLS auditor PASS. **Deterministic end-to-end DB simulation** on a real Patriot job (operator Aiden, helper Lucas): 1000 LF target → 100 logged → **10.0%** (the founder's exact example), demo manual 40% → 40.0%, helper review upsert idempotent (re-submit updated in place, count stayed 1, name+job resolved) — all test rows cleaned up after.
-
-> ## 📌 Jul 27–28 (earlier) — big field-ops batch, all shipped
-> Long session, many founder requests, each guardian-reviewed + pushed. All LIVE on prod.
-> - **Operator cost security + editable project cost** (`11e9886a`, `fded7c9b`): operator API
->   `/api/job-orders` now strips ALL office-only money fields (`stripOfficeOnly`: estimated_cost,
->   job_quote, hours, P&L) for non-admins — they never reach the device. Office "Total project
->   cost" is editable (→ `job_orders.job_quote`) and **approved change orders roll into the total**
->   (base + approved COs; pending excluded). Panel: `components/admin/OfficeDocumentsPanel.tsx`;
->   route `/api/admin/jobs/[id]/office-documents` (GET base+CO total, new PATCH sets job_quote).
-> - **Edit-save bug fixed** (`11e9886a`): EditJobPanel sent `undefined` on cleared fields → JSON
->   dropped them → PATCH never cleared. Now sends `null`; admin PATCH coerces estimated_cost/hours
->   to number-or-null (empty '' was crashing the numeric column). Full-job editor (schedule-form
->   `?editJobId`) now SAVES everything it loads (was silently dropping most fields); summary route
->   extended so the round-trip can't wipe data.
-> - **Project Manager** (`81aec7c1`): new `job_orders.project_manager_id` (managers & admins only,
->   `/api/admin/project-managers`). Picker in schedule-form + EditJobPanel + PM badge on
->   JobDetailView. PM notified on "Job Not Ready".
-> - **Landscape dispatch ticket** (`fded7c9b`): the PRINTED ticket is `app/dashboard/admin/jobs/[id]/print/page.tsx`
->   (HTML `window.print()`, NOT the @react-pdf one). Now landscape + adds jobsite conditions,
->   equipment, PPE, PM, difficulty, compliance. Data was already in the summary route.
-> - **SMS opt-in button state** (`fded7c9b`): `sms_consent.requested_at` added; button shows
->   Send → Request sent → Opted in (was in-memory only). `/api/admin/sms-opt-in-status`.
-> - **Job Not Ready → Pending Jobs** (`4bd9d6d5`?/`5a4c31b2`/`27dafa37`): operator red "Job Not
->   Ready" button (my-jobs/[id]) → reason + GPS photos + on-site signature → `job_not_ready_reports`
->   table → job parks to `on_hold` + PM notified. **Pending Jobs page** `/dashboard/admin/pending-jobs`
->   (list + reschedule/push-up + `suggest-dates` = next weekdays a skill-matched, free operator).
->   "Move to Pending" button on JobDetailView + a **third "Just put it in Pending" option** on the
->   Remove-from-Schedule dialog (no date needed). Routes under `/api/admin/pending-jobs/[id]/{park,reactivate,suggest-dates}`.
-> - **Helper clock-out bug FIXED** (`c9df6e18`): apprentice clock-out gate treated a parked
->   (on_hold) job as an outstanding ticket + hard-blocked 403 with no escape → helper stuck.
->   Now excludes cancelled/on_hold/pending/completed, multi-day aware, and is a SOFT 409 with
->   "clock out anyway" (mirrors operator). File `app/api/timecard/clock-out/route.ts` + dashboard modal.
-> - **Name/title propagation** (`91657406`,`74bdcaff`,`bfe3827c`,`10231609`): My Profile now edits
->   Full Name + a **Title** (`profiles.job_title`, display-only, shown as the badge instead of raw
->   role — Andres's = "Ops Dispatch"). Name change syncs auth metadata + refreshes the cached
->   sidebar name (DashboardSidebar self-heals from DB on load — no re-login needed).
-> - **Contact dropdown + photo upload** (`006830cb`/`11e9886a`): on-site contact now appears
->   (create route awaits the insert; read route surfaces primary contact; form re-fetches).
->   PhotoUploader: compress-before-size-check, HEIC-aware, clear error box.
-> - **Concrete weight calculator** + **Tools hub** (`/dashboard/tools`) for all users; Takeoffs back button.
-> - **DB/account:** gmail `andres.altamirano1280@gmail.com` MOVED Pontifex super_admin → **Patriot
->   operations_manager** (founder wanted his gmail on Patriot; kept andres@pontifexindustries.com as
->   Pontifex super_admin). One-email-one-tenant enforced. **Twilio toll-free +18336954288 = APPROVED/LIVE**
->   (see memory `twilio-sms-live`). Active-Jobs API now excludes `on_hold`; **Pending Jobs added to
->   sidebar nav**. Pinnacle (JOB-2026-815303) parked to Pending per founder.
-> - **Test data:** deleted TEST01/TEST02/DEMO01. **`JOB-2026-MYTEST` KEPT** — assigned to Demo
->   Operator (`demo@pontifex.com`/PontifexDemo2026!), site contact = founder's +14706586313, so
->   walking it to completion + "send signature link" texts the founder to demo the customer flow.
-> - **NEXT:** founder to walk MYTEST as demo operator (customer SMS/sign/survey); then crew plan /
->   shop tickets; takeoffs T3 (exports/quote handoff). Migrations this session (all additive, applied):
->   project_manager_id, sms_consent.requested_at + method CHECK, job_not_ready_reports, on_hold_* cols,
->   profiles.job_title.
-
-**Prior — Last updated:** Jul 21, 2026 | **Prod:** ✅ LIVE through `9d133b5f`.
-
-> ## 📌 Jul 22 session (Fable 5) — TAKEOFFS MODULE SHIPPED
-> - **Takeoffs live for Patriot** (`10c7b1ec`): /dashboard/takeoffs — upload PDF plan sets
->   (signed-URL to `takeoff-documents` bucket), pdf.js viewer (LEGACY build — modern build's
->   paint stalls under Turbopack; static worker in public/, keep in sync on upgrades), sheet
->   numbers auto-extracted (S-101 heuristics), calibrate-by-dimension (snaps to named scales),
->   linear+count measuring in PDF page coordinates (SVG overlay needs pointer-events:all — svg
->   roots are click-transparent!), scope buckets w/ trade fields, server-side quantity recompute,
->   "Analyze scope" AI (text-layer only, after()+maxDuration 120). 4 new tables w/ tenant RLS +
->   composite tenant FKs (rls-auditor PASS). E2E: scale snapped to 1/4"=1'-0" exactly, 40 LF wall
->   measured 40.05 server-side, AI found all 3 planted scope items. Research + phases in
->   docs/plans/TAKEOFFS_MODULE_PLAN.md; T3 (exports/quote handoff) + T4 (callout pins) next.
-> - "E2E Test Blueprint" left in Patriot takeoffs for founder hands-on; founder should re-upload
->   the real Wolfie's 43-page IFP set and cross-check totals vs his Easy Takeoffs numbers.
->
-> ## 📌 Jul 23 — invite-link UX (PUSHED `d4f798b8`, verified live)
-> - Founder re-clicked his used Jul-12 invite → generic error card → company-login = "sent me
->   to the homepage". Fixed: validate API returns 410 `already_used` + tenant for accepted
->   tokens; setup-account shows green "You're already set up" card deep-linking
->   `/login?tenant_id=…` + Forgot-password. E2E-verified with his real token.
-> - His andres@pontifexindustries.com (PONTIFEX super_admin) EXISTS since Jul 12 — if password
->   forgotten, the new card's Forgot-password link is the path.
-
-> ## 📌 Jul 21 session (Fable 5)
-> - **DATA CLEANUP (founder-ordered, prod DB):** Apex demo tenant fully deleted (tenant, 8 @apexdemo.com profiles+auth users, 6 demo jobs, flags, alerts). ALL 11 Patriot test tickets hard-deleted (Scout Mech QA-2026-105647, Trehel QA-2026-755047, Touch of Chisholm QA-2026-792208 + 8 soft-deleted) + test invoice INV-2026-463087 + "Patriot Test GC" customer + 2 stale health alerts. Real crew timecards untouched (verified zero referenced test jobs). Patriot is clean: 0 tickets, 0 invoices. Real-looking customers (Harper, INEO, Westmoreland, AM King, Triangle, Touch of tism) KEPT pending founder word.
-> - **ROCK-SOLID BATCH 4 (compliance) DONE:** audit in `docs/plans/COMPLIANCE_AUDIT.md`. Fixed: privacy policy v1.2 (accurate GPS disclosure incl. In-Route live sharing, full 9-subprocessor table, new biometric/push/SMS sections), setup-account waiver now links /privacy+/terms, privacy page renderer bolds list items. Follow-ups in BACKLOG "Jul 21" block (iOS Info.plist location strings = next native build; store data-safety labels = founder; SMS STOP webhook; retention cron).
-> - All 4 Rock-Solid batches complete. Next: crew plan (helper bug first) per the Jul 14 block below.
-> - **OPIFEX FOLDED IN (founder Jul 21: "feature instead of independent app"):** hiring is now a
->   plain platform module — deleted the self-serve signup route, `HIRE_TENANT_ID` special-casing,
->   and the OPIFEX front-door tenant from prod (incl. founder's own test signup
->   pontifexindustries@gmail.com — his real logins untouched). `/jobs` = feature marketing →
->   /request-demo. Only tenants now: PATRIOT + PONTIFEX. Doc: `docs/plans/OPIFEX_FEATURE_PLAN.md`.
->   Committed, UNPUSHED (say "push it").
-> - **LATER JUL 21 (all PUSHED through `acbd8106`, deploys verified):** (1) feedback loop
->   actually works now — bare fire-and-forget died on Vercel (use `after()` + maxDuration 120;
->   E2E: analysis lands ~25s); (2) **notifications_notification_type_check DROPPED** — it
->   silently ate EVERY typed notification platform-wide (only 'general' ever landed);
->   (3) **morning clock-in gate** built+verified (clock-in returns overdueTickets → amber modal;
->   /status 409 overdue_ticket_block hard-blocks starting a new job w/ an overdue one);
->   (4) live SMS workflow test w/ founder as contact (QA-2026-320243, kept on board) — caught
->   TWO more silent bugs: job_orders_status_check missing on_site/pending_completion/archived
->   (fixed via migration), and **customer portal never rendered** (completed_at→
->   work_completed_at alias + page stored envelope not json.data — fixed, verified w/ live
->   token). Feedback row "[TEST-3]" left in Hub for founder to try Approve. LESSON: check
->   constraints vs code enums drift silently because ALL our inserts are fire-and-forget —
->   when adding a typed insert, verify the CHECK constraint allows the value.
-
-> ## 🤝 OPUS HANDOFF — read this block, then work
->
-> **YOU ARE PICKING UP MID-SPRINT.** Founder (Andres, non-technical, typo-heavy, sends
-> screenshots while live-testing prod) runs 3 REAL operators daily on Patriot. He directs;
-> you architect, build, verify, ship. Truth > reassurance. Read the read path AND write path.
->
-> **THE LOOP (every change):** build → guardian-review (money/auth = adversarial) →
-> LIVE-verify in the browser preview (login super@pontifex.com/super0202! code PATRIOT;
-> founder's own = andres…@gmail.com/PONTIFEX → Platform Hub) → gate
-> (`rm -rf .next && npm run build` + `npx tsc --noEmit` + `npx jest`; 163 tests, the 2
-> email-suite TextEncoder failures are pre-existing env noise) → commit (batch!) →
-> `git push origin main` = ~$1–2 billed build, once per batch, watch deploy READY (~90s).
-> Browser-pane gotchas: React inputs need the native-setter+input-event trick, then
-> `form.requestSubmit()`; sessions die between preview restarts — just re-login.
->
-> **NEXT WORK, IN ORDER (founder-directed Jul 14):**
-> 1. **`docs/plans/SHOP_TICKETS_AND_CREW_PLAN.md`** — LIVE helper-visibility bug (his real
->    crew, job QA-2026-105647; diagnostic state + suspects in the doc) → then multi-helper
->    crews (`job_crew`) → then shop tickets w/ admin sign-off. Rollout order + verification
->    steps are in the doc. START WITH THE BUG.
-> 2. **Job-ad creation upgrade** (BACKLOG P1 top, full spec) — logo on ad previews + "Ad
->    context" fields feeding generateAdKit. GATES: founder's hiring card + FB/TikTok connect.
-> 3. Founder-side pending: his $5 subscription test (button live), real paper-ticket scans,
->    Meta business verification (Phase 4 gate), correcting the "Conrade Richardson" invite
->    name if wrong (pencil icon, Invite Users).
->
-> **YOUR TEAM (use it):** worktree subagent builders for parallel independent items
-> (`parallel-burndown` skill; ALWAYS merge worktrees back + clean `.claude/worktrees/`);
-> `guardian-review` behind every builder; `rls-policy-auditor` on every migration;
-> `supabase-migration-author` for new tables; `mobile-responsive-auditor` before operator-UI
-> merges; `dev-decisions` skill BEFORE any architecture/vendor/schema decision (honest-options
-> rule); `prod-deploy` skill for the push gate. Supabase MCP = live prod DB (execute_sql for
-> ground truth — verify before asserting); Vercel MCP = deploy watch.
->
-> **HARD RULES:** never touch secret VALUES (founder pastes into Vercel); tenant_id filter on
-> every supabaseAdmin query (it bypasses RLS — the filter IS the boundary; the Jul 13 dispatch
-> bug was exactly this); tenant timezone for anything time-ish (`ymdInTz` — server is UTC);
-> voice transcription garbles PROPER NOUNS → Artifex spells back names/emails, snaps customers
-> via search_customers, job types via enum; PLATFORM_TENANT_ID gates the hub; never market as
-> "concrete cutting software" (non-compete — positioning: custom digital infrastructure).
-
-> **🛎️ Jul 14 shipped (all live through `7e67aa80`):** invite name editing (PATCH pending
-> invitation + pencil UI, verified E2E) + Artifex spells invite names/emails letter-by-letter;
-> Platform-Hub landing fixed = PONTIFEX-org only (4 decision points + hub guard + company-login
-> button; tenant super admins land in their own portal); $5/mo owner-only payment-cycle test
-> plan (inline price_data, no trial, live on Subscription page); deep-set rule (>15in wall/slab
-> → ask); equipment learning (suggest_equipment from job history + memory loop, verified: DFS →
-> "5000 slab saw + 30-inch guard"); paper-ticket scanner (Scan Ticket on board → Haiku vision →
-> Quick Add prefill, review-first — founder still to test with REAL paper tickets); dispatch
-> repair (tenant filter was MISSING — was counting/texting other tenants' crews; stale-span
-> fixed; modal lists exact tickets); editable draft canvas (click-to-correct fields feed back
-> into the conversation); Job Board Billing dark mode; multi-day fixes (week-view spans,
-> approval preserves duration, crew-safe day counts via 60-day real-DB stress test); Artifex
-> caller identity + customer lookup + persistent live captions + continuous multi-part
-> listening (2.2s silence window); tenant-tz everywhere; mic-blocked explanations (company
-> Chrome policy / NO MIC on office desktop — founder buying USB mic).
-
-> **🛎️ Jul 13 (operators went LIVE — Zack/Aiden/Lucas clocked in 6:29/6:37/6:55 AM):**
-> TENANT-TZ fix (`0cdb3767`): Artifex tools were UTC ("clocked in at 10" for 6:29 ET; after 8 PM
-> ET "today" queried tomorrow) — assistant route now threads tenants.timezone through agent+tools,
-> times pre-formatted local, verified to-the-minute vs timecards. MIC: company-managed Chrome
-> denies with no prompt (our Permissions-Policy allows mic) — onerror now surfaces plain-language
-> guidance in HUD+panel. CONTINUOUS LISTENING (`27f4a2a6`): mic no longer stops at first pause —
-> 2.2s silence window ends the turn, one combined transcript, live caption under the orb (founder:
-> "process more than 1 piece of info at a time"). HUB REDESIGN (`03720359`, research-driven):
-> usage cost anchors top-left, client CARDS→TABLE w/ per-tenant month cost, color=attention-only;
-> hub Sign out (`95658db5`) + tenant-facing usage card + ?tenantId= forwarding fix; OPERATING_
-> COSTS.md closes Phase 2. PATRIOT PROOF SCRUBBED from public site (`91322fa4`, founder: "proof is
-> fake so far"): landing PROOF section + /patriot page deleted, hero first-client line (also
-> non-compete leak) gone, zero "patriot" matches verified live. Phase 3 = engineering DONE
-> (remaining: founder activates Patriot's paid plan when ready). Phase 4 blocked on Meta
-> verification. QUEUED: Opifex build-out (need founder vision), content strategy post-phases.
-
-> **🛎️ Jul 12 evening batch (`9109a606` — ALL live):** AUTH GUARDS (founder: "no one should
-> automatically get into Pontifex"): tenant login pages no longer hijacked by a remembered
-> other-org session (tenant-match required for auto-resume); company-login shows explicit
-> "Continue to Pontifex Platform Hub" for owner/super_admin sessions instead of silent forward —
-> tenant staff keep silent remember-me. MULTI-DAY solid for 3-operator rollout tomorrow: week
-> view renders every spanned day ("Day N of M"), approval preserves duration, operator Artifex
-> span-aware (day-2 visibility), My Jobs "Multi-Day In Progress / Up next: Day N", crew-safe
-> total_days_worked (distinct dates, was 2× on crews — caught by a 60-day REAL-DB stress test,
-> all test rows deleted). EN-ROUTE SMS day-2+ confirmed already suppressed (in_route_at claim
-> never cleared by day reset — verified, no change needed). PLATFORM HUB: AI & Usage tile on the
-> cockpit ($1.04 Jul: AI $0.40/Voice $0.64), in-hub tenant Billing tab (plan/status/usage costs/
-> SMS margin, no more bounce to tenant surface), usage-card-on-file indicator reads
-> hiring_billing. STRIPE AUDIT: SetupIntent+Elements card flow verified correct + LIVE mode
-> (pk_live in bundle), webhook endpoint confirmed active in founder's Stripe dashboard
-> (/api/stripe/webhook), all unbilled balances $0 → founder adding real card via Job Board
-> Billing. Attendance: Artifex get_attendance_summary (codes + calendar's auto overlays,
-> live-verified vs timecards: Lucas 4/Zack 2/David 1). NEXT: founder card test + 3-operator
-> live-fire; then Opifex block + content strategy (both queued in BACKLOG P1).
-
-> **🛎️ Jul 12 PM batch 2 (`6eeb7395`, verified live pre-push):** Artifex CONVERSATIONAL persona
-> (coworker-on-the-phone, never numbered lists, batches up to 3 missing slots into ONE natural
-> question) + **update_ticket_draft live draft pad** — the "Job Ticket — Drafting" canvas slides
-> out and fills from the user's FIRST sentence (no-op tool, paints the form only; Done reserved
-> for real create) + **X button on the transcript panel header** closes the chat back to orb+mic
-> (founder: "a spot where I can x out of the chat"). Live test: "new ticket for ACME, wall sawing
-> at 500 Main St" → orb slid left, panel filled Customer/Job type (snapped Wall/Track Sawing)/
-> Address, reply asked start date + site contact in one sentence. KNOWN: lib/email(.links).test.ts
-> suites fail to RUN (jsdom TextEncoder missing — pre-existing env gap, 163/163 tests still pass);
-> spawn-task chip filed to polyfill.
-
-> **🛎️ Jul 12 marathon (voice day — ALL pushed through `bf27177d`):** Felix voice LIVE +
-> founder-confirmed audible (final fix: pure-WebAudio buffer playback — HTMLMediaElement play()
-> is gated per-call by Chrome transient activation which EXPIRES during generation; running
-> AudioContext has no per-play gate). Artifex: slot-filling brain, job-type ENUM (13 real
-> services — no more 'Wall Sign'), review-after-create nudge, submitted-by stamps creator,
-> knows it has a voice. OPERATOR ARTIFEX: separate field agent, structural wall = operator-only
-> toolset (own jobs/hours, directions link, tap-to-call site contact); room slim for field roles;
-> entry button on operator home. PERMISSION MATRIX: per-role toolsets (sales=reads+create,
-> supervisor=reads+approvals, shop=reads; admins=all+invite). invite_team_member tool (rank
-> guard) + SMS invitations from (833) via invite screen + tool (metered team_invite_sms).
-> CO-PILOT CANVAS v1: orb slides left, live panel renders the tool call in real time (ticket
-> form filling, hours table, history list, invite card) — verified live. Room: light/dark parity
-> (reactor bezel), full-screen default, ambient 2nd-brain, ARTIFEX identity. Also: annual
-> employee report (Pull Report on operator page; codes integrated), ATTENDANCE SYSTEM
-> (attendance_events + 15 Patriot codes + calendar tab in Time Off, click-to-mark, auto
-> late/time-off overlays), inbox notification deletes, remember-me sticky fix, platform-org
-> redirect guard, Stripe messaging-billing cron (settle-pattern, no-ops until cards on file),
-> Platform Hub AI & Usage dashboard. NEXT: canvas layout polish + reskin Phase 2 (light/dark
-> chrome), Phase-1 live-fire SMS test, Phase 4 ads (Meta verification pending founder).
-
-**Prior state (Jul 11):** CREDIT-SAVER MODE: build inline; adversarial reviews for money/auth code. **Roadmap: docs/plans/FINISH_LINE_PHASES.md** (keys → live-fire test → AI/usage cost dashboard → Stripe flat+usage → FB/IG/TikTok ads).
-
-> **🛎️ Jul 8–11 sprint (demo week, all pushed through `571dea39`):**
-> - **CONTRACTS + E-SIGNATURE (Jul 11, `571dea39`)**: contracts table + /dashboard/admin/contracts
->   (create contract/change order → tenant-branded email → public /contract/[token] sign page,
->   white-labeled per tenant → signed PDF to 'contracts' bucket → signed-copy email + customer
->   portal magic link). Verified live E2E. Change orders link parent + pre-fill customer.
-> - **Artifex voice-first Command Center (`22c4915c`)**: orb = the interface (amplitude-reactive
->   via WebAudio analyser), midnight-steel+crimson redesign, chat demoted to transcript panel,
->   auto re-listen conversation mode, **create_job_ticket tool** (dispatcher flow, confirm-before-
->   create, verified live). TTS = ElevenLabs behind /api/command-center/tts (503s until
->   ELEVENLABS_API_KEY lands in Vercel).
-> - **Artifex tools (`a7d59ac8`)**: search_job_history (schedule history by person/customer/date),
->   get_hours_summary (payroll-worksheet columns per pay period), TODAY'S DATE grounding fix.
->   Patriot report formats decoded in docs/plans/PATRIOT_REPORTS_PLAN.md (attendance codes EA/UA/
->   NCNS/... + payroll worksheet); attendance tracker + payroll worksheet page = next builds (P1).
-> - **GPS-stamped photos (`667ec6cc`+`21d4c05b`)**: BOTH ticket photo steps (work-performed +
->   day-complete) force camera + require GPS; photo_locations table.
-> - **Fixes (`cf00e540`, `07ddf804`)**: NotificationBell portaled (was clipped under schedule-board
->   toolbar), Opifex apply page white-labeled to posting tenant's color, real Google drive-time on
->   geofence flags (lib/drive-time.ts, GOOGLE_MAPS_SERVER_KEY added Jul 11 ✅ — activates with the
->   `571dea39` deploy), remote clock-in selfie lightbox, message_usage meter live
->   (docs/plans/MESSAGING_BILLING_PLAN.md).
-> - **Founder still owed**: ELEVENLABS_API_KEY paste → voice on · live SMS test on (833) 695-4288 ·
->   Meta business verification + FB page (ads Phase 4).
-
-> **🛎️ Jul 2–3 session (Sonnet 5) — HIRING MODULE PHASE 1 BUILT ("Pontifex Industries Job Board"):**
-> Founder-directed Hireline clone (his real recruiting tool, analyzed live in his account + FB Ads
-> Library recon). Full loop VERIFIED LIVE in browser: create job (title+description only) → Claude
-> generates the ad kit (FB post text, IG, TikTok caption, creative bullets) + 6 ADEA-safe screeners
-> → activate → mobile /apply/[slug] (ES support, resume upload) → candidate lands in pipeline →
-> shortlist. Built by 4 worktree builders + 5 adversarial guardian reviews (every BLOCKING finding
-> fixed + re-verified: double-charge race, margin-leak RLS, auto-reject enumeration oracle,
-> idempotency-key retry trap). Key facts: HIRE tenant = branded front door (self-signup creates
-> hiring-only tenants); revenue = ad-spend markup (default 1.5×, hiring_billing.ad_spend_markup,
-> raw cost NEVER exposed to customers); ADEA guardrail in lib/hiring/types.ts blocklists age/DOB
-> screeners at generate + save. Schema: migrations 20260703 + 20260703b (applied). Plan + Phase 2
-> ad-API playbook: docs/plans/HIRELINE_MODULE_PLAN.md. **Founder critical path: create the
-> "Pontifex Industries Job Board" Facebook page + start Meta business verification (weeks of wait).**
-> Also this session: Artifex tile on Platform Hub (b7bb8edd), homepage non-compete scrub (7374bc2c),
-> P&L simplification pushed+live (30f89682). Follow-ups in BACKLOG (billing crons, durable rate
-> limits, Stripe publishable key for live card entry). **PUSH PENDING — founder to say "push it."**
-
-> **🛎️ Jul 1 session (Sonnet 5) — non-compete scrub + 4 live prod issues fixed + team-pattern doc:**
-> Founder ran a fresh 6-agent director-level audit (docs, codebase, DB/RLS, backlog, test/CI, mobile) —
-> full findings in the audit itself, not re-copied here. From that audit, stood up 4 worktree-isolated
-> builders + verified/merged/committed all 4 (build+tsc+jest all clean, pushed `ff40da25`):
-> 1. **Non-compete leak scrubbed from the LIVE WEBSITE + Stripe checkout** (not just store listings —
->    9 files: homepage, pricing, request-demo, offer/case-study pages, Stripe description). Biggest
->    catch: the platform-WIDE login page fallback tagline was literally *"Concrete Cutting Management
->    System"*, shown to ANY tenant. See [[pontifex-positioning-noncompete]] memory.
-> 2. **Live conditional-React-hooks bug fixed** — `app/dashboard/admin/settings/page.tsx`
->    `BillingSection` had hooks gated behind an early `return null`. Fixed, zero UX change.
-> 3. **CI green again** — those 4 hook errors WERE the entire CI failure (had been red 30+ pushes,
->    unnoticed since Vercel deploys regardless). Plus `.eslintrc.json` needed `"root": true`.
-> 4. **5 public storage buckets locked down** (`avatars`, `job-photos`, `jobsite-area-docs`,
->    `scope-photos`, `site-compliance-docs`) — removed anon-listable SELECT policies (advisor
->    `public_bucket_allows_listing` was 5/5, now 0/5). Reads still work via `getPublicUrl()`.
->
-> **New reusable systems from this session:** `docs/plans/JULY1_LAUNCH_BLOCKERS_TEAM_PLAN.md` (the
-> worktree-builders + fidelity-reviewer team pattern) · `docs/playbooks/TWILIO_TOLLFREE_RESUBMIT.md`
-> (exact fields for the 30530 rejection) · prompt-reconfiguration "lens" table added to
-> `docs/playbooks/PROMPTING_GUIDE.md` + memory (reconfigure rough/typo prompts through a
-> senior-engineer lens before acting — audit/debug/perf/refactor/architect/security/devops).
->
-> **⚠️ STILL OPEN — needs founder action or confirmation next session:**
-> - **Twilio toll-free**: rejected (30530, Entity Misclassification — `BusinessType` was
->   `SOLE_PROPRIETOR`, should be an LLC/private-for-profit type). Founder was mid-resubmission in the
->   console at session end (had corrected Legal Business Name + was changing Company Type) —
->   **verify this actually completed/was submitted next session**, don't assume it's done.
-> - **Google Play store-listing copy**: the "bridge/digital-infrastructure" positioning text is
->   written and SAVED but sits as an unsubmitted draft ("Submit 2 changes for review" button never
->   clicked, pending founder go-ahead — outward-publish action, intentionally not auto-clicked).
-> - **Google Play app review**: submission #4 (Jun 22) still "In review" as of Jul 1 (10 days).
->   Founder filed a Play support ticket Jul 1 ("App publishing", Pending, case ID pending, reply
->   window 2 business days) — check for Google's reply next session.
-> - **iOS 1.0.5 / Build 10**: confirmed "Ready for Distribution" (live) as of Jun 30 — no action needed.
-
-> **Prior — 🛎️ Customer Portal completed (Jun 28):** the portal was ~70% pre-built (magic-link `/portal/[token]`,
-> doc signing `/sign/[token]`, liability waiver, survey). Built the 3 gaps this session, all guardian +
-> rls-auditor PASS: **(1) customer notifications** (en-route + job-complete emails w/ portal link; SMS
-> dormant till Twilio toll-free verified), **(2) customer comments → management** (2-way channel: portal
-> thread + admin panel, notifies admin/PM/super_admin; new `customer_comments` table), **(3) live "In Route"
-> tracker** (operator broadcasts GPS while in_route → customer sees "on the way" + last-updated; new
-> `operator_location_pings` table; strict privacy cutoff outside in_route). Also live-caught + fixed the
-> **office-documents 500** on the job-detail page. Spec/follow-ups: `docs/plans/CUSTOMER_PORTAL_GAPS_PLAN.md`.
-> **Still TODO:** Twilio toll-free verification (founder+Twilio — unblocks ALL customer SMS); v2 location
-> (geocode jobsite → real ETA + map); auto-trigger liability waiver on completion; the branding admin-gate
-> fix + Settings design pass (founder ask, specced). | **iOS:** ✅ v1.0.4 APPROVED (auto-releasing) | **Android:** ✅ in Google Play review — **org account, closed-testing NOT required**, auto-publishes on approval
-
-> **⚡ NEW — the dev-velocity engine (Jun 27 PT2):** we now run **parallel-burndown** — fan out N independent backlog items as concurrent reviewed builders instead of fixing 2–3 by hand. Engine: `.claude/workflows/parallel-burndown.js`; playbook: `docs/playbooks/PARALLEL_BURNDOWN.md`; tool verdicts: `docs/TOOLING_EVALUATION.md` Batch 3. Removed the dormant ruflo/claude-flow swarm (never invoked); added **Playwright MCP** (in-loop UI verification). Proven this session on a real 3-item batch incl. a P1 security fix. Default to this for multi-item work.
->
-> **🚀 PATRIOT LAUNCH is the #1 priority now (revenue-first).** Founder needs revenue; fastest path =
-> finish Patriot → they pay → LinkedIn proof. Full strategy: `docs/plans/PONTIFEX_STRATEGY_AND_ROADMAP.md`
-> (resist scope creep; tenants≠apps; Hermes=personal-ops-only; Perplexity=research copilot). The launch
-> definition + tiered punch list = the **PATRIOT LAUNCH EPIC** at the top of BACKLOG.md. **Tier 1 (launch
-> fixes) ✅ DONE + LIVE (pushed `2f3143c3`):** clock-in reminder now admin-configurable (cron honors
-> notification_settings), job-completion PDF hardened, shop inbox count wired + dead route removed,
-> schedule-board duplicate bug fixed (was double-assigning operators). **NEXT = Tier 2** (the showcase
-> data UIs, design-sensitive, use `frontend-design` skill): (1) operator production-input form (linear
-> ft/holes per operator/job → existing `equipment_usage` table; add holes modeling), (2) cost input +
-> Project P&L/production dashboard (surface the existing `job_pnl_summary` view + per-operator production).
-> Then **Tier 3 = Artifex** (post-launch showcase; data already exists). Audit details: BACKLOG epic.
->
-> **🎨 Tenant brand-token system (Jun 27 PT2, pushed `7c60735d`):** the recurring "UI ignores the tenant's color palette" bug had a ROOT CAUSE — `tailwind.config` never mapped a token to the `--color-*` vars BrandingProvider sets, so code hardcoded Pontifex purple across ~305 files. FIXED: added tenant-aware **`brand` / `brand-dark` / `brand-secondary` / `brand-accent`** Tailwind tokens (backed by `--color-*-rgb` channel vars for opacity; safelisted; `:root` defaults in globals.css; verified live = Patriot red/navy). **Use `bg-brand`/`text-brand`/`from-brand to-brand-accent`/`bg-brand/10` for ALL tenant-facing accents — never hardcoded purple/violet.** 16 highest-impact files swept (~213 swaps); ~290-file long tail tracked in BACKLOG P1 (run more parallel-burndown waves; preserve semantic status/category colors).
-
-> **New session? Read this top-to-bottom once, then work from [BACKLOG.md](BACKLOG.md).**
-> This file = where we are + how we work. BACKLOG.md = what to do next. [CLAUDE.md](CLAUDE.md) = the hard conventions (RLS, dates, auth, email, push-cost). [docs/SESSION_LOG.md](docs/SESSION_LOG.md) = older history.
-
----
-
-## ⚡ WHERE WE ARE (Jun 27, 2026) — LAUNCH IN PROGRESS
-
-The platform is **live on the web** with a paying trial customer (Patriot Concrete Cutting) and **both mobile apps are in store review**.
+## 📦 Current platform status (Jul 31, 2026)
 
 | Surface | Status |
 |---|---|
-| **Web** | ✅ LIVE — `pontifexindustries.com` (latest `0e8c1506`, Jun 27). This is the product; the mobile apps are thin wrappers around it. |
-| **iOS** | ✅ **v1.0.5 / Build 10 — "Ready for Distribution"** (live since Jun 30 — App Store metadata non-compete scrub) + **Automatically release**. Don't cut a new build for web/bugfix changes. |
-| **Android** | **v1.0.1 / versionCode 2 — STILL IN REVIEW** (Submission 4, Jun 22 — 10 days as of Jul 1), US-only, Managed publishing OFF → auto-publishes on approval. Founder filed a Play support ticket Jul 1 asking for a status check (case ID pending, 2-business-day reply window). **Separately:** an unrelated store-listing copy edit (non-compete positioning fix) is saved as an unsubmitted draft — "Submit 2 changes for review" not yet clicked, awaiting founder go-ahead. Procedure in the **`android-release`** skill. |
+| **Web** | ✅ LIVE — `pontifexindustries.com` (`main` auto-deploys via Vercel). This IS the product; the apps are thin webviews around it. |
+| **iOS** | ✅ LIVE on the App Store. New build only for NATIVE changes (Phase C GPS is the next one). |
+| **Android** | ✅ LIVE in Google Play (see memory `android-play-release`). Ship future Android via `scripts/play-upload.mjs` (one command). |
 
-**The mobile apps are a remote-URL Capacitor webview that loads `pontifexindustries.com`.** This is the single most important architectural fact: **web/UI/API changes ship to BOTH apps instantly via a Vercel deploy — no App Store / Play build needed.** Only *native* changes (icon, splash, plugins, Info.plist/AndroidManifest, Capacitor config) require a store build.
+**Live now:** 3 real Patriot operators clock in daily. Twilio toll-free SMS (+18336954288) approved + live.
+Contracts + e-signature, customer portal, hiring/job-board module, takeoffs, Artifex AI assistant, the full
+timecard/payroll + field-ops workflow — all shipped.
 
-### Shipped + LIVE (Jun 27 PT2) — dev-velocity + security batch (pushed `96964571`)
-- **Dev-velocity engine** (`e25e8074`) — killed dormant ruflo/claude-flow (`.claude-flow/` + ~23 swarm agent-stub dirs, never invoked) + 4 dead npm deps + a stale duplicate component; added **Playwright MCP** + the **parallel-burndown Workflow** + playbook + TOOLING_EVALUATION Batch 3 (Hermes/Fugu/ruflo all rejected with reasons). Context: founder sent 5 IG videos → fact-checked by a 109-agent deep-research pass; the real "10x" was native Claude Code parallelism, not any IG tool.
-- **🔒 voice-checkouts RLS leak FIXED + APPLIED to prod** (`96964571`, migration `20260627_voice_checkouts_drop_broad_policies.sql`) — dropped 3 broad authenticated storage policies; verified zero remain; access stays server-side via `supabaseAdmin`. rls-policy-auditor PASS.
-- **grant-super-admin audit log FIXED** (`96964571`) — was silently never writing (wrong/missing columns); now correct `audit_logs` schema. guardian-review PASS.
-- **Jest ignores `.claude/`** (`96964571`) — no more stale worktree suite pickup.
-- ⚠️ **New follow-ups in BACKLOG (Jun 27 PT2):** 5 PUBLIC buckets allow listing (P1 security), `npm audit` 59 vulns (P2), Claude Context/Conductor trials staged (P2), grant-super-admin→logAuditEvent NIT (P3).
+**Older session history** (Jun–Jul 2026, per-commit) lives in **[docs/SESSION_LOG.md](docs/SESSION_LOG.md)**
+and `git log`. Only the current sprint stays in this file; prune older blocks into the log at session end.
 
-### Shipped + LIVE (Jun 24–27) — pushed, build-verified
-- **Time Edit Requests redesign (white-label brand palette)** (`0e8c1506`) — accents now come from the tenant brand via `useBranding()` (Patriot → navy chrome/fills + red accents) instead of hardcoded purple/yellow/green; every company code gets its own palette. Geofence callout redesigned with distance + drive-time pills. **Don't reintroduce hardcoded `violet`/`amber`/`emerald` accents on tenant-facing screens — drive them from `branding.primary_color`/`secondary_color`.**
-- **Drive-time auto-suggest** (`0e8c1506`) — Modify on a geofence flag pre-fills clock-out = recorded − estimated drive time from the shop (free distance-based estimate via `estimateDriveMinutes`, tenant-correct, works on localhost). Optional future upgrade: live Google driving time.
-- **Smart notification auto-ack** (`0e8c1506`) — `mark-read` gained a `{ types }` mode (caller-scoped); opening the corrections page clears the admin's `timecard_review` bell items; resolving a flag clears the matching notifications tenant-wide. Fixes the "bell still shows N after I caught up" mismatch.
-- **Resend acceptance email** (`0e8c1506`) — approved access requests expose `invitation_id` and show a "Resend email" button reusing `PUT /api/admin/invite` (rotates token, refreshes 7-day TTL).
-- **Geofence clock-outs split into their own section + drive-time estimate + access-request bell alerts** (`e742d403`) — and fixed two worker notifications that were silently dropped by the `notification_type` CHECK (now use the allowed `'general'` value; keep the event key in `type`).
-- **Permanently Delete user** (`61a809b0`) — `close_account()` scrub + frees the email (auth/profile renamed to a sentinel + permanent ban) + purges pending invitations/access_requests.
-- **Subsistence out-of-town** (`3806f3f4`) — remote clock-in asks "working out of town?"; per-day "Subs." surfacing; night_date aligned to tenant timezone.
-
-### Prior batches (Jun 22–23) — pushed, verified
-**Jun 23 batch (deployed `113cd77a`):**
-- **Maps address autocomplete FIXED** (`113cd77a`) — TRUE root cause was our **CSP in `middleware.ts`** (`script-src` lacked `maps.googleapis.com` → browser blocked the Maps script client-side; zero traffic reached Google). Added the Google origins to `script-src`/`connect-src`. **Verified live: `fetchAutocompleteSuggestions` returns 5 suggestions.** (Also done: dedicated website-restricted key "Pontifex Web Maps Key" in GCP project `quantum-conduit-482219-a1` w/ www referrer + Maps JS + Places New + billing; `NEXT_PUBLIC_GOOGLE_MAPS_API_KEY` swapped in Vercel. The old key `AIzaSyB4kg…` was orphaned/unmanageable — retired.)
-- **Time-off** (`b77ca30e`+`4d120ecd`) — Log modal lists ALL company profiles; rank approval (admin→below-admin incl. PM/salesman+supervisor, super_admin→all, no auto/self-approve); **callouts/no-shows immediate + notify ALL management**, planned requests pending + notify approvers; schedule-board **"Out Today"** card for non-operators.
-- **Email header** (`e67d39f2`) — logo renders/centers/spacing (Outlook-safe), no dup name, white-label-safe.
-- **Remember Me default OFF** (`c736406b`) — opt-in; existing remembered users unaffected.
-- **Secure biometric Face ID** (`dca49afd`) — stores Supabase **refresh token** (not password) in Keychain, **OS-enforced** (`BIOMETRY_CURRENT_SET`), decoupled from Remember Me, explicit opt-in (post-login prompt + My Profile→Security toggle), per-user-bound. **Web-only — no new iOS build** (Build 9 has plugin 8.4.5). Plan: `docs/plans/BIOMETRIC_LOGIN_ARCHITECTURE.md`.
-
-**Jun 22 batch (deployed `0aaf111d`):** email white-label migration · notif-bell deep-link · remote-photo storage + out-of-radius auto-edit-request + storage RLS fix · late-recompute-on-edit · email UI polish (invoice clipping).
-
-> **All commits through `0e8c1506` are pushed** (Jun 27 batch shipped with the docs cleanup).
-> **No new DB migrations in the Jun 24–27 work** — all of it was code-only (the brand redesign, drive-time, smart-ack, and resend reuse existing tables/columns; the `notification_type` CHECK was worked *around* with the allowed `'general'` value, not altered). Prior additive/idempotent migrations: `timecard_photos_bucket`, `timecard_photos_drop_broad_policies`, `timecard_corrections_metadata`, `notifications_action_url`, `timecards_out_of_town` (subsistence).
-
-### What shipped recently (the launch arc, Jun 20–22)
-- **Timecards batch** (live `a0bf8bcb`): correction-request 404 fix, km→**miles** distance everywhere, **configurable start-time + late-entries** system (`lib/timecard-start.ts` resolution chain: job ticket > per-day override > tenant standard; new `/dashboard/admin/timecards/late` page + `timecard_day_overrides` table), geofence detail + remote-clock-in review tab.
-- **Emails redesigned** to **react-email** (`emails/` component system, white-label via `getTenantEmailBranding`, dark-mode-proof, glossy red→navy, 72px logo).
-- **iOS Build 9** archived/signed/uploaded/submitted to App Store review.
-- **Google Play** taken from zero to in-review: app created on the **business** account (id `4973761380467352338`, package `com.pontifexindustries.platform`), all 11 App-content declarations + all 11 setup tasks + store listing (PII-scrubbed screenshots) done, production release submitted.
-- **Play photo-permission block fixed** (this session): Google held the submit for declaring `READ_MEDIA_IMAGES` on an app with only infrequent photo use. Removed it (`tools:node="remove"`; the app uses the web `<input type=file>` system picker, not the unused `@capacitor/camera`), rebuilt vc2, resubmitted — passed.
-- **Play Developer API upload automated** (`scripts/play-upload.mjs`): no more manual `.aab` file-pick. One-time setup done — Android Publisher API enabled on GCP project `pontifex-ind-1dc89`; SA `firebase-adminsdk-fbsvc@pontifex-ind-1dc89.iam.gserviceaccount.com` granted Admin in Play. Future Android ships = one command.
-
-### Blocked on the founder (only the founder can do these)
-- 🤖 **Google Play review** — out of our hands; auto-notifies by email; auto-publishes on approval (~day 5 of up-to-7). Nothing else to do on Play. (iOS v1.0.4 already approved/auto-releasing.)
-- 👤 **Sentry DSN** · (optional) **AI Gateway greenlight + $ ceiling** for Jarvis Phase 2 · (optional) expand Play beyond US.
-- ✅ Resolved since last handoff: Apple Developer Agreement re-accepted; Maps autocomplete fixed (was our CSP, not the API); Android closed-testing question settled (org-exempt).
+**Founder-side open items** (only the founder can do): the Phase C store/legal checklist above · real
+paper-ticket scan tests · Meta business verification (unblocks job-ad Phase 4) · exercising the $5/mo
+subscription test. Feature backlog → **[BACKLOG.md](BACKLOG.md)**.
 
 ---
 
