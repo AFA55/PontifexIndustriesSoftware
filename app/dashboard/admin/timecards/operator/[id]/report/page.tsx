@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { ChevronLeft, Printer, Loader2, Star, FileBarChart } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
+import { useBranding } from '@/lib/branding-context';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -47,6 +48,8 @@ export default function OperatorAnnualReportPage() {
   const search = useSearchParams();
   const router = useRouter();
   const operatorId = params.id as string;
+  const { branding } = useBranding();
+  const accent = branding.primary_color || '#1E40AF';
 
   const [year, setYear] = useState(() => {
     const y = search.get('year');
@@ -95,8 +98,53 @@ export default function OperatorAnnualReportPage() {
     ? [...new Set(data.months.flatMap((m) => Object.keys(m.attendanceCodes ?? {})))]
     : [];
 
+  const companyLocation = [branding.company_city, branding.company_state, branding.company_zip]
+    .filter(Boolean)
+    .join(', ');
+
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-6 print:max-w-none print:p-0">
+    <div className="annual-report-print mx-auto w-full max-w-5xl px-4 py-6 print:max-w-none print:p-0">
+      {/* Print-safe colors: dark-mode classes would otherwise print white text
+          on the (unprinted) white page. Only `color`/background are forced —
+          inline accent styles on borders/`.print-accent` keep the brand color. */}
+      <style>{`
+        @media print {
+          .annual-report-print { background: #fff !important; }
+          .annual-report-print, .annual-report-print * { color: #000 !important; }
+          .annual-report-print .print-accent { color: ${accent} !important; }
+        }
+      `}</style>
+
+      {/* Branded header (print only — same pattern as completed-print) */}
+      <div
+        className="hidden border-b-4 pb-3 mb-4 print:flex items-start justify-between"
+        style={{ borderColor: accent }}
+      >
+        <div className="flex items-center gap-3">
+          {branding.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={branding.logo_url} alt="" className="h-14 w-auto object-contain" />
+          )}
+          <div>
+            <h1 className="text-xl font-extrabold tracking-wide leading-tight">{branding.company_name}</h1>
+            {(branding.company_address || companyLocation) && (
+              <p className="text-[11px] text-gray-600 leading-tight">
+                {[branding.company_address, companyLocation].filter(Boolean).join(' · ')}
+              </p>
+            )}
+            {branding.support_phone && (
+              <p className="text-[11px] text-gray-600 leading-tight">{branding.support_phone}</p>
+            )}
+          </div>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Annual Report</p>
+          <p className="print-accent text-2xl font-extrabold font-mono leading-none" style={{ color: accent }}>
+            {year}
+          </p>
+        </div>
+      </div>
+
       {/* Toolbar (hidden in print) */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3 print:hidden">
         <div className="flex items-center gap-3">

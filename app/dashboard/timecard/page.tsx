@@ -716,20 +716,37 @@ function TimecardPage() {
           <button
             onClick={async () => {
               const mondayStr = toLocalDateStr(monday);
-              // WEB: keep the original synchronous window.open (popup-blocker
-              // safe, unchanged behavior). NATIVE: fetch + in-app viewer —
-              // window.open ejected operators to the browser ("clicked
-              // timecard, sent to website", Jul 21 audit finding #1).
-              if (!isNativeApp()) {
-                window.open(`/api/timecard/pdf?weekStart=${mondayStr}`, '_blank');
-                return;
-              }
+              const pdfUrl = `/api/timecard/pdf?weekStart=${mondayStr}`;
               try {
                 const { data: { session } } = await supabase.auth.getSession();
                 if (!session) return;
-                await viewPdfUrl(`/api/timecard/pdf?weekStart=${mondayStr}`, session.access_token);
+                // NATIVE: in-app viewer — window.open ejected operators to the
+                // browser ("clicked timecard, sent to website", Jul 21 audit).
+                if (isNativeApp()) {
+                  await viewPdfUrl(pdfUrl, session.access_token);
+                  return;
+                }
+                // WEB: requireAuth() only accepts an Authorization: Bearer
+                // header — a bare window.open(pdfUrl) sends no header and
+                // 401s. Fetch with the token, then download the blob via an
+                // anchor click (not popup-blocked, unlike async window.open).
+                const res = await fetch(pdfUrl, {
+                  headers: { Authorization: `Bearer ${session.access_token}` },
+                });
+                if (!res.ok) throw new Error('Failed to load PDF');
+                const blob = await res.blob();
+                const blobUrl = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = `timecard_${mondayStr}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                // Deferred: Safari can cancel the download on immediate revoke.
+                setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
               } catch (err) {
                 console.error('Timecard PDF failed:', err);
+                alert('Could not download your timecard PDF. Please try again.');
               }
             }}
             className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-blue-700 dark:text-blue-400 rounded-lg transition-all text-sm font-medium border border-blue-200 dark:border-white/10 shadow-sm hover:shadow"

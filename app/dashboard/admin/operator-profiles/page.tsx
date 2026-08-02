@@ -12,6 +12,7 @@ import {
   BarChart3, Hash, MapPin, Filter, Zap
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { toLocalYMD } from '@/lib/dates';
 import SkillsTab from './_components/SkillsTab';
 import { supabase } from '@/lib/supabase';
 import AddProfileModal from './_components/AddProfileModal';
@@ -295,8 +296,10 @@ export default function OperatorProfilesPage() {
   const fetchTimecards = useCallback(async (id: string) => {
     setTimecardsLoading(true);
     try {
-      const startDate = monday.toISOString().split('T')[0];
-      const endDate = sunday.toISOString().split('T')[0];
+      // Local calendar dates — toISOString() shifts a local midnight to the
+      // PREVIOUS day in US timezones (the recurring off-by-one bug class).
+      const startDate = toLocalYMD(monday);
+      const endDate = toLocalYMD(sunday);
       const res = await apiFetch(`/api/admin/timecards?userId=${id}&startDate=${startDate}&endDate=${endDate}&limit=200`);
       if (res.ok) {
         const json = await res.json();
@@ -938,9 +941,28 @@ export default function OperatorProfilesPage() {
                       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                         <p className="text-sm font-bold text-gray-800">Time Entries</p>
                         <button
-                          onClick={() => {
-                            const mondayStr = monday.toISOString().split('T')[0];
-                            window.open(`/api/admin/timecards/${selectedId}/pdf?weekStart=${mondayStr}`, '_blank');
+                          onClick={async () => {
+                            // requireAdmin() only accepts a Bearer header — a bare
+                            // window.open(url) sends no header and 401s. Fetch with
+                            // the token, then download the blob via an anchor click.
+                            const mondayStr = toLocalYMD(monday);
+                            try {
+                              const res = await apiFetch(`/api/admin/timecards/${selectedId}/pdf?weekStart=${mondayStr}`);
+                              if (!res.ok) throw new Error(`PDF request failed (${res.status})`);
+                              const blob = await res.blob();
+                              const blobUrl = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = blobUrl;
+                              a.download = `timecard_${mondayStr}.pdf`;
+                              document.body.appendChild(a);
+                              a.click();
+                              document.body.removeChild(a);
+                              // Deferred: Safari can cancel the download on immediate revoke.
+                              setTimeout(() => URL.revokeObjectURL(blobUrl), 30_000);
+                            } catch (err) {
+                              console.error('Timecard PDF failed:', err);
+                              alert('Could not download the timecard PDF. Please try again.');
+                            }
                           }}
                           className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white hover:bg-gray-50 text-blue-700 rounded-lg text-xs font-medium border border-blue-200 shadow-sm"
                         >

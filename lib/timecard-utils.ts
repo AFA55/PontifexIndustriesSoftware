@@ -145,6 +145,61 @@ export function getWeekDates(weekStart: string): string[] {
   return weekDatesFrom(weekStart);
 }
 
+/** One display row per calendar day on the weekly timecard PDF. */
+export interface TimecardDayEntry {
+  date: string;
+  clockIn: string | null;
+  clockOut: string | null;
+  totalHours: number;
+  category: string;
+  isApproved: boolean;
+}
+
+/**
+ * Collapse a week's raw timecards into one row per calendar day: first clock-in,
+ * last clock-out, summed hours, category tags. Shared by the self-serve, admin
+ * single-employee, and batch PDF routes (was copy-pasted in all three).
+ */
+export function buildWeekDayEntries(
+  entries: TimecardEntry[],
+  weekDates: string[]
+): TimecardDayEntry[] {
+  return weekDates.map((date) => {
+    const dayEntries = entries.filter((tc) => tc.date === date);
+
+    if (dayEntries.length === 0) {
+      return {
+        date,
+        clockIn: null,
+        clockOut: null,
+        totalHours: 0,
+        category: '—',
+        isApproved: false,
+      };
+    }
+
+    const firstEntry = dayEntries[0];
+    const lastEntry = dayEntries[dayEntries.length - 1];
+    const totalHours = dayEntries.reduce((sum, e) => sum + (e.total_hours || 0), 0);
+
+    const cats: string[] = [];
+    if (dayEntries.some((e) => e.hour_type === 'mandatory_overtime')) cats.push('Mandatory OT');
+    if (dayEntries.some((e) => e.pay_type_override === 'double_time')) cats.push('Double Time');
+    if (dayEntries.some((e) => e.is_night_shift)) cats.push('Night');
+    if (dayEntries.some((e) => e.is_shop_hours)) cats.push('Shop');
+    if (cats.length === 0) cats.push('Regular');
+
+    return {
+      date,
+      clockIn: firstEntry.clock_in_time,
+      clockOut: lastEntry.clock_out_time,
+      totalHours: Number(totalHours.toFixed(2)),
+      category: cats.join(', '),
+      isApproved: dayEntries.every((e) => e.is_approved),
+    };
+  });
+}
+
 /**
  * Format an ISO timestamp to a human-readable time string.
  */

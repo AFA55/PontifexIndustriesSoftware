@@ -87,10 +87,13 @@ export interface PDFBranding {
   company_address?: string;
   company_phone?: string;
   logo_url?: string | null;
+  /** Pre-fetched PNG/JPEG data URI for react-pdf <Image> (see lib/pdf-branding.ts fetchLogoDataUri). */
+  logoDataUri?: string | null;
   pdf_header_text?: string | null;
   pdf_footer_text?: string | null;
   pdf_show_logo?: boolean;
   primary_color?: string;
+  secondary_color?: string;
 }
 
 // ── Interfaces ──────────────────────────────────────────────

@@ -10,6 +10,7 @@ import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import React from 'react';
 import DispatchTicketPDF from '@/components/pdf/DispatchTicketPDF';
+import { getTenantPdfBranding, type PDFBranding } from '@/lib/pdf-branding';
 
 export async function GET(
   request: NextRequest,
@@ -64,30 +65,16 @@ export async function GET(
       helperName = helpProfile?.full_name || '';
     }
 
-    // Fetch branding for PDF
-    let pdfBranding: Record<string, unknown> = {};
-    try {
-      const { data: brandingRow } = await supabaseAdmin
-        .from('tenant_branding')
-        .select('company_name, support_phone, support_email, company_address, company_city, company_state, company_zip, pdf_header_text, pdf_footer_text, pdf_show_logo, primary_color, logo_url')
-        .limit(1)
-        .single();
-      if (brandingRow) {
-        const addr = [brandingRow.company_address, brandingRow.company_city, brandingRow.company_state, brandingRow.company_zip].filter(Boolean).join(', ');
-        pdfBranding = {
-          company_name: brandingRow.company_name,
-          company_address: addr || undefined,
-          company_phone: brandingRow.support_phone ? `Phone: ${brandingRow.support_phone}` : undefined,
-          logo_url: brandingRow.logo_url,
-          pdf_header_text: brandingRow.pdf_header_text,
-          pdf_footer_text: brandingRow.pdf_footer_text,
-          pdf_show_logo: brandingRow.pdf_show_logo,
-          primary_color: brandingRow.primary_color,
-        };
-      }
-    } catch {
-      // Use defaults if branding fetch fails
-    }
+    // Fetch branding for PDF — tenant-scoped (was unscoped: any tenant's row).
+    // A null-tenant super_admin brands with the JOB's tenant, not neutral.
+    const tenantBranding = await getTenantPdfBranding(tenantId ?? job.tenant_id ?? null);
+    const pdfBranding: PDFBranding = {
+      ...tenantBranding,
+      // Dispatch ticket shows the phone with an explicit label
+      company_phone: tenantBranding.company_phone
+        ? `Phone: ${tenantBranding.company_phone}`
+        : undefined,
+    };
 
     // Build the PDF data
     const pdfData = {

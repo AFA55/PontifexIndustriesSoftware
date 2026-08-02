@@ -15,11 +15,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import TimecardPDF from '@/components/pdf/TimecardPDF';
-import type { TimecardPDFEntry } from '@/components/pdf/TimecardPDF';
+import { getTenantPdfBranding, fetchLogoDataUri } from '@/lib/pdf-branding';
 import {
   calculateWeekSummary,
   getWeekDates,
   getMondayOfWeek,
+  buildWeekDayEntries,
 } from '@/lib/timecard-utils';
 import type { TimecardEntry } from '@/lib/timecard-utils';
 
@@ -34,11 +35,8 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const weekStart = searchParams.get('weekStart') || getMondayOfWeek();
 
-    // Calculate week end (Sunday)
-    const startDate = new Date(weekStart + 'T00:00:00');
-    const endDate = new Date(startDate);
-    endDate.setDate(endDate.getDate() + 6);
-    const weekEnd = endDate.toISOString().split('T')[0];
+    // Week end (Sunday) — local calendar math via lib/dates (never toISOString)
+    const weekEnd = getWeekDates(weekStart)[6];
 
     // Fetch user profile
     const { data: profile, error: profileError } = await supabaseAdmin
@@ -72,78 +70,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch branding
-    let branding: Record<string, any> = {};
-    try {
-      const { data: brandingRow } = await supabaseAdmin
-        .from('tenant_branding')
-        .select(
-          'company_name, company_address, support_phone, primary_color, logo_url'
-        )
-        .eq('is_active', true)
-        .limit(1)
-        .single();
-
-      if (brandingRow) {
-        branding = {
-          company_name: brandingRow.company_name,
-          company_address: brandingRow.company_address || '',
-          company_phone: brandingRow.support_phone || '',
-          primary_color: brandingRow.primary_color,
-          logo_url: brandingRow.logo_url,
-        };
-      }
-    } catch {
-      // Use defaults if branding fetch fails
-    }
+    // Tenant-scoped branding (+ logo pre-fetched as a data URI; null on failure
+    // renders the text-only header — a logo problem never fails the download)
+    const branding = await getTenantPdfBranding(auth.tenantId);
+    branding.logoDataUri = await fetchLogoDataUri(branding.logo_url);
 
     // Build 7-day entries array (Mon through Sun)
     const weekDates = getWeekDates(weekStart);
     const tcArray = (timecards || []) as TimecardEntry[];
-
-    const entries: TimecardPDFEntry[] = weekDates.map((date) => {
-      const dayEntries = tcArray.filter((tc) => tc.date === date);
-
-      if (dayEntries.length === 0) {
-        return {
-          date,
-          clockIn: null,
-          clockOut: null,
-          totalHours: 0,
-          category: '\u2014',
-          isApproved: false,
-        };
-      }
-
-      const firstEntry = dayEntries[0];
-      const lastEntry = dayEntries[dayEntries.length - 1];
-      const totalHours = dayEntries.reduce(
-        (sum, e) => sum + (e.total_hours || 0),
-        0
-      );
-
-      const cats: string[] = [];
-      if (dayEntries.some((e) => e.hour_type === 'mandatory_overtime'))
-        cats.push('Mandatory OT');
-      if (dayEntries.some((e) => e.is_night_shift)) cats.push('Night');
-      if (dayEntries.some((e) => e.is_shop_hours)) cats.push('Shop');
-      if (cats.length === 0) cats.push('Regular');
-
-      return {
-        date,
-        clockIn: firstEntry.clock_in_time,
-        clockOut: lastEntry.clock_out_time,
-        totalHours: Number(totalHours.toFixed(2)),
-        category: cats.join(', '),
-        isApproved: dayEntries.every((e) => e.is_approved),
-      };
-    });
-
-    // Calculate summary
+    const entries = buildWeekDayEntries(tcArray, weekDates);
     const summary = calculateWeekSummary(tcArray);
 
     // Generate PDF
-    const pdfElement = TimecardPDF({
+    const pdfElement = React.createElement(TimecardPDF, {
       operatorName: profile.full_name || profile.email,
       operatorEmail: profile.email || '',
       operatorRole: profile.role || 'operator',
@@ -152,9 +91,10 @@ export async function GET(request: NextRequest) {
       weekEnd,
       entries,
       summary,
-      branding: branding as any,
+      branding,
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const pdfBuffer = await renderToBuffer(pdfElement as any);
     const uint8 = new Uint8Array(pdfBuffer);
 
@@ -171,7 +111,7 @@ export async function GET(request: NextRequest) {
         'Content-Length': String(pdfBuffer.length),
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error generating timecard PDF:', error);
     return NextResponse.json(
       { error: 'Failed to generate timecard PDF' },
