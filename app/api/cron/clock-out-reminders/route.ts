@@ -15,6 +15,14 @@ export const dynamic = 'force-dynamic';
  * we compute hours-since-clock-in and fire the HIGHEST threshold crossed, so a
  * late/skipped cron tick sends ONE correct message instead of a burst.
  *
+ * FOURTH trigger (completion-aware smart reminder): an operator/apprentice who
+ * finished ALL of their job tickets for the shift and is still clocked in gets
+ * a nudge ~30 min after the last completion — delayed further (up to 2h) when
+ * the completed jobsite is a long drive from the shop, so the reminder lands
+ * about when they're back, not mid-drive. If they're STILL clocked in an hour
+ * past that, management gets one escalation per worker per shift. Pure logic
+ * lives in lib/clock-out-reminder.ts (unit-tested).
+ *
  * Dedup via reminder_log (sendReminderOnce). Keys are keyed off the timecard's
  * clock-in DATE so the three reminders group per shift and survive midnight.
  *
@@ -24,6 +32,17 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
+import { getTenantShopLocationOrDefault } from '@/lib/geolocation-server';
+import {
+  ESCALATION_AFTER_MINUTES,
+  driveMinutesForJob,
+  formatMinutesAgo,
+  isJobUnfinished,
+  reminderDelayMinutes,
+  resolveCompletionInstant,
+  type CompletionCandidate,
+  type ReminderJob,
+} from '@/lib/clock-out-reminder';
 
 // How long before the tenant's auto-clockout time to warn still-clocked-in workers.
 const PRE_AUTOCLOCKOUT_WARN_MINUTES = 30;
@@ -126,14 +145,22 @@ export async function GET(request: NextRequest) {
         localMinutes >= autoMinutes - PRE_AUTOCLOCKOUT_WARN_MINUTES &&
         localMinutes < autoMinutes;
 
-      // Phone numbers for SMS fallback (mirrors clock-in-reminders)
+      // Phone numbers for SMS fallback (mirrors clock-in-reminders) + role/name
+      // for the completion-aware pass below.
       const userIds = Array.from(new Set(openCards.map((t) => t.user_id)));
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('id, phone, phone_number')
+        .select('id, phone, phone_number, role, full_name')
         .in('id', userIds);
+      type ProfileRow = { id: string; phone: string | null; phone_number: string | null; role: string | null; full_name: string | null };
       const phoneMap = new Map<string, string | null>(
-        (profiles || []).map((p: { id: string; phone: string | null; phone_number: string | null }) => [p.id, p.phone || p.phone_number || null])
+        (profiles || []).map((p: ProfileRow) => [p.id, p.phone || p.phone_number || null])
+      );
+      const roleMap = new Map<string, string | null>(
+        (profiles || []).map((p: ProfileRow) => [p.id, p.role])
+      );
+      const nameMap = new Map<string, string | null>(
+        (profiles || []).map((p: ProfileRow) => [p.id, p.full_name])
       );
 
       for (const tc of openCards) {
@@ -174,6 +201,22 @@ export async function GET(request: NextRequest) {
         });
         if (res) remindersSent++;
       }
+
+      // ── Fourth trigger: completion-aware smart reminder + admin escalation.
+      // Wrapped per-tenant so one tenant's failure never aborts the others.
+      try {
+        remindersSent += await processCompletionAwareReminders({
+          tenantId: tenant.id,
+          tz,
+          nowMs,
+          openCards,
+          phoneMap,
+          roleMap,
+          nameMap,
+        });
+      } catch (e) {
+        console.error(`[clock-out-reminders] completion-aware pass failed (tenant ${tenant.id}):`, e);
+      }
     }
 
     return NextResponse.json({ success: true, remindersSent });
@@ -181,4 +224,243 @@ export async function GET(request: NextRequest) {
     console.error('[clock-out-reminders] error:', error);
     return NextResponse.json({ success: false, remindersSent, error: String(error) }, { status: 500 });
   }
+}
+
+// ─── Fourth trigger: completion-aware smart reminder ─────────────────────────
+
+interface OpenCardRow {
+  user_id: string;
+  clock_in_time: string;
+  date: string;
+  is_night_shift: boolean | null;
+}
+
+type JobRow = ReminderJob & {
+  assigned_to: string | null;
+  helper_assigned_to: string | null;
+  customer_name: string | null;
+};
+
+interface DailyLogRow {
+  job_order_id: string;
+  operator_id: string;
+  day_completed_at: string | null;
+}
+
+/** Field roles that get the ticket-completion nudge (never admins). */
+const REMINDED_ROLES = ['operator', 'apprentice'];
+
+const JOB_SELECT =
+  'id, job_number, customer_name, status, work_completed_at, drive_time, jobsite_latitude, jobsite_longitude, assigned_to, helper_assigned_to';
+
+/**
+ * For each still-clocked-in operator/apprentice whose tickets for the shift
+ * are ALL complete: nudge them `reminderDelayMinutes` after the last
+ * completion (drive-time-aware), and escalate to management an hour after
+ * that. Returns the number of notifications sent. Pure decision logic lives
+ * in lib/clock-out-reminder.ts.
+ */
+async function processCompletionAwareReminders(args: {
+  tenantId: string;
+  tz: string;
+  nowMs: number;
+  openCards: OpenCardRow[];
+  phoneMap: Map<string, string | null>;
+  roleMap: Map<string, string | null>;
+  nameMap: Map<string, string | null>;
+}): Promise<number> {
+  const { tenantId, tz, nowMs, openCards, phoneMap, roleMap, nameMap } = args;
+  let sent = 0;
+
+  // Only field workers; one card per user (deterministic if dupes ever exist).
+  const cardByUser = new Map<string, OpenCardRow>();
+  for (const tc of openCards) {
+    if (!REMINDED_ROLES.includes(roleMap.get(tc.user_id) || '')) continue;
+    if (!cardByUser.has(tc.user_id)) cardByUser.set(tc.user_id, tc);
+  }
+  if (cardByUser.size === 0) return 0;
+
+  // Shop pin for the drive-time fallback. The accessor's hardcoded default
+  // (Patriot's tenant row has NULL coords) is load-bearing — keep using it.
+  const shop = await getTenantShopLocationOrDefault(supabaseAdmin, tenantId);
+
+  // Multi-operator crews: jobs beyond the assigned_to/helper_assigned_to slots.
+  const eligibleIds = Array.from(cardByUser.keys());
+  const { data: crewRows } = await supabaseAdmin
+    .from('job_crew')
+    .select('job_order_id, user_id')
+    .eq('tenant_id', tenantId)
+    .in('user_id', eligibleIds);
+  const crewJobIdsByUser = new Map<string, string[]>();
+  for (const r of (crewRows || []) as { job_order_id: string; user_id: string }[]) {
+    const list = crewJobIdsByUser.get(r.user_id) || [];
+    list.push(r.job_order_id);
+    crewJobIdsByUser.set(r.user_id, list);
+  }
+
+  // Lazy — only fetched if an escalation actually fires this tick.
+  let adminIds: string[] | null = null;
+
+  // Group by the card's shift date (tenant-local, stamped at clock-in). It
+  // keys the job window, the daily-log date, and both dedup keys, so night
+  // shifts stay consistent across midnight.
+  const dates = Array.from(new Set(Array.from(cardByUser.values()).map((c) => c.date)));
+
+  for (const refDate of dates) {
+    const usersForDate = eligibleIds.filter((u) => cardByUser.get(u)!.date === refDate);
+    if (usersForDate.length === 0) continue;
+
+    // Job window + dispatched filter mirror the operator clock-out gate
+    // (app/api/timecard/clock-out/route.ts) exactly.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const windowed = (q: any) =>
+      q
+        .eq('tenant_id', tenantId)
+        .lte('scheduled_date', refDate)
+        .or(`scheduled_date.eq.${refDate},end_date.gte.${refDate}`)
+        .not('dispatched_at', 'is', null);
+
+    const { data: opJobs } = await windowed(
+      supabaseAdmin.from('job_orders').select(JOB_SELECT).in('assigned_to', usersForDate)
+    );
+    const { data: helperSlotJobs } = await windowed(
+      supabaseAdmin.from('job_orders').select(JOB_SELECT).in('helper_assigned_to', usersForDate)
+    );
+    const crewJobIds = Array.from(
+      new Set(usersForDate.flatMap((u) => crewJobIdsByUser.get(u) || []))
+    );
+    const { data: crewJobs } = crewJobIds.length
+      ? await windowed(supabaseAdmin.from('job_orders').select(JOB_SELECT).in('id', crewJobIds))
+      : { data: [] as JobRow[] };
+
+    const jobsById = new Map<string, JobRow>();
+    for (const j of [...(opJobs || []), ...(helperSlotJobs || []), ...(crewJobs || [])] as JobRow[]) {
+      jobsById.set(j.id, j);
+    }
+    if (jobsById.size === 0) continue;
+
+    // "Done for Today" logs for these jobs on the shift date. Scoped through
+    // the tenant-scoped job ids (same shape as the clock-out route — old
+    // daily_job_logs rows can predate the tenant_id backfill).
+    const { data: logRows } = await supabaseAdmin
+      .from('daily_job_logs')
+      .select('job_order_id, operator_id, day_completed_at')
+      .eq('log_date', refDate)
+      .in('job_order_id', Array.from(jobsById.keys()));
+    const logsByJob = new Map<string, DailyLogRow[]>();
+    for (const l of (logRows || []) as DailyLogRow[]) {
+      const list = logsByJob.get(l.job_order_id) || [];
+      list.push(l);
+      logsByJob.set(l.job_order_id, list);
+    }
+
+    for (const userId of usersForDate) {
+      const card = cardByUser.get(userId)!;
+
+      // This worker's jobs, deduped. assigned_to ⇒ operator semantics (their
+      // OWN daily log satisfies the day — exact mirror of the clock-out
+      // gate); helper slot / job_crew ⇒ the job completing or ANY crew daily
+      // log satisfies it (helpers don't write operator daily logs).
+      const myJobs = new Map<string, JobRow>();
+      for (const j of jobsById.values()) {
+        if (j.assigned_to === userId || j.helper_assigned_to === userId) myJobs.set(j.id, j);
+      }
+      for (const jid of crewJobIdsByUser.get(userId) || []) {
+        const j = jobsById.get(jid);
+        if (j) myJobs.set(jid, j);
+      }
+      if (myJobs.size === 0) continue; // shop day, no tickets → nothing to key off
+
+      const hasLogFor = (j: JobRow): boolean => {
+        const logs = logsByJob.get(j.id) || [];
+        return j.assigned_to === userId
+          ? logs.some((l) => l.operator_id === userId)
+          : logs.length > 0;
+      };
+
+      // 1) Any unfinished ticket left → don't nag between jobs. The slot is
+      // per-job: lead (assigned_to) uses the operator status list; helper
+      // slot / crew uses the helper list (which also excludes 'on_hold' —
+      // a parked job must not silence a helper's reminder).
+      let blocked = false;
+      for (const j of myJobs.values()) {
+        const slot = j.assigned_to === userId ? 'operator' : 'helper';
+        if (isJobUnfinished(j, hasLogFor(j), slot)) {
+          blocked = true;
+          break;
+        }
+      }
+      if (blocked) continue;
+
+      // 2) Latest completion instant this shift (job completion or Done-for-Today).
+      const candidates: CompletionCandidate[] = [];
+      for (const j of myJobs.values()) {
+        if (j.work_completed_at) candidates.push({ at: j.work_completed_at, job: j });
+        for (const l of logsByJob.get(j.id) || []) {
+          if (j.assigned_to === userId && l.operator_id !== userId) continue;
+          candidates.push({ at: l.day_completed_at, job: j });
+        }
+      }
+      const completion = resolveCompletionInstant(candidates, card.clock_in_time);
+      if (!completion) continue; // never-completed → the 10/12/15h reminders cover it
+
+      // 3) Adaptive delay: drive_time column → haversine estimate → base 30 min.
+      const delay = reminderDelayMinutes(driveMinutesForJob(completion.job, shop));
+      const minutesSince = (nowMs - completion.atMs) / 60_000;
+      if (minutesSince < delay) continue;
+
+      // 4) Worker nudge — once per worker per shift date (reminder_log dedup).
+      const jobLabel = completion.job?.job_number
+        ? `job ${completion.job.job_number}`
+        : 'your last job';
+      const res = await sendReminderOnce(`clock_out_after_job:${userId}:${card.date}`, {
+        userId,
+        tenantId,
+        category: 'clock_in_reminder',
+        inAppType: 'reminder',
+        title: 'Job complete — remember to clock out',
+        message: `You finished ${jobLabel} ${formatMinutesAgo(minutesSince)} and you're still on the clock. Clock out if your day is done.`,
+        actionUrl: '/dashboard/timecard',
+        smsPhone: phoneMap.get(userId) ?? null,
+      });
+      if (res) sent++;
+
+      // 5) Admin escalation an hour past the nudge threshold. reminder_log is
+      // UNIQUE(user_id, reminder_key), so keying on the WORKER + shift date
+      // while sending to each manager means each manager gets it at most once
+      // per worker per shift — idempotent across cron ticks.
+      if (minutesSince >= delay + ESCALATION_AFTER_MINUTES) {
+        if (adminIds === null) {
+          const { data: adminProfiles } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('tenant_id', tenantId)
+            .in('role', ['super_admin', 'admin', 'operations_manager']);
+          adminIds = ((adminProfiles || []) as { id: string }[]).map((p) => p.id);
+        }
+        const name = nameMap.get(userId) || 'A worker';
+        const finishedAt = new Date(completion.atMs).toLocaleTimeString('en-US', {
+          timeZone: tz,
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+        for (const adminId of adminIds) {
+          if (adminId === userId) continue;
+          const esc = await sendReminderOnce(`clock_out_escalation:${userId}:${card.date}`, {
+            userId: adminId,
+            tenantId,
+            category: 'clock_in_reminder',
+            inAppType: 'warning',
+            title: '⏰ Still clocked in after finishing',
+            message: `${name} finished their last job at ${finishedAt} and hasn't clocked out.`,
+            actionUrl: '/dashboard/admin/timecards',
+          });
+          if (esc) sent++;
+        }
+      }
+    }
+  }
+
+  return sent;
 }
