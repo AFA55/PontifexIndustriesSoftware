@@ -176,6 +176,31 @@ export async function PATCH(
     console.log('Update result:', { jobOrder, updateError });
 
     if (!updateError && jobOrder) {
+      // ── Per-day ledger cleanup on a DATE MOVE (guardian B4) ───────────────
+      // When scheduled_date/end_date change, this job's job_daily_assignments
+      // rows for dates now OUTSIDE the new window are stale: they'd keep
+      // blocking the old day's sequence gate and ghost the board overlay.
+      // Delete out-of-window rows; in-window rows (who runs which day) stay.
+      // Scope: job id (tenant-verified above) + tenant_id match-or-NULL so
+      // legacy NULL-tenant rows are cleaned too.
+      const dateChanged =
+        ('scheduled_date' in updates && jobOrder.scheduled_date !== oldJobOrder.scheduled_date) ||
+        ('end_date' in updates && jobOrder.end_date !== oldJobOrder.end_date);
+      if (dateChanged && jobOrder.scheduled_date) {
+        const windowStart = jobOrder.scheduled_date;
+        const windowEnd = jobOrder.end_date || jobOrder.scheduled_date;
+        const { error: ledgerCleanupError } = await supabaseAdmin
+          .from('job_daily_assignments')
+          .delete()
+          .eq('job_order_id', id)
+          .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+          .or(`assignment_date.lt.${windowStart},assignment_date.gt.${windowEnd}`);
+        if (ledgerCleanupError) {
+          // Non-fatal: the sequence gate also filters stale rows by window.
+          console.error('Failed to clean stale per-day assignments after date move:', ledgerCleanupError);
+        }
+      }
+
       // Create audit trail entry - track what changed
       const changes: Record<string, { old: any; new: any }> = {};
 

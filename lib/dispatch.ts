@@ -14,6 +14,7 @@
  */
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendSMS } from '@/lib/sms';
+import { sendNotification } from '@/lib/send-reminder';
 
 export interface DispatchResult {
   dispatched_count: number;
@@ -40,6 +41,64 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
   if (fetchError) throw new Error(`dispatch fetch failed: ${fetchError.message}`);
   if (!jobs || jobs.length === 0) {
     return { dispatched_count: 0, already_dispatched_count: 0, total_jobs: 0, notification_count: 0, sms_attempted: 0 };
+  }
+
+  // ── Per-day lead SYNC (before the dispatch loop) ─────────────────────────
+  // job_daily_assignments is the per-day ledger; job_orders.assigned_to is
+  // "the current lead". If today's ledger row names a different operator
+  // (a day-scoped reassignment made in advance), promote it into assigned_to
+  // NOW so the day's dispatch latch, notifications and downstream operator
+  // guards all hit the right person. NOTE on sequencing: an operator can hold
+  // several jobs today (day_sequence 1..N) — each job still has exactly ONE
+  // ledger row, so this sync is per-job; the operator's "current" job is the
+  // LOWEST-sequence incomplete one (enforced operator-side by the
+  // sequence gate in /api/job-orders/[id]/status).
+  // The ledger query is scoped by the tenant-scoped job ids (legacy JDA rows
+  // can carry tenant_id NULL, so an .eq tenant filter could miss them).
+  const reassignedAlreadyDispatched: typeof jobs = [];
+  try {
+    const { data: todaysLedger } = await supabaseAdmin
+      .from('job_daily_assignments')
+      .select('job_order_id, operator_id, helper_id')
+      .eq('assignment_date', targetDate)
+      .in('job_order_id', jobs.map((j) => j.id));
+
+    for (const row of todaysLedger || []) {
+      const job = jobs.find((j) => j.id === row.job_order_id);
+      if (!job) continue;
+      const operatorDiffers = row.operator_id && row.operator_id !== job.assigned_to;
+      const helperDiffers = (row.helper_id ?? null) !== (job.helper_assigned_to ?? null);
+      if (!operatorDiffers && !helperDiffers) continue;
+
+      // Status is intentionally untouched here (the claim update below owns
+      // status); this only corrects WHO today's lead/helper is.
+      const { error: syncError } = await supabaseAdmin
+        .from('job_orders')
+        .update({
+          ...(operatorDiffers ? { assigned_to: row.operator_id } : {}),
+          ...(helperDiffers ? { helper_assigned_to: row.helper_id ?? null } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', job.id)
+        .eq('tenant_id', tenantId);
+      if (syncError) {
+        console.error('dispatch lead-sync failed for job', job.id, syncError);
+        continue;
+      }
+
+      // Keep the in-memory job true so the notification loop below texts the
+      // RIGHT person, and remember already-dispatched jobs — their one-time
+      // dispatch latch already fired for the OLD operator, so the incoming
+      // operator gets an explicit assignment-changed notification instead.
+      if (operatorDiffers) job.assigned_to = row.operator_id;
+      if (helperDiffers) job.helper_assigned_to = row.helper_id ?? null;
+      if (operatorDiffers && job.dispatched_at !== null) {
+        reassignedAlreadyDispatched.push(job);
+      }
+    }
+  } catch (e) {
+    // Sync is best-effort — never block the morning dispatch.
+    console.error('dispatch lead-sync step failed:', e);
   }
 
   // Duplicate-dispatch guard: only jobs whose dispatched_at was NULL get
@@ -69,11 +128,15 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
 
   const jobsToNotify = firstTimeJobs.filter((j) => claimedIds.has(j.id));
 
-  // Names + phones for the operators/helpers being notified.
+  // Names + phones for the operators/helpers being notified (incl. incoming
+  // operators on already-dispatched jobs that were reassigned via the ledger).
   const allUserIds = new Set<string>();
   jobsToNotify.forEach((j) => {
     if (j.assigned_to) allUserIds.add(j.assigned_to);
     if (j.helper_assigned_to) allUserIds.add(j.helper_assigned_to);
+  });
+  reassignedAlreadyDispatched.forEach((j) => {
+    if (j.assigned_to) allUserIds.add(j.assigned_to);
   });
   const { data: profiles } = allUserIds.size
     ? await supabaseAdmin.from('profiles').select('id, full_name, phone_number').in('id', Array.from(allUserIds))
@@ -150,6 +213,32 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
     }
     if (job.helper_assigned_to && phoneMap.has(job.helper_assigned_to)) {
       smsPromises.push(sendSMS({ to: phoneMap.get(job.helper_assigned_to)!, message: buildMsg(job, 'helper'), jobId: job.id }).catch((e) => console.error('dispatch SMS failed:', e)));
+    }
+  }
+
+  // Incoming operators on ALREADY-dispatched jobs (per-day reassignment took
+  // effect this morning): the one-time dispatch latch fired for the previous
+  // operator, so explicitly notify + text the new one. Fire-and-forget.
+  for (const job of reassignedAlreadyDispatched) {
+    if (!job.assigned_to) continue;
+    smsPromises.push(
+      sendNotification({
+        userId: job.assigned_to,
+        tenantId,
+        category: 'job_dispatched',
+        title: 'New job assigned 📋',
+        message: `${job.job_number} for ${job.customer_name || 'a customer'} is yours today (${formattedDate}).`,
+        inAppType: 'job_order',
+        jobOrderId: job.id,
+        actionUrl: '/dashboard/my-jobs',
+      }).catch((e) => console.error('dispatch reassignment notify failed:', e))
+    );
+    if (phoneMap.has(job.assigned_to)) {
+      smsPromises.push(
+        sendSMS({ to: phoneMap.get(job.assigned_to)!, message: buildMsg(job, 'operator'), jobId: job.id }).catch((e) =>
+          console.error('dispatch SMS failed:', e)
+        )
+      );
     }
   }
   Promise.allSettled(smsPromises).catch(() => {});

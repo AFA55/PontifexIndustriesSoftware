@@ -76,7 +76,27 @@ export async function POST(request: NextRequest) {
         .in('id', jobsToTouch);
     }
 
-    // 3. Build notifications for all operators and helpers
+    // 3. Build notifications for all operators and helpers.
+    //    Recipients are resolved JDA-FIRST: job_daily_assignments is the
+    //    per-day ledger, so when a row exists for this date it names who is
+    //    actually on the job THAT day (a per-day reassignment); fall back to
+    //    job_orders.assigned_to when no ledger row exists. Ledger rows are
+    //    1:1 per (job, date) — an operator with several jobs today simply
+    //    appears in several rows (sequenced via day_sequence).
+    //    Scoped by the tenant-scoped job ids (legacy ledger rows can carry
+    //    tenant_id NULL, so an .eq tenant filter could miss them).
+    const ledgerByJob = new Map<string, { operator_id: string | null; helper_id: string | null }>();
+    try {
+      const { data: ledgerRows } = await supabaseAdmin
+        .from('job_daily_assignments')
+        .select('job_order_id, operator_id, helper_id')
+        .eq('assignment_date', date)
+        .in('job_order_id', jobIds);
+      for (const r of ledgerRows || []) {
+        ledgerByJob.set(r.job_order_id, { operator_id: r.operator_id ?? null, helper_id: r.helper_id ?? null });
+      }
+    } catch { /* best-effort — fall back to assigned_to below */ }
+
     const formattedDate = new Date(date + 'T12:00:00').toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
@@ -98,10 +118,15 @@ export async function POST(request: NextRequest) {
     }[] = [];
 
     for (const job of jobs) {
-      if (job.assigned_to) {
+      // Per-day ledger row wins (incl. an explicit unassign for the day —
+      // operator_id NULL means nobody runs it that day, so notify nobody).
+      const ledger = ledgerByJob.get(job.id);
+      const dayOperator = ledger ? ledger.operator_id : job.assigned_to;
+      const dayHelper = ledger ? ledger.helper_id : job.helper_assigned_to;
+      if (dayOperator) {
         // schedule_updated notification
         notifications.push({
-          recipient_id: job.assigned_to,
+          recipient_id: dayOperator,
           job_order_id: job.id,
           type: 'schedule_updated',
           title: notificationTitle,
@@ -110,7 +135,7 @@ export async function POST(request: NextRequest) {
         });
         // Also insert a dispatched-type notification so per-day dispatch status is tracked
         notifications.push({
-          recipient_id: job.assigned_to,
+          recipient_id: dayOperator,
           job_order_id: job.id,
           type: 'dispatched',
           title: 'Job Ticket Updated',
@@ -118,9 +143,9 @@ export async function POST(request: NextRequest) {
           metadata: { date, formatted_date: formattedDate, job_number: job.job_number, dispatch_date: date, via_update_schedule: true },
         });
       }
-      if (job.helper_assigned_to) {
+      if (dayHelper) {
         notifications.push({
-          recipient_id: job.helper_assigned_to,
+          recipient_id: dayHelper,
           job_order_id: job.id,
           type: 'schedule_updated',
           title: notificationTitle,
@@ -128,7 +153,7 @@ export async function POST(request: NextRequest) {
           metadata: { date, formatted_date: formattedDate, job_number: job.job_number, dispatch_date: date, is_helper: true },
         });
         notifications.push({
-          recipient_id: job.helper_assigned_to,
+          recipient_id: dayHelper,
           job_order_id: job.id,
           type: 'dispatched',
           title: 'Job Ticket Updated',

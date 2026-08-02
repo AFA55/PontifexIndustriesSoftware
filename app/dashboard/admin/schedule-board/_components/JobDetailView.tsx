@@ -25,6 +25,10 @@ interface JobDetailViewProps {
   helperName?: string | null;
   rowIndex: number | null;
   userRole?: string;
+  /** The board's currently-viewed date — anchors "Change operator…" writes. */
+  boardDate?: string;
+  /** Whether the viewer may reassign operators (board canEdit). */
+  canReassign?: boolean;
   onClose: () => void;
   onEdit: () => void;
   onRemove?: () => void;
@@ -187,7 +191,7 @@ function StatusTimeline({ data }: { data: FullJobData }) {
   );
 }
 
-export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, onClose, onEdit, onRemove, onSaved }: JobDetailViewProps) {
+export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, boardDate, canReassign, onClose, onEdit, onRemove, onSaved }: JobDetailViewProps) {
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
   const [printingPdf, setPrintingPdf] = useState(false);
@@ -218,6 +222,85 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
   const [editFields, setEditFields] = useState<Record<string, any>>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // "Change operator…" inline picker state (goes through /assign — the same
+  // write path as every other reassignment, so per-day ledger + notifications
+  // + sequencing all apply).
+  const [showOpPicker, setShowOpPicker] = useState(false);
+  const [opOptions, setOpOptions] = useState<{ id: string; name: string }[]>([]);
+  const [opOptionsLoading, setOpOptionsLoading] = useState(false);
+  const [pickedOperatorId, setPickedOperatorId] = useState('');
+  const [pickScope, setPickScope] = useState<'day' | 'remaining'>('remaining');
+  const [pickPosition, setPickPosition] = useState<'first' | 'last'>('last');
+  const [reassignSaving, setReassignSaving] = useState(false);
+  const [reassignError, setReassignError] = useState<string | null>(null);
+  const [reassignDone, setReassignDone] = useState<string | null>(null);
+
+  const openOpPicker = async () => {
+    setShowOpPicker(true);
+    setReassignError(null);
+    setReassignDone(null);
+    if (opOptions.length > 0 || opOptionsLoading) return;
+    setOpOptionsLoading(true);
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/admin/schedule-board/operators', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setOpOptions((json.data?.operators || []).map((o: any) => ({ id: o.id, name: o.name })));
+      }
+    } catch { /* picker shows empty list */ } finally {
+      setOpOptionsLoading(false);
+    }
+  };
+
+  const handleReassignOperator = async () => {
+    if (!pickedOperatorId) return;
+    setReassignSaving(true);
+    setReassignError(null);
+    try {
+      const token = await getToken();
+      // Anchor on the board's viewed date when the job spans it; otherwise the
+      // job's start date. Single-day jobs always use 'remaining' (same thing).
+      const sched = fullData?.scheduled_date || job.scheduled_date || '';
+      const end = fullData?.end_date || job.end_date || null;
+      const multiDay = !!end && end !== sched;
+      const anchor = boardDate && sched && boardDate >= sched && boardDate <= (end || sched) ? boardDate : sched;
+      const res = await fetch('/api/admin/schedule-board/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          jobOrderId: job.id,
+          operatorId: pickedOperatorId,
+          helperId: (fullData?.helper_assigned_to as string) ?? null, // keep the current helper
+          assignment_date: anchor,
+          scope: multiDay ? pickScope : 'remaining',
+          position: pickPosition,
+        }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) {
+        setReassignError(json?.details || json?.error || 'Could not change operator.');
+        return;
+      }
+      const newName = opOptions.find(o => o.id === pickedOperatorId)?.name || 'new operator';
+      const seq = json?.data?.day_sequence;
+      const count = json?.data?.operator_day_job_count;
+      setReassignDone(
+        `Operator changed to ${newName}${count > 1 && seq ? ` — their #${seq} job that day (runs after the earlier one)` : ''}.`
+      );
+      setFullData(prev => (prev ? { ...prev, operator_name: newName, assigned_to: pickedOperatorId } : prev));
+      setShowOpPicker(false);
+      setPickedOperatorId('');
+      onSaved?.();
+    } catch {
+      setReassignError('Could not change operator.');
+    } finally {
+      setReassignSaving(false);
+    }
+  };
 
   const toggleSection = (key: string) => {
     setExpandedSections(prev => ({ ...prev, [key]: !prev[key] }));
@@ -760,10 +843,112 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                           <FieldRow label="Arrival Time" value={formatTime(d?.arrival_time || job.arrival_time) || '--'} bold />
                         </>
                       )}
-                      <FieldRow label="Operator" value={d?.operator_name || operatorName || 'Unassigned'} bold />
+                      <div className="flex items-baseline gap-2 flex-wrap">
+                        <FieldRow label="Operator" value={d?.operator_name || operatorName || 'Unassigned'} bold />
+                        {canReassign && !isEditing && (
+                          <button
+                            onClick={() => (showOpPicker ? setShowOpPicker(false) : openOpPicker())}
+                            className="inline-flex items-center gap-1 min-h-[44px] px-3 rounded-lg text-xs font-bold text-brand dark:text-brand bg-brand/5 dark:bg-brand/15 hover:bg-brand/10 dark:hover:bg-brand/25 border border-brand/30 transition-colors"
+                          >
+                            <UserCog className="w-3.5 h-3.5" />
+                            Change operator…
+                          </button>
+                        )}
+                      </div>
                       <FieldRow label="Helper" value={d?.helper_name || helperName || 'None'} />
                       {job.day_label && <FieldRow label="Multi-Day" value={job.day_label} />}
                     </div>
+
+                    {/* Reassign result banners */}
+                    {reassignDone && (
+                      <p className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-400">{reassignDone}</p>
+                    )}
+                    {reassignError && !showOpPicker && (
+                      <p className="mt-2 text-xs font-semibold text-rose-600 dark:text-rose-400">{reassignError}</p>
+                    )}
+
+                    {/* Inline change-operator picker — writes via /assign so the
+                        per-day ledger, sequencing + notifications all apply */}
+                    {showOpPicker && (
+                      <div className="mt-3 p-3 rounded-xl border-2 border-brand/30 bg-brand/5 dark:bg-white/5 space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase mb-1">New operator</label>
+                          <select
+                            value={pickedOperatorId}
+                            onChange={(e) => setPickedOperatorId(e.target.value)}
+                            className="w-full min-h-[44px] px-3 py-2 rounded-lg border border-gray-300 dark:border-white/10 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                          >
+                            <option value="">{opOptionsLoading ? 'Loading operators…' : 'Select operator…'}</option>
+                            {opOptions.map((o) => (
+                              <option key={o.id} value={o.id}>{o.name}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Multi-day jobs: this day only vs this + remaining days */}
+                        {!!(d?.end_date && d.end_date !== d.scheduled_date) && (
+                          <div className="flex flex-col gap-1.5">
+                            <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase">Applies to</span>
+                            {([
+                              { v: 'remaining', label: 'This and remaining days' },
+                              { v: 'day', label: 'This day only' },
+                            ] as const).map((opt) => (
+                              <label key={opt.v} className="flex items-center gap-2 min-h-[44px] px-2 rounded-lg cursor-pointer hover:bg-white/60 dark:hover:bg-white/5">
+                                <input
+                                  type="radio"
+                                  name="reassign-scope"
+                                  checked={pickScope === opt.v}
+                                  onChange={() => setPickScope(opt.v)}
+                                  className="accent-[var(--brand,#7C3AED)]"
+                                />
+                                <span className="text-sm text-gray-800 dark:text-slate-200 font-medium">{opt.label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Order within the operator's day (2+ jobs sequence) */}
+                        <div className="flex flex-col gap-1.5">
+                          <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase">If they already have a job that day</span>
+                          {([
+                            { v: 'last', label: 'Add as their next job (runs after the earlier one)' },
+                            { v: 'first', label: 'Make this their first job of the day' },
+                          ] as const).map((opt) => (
+                            <label key={opt.v} className="flex items-center gap-2 min-h-[44px] px-2 rounded-lg cursor-pointer hover:bg-white/60 dark:hover:bg-white/5">
+                              <input
+                                type="radio"
+                                name="reassign-position"
+                                checked={pickPosition === opt.v}
+                                onChange={() => setPickPosition(opt.v)}
+                                className="accent-[var(--brand,#7C3AED)]"
+                              />
+                              <span className="text-sm text-gray-800 dark:text-slate-200 font-medium">{opt.label}</span>
+                            </label>
+                          ))}
+                        </div>
+
+                        {reassignError && (
+                          <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">{reassignError}</p>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleReassignOperator}
+                            disabled={!pickedOperatorId || reassignSaving}
+                            className="flex-1 min-h-[44px] px-4 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {reassignSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCog className="w-4 h-4" />}
+                            Change Operator
+                          </button>
+                          <button
+                            onClick={() => { setShowOpPicker(false); setReassignError(null); }}
+                            className="min-h-[44px] px-4 rounded-xl bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 text-gray-700 dark:text-white text-sm font-bold transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </SectionCard>
 
                   {/* ---- Crew (additional operators beyond the lead) ---- */}

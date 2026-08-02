@@ -75,6 +75,11 @@ export function toJobCard(job: any, viewDate?: string): JobCardData {
     helper_names: job.helper_name ? [job.helper_name] : [],
     po_number: job.po_number || null,
     day_label: computeDayLabel(job, viewDate),
+    // Same-day sequencing (from the board GET's per-day-ledger overlay)
+    day_sequence: job.day_sequence ?? null,
+    operator_day_job_count: job.operator_day_job_count ?? null,
+    // Current lead (post-overlay) — keep-operator source for helper-only edits
+    assigned_to: job.assigned_to ?? null,
     status: job.status || null,
     // Live operator-progress timestamps (already in job_orders select('*'))
     in_route_at: job.in_route_at ?? null,

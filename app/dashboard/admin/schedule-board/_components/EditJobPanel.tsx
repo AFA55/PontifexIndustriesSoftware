@@ -432,7 +432,7 @@ export default function EditJobPanel({
                 <button
                   onClick={() => setShowDuplicate(!showDuplicate)}
                   className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-white/20 rounded-xl transition-colors text-sm font-semibold"
-                  title="Duplicate this job — copy it to assign a second operator (or to a new date). The copy is created unassigned so you can pick a different operator."
+                  title="Duplicate this job — create a copy for a return trip or additional scope on another date. (To change WHO runs this job, just change the Operator below — no duplicate needed.)"
                 >
                   <Copy className="w-5 h-5" />
                   <span className="hidden sm:inline">Duplicate</span>
@@ -459,7 +459,7 @@ export default function EditJobPanel({
             <Copy className="w-4 h-4 text-blue-600 flex-shrink-0" />
             <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">Duplicate this job</span>
             <span className="text-xs text-blue-600 dark:text-blue-400 basis-full sm:basis-auto">
-              Creates an unassigned copy — assign it to a different operator for the same job. Pick a date:
+              Creates an unassigned copy for a return trip or added scope. (Wrong operator? Change it below instead.) Pick a date:
             </span>
             <input type="date" value={dupDate} onChange={e => setDupDate(e.target.value)}
               className="px-3 py-1.5 border border-blue-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05]" />

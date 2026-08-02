@@ -130,8 +130,11 @@ export default function MyJobsPage() {
           // the list to jobs the user is on, incl. job_crew, and set
           // viewer_is_helper — so keep every returned row, don't re-filter it out).
           const uidRef = uid;
+          // viewer_is_daily = the per-day assignment ledger maps this user to
+          // the job for this date (e.g. day-2 operator of a multi-day job
+          // before assigned_to syncs over) — keep those rows too.
           const onCrew = (j: any) =>
-            j.assigned_to === uidRef || j.helper_assigned_to === uidRef || j.viewer_is_helper === true;
+            j.assigned_to === uidRef || j.helper_assigned_to === uidRef || j.viewer_is_helper === true || j.viewer_is_daily === true;
           const visible = ((json.data || []) as any[]).filter(onCrew);
 
           const enriched = visible.map((j: any) => ({
@@ -424,6 +427,33 @@ export default function MyJobsPage() {
   // Backstop for missed Realtime events; not the primary refresh path.
   useVisiblePoll(() => fetchJobs(selectedDate), { intervalMs: 180_000 });
 
+  // ── Same-day sequencing (Aug 2026): an operator can hold 2+ jobs a day,
+  // ordered by day_sequence (from the per-day assignment ledger). The list
+  // sorts by sequence; a later job renders visually LOCKED until the earlier
+  // one is done for the day (server enforces via a 403 sequence_block on the
+  // status route — this is the matching UI affordance).
+  const isDoneForDay = (j: any) =>
+    j.status === 'completed' || !!j.work_completed_at || !!doneTodayMap[j.id];
+  const mySequencedJobs = jobs
+    .filter((j: any) => j.assigned_to === userId && j.day_sequence != null)
+    .sort((a: any, b: any) => (a.day_sequence ?? 1) - (b.day_sequence ?? 1));
+  const showSequence = mySequencedJobs.length > 1;
+  const firstIncompleteSeqJob = showSequence
+    ? mySequencedJobs.find((j: any) => !isDoneForDay(j)) || null
+    : null;
+  const sequenceLockFor = (j: any) =>
+    showSequence &&
+    firstIncompleteSeqJob &&
+    selectedDate === toDateString(new Date()) &&
+    j.assigned_to === userId &&
+    j.day_sequence != null &&
+    (j.day_sequence ?? 1) > (firstIncompleteSeqJob.day_sequence ?? 1)
+      ? firstIncompleteSeqJob
+      : null;
+  const sortedJobs = showSequence
+    ? [...jobs].sort((a: any, b: any) => (a.day_sequence ?? 99) - (b.day_sequence ?? 99))
+    : jobs;
+
   if (loading && jobs.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center">
@@ -613,9 +643,32 @@ export default function MyJobsPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {jobs.map((job) => (
-              <JobTicketCard key={job.id} job={job} doneToday={!!doneTodayMap[job.id]} />
-            ))}
+            {sortedJobs.map((job: any) => {
+              const lockedBy = sequenceLockFor(job);
+              const showSeqBadge = showSequence && job.assigned_to === userId && job.day_sequence != null;
+              return (
+                <div key={job.id}>
+                  {showSeqBadge && (
+                    <div className="flex items-center gap-2 mb-1.5 px-1">
+                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-500/40">
+                        Job #{job.day_sequence} of your day
+                      </span>
+                      {lockedBy && (
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/70 border border-slate-300 dark:border-white/20">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                          </svg>
+                          Complete {lockedBy.job_number} first
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  <div className={lockedBy ? 'opacity-60 saturate-50' : ''}>
+                    <JobTicketCard job={job} doneToday={!!doneTodayMap[job.id]} />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

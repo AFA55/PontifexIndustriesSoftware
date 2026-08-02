@@ -92,6 +92,55 @@ export async function GET(request: NextRequest) {
         if (r.role === 'helper') crewHelperJobIds.add(r.job_order_id);
       }
     }
+
+    // Tenant-local "today" for per-day assignment (JDA) visibility windows.
+    let tenantToday = '';
+    if (!isAdmin) {
+      let tz = 'America/New_York';
+      try {
+        if (tenantId) {
+          const { data: tzRow } = await supabaseAdmin
+            .from('tenants')
+            .select('timezone')
+            .eq('id', tenantId)
+            .maybeSingle();
+          if (tzRow?.timezone) tz = tzRow.timezone;
+        }
+      } catch { /* fall back */ }
+      tenantToday = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+    }
+
+    // Per-day assignment (job_daily_assignments) visibility: a non-admin also
+    // sees jobs where the per-day ledger maps them (operator OR helper) to the
+    // requested date or ANY date from today forward — e.g. the "day-2 operator"
+    // of a multi-day job, before the morning sync promotes them to assigned_to.
+    // Scoped by the user's own id (a uid belongs to exactly one tenant; legacy
+    // ledger rows can carry tenant_id NULL, so an .eq tenant filter would drop
+    // them). day_sequence rides along for the operator-side sequencing UI.
+    const jdaUserJobIds: string[] = [];
+    const jdaUserJobIdSet = new Set<string>();
+    if (!isAdmin) {
+      try {
+        let jdaQuery = supabaseAdmin
+          .from('job_daily_assignments')
+          .select('job_order_id, assignment_date, operator_id, helper_id')
+          .or(`operator_id.eq.${user.id},helper_id.eq.${user.id}`);
+        // Window: today forward, plus the explicitly requested date (which may
+        // be in the past — the operator reviewing an earlier day they ran).
+        jdaQuery =
+          scheduledDate && scheduledDate < tenantToday
+            ? jdaQuery.or(`assignment_date.gte.${tenantToday},assignment_date.eq.${scheduledDate}`)
+            : jdaQuery.gte('assignment_date', tenantToday);
+        const { data: jdaRows } = await jdaQuery;
+        for (const r of jdaRows || []) {
+          if (!jdaUserJobIdSet.has(r.job_order_id)) {
+            jdaUserJobIdSet.add(r.job_order_id);
+            jdaUserJobIds.push(r.job_order_id);
+          }
+        }
+      } catch { /* best-effort — falls back to assigned_to visibility */ }
+    }
+
     // Helper detection for a job the current non-admin user is viewing.
     const viewerIsHelper = (j: any): boolean =>
       !isAdmin && j.assigned_to !== user.id &&
@@ -121,12 +170,26 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // Check if user has access to this job (operator OR helper OR crew member)
+      // Check if user has access to this job (operator OR helper OR crew
+      // member OR mapped to it by the per-day assignment ledger — e.g. the
+      // day-2 operator of a multi-day job, or any date they ran it).
+      let hasJdaAccess = jdaUserJobIdSet.has(specificJob.id);
+      if (!isAdmin && !hasJdaAccess) {
+        const { data: anyJdaRow } = await supabaseAdmin
+          .from('job_daily_assignments')
+          .select('id')
+          .eq('job_order_id', specificJob.id)
+          .or(`operator_id.eq.${user.id},helper_id.eq.${user.id}`)
+          .limit(1)
+          .maybeSingle();
+        hasJdaAccess = !!anyJdaRow;
+      }
       if (
         !isAdmin &&
         specificJob.assigned_to !== user.id &&
         specificJob.helper_assigned_to !== user.id &&
-        !crewJobIds.includes(specificJob.id)
+        !crewJobIds.includes(specificJob.id) &&
+        !hasJdaAccess
       ) {
         return NextResponse.json(
           { error: 'Unauthorized to view this job' },
@@ -191,11 +254,17 @@ export async function GET(request: NextRequest) {
     if (!isAdmin) {
       if (includeHelperJobs) {
         // assigned_to = uid OR helper_assigned_to = uid OR crewed on the job
+        // OR mapped by the per-day ledger (today-forward / requested date)
         const ors = [`assigned_to.eq.${user.id}`, `helper_assigned_to.eq.${user.id}`];
         if (crewJobIds.length) ors.push(`id.in.(${crewJobIds.join(',')})`);
+        if (jdaUserJobIds.length) ors.push(`id.in.(${jdaUserJobIds.join(',')})`);
         query = query.or(ors.join(','));
       } else {
-        query = query.eq('assigned_to', user.id);
+        // Even without helper jobs, the per-day ledger can make this user the
+        // operator of a day they aren't assigned_to on yet (day-2 operator).
+        const ors = [`assigned_to.eq.${user.id}`];
+        if (jdaUserJobIds.length) ors.push(`id.in.(${jdaUserJobIds.join(',')})`);
+        query = query.or(ors.join(','));
       }
       // Operators only see DISPATCHED tickets — no peeking at tomorrow's work
       // until it's dispatched (founder). BUT always show a job that is actively
@@ -240,38 +309,115 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // For non-admin users viewing a specific date: respect job_daily_assignments.
-    // The schedule board can override which operator is on a job for a given day
-    // (e.g., reassigning or unassigning a multi-day job). If such an override exists
-    // and the current user is NOT the assigned operator for that day, exclude the job
-    // so the operator's view stays in sync with what the schedule board shows.
+    // ── Per-day ledger filtering (non-admin) ──────────────────────────────
+    // VISIBILITY MATRIX (my-jobs is a WORK QUEUE, not a history view):
+    //   Date-scoped query (scheduled_date=D):
+    //     • ledger row for (job, D) exists → show only if it names THIS user
+    //       (operator_id OR helper_id) or the user is job_crew.
+    //     • no ledger row → base slots apply (assigned_to / helper slot / crew).
+    //   Non-date query (status lists, lookahead ranges):
+    //     • user in a slot other than assigned_to (helper/crew) → keep.
+    //     • user in ANY today-forward ledger row for the job → keep.
+    //     • user is assigned_to: keep UNLESS every remaining day (today →
+    //       end of span) has a ledger row naming someone else — the
+    //       "old-operator ghost": they were fully reassigned going forward,
+    //       so the job leaves their queue. Days without a ledger row still
+    //       belong to assigned_to, so one uncovered day keeps it visible.
+    //     • jobs whose span is entirely in the past keep base-slot rules
+    //       (unfinished past tickets must stay visible for late completion).
     let filteredOrders = jobOrders || [];
     if (!isAdmin && scheduledDate && filteredOrders.length > 0) {
       const jobIds = filteredOrders.map((j: any) => j.id);
       const { data: dailyAssignments } = await supabaseAdmin
         .from('job_daily_assignments')
-        .select('job_order_id, operator_id')
+        .select('job_order_id, operator_id, helper_id, day_sequence')
         .eq('assignment_date', scheduledDate)
         .in('job_order_id', jobIds);
 
       if (dailyAssignments && dailyAssignments.length > 0) {
-        const dailyMap = new Map(dailyAssignments.map((a: any) => [a.job_order_id, a.operator_id]));
+        const dailyMap = new Map(dailyAssignments.map((a: any) => [a.job_order_id, a]));
         filteredOrders = filteredOrders.filter((j: any) => {
-          const dailyOperator = dailyMap.get(j.id);
+          const dayRow = dailyMap.get(j.id);
           // If no daily override exists, fall through (base assignment applies)
-          if (dailyOperator === undefined) return true;
+          if (dayRow === undefined) return true;
           // A crew helper stays on the job regardless of the operator daily override.
           if (crewJobIds.includes(j.id)) return true;
-          // Daily override exists — only show this job if the override assigns it to THIS user
-          return dailyOperator === user.id;
+          // Daily override exists — show only if it names THIS user (either seat)
+          return dayRow.operator_id === user.id || dayRow.helper_id === user.id;
         });
+        // Attach the day's sequence so the client can render 1st/2nd badges
+        // and lock job #2 until job #1 is done (sequencing, Aug 2026).
+        for (const j of filteredOrders) {
+          const dayRow = dailyMap.get(j.id);
+          if (dayRow) (j as any).day_sequence = dayRow.day_sequence ?? 1;
+        }
       }
     }
 
+    // Old-operator ghost filter for status/range queries (no scheduled_date).
+    if (!isAdmin && !scheduledDate && filteredOrders.length > 0) {
+      try {
+        const candidateIds = filteredOrders
+          .filter(
+            (j: any) =>
+              j.assigned_to === user.id &&
+              j.helper_assigned_to !== user.id &&
+              !crewJobIds.includes(j.id) &&
+              !jdaUserJobIdSet.has(j.id)
+          )
+          .map((j: any) => j.id);
+
+        if (candidateIds.length > 0) {
+          const { data: futureRows } = await supabaseAdmin
+            .from('job_daily_assignments')
+            .select('job_order_id, assignment_date, operator_id, helper_id')
+            .gte('assignment_date', tenantToday)
+            .in('job_order_id', candidateIds);
+
+          const rowsByJob = new Map<string, Map<string, { operator_id: string | null; helper_id: string | null }>>();
+          for (const r of futureRows || []) {
+            const m = rowsByJob.get(r.job_order_id) || new Map();
+            m.set(r.assignment_date, { operator_id: r.operator_id ?? null, helper_id: r.helper_id ?? null });
+            rowsByJob.set(r.job_order_id, m);
+          }
+
+          filteredOrders = filteredOrders.filter((j: any) => {
+            if (!candidateIds.includes(j.id)) return true;
+            const jobRows = rowsByJob.get(j.id);
+            if (!jobRows || jobRows.size === 0) return true; // no overrides → theirs
+            // Remaining days of the job's span, today forward.
+            const spanEnd = j.end_date || j.scheduled_date;
+            if (!j.scheduled_date || !spanEnd || spanEnd < tenantToday) return true; // fully past → keep
+            const start = j.scheduled_date > tenantToday ? j.scheduled_date : tenantToday;
+            const remaining: string[] = [];
+            const cur = new Date(start + 'T00:00:00');
+            const end = new Date(spanEnd + 'T00:00:00');
+            while (cur <= end) {
+              remaining.push(
+                `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, '0')}-${String(cur.getDate()).padStart(2, '0')}`
+              );
+              cur.setDate(cur.getDate() + 1);
+            }
+            if (remaining.length === 0) return true;
+            // Ghost only when EVERY remaining day is ledgered to someone else.
+            return !remaining.every((d) => {
+              const row = jobRows.get(d);
+              return row !== undefined && row.operator_id !== user.id && row.helper_id !== user.id;
+            });
+          });
+        }
+      } catch { /* best-effort — never hide work on an unexpected error */ }
+    }
+
     // Annotate helper-view flag per job so the client shows the light view for
-    // crew members (not just the helper_assigned_to slot).
+    // crew members (not just the helper_assigned_to slot). viewer_is_daily
+    // marks rows the user sees via the per-day ledger only (day-2 operator) —
+    // the my-jobs client keeps those instead of re-filtering them out.
     if (!isAdmin) {
-      for (const j of filteredOrders) (j as any).viewer_is_helper = viewerIsHelper(j);
+      for (const j of filteredOrders) {
+        (j as any).viewer_is_helper = viewerIsHelper(j);
+        if (jdaUserJobIdSet.has(j.id)) (j as any).viewer_is_daily = true;
+      }
     }
 
     // Operators/helpers must not see office-only money & estimate fields

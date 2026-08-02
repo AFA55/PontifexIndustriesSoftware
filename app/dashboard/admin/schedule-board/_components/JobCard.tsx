@@ -23,6 +23,14 @@ export interface JobCardData {
   helper_names: string[];
   po_number: string | null;
   day_label?: string; // e.g. "Day 2 of 5"
+  // Same-day sequencing (Aug 2026): this job's position within its operator's
+  // day + how many jobs that operator holds this day. Badge shows when > 1.
+  day_sequence?: number | null;
+  operator_day_job_count?: number | null;
+  // Current lead (job_orders.assigned_to, after the board's per-day overlay).
+  // Used to derive "keep this operator" on helper-only edits — NEVER derive
+  // that from board-row state (guardian B3).
+  assigned_to?: string | null;
   status?: string;
   loading_started_at?: string | null;
   route_started_at?: string | null;
@@ -85,6 +93,16 @@ export function jobLiveStatus(
   }
   // Scheduled (not yet dispatched) — no badge
   return null;
+}
+
+/** "1st" / "2nd" / "3rd" / "4th" … for the same-day sequence badge. */
+export function ordinalLabel(n: number): string {
+  const rem10 = n % 10;
+  const rem100 = n % 100;
+  if (rem10 === 1 && rem100 !== 11) return `${n}st`;
+  if (rem10 === 2 && rem100 !== 12) return `${n}nd`;
+  if (rem10 === 3 && rem100 !== 13) return `${n}rd`;
+  return `${n}th`;
 }
 
 function getStatusColor(job: JobCardData): { border: string; dot: string; bg: string } {
@@ -221,6 +239,15 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
               {job.day_label && (
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-blue-100 dark:bg-blue-500/20 text-blue-700 dark:text-blue-400">
                   {job.day_label}
+                </span>
+              )}
+              {/* Sequence badge — operator has 2+ jobs this day (Aug 2026) */}
+              {(job.operator_day_job_count ?? 1) > 1 && (
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-300 border border-violet-300 dark:border-violet-500/40"
+                  title={`This operator's job #${job.day_sequence ?? 1} of ${job.operator_day_job_count} this day — later jobs start after earlier ones are completed`}
+                >
+                  {ordinalLabel(job.day_sequence ?? 1)} job
                 </span>
               )}
             </div>

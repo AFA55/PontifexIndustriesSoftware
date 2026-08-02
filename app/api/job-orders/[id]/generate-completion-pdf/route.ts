@@ -62,10 +62,65 @@ export async function POST(
     }
 
     // ── Fetch operator & helper names ───────────────────────────────────────
+    // Operator attribution comes from the daily-log ledger, NOT just the
+    // current assigned_to: on a reassigned multi-day job the PDF must credit
+    // everyone who actually worked it ("Aiden (Day 1), Zack (Day 2)"), not
+    // whoever happens to hold assigned_to at completion time. Falls back to
+    // assigned_to when there are no logs. (daily_job_logs has no tenant_id
+    // column — the job row above is already tenant-verified, and we scope by
+    // its id.)
     let operatorName = '';
     let helperName = '';
 
-    if (job.assigned_to) {
+    try {
+      const { data: logRows } = await supabaseAdmin
+        .from('daily_job_logs')
+        .select('operator_id, log_date')
+        .eq('job_order_id', jobId)
+        .order('log_date', { ascending: true });
+
+      const logs = (logRows || []).filter((l: any) => l.operator_id);
+      if (logs.length > 0) {
+        // Day numbers = position of the calendar date within the job's logged days.
+        const distinctDates = Array.from(new Set(logs.map((l: any) => String(l.log_date)))).sort();
+        const dayNumber = new Map(distinctDates.map((d, i) => [d, i + 1]));
+
+        // Distinct operators in first-worked order, excluding the helper slot
+        // (helpers log days too on crew jobs — their credit stays on the
+        // helper line below).
+        const operatorDays = new Map<string, number[]>();
+        for (const l of logs) {
+          if (l.operator_id === job.helper_assigned_to) continue;
+          const days = operatorDays.get(l.operator_id) || [];
+          const n = dayNumber.get(String(l.log_date))!;
+          if (!days.includes(n)) days.push(n);
+          operatorDays.set(l.operator_id, days);
+        }
+
+        if (operatorDays.size > 0) {
+          const ids = Array.from(operatorDays.keys());
+          const { data: profiles } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', ids);
+          const nameById = new Map((profiles || []).map((p: any) => [p.id, p.full_name || 'Operator']));
+          operatorName =
+            operatorDays.size === 1
+              ? nameById.get(ids[0]) || ''
+              : ids
+                  .map((id) => {
+                    const days = (operatorDays.get(id) || []).sort((a, b) => a - b);
+                    return `${nameById.get(id) || 'Operator'} (Day ${days.join(', Day ')})`;
+                  })
+                  .join(', ');
+        }
+      }
+    } catch (attrErr) {
+      // Attribution is best-effort — fall through to assigned_to below.
+      console.warn('completion PDF operator attribution failed:', attrErr);
+    }
+
+    if (!operatorName && job.assigned_to) {
       const { data: opProfile } = await supabaseAdmin
         .from('profiles')
         .select('full_name')

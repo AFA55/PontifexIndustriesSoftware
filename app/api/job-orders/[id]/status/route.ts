@@ -11,6 +11,7 @@ import { getTenantId } from '@/lib/get-tenant-id';
 import { notifySalesperson } from '@/lib/notify-salesperson';
 import { notifyCustomer } from '@/lib/notify-customer';
 import { isValidTransition, validateTransitionTimestamp } from '@/lib/job-status';
+import { sequenceBlocks } from '@/lib/reassign';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -147,14 +148,11 @@ async function updateJobStatus(
       );
     }
 
-    // ── Overdue-ticket gate (founder Jul 21): an operator may NOT start a
-    // NEW job while a ticket from a previous day is still unfinished — they
-    // complete it first (late completion books to its scheduled day), THEN
-    // start today's. The morning clock-in modal points them there; this is
-    // the server-side enforcement so the order can't be skipped.
-    if (status === 'in_route' && isAssignedOperator && !isAdmin) {
+    // Tenant-local "today" — used by the overdue-ticket gate and the
+    // same-day sequence gate below.
+    let tenantTz = 'America/New_York';
+    if (!isAdmin && (status === 'in_route' || status === 'in_progress')) {
       try {
-        let tenantTz = 'America/New_York';
         if (existingJob.tenant_id) {
           const { data: tzRow } = await supabaseAdmin
             .from('tenants')
@@ -163,7 +161,18 @@ async function updateJobStatus(
             .maybeSingle();
           if (tzRow?.timezone) tenantTz = tzRow.timezone;
         }
-        const today = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
+      } catch { /* fall back */ }
+    }
+    const tenantToday = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
+
+    // ── Overdue-ticket gate (founder Jul 21): an operator may NOT start a
+    // NEW job while a ticket from a previous day is still unfinished — they
+    // complete it first (late completion books to its scheduled day), THEN
+    // start today's. The morning clock-in modal points them there; this is
+    // the server-side enforcement so the order can't be skipped.
+    if (status === 'in_route' && isAssignedOperator && !isAdmin) {
+      try {
+        const today = tenantToday;
         const { data: overdueCandidates } = await supabaseAdmin
           .from('job_orders')
           .select('id, job_number, customer_name, scheduled_date, end_date')
@@ -194,6 +203,81 @@ async function updateJobStatus(
         }
       } catch {
         // Gate fails OPEN on unexpected errors — never strand a live crew.
+      }
+    }
+
+    // ── Same-day SEQUENCE gate (founder Aug 2: multiple jobs per operator
+    // per day, sequenced). If today's per-day ledger gives this operator a
+    // LOWER-sequence job that isn't finished for the day yet, they cannot
+    // start this one (in_route / in_progress). What blocks is decided by
+    // lib/reassign.sequenceBlocks: NOT blocked by completed/cancelled jobs,
+    // jobs parked on_hold, jobs with a day-completed daily log today, or
+    // stale ledger rows whose job was moved off today. No ledger rows for
+    // this job today → no gate.
+    // Fails OPEN on unexpected errors — never strand a live crew.
+    if ((status === 'in_route' || status === 'in_progress') && isAssignedOperator && !isAdmin) {
+      try {
+        const { data: myTodayRows } = await supabaseAdmin
+          .from('job_daily_assignments')
+          .select('job_order_id, day_sequence')
+          .eq('operator_id', user.id)
+          .eq('assignment_date', tenantToday);
+
+        const rows = myTodayRows || [];
+        const mine = rows.find((r: any) => r.job_order_id === jobId);
+        const lowerRows = mine
+          ? rows.filter((r: any) => r.job_order_id !== jobId && (r.day_sequence ?? 1) < (mine.day_sequence ?? 1))
+          : [];
+
+        if (mine && lowerRows.length > 0) {
+          const lowerIds = lowerRows.map((r: any) => r.job_order_id);
+          const [lowerJobsRes, doneLogsRes] = await Promise.all([
+            supabaseAdmin
+              .from('job_orders')
+              // scheduled_date/end_date: a job MOVED to another date can leave
+              // a stale ledger row for today — sequenceBlocks skips jobs whose
+              // window no longer covers today (guardian B4).
+              .select('id, job_number, customer_name, status, work_completed_at, scheduled_date, end_date')
+              .in('id', lowerIds)
+              .eq('tenant_id', existingJob.tenant_id || ''),
+            supabaseAdmin
+              .from('daily_job_logs')
+              .select('job_order_id')
+              .in('job_order_id', lowerIds)
+              .eq('log_date', tenantToday)
+              .not('day_completed_at', 'is', null),
+          ]);
+          // Fail OPEN if EITHER query errored — a failed done-log lookup must
+          // not make a day-completed job look unfinished (guardian NIT1).
+          if (lowerJobsRes.error || doneLogsRes.error) {
+            console.warn(
+              '[job-status] sequence gate lookup failed — failing open:',
+              lowerJobsRes.error?.message || doneLogsRes.error?.message
+            );
+            throw new Error('sequence gate lookup failed');
+          }
+          const doneToday = new Set((doneLogsRes.data || []).map((l: any) => l.job_order_id));
+          const blocking = (lowerJobsRes.data || []).find((j: any) =>
+            sequenceBlocks(j, doneToday.has(j.id), tenantToday)
+          );
+          if (blocking) {
+            const seq = rows.find((r: any) => r.job_order_id === blocking.id)?.day_sequence ?? 1;
+            return NextResponse.json(
+              {
+                error: `Complete ${blocking.job_number} (${blocking.customer_name}) first — it's your #${seq} job today. This one starts after it's done.`,
+                block_type: 'sequence_block',
+                first_job: {
+                  id: blocking.id,
+                  job_number: blocking.job_number,
+                  customer_name: blocking.customer_name,
+                },
+              },
+              { status: 403 }
+            );
+          }
+        }
+      } catch {
+        // Gate fails OPEN — sequencing must never strand a live crew.
       }
     }
 

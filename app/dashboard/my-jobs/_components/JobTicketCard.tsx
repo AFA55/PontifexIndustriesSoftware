@@ -63,6 +63,12 @@ export interface JobTicketData {
   scope_of_work?: string | null;
   // isHelper indicates the current user is the helper, not the operator
   isHelper?: boolean;
+  // Same-day sequencing (Aug 2026): this job's position within the viewer's
+  // day (from job_daily_assignments.day_sequence) — job #2 is locked until
+  // job #1 is done for the day.
+  day_sequence?: number | null;
+  // Visible via the per-day assignment ledger only (e.g. day-2 operator)
+  viewer_is_daily?: boolean;
   // Utility waiver
   require_waiver_signature?: boolean;
   utility_waiver_signed?: boolean;

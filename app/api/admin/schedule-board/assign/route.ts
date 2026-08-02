@@ -2,10 +2,24 @@ export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/admin/schedule-board/assign
- * Assign an operator and/or helper to a job order.
- * When assignment_date is provided, writes a per-day record to job_daily_assignments
- * so that changing/unassigning on one day does not affect other days of a multi-day job.
- * Access: super_admin only
+ * THE write path for assigning/reassigning an operator and/or helper.
+ *
+ * Body: {
+ *   jobOrderId: string,
+ *   operatorId: string | null,
+ *   helperId?: string | null,
+ *   assignment_date?: 'YYYY-MM-DD',    // the board date the change anchors on
+ *   scope?: 'day' | 'remaining',       // default 'remaining' ("wrong operator")
+ *   position?: 'first' | 'last',       // default 'last' — where in the
+ *                                      // operator's day this job lands when
+ *                                      // they already have a job that date
+ * }
+ *
+ * All semantics (per-day ledger, sequencing, status guard, notifications,
+ * outgoing-operator preservation) live in lib/reassign.ts — shared with the
+ * reorder route so they cannot drift.
+ *
+ * Access: schedule-board editors (requireScheduleBoardAccess)
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -14,6 +28,7 @@ import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
+import { applyReassignment, shouldPromoteToAssigned, shouldDowngradeToScheduled, ordinal } from '@/lib/reassign';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
-    const { jobOrderId, operatorId, helperId, assignment_date } = body;
+    const { jobOrderId, operatorId, helperId, assignment_date, scope, position } = body;
 
     if (!jobOrderId) {
       return NextResponse.json(
@@ -33,154 +48,96 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let updated: { id: string; job_number: string; customer_name: string; assigned_to: string | null; helper_assigned_to: string | null; status: string } | null = null;
-
     if (assignment_date) {
-      // ── Per-day assignment path ──────────────────────────────────────────
+      // ── Per-day path: the shared reassignment write path ────────────────
+      const result = await applyReassignment({
+        jobOrderId,
+        operatorId: operatorId || null,
+        helperId: helperId ?? null,
+        assignmentDate: assignment_date,
+        scope: scope === 'day' ? 'day' : 'remaining',
+        position: position === 'first' ? 'first' : 'last',
+        tenantId,
+        actor: { userId: auth.userId, userEmail: auth.userEmail, role: auth.role },
+        request,
+      });
 
-      // Race condition guard: check for an existing assignment for this operator on this date
-      // (a different job = conflict). Must run before the upsert so two simultaneous requests
-      // cannot both pass this check and create a double-booking.
-      if (operatorId) {
-        const { data: existingAssignment } = await supabaseAdmin
-          .from('job_daily_assignments')
-          .select('id, job_order_id')
-          .eq('operator_id', operatorId)
-          .eq('assignment_date', assignment_date)
-          .neq('job_order_id', jobOrderId)
-          .maybeSingle();
-
-        if (existingAssignment) {
-          const { data: conflictJob } = await supabaseAdmin
-            .from('job_orders')
-            .select('job_number, customer_name')
-            .eq('id', existingAssignment.job_order_id)
-            .maybeSingle();
-
-          return NextResponse.json({
-            error: 'Assignment conflict detected.',
-            details: `This operator is already assigned to ${conflictJob?.job_number || 'another job'} (${conflictJob?.customer_name || ''}) on ${assignment_date}. Reassign from that job first.`,
-            conflict_job_id: existingAssignment.job_order_id,
-            block_type: 'operator_conflict',
-          }, { status: 409 });
-        }
-      }
-
-      // 1. Look up names for history record
-      let operatorName: string | null = null;
-      let helperName: string | null = null;
-
-      if (operatorId) {
-        const { data: op } = await supabaseAdmin
-          .from('profiles')
-          .select('full_name')
-          .eq('id', operatorId)
-          .single();
-        operatorName = op?.full_name ?? null;
-      }
-      if (helperId) {
-        const { data: hlp } = await supabaseAdmin
-          .from('profiles')
-          .select('full_name')
-          .eq('id', helperId)
-          .single();
-        helperName = hlp?.full_name ?? null;
-      }
-
-      // 2. Upsert the per-day record
-      await supabaseAdmin.from('job_daily_assignments').upsert(
-        {
-          job_order_id: jobOrderId,
-          assignment_date,
-          operator_id: operatorId ?? null,
-          helper_id: helperId ?? null,
-          operator_name: operatorName,
-          helper_name: helperName,
-          assigned_by: auth.userId,
-          tenant_id: tenantId ?? null,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'job_order_id,assignment_date' }
-      );
-
-      // 3. Fetch job to decide whether to touch job_orders.assigned_to
-      //    (tenant-scoped — prevents cross-tenant assignment via guessed UUID)
-      let jobLookup = supabaseAdmin
-        .from('job_orders')
-        .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status, scheduled_date, end_date')
-        .eq('id', jobOrderId);
-      if (tenantId) jobLookup = jobLookup.eq('tenant_id', tenantId);
-      const { data: job } = await jobLookup.single();
-
-      const isMultiDay =
-        job?.end_date != null && job.end_date !== job?.scheduled_date;
-
-      // Only write to job_orders if this is a single-day job OR the job has never been assigned
-      if (!isMultiDay || !job?.assigned_to) {
-        const updateData: Record<string, unknown> = {
-          assigned_to: operatorId ?? null,
-          helper_assigned_to: helperId ?? null,
-          updated_at: new Date().toISOString(),
-        };
-        if (operatorId) {
-          updateData.status = 'assigned';
-          updateData.assigned_at = new Date().toISOString();
-        } else {
-          updateData.status = 'scheduled';
-          updateData.assigned_at = null;
-        }
-
-        const q = supabaseAdmin.from('job_orders').update(updateData).eq('id', jobOrderId).eq('tenant_id', tenantId);
-        const { data: u } = await q
-          .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
-          .single();
-        updated = u ?? null;
-      } else {
-        updated = {
-          id: job.id,
-          job_number: job.job_number,
-          customer_name: job.customer_name,
-          assigned_to: job.assigned_to,
-          helper_assigned_to: job.helper_assigned_to,
-          status: job.status,
-        };
-      }
-    } else {
-      // ── Legacy path: no date provided — update job_orders directly ───────
-      const updateData: Record<string, unknown> = {
-        assigned_to: operatorId || null,
-        helper_assigned_to: helperId || null,
-        updated_at: new Date().toISOString(),
-      };
-
-      if (operatorId) {
-        updateData.status = 'assigned';
-        updateData.assigned_at = new Date().toISOString();
-      } else {
-        updateData.status = 'scheduled';
-        updateData.assigned_at = null;
-      }
-
-      const assignQuery = supabaseAdmin
-        .from('job_orders')
-        .update(updateData)
-        .eq('id', jobOrderId)
-        .eq('tenant_id', tenantId);
-      const { data: u, error } = await assignQuery
-        .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
-        .single();
-
-      if (error) {
-        console.error('Error assigning job:', error);
+      if (!result.ok) {
         return NextResponse.json(
-          { error: 'Failed to assign job' },
-          { status: 500 }
+          {
+            error: result.error,
+            ...(result.details ? { details: result.details } : {}),
+            ...(result.conflict_job_id ? { conflict_job_id: result.conflict_job_id } : {}),
+            ...(result.block_type ? { block_type: result.block_type } : {}),
+          },
+          { status: result.status }
         );
       }
-      updated = u ?? null;
+
+      const seqNote =
+        operatorId && result.operator_day_job_count > 1
+          ? ` (operator's ${ordinal(result.day_sequence)} job that day)`
+          : '';
+      return NextResponse.json({
+        success: true,
+        message: `Job ${operatorId ? 'assigned' : 'unassigned'} successfully${seqNote}`,
+        data: {
+          ...result.job,
+          day_sequence: result.day_sequence,
+          operator_day_job_count: result.operator_day_job_count,
+          sequences: result.sequences,
+        },
+      });
     }
 
-    // Audit log: job assignment
+    // ── Legacy path: no date provided — update job_orders directly ─────────
+    // (Kept for old callers; still status-guarded so a live job is never
+    // downgraded or re-stamped.)
+    const { data: currentJob } = await supabaseAdmin
+      .from('job_orders')
+      .select('id, status')
+      .eq('id', jobOrderId)
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
+
+    if (!currentJob) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
+    const updateData: Record<string, unknown> = {
+      assigned_to: operatorId || null,
+      helper_assigned_to: helperId || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // STATUS GUARD: promote only pre-work statuses; never downgrade a live job.
+    if (shouldPromoteToAssigned(currentJob.status, operatorId || null)) {
+      updateData.status = 'assigned';
+      updateData.assigned_at = new Date().toISOString();
+    } else if (shouldDowngradeToScheduled(currentJob.status, operatorId || null)) {
+      updateData.status = 'scheduled';
+      updateData.assigned_at = null;
+    }
+
+    const assignQuery = supabaseAdmin
+      .from('job_orders')
+      .update(updateData)
+      .eq('id', jobOrderId)
+      .eq('tenant_id', tenantId);
+    const { data: updated, error } = await assignQuery
+      .select('id, job_number, customer_name, assigned_to, helper_assigned_to, status')
+      .single();
+
+    if (error) {
+      console.error('Error assigning job:', error);
+      return NextResponse.json(
+        { error: 'Failed to assign job' },
+        { status: 500 }
+      );
+    }
+
+    // Audit log: job assignment (legacy path — the per-day path audits inside
+    // applyReassignment).
     logAuditEvent({
       userId: auth.userId,
       userEmail: auth.userEmail,
@@ -188,14 +145,13 @@ export async function POST(request: NextRequest) {
       action: operatorId ? 'assign' : 'unassign',
       resourceType: 'job_order',
       resourceId: jobOrderId,
-      details: { operatorId, helperId, assignment_date, jobNumber: updated?.job_number },
+      details: { operatorId, helperId, jobNumber: updated?.job_number },
       request,
     });
 
     // Fire-and-forget: notify assigned operator via in-app notification
     if (operatorId && updated) {
       Promise.resolve((async () => {
-        // Fetch the full job to build a meaningful message
         const { data: job } = await supabaseAdmin
           .from('job_orders')
           .select('customer_name, location, scheduled_date, arrival_time, job_type')
@@ -220,7 +176,7 @@ export async function POST(request: NextRequest) {
             job_number: updated!.job_number,
             customer_name: job?.customer_name,
             location: job?.location,
-            scheduled_date: assignment_date ?? job?.scheduled_date,
+            scheduled_date: job?.scheduled_date,
             arrival_time: job?.arrival_time,
             job_type: job?.job_type,
           },

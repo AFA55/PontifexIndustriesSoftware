@@ -440,6 +440,9 @@ export default function ScheduleBoardPage() {
           jobId: jobId,
           newOperatorId: targetOpId || null,
           newHelperId: targetHelpId || null,
+          // Anchor on the board's viewed date so the per-day ledger + the
+          // job's lead are BOTH written (scope 'remaining' server-side).
+          assignment_date: selectedDate,
         }),
       });
 
@@ -461,12 +464,20 @@ export default function ScheduleBoardPage() {
         } else {
           setUnassignedJobs(prev => [...prev, draggedJob!]);
         }
-        addToast('error', 'Move Failed', 'Could not reassign job');
+        const errJson = await res.json().catch(() => null);
+        addToast('error', 'Move Failed', errJson?.details || errJson?.error || 'Could not reassign job');
         return false;
       }
 
+      const okJson = await res.json().catch(() => null);
+      const seq = okJson?.data?.day_sequence;
+      const count = okJson?.data?.operator_day_job_count;
       const targetName = targetOp || 'Unassigned';
-      addToast('success', 'Job Moved', `${draggedJob.customer_name} → ${targetName}`);
+      addToast(
+        'success',
+        'Job Moved',
+        `${draggedJob.customer_name} → ${targetName}${seq && count > 1 ? ` (their #${seq} job that day)` : ''}`
+      );
       return true;
     } catch {
       // Revert optimistic: put it back
@@ -925,7 +936,8 @@ export default function ScheduleBoardPage() {
       const targetOperatorId = targetOperator ? operatorIdMap[targetOperator] : null;
       const targetHelperId = targetHelper ? operatorIdMap[targetHelper] : null;
 
-      // Update backend
+      // Update backend (scope defaults to 'remaining' server-side — a slot
+      // drag means "this operator runs the job from this date on")
       const res = await apiFetch('/api/admin/schedule-board/assign', {
         method: 'POST',
         body: JSON.stringify({
@@ -937,7 +949,8 @@ export default function ScheduleBoardPage() {
       });
 
       if (!res.ok) {
-        addToast('error', 'Move Failed', 'Could not reassign job');
+        const errJson = await res.json().catch(() => null);
+        addToast('error', 'Move Failed', errJson?.details || errJson?.error || 'Could not reassign job');
         return;
       }
 
@@ -1170,7 +1183,7 @@ export default function ScheduleBoardPage() {
     return -1;
   };
 
-  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string) => {
+  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string, position?: 'first' | 'last') => {
     const operatorName = explicitOperatorName ?? rowAssignments[rowIndex]?.operator;
     const operatorId = operatorName ? operatorIdMap[operatorName] : null;
     const helperId = helperName ? helperIdMap[helperName] : null;
@@ -1181,12 +1194,21 @@ export default function ScheduleBoardPage() {
       return;
     }
 
+    let daySequence: number | null = null;
+    let dayJobCount = 1;
     try {
       const res = await apiFetch('/api/admin/schedule-board/assign', {
         method: 'POST',
-        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId, assignment_date: selectedDate }),
+        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId, assignment_date: selectedDate, position: position || 'last' }),
       });
-      if (!res.ok) throw new Error('Failed to assign');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => null);
+        addToast('error', 'Assignment Failed', errJson?.details || errJson?.error || 'Could not assign operator');
+        return;
+      }
+      const okJson = await res.json().catch(() => null);
+      daySequence = okJson?.data?.day_sequence ?? null;
+      dayJobCount = okJson?.data?.operator_day_job_count ?? 1;
     } catch {
       addToast('error', 'Assignment Failed', 'Could not assign operator');
       return;
@@ -1211,7 +1233,15 @@ export default function ScheduleBoardPage() {
     }));
 
     const opName = operatorName || 'Operator';
-    addToast('success', `${job.customer_name} → ${opName}`, 'Operator assigned successfully');
+    addToast(
+      'success',
+      `${job.customer_name} → ${opName}`,
+      dayJobCount > 1 && daySequence
+        ? `Assigned as ${opName}'s #${daySequence} job that day — starts after the earlier one is completed`
+        : 'Operator assigned successfully'
+    );
+    // Refetch so sequence badges + per-day ledger state show correctly.
+    fetchScheduleData(selectedDate);
   };
 
   const handleAssignOperator = (operatorName: string, helperName: string | null) => {
@@ -1254,32 +1284,20 @@ export default function ScheduleBoardPage() {
     setAssignTarget(null);
   };
 
+  // Sequencing confirm (founder Aug 2 — an operator can hold 2+ jobs a day):
+  // "Add as their next job" appends after their existing job(s)…
   const handleConflictAddSecondJob = () => {
     if (!conflictData) return;
     const { targetRowIndex, newJob, newJobSource, helperName } = conflictData;
-    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName);
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName, 'last');
     setConflictData(null);
   };
 
-  const handleConflictMoveToJob = async () => {
+  // …and "Make this their #1 job" puts the new job first (existing shifts after).
+  const handleConflictMakeFirst = () => {
     if (!conflictData) return;
     const { targetRowIndex, newJob, newJobSource, helperName } = conflictData;
-
-    const existingJobs = operatorJobs[targetRowIndex] || [];
-    if (existingJobs.length > 0) {
-      for (const j of existingJobs) {
-        try {
-          await apiFetch('/api/admin/schedule-board/assign', {
-            method: 'POST',
-            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
-          });
-        } catch { /* continue */ }
-      }
-      setUnassignedJobs(prev => [...prev, ...existingJobs.map(j => ({ ...j, helper_names: [] }))]);
-      setOperatorJobs(prev => ({ ...prev, [targetRowIndex]: [] }));
-    }
-
-    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName);
+    proceedWithAssignment(targetRowIndex, newJob, newJobSource, helperName, conflictData.personName, 'first');
     setConflictData(null);
   };
 
@@ -1311,15 +1329,9 @@ export default function ScheduleBoardPage() {
     if (updates.project_manager_id !== undefined) apiPayload.project_manager_id = updates.project_manager_id;
 
     const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
+    const currentHelper = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.helper : null;
     const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
-
-    if (operatorChanged) {
-      const newOperatorId = newOpName ? operatorIdMap[newOpName] : null;
-      const newHelperId = newHelperName ? helperIdMap[newHelperName] : null;
-      apiPayload.assigned_to = newOperatorId;
-      apiPayload.helper_assigned_to = newHelperId;
-      apiPayload.status = newOperatorId ? 'assigned' : 'scheduled';
-    }
+    const helperChanged = newHelperName !== undefined && newHelperName !== currentHelper;
 
     try {
       const res = await apiFetch(`/api/admin/job-orders/${job.id}`, {
@@ -1330,6 +1342,63 @@ export default function ScheduleBoardPage() {
     } catch {
       addToast('error', 'Save Failed', 'Could not update job');
       return;
+    }
+
+    // Operator/helper changes go through the SAME write path as every other
+    // reassignment (/assign, scope 'remaining' = this date forward). The old
+    // PATCH-assigned_to route was masked by the per-day ledger overlay on the
+    // board GET, so the edit looked like it reverted.
+    if (operatorChanged || helperChanged) {
+      const explicitUnassign = operatorChanged && !newOpName;
+      const newOperatorId = newOpName ? (operatorIdMap[newOpName] ?? null) : null;
+      // Keep-operator comes from the JOB RECORD (assigned_to, post-overlay) —
+      // NEVER from board-row state, which is null via the preview path and
+      // would silently unassign every remaining day (guardian B3).
+      const keepOperatorId = job.assigned_to ?? null;
+      const effectiveOperatorId = operatorChanged
+        ? (explicitUnassign ? null : newOperatorId)
+        : keepOperatorId;
+      const newHelperId = newHelperName ? (helperIdMap[newHelperName] ?? null) : null;
+
+      // Unresolvable operator (roster map miss) → NEVER unassign implicitly:
+      // keep the PATCH-only save and tell the admin.
+      if (operatorChanged && newOpName && !newOperatorId) {
+        addToast('error', 'Operator Not Changed', `"${newOpName}" isn't in the crew roster — other changes were saved. Refresh and try the operator change again.`);
+        fetchScheduleData(selectedDate);
+        setEditTarget(null);
+        return;
+      }
+
+      // Anchor on the board's viewed date when the job spans it, otherwise the
+      // job's (possibly just-edited) start date.
+      const sched = (jobUpdates.scheduled_date as string) || job.scheduled_date || selectedDate;
+      const end = (jobUpdates.end_date as string | null | undefined) ?? job.end_date;
+      const anchorDate =
+        selectedDate >= sched && selectedDate <= (end || sched) ? selectedDate : sched;
+      try {
+        const res = await apiFetch('/api/admin/schedule-board/assign', {
+          method: 'POST',
+          body: JSON.stringify({
+            jobOrderId: job.id,
+            operatorId: effectiveOperatorId,
+            helperId: newHelperId,
+            assignment_date: anchorDate,
+            scope: 'remaining',
+          }),
+        });
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => null);
+          addToast('error', 'Reassign Failed', errJson?.details || errJson?.error || 'Could not change operator');
+          fetchScheduleData(selectedDate);
+          setEditTarget(null);
+          return;
+        }
+      } catch {
+        addToast('error', 'Reassign Failed', 'Could not change operator');
+        fetchScheduleData(selectedDate);
+        setEditTarget(null);
+        return;
+      }
     }
 
     if (operatorChanged) {
@@ -1386,6 +1455,9 @@ export default function ScheduleBoardPage() {
       addToast('success', 'Job Updated', `${job.customer_name} changes saved`);
     }
 
+    // Always refetch after a save — the optimistic moves above are a best
+    // guess; the board GET (with its per-day ledger overlay) is the truth.
+    fetchScheduleData(selectedDate);
     setEditTarget(null);
   };
 
@@ -1671,13 +1743,15 @@ export default function ScheduleBoardPage() {
   // --- Row dropdown: change operator (with conflict detection) ---
   const handleChangeRowOperator = async (rowIndex: number, newOperator: string | null) => {
     if (!newOperator) {
-      // Clearing operator — unassign all jobs in this row from the DB first
+      // Clearing operator — unassign all jobs in this row from the DB first.
+      // scope 'day': clearing a row only vacates the BOARD DATE, not the
+      // remaining days of a multi-day job.
       const rowJobs = operatorJobs[rowIndex] || [];
       for (const j of rowJobs) {
         try {
           await apiFetch('/api/admin/schedule-board/assign', {
             method: 'POST',
-            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
+            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate, scope: 'day' }),
           });
         } catch { /* continue */ }
       }
@@ -1705,7 +1779,54 @@ export default function ScheduleBoardPage() {
       }
     }
 
-    // No conflict — assign freely
+    // Setting a NEW operator on a row that already has jobs = REASSIGN those
+    // jobs for the board date. This used to be local state only (the founder's
+    // "it won't let me change operators" bug) — the change reverted on the
+    // next refetch. Now every job in the row is written through /assign
+    // (scope 'day': this board date only; use the Edit panel or a drag for
+    // "this and remaining days").
+    const rowJobs = operatorJobs[rowIndex] || [];
+    const newOperatorId = operatorIdMap[newOperator];
+    if (rowJobs.length > 0 && !newOperatorId) {
+      addToast('error', 'Change Failed', `Operator "${newOperator}" not found in crew roster. Please refresh the page.`);
+      return;
+    }
+    if (rowJobs.length > 0) {
+      const rowHelperName = rowAssignments[rowIndex]?.helper ?? null;
+      const rowHelperId = rowHelperName ? (helperIdMap[rowHelperName] ?? null) : null;
+      const failures: string[] = [];
+      for (const j of rowJobs) {
+        try {
+          const res = await apiFetch('/api/admin/schedule-board/assign', {
+            method: 'POST',
+            body: JSON.stringify({
+              jobOrderId: j.id,
+              operatorId: newOperatorId,
+              helperId: rowHelperId,
+              assignment_date: selectedDate,
+              scope: 'day',
+            }),
+          });
+          if (!res.ok) {
+            const errJson = await res.json().catch(() => null);
+            failures.push(`${j.customer_name}: ${errJson?.details || errJson?.error || 'failed'}`);
+          }
+        } catch {
+          failures.push(`${j.customer_name}: network error`);
+        }
+      }
+      if (failures.length > 0) {
+        addToast('error', 'Some Jobs Not Moved', failures.join(' · '));
+      } else {
+        addToast('success', `Row → ${newOperator}`, `${rowJobs.length} job${rowJobs.length > 1 ? 's' : ''} reassigned for ${formatDisplayDate(selectedDate)}`);
+      }
+      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, operator: newOperator } : r));
+      // Refetch so the board reflects the DB (and any partial failures revert).
+      fetchScheduleData(selectedDate);
+      return;
+    }
+
+    // Empty row — just relabel it locally (nothing to write yet)
     setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, operator: newOperator } : r));
   };
 
@@ -1719,7 +1840,7 @@ export default function ScheduleBoardPage() {
       try {
         await apiFetch('/api/admin/schedule-board/assign', {
           method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate }),
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate, scope: 'day' }),
         });
       } catch { /* continue */ }
     }
@@ -1759,7 +1880,7 @@ export default function ScheduleBoardPage() {
       try {
         await apiFetch('/api/admin/schedule-board/assign', {
           method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId, assignment_date: selectedDate }),
+          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId, assignment_date: selectedDate, scope: 'day' }),
         });
       } catch { /* continue */ }
     }
@@ -2170,7 +2291,7 @@ export default function ScheduleBoardPage() {
           currentJobName={conflictData.currentJobName}
           newJobName={conflictData.newJob.customer_name}
           onAddSecondJob={handleConflictAddSecondJob}
-          onMoveToJob={handleConflictMoveToJob}
+          onMakeFirst={handleConflictMakeFirst}
           onClose={() => setConflictData(null)}
         />
       )}
@@ -2194,6 +2315,8 @@ export default function ScheduleBoardPage() {
           helperName={jobDetailTarget.helperName}
           rowIndex={jobDetailTarget.rowIndex}
           userRole={userRole}
+          boardDate={selectedDate}
+          canReassign={canEdit}
           onClose={() => setJobDetailTarget(null)}
           onEdit={() => {
             const target = jobDetailTarget;

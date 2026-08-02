@@ -73,13 +73,21 @@ export async function GET(request: NextRequest) {
     if (date && jobs && jobs.length > 0) {
       let dailyQuery = supabaseAdmin
         .from('job_daily_assignments')
-        .select('job_order_id, operator_id, helper_id, operator_name, helper_name')
+        .select('job_order_id, operator_id, helper_id, operator_name, helper_name, day_sequence')
         .eq('assignment_date', date);
       if (tenantId) { dailyQuery = dailyQuery.eq('tenant_id', tenantId); }
       const { data: dailyAssignments } = await dailyQuery;
 
       if (dailyAssignments && dailyAssignments.length > 0) {
         const dailyMap = new Map(dailyAssignments.map(a => [a.job_order_id, a]));
+        // How many jobs each operator holds THIS date (sequencing, Aug 2026)
+        // — drives the "1st/2nd job" badge on board cards.
+        const operatorDayCounts = new Map<string, number>();
+        for (const a of dailyAssignments) {
+          if (a.operator_id) {
+            operatorDayCounts.set(a.operator_id, (operatorDayCounts.get(a.operator_id) || 0) + 1);
+          }
+        }
         for (const job of jobs) {
           const da = dailyMap.get(job.id);
           if (da) {
@@ -88,6 +96,8 @@ export async function GET(request: NextRequest) {
             job.helper_id = da.helper_id !== undefined ? da.helper_id : job.helper_id;
             if (da.operator_name !== undefined) job.operator_name = da.operator_name;
             if (da.helper_name !== undefined) job.helper_name = da.helper_name;
+            job.day_sequence = da.day_sequence ?? 1;
+            job.operator_day_job_count = da.operator_id ? (operatorDayCounts.get(da.operator_id) || 1) : 1;
           }
         }
       }
