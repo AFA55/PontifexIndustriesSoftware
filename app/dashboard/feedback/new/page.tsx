@@ -4,17 +4,17 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useCallback, Suspense } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   ArrowLeft, Bug, Wand2, Lightbulb, CheckCircle2, Loader2, Home,
-  AlertTriangle, MessageSquarePlus, Clock,
+  AlertTriangle, MessageSquarePlus, MessageSquare, Clock,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-type FeedbackType = 'bug' | 'change_request' | 'idea';
+type FeedbackType = 'bug' | 'change_request' | 'idea' | 'message';
 
 interface MyFeedback {
   id: string;
@@ -58,6 +58,14 @@ const TYPE_OPTIONS: {
     active: 'border-amber-500 bg-amber-50 dark:bg-amber-900/30 ring-2 ring-amber-500/40',
     iconColor: 'text-amber-600 dark:text-amber-400',
   },
+  {
+    key: 'message',
+    label: 'Message Management',
+    hint: 'Question, concern, or anything else',
+    icon: MessageSquare,
+    active: 'border-sky-500 bg-sky-50 dark:bg-sky-900/30 ring-2 ring-sky-500/40',
+    iconColor: 'text-sky-600 dark:text-sky-400',
+  },
 ];
 
 const STATUS_CHIP: Record<string, string> = {
@@ -72,6 +80,7 @@ const TYPE_META: Record<FeedbackType, { label: string; icon: React.ElementType }
   bug: { label: 'Bug', icon: Bug },
   change_request: { label: 'Change', icon: Wand2 },
   idea: { label: 'Idea', icon: Lightbulb },
+  message: { label: 'Message', icon: MessageSquare },
 };
 
 function formatDate(iso: string): string {
@@ -84,9 +93,19 @@ function formatDate(iso: string): string {
 
 function FeedbackForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [authChecked, setAuthChecked] = useState(false);
 
   const [type, setType] = useState<FeedbackType | null>(null);
+
+  // ?type=message (etc.) preselects the category — the Inbox's "Message
+  // Management" button lands here ready to type.
+  useEffect(() => {
+    const t = searchParams.get('type');
+    if (t === 'bug' || t === 'change_request' || t === 'idea' || t === 'message') {
+      setType(t);
+    }
+  }, [searchParams]);
   const [title, setTitle] = useState('');
   const [bodyText, setBodyText] = useState('');
   const [pageUrl, setPageUrl] = useState('');
@@ -290,6 +309,8 @@ function FeedbackForm() {
                   ? 'What happened?'
                   : type === 'change_request' || type === 'idea'
                   ? 'What would you change?'
+                  : type === 'message'
+                  ? 'What do you want management to know?'
                   : 'Tell us more'}
                 <span className="text-rose-500"> *</span>
               </label>
@@ -299,6 +320,8 @@ function FeedbackForm() {
                 placeholder={
                   type === 'bug'
                     ? "Describe what went wrong, and what you were trying to do…"
+                    : type === 'message'
+                    ? "Ask a question, raise a concern, or share anything with the office…"
                     : "Describe what you'd change and why it would help…"
                 }
                 rows={5}

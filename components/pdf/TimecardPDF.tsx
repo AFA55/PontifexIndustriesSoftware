@@ -224,6 +224,11 @@ const createStyles = (primaryColor: string, secondaryColor: string) =>
       fontWeight: 'bold',
       color: '#1E293B',
     },
+    breakdownNote: {
+      fontSize: 6.5,
+      color: '#94A3B8',
+      marginTop: 5,
+    },
     breakdownUnit: {
       fontSize: 7.5,
       color: '#64748B',
@@ -551,6 +556,11 @@ export function TimecardPage({
             </View>
           ))}
         </View>
+        {/* Night/Shop are attributes of hours already counted in the pay
+            buckets — a signer must not read the six boxes as additive. */}
+        <Text style={s.breakdownNote}>
+          Night Shift and Shop Hours are subsets of the hours above, not additional pay categories.
+        </Text>
       </View>
 
       {/* ═══ SIGNATURES ═══ */}

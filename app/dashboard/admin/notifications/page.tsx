@@ -142,19 +142,6 @@ export default function AdminNotificationsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const res = await fetch('/api/notifications?limit=50', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      // For admin, we query directly for recently sent notifications
-      // Since the API only returns the current user's notifications, we use supabase directly
-      // Actually, let's just show notifications sent by this admin
-    } catch { /* silent */ }
-
-    // Use a direct query for admin-sent notifications
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
       // We'll fetch from the API admin route
       const res = await fetch('/api/admin/notifications?unread=false&limit=50', {
         headers: { Authorization: `Bearer ${session.access_token}` },

@@ -173,7 +173,12 @@ const NAV_SECTIONS: NavSection[] = [
     items: [
       // Settings is visible to admin + super_admin (super_admin/ops_manager bypass roles via SUPER_ADMIN_FLAGS).
       { label: 'Settings', href: '/dashboard/admin/settings', icon: Settings, roles: ['admin', 'super_admin', 'operations_manager'] },
-      { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications' },
+      // Notifications is split by audience: the admin send/settings console
+      // bounces non-isAdmin() roles to /dashboard, so shop_manager/shop_help/
+      // inventory_manager etc. get the PERSONAL inbox instead (same badge —
+      // it counts personal unread for everyone).
+      { label: 'Notifications', href: '/dashboard/admin/notifications', icon: Bell, badgeKey: 'notifications', roles: ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'] },
+      { label: 'Notifications', href: '/dashboard/notifications', icon: Bell, badgeKey: 'notifications', excludeRoles: ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'] },
       { label: 'Analytics', href: '/dashboard/admin/analytics', icon: BarChart3, flagKey: 'can_view_analytics', moduleKey: 'analytics' },
       { label: 'Billing', href: '/dashboard/admin/subscription', icon: CreditCard, superAdminOnly: true },
     ],
@@ -232,7 +237,9 @@ function useBadgeCounts(): BadgeCounts {
 
       if (notifRes.status === 'fulfilled' && notifRes.value.ok) {
         const json = await notifRes.value.json();
-        notifications = json.unread_count ?? json.total ?? (Array.isArray(json.data) ? json.data.length : 0);
+        // Unified feed shape nests unread_count under data; the top-level
+        // mirror is kept for back-compat — read both.
+        notifications = json.data?.unread_count ?? json.unread_count ?? json.total ?? 0;
       }
 
       // Non-shop-role users get a 403 here — that's expected, .ok is false and

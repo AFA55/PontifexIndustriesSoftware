@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useCallback } from 'react';
 import {
-  MessageSquareWarning, RefreshCw, Bug, Wand2, Lightbulb, Building2,
+  MessageSquare, MessageSquareWarning, RefreshCw, Bug, Wand2, Lightbulb, Building2,
   Save, Check, Trash2, Sparkles, ChevronDown, ChevronUp, HelpCircle,
 } from 'lucide-react';
 import { getHeaders, getJsonHeaders } from '@/components/platform/shared';
@@ -57,6 +57,7 @@ const TYPE_META: Record<string, { label: string; icon: React.ElementType; color:
   bug: { label: 'Bug', icon: Bug, color: 'text-rose-500' },
   change_request: { label: 'Change request', icon: Wand2, color: 'text-violet-500' },
   idea: { label: 'Idea', icon: Lightbulb, color: 'text-amber-500' },
+  message: { label: 'Message', icon: MessageSquare, color: 'text-sky-500' },
 };
 
 function timeAgo(iso: string): string {

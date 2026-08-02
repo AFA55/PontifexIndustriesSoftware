@@ -189,6 +189,13 @@ export async function sendPushToUser(userId: string, payload: PushPayload): Prom
 
   if (!userId) return { configured: true, sent: 0, failed: 0 };
 
+  // APNs/FCM reject payloads over ~4KB — a very long body (e.g. a full
+  // operator message) would silently lose the push. Cap it; the in-app
+  // notification keeps the full text.
+  if (payload.body && payload.body.length > 1500) {
+    payload = { ...payload, body: payload.body.slice(0, 1499) + '…' };
+  }
+
   let tokens: Array<{ token: string; platform: string }> = [];
   try {
     const { data, error } = await supabaseAdmin

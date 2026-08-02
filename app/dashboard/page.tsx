@@ -13,6 +13,7 @@ import NotificationBell from '@/components/NotificationBell';
 import { useBranding } from '@/lib/branding-context';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
+import { useUnreadNotifications } from '@/lib/hooks/useUnreadNotifications';
 
 // Dynamic Logo Component — uses branding if available
 function BrandedLogo({ className = "h-8", logoUrl, companyName }: { className?: string; logoUrl?: string | null; companyName?: string }) {
@@ -66,6 +67,9 @@ type OperatorStatus = 'clocked_in' | 'en_route' | 'in_progress' | 'job_completed
 
 export default function Dashboard() {
   const { branding } = useBranding();
+  // Unread badge for the Inbox quick-action tile (slow visibility-aware poll —
+  // the bell keeps its own faster one; this does NOT double-poll it).
+  const unreadNotifications = useUnreadNotifications();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isClockedIn, setIsClockedIn] = useState(false);
@@ -1403,6 +1407,22 @@ export default function Dashboard() {
           <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-xl rounded-3xl p-6 shadow-2xl border-2 border-white/50 dark:border-white/10">
             <p className="text-sm font-bold text-gray-600 dark:text-white/50 mb-4 uppercase tracking-wide">QUICK ACTIONS</p>
             <div className="flex gap-3 overflow-x-auto pb-2">
+              {/* Inbox FIRST — operators were missing their notifications
+                  (the tile was buried at the end of this scroll strip). */}
+              <Link
+                href="/dashboard/notifications"
+                className="relative flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
+                Inbox
+                {unreadNotifications > 0 && (
+                  <span className="ml-1 min-w-[22px] h-[22px] px-1.5 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-md ring-2 ring-white/40">
+                    {unreadNotifications > 99 ? '99+' : unreadNotifications}
+                  </span>
+                )}
+              </Link>
               <button
                 onClick={isClockedIn ? handleClockOut : handleClockIn}
                 disabled={clockLoading || clockStatusLoading}
@@ -1447,15 +1467,6 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
                 Time Off
-              </Link>
-              <Link
-                href="/dashboard/notifications"
-                className="flex items-center gap-2 px-5 py-3 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 text-white rounded-xl font-bold whitespace-nowrap transition-all shadow-lg hover:shadow-xl hover:scale-105"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-                Inbox
               </Link>
               <Link
                 href="/dashboard/my-profile"

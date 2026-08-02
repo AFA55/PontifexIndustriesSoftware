@@ -20,8 +20,11 @@ export const maxDuration = 120;
 import { NextRequest, NextResponse, after } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { sendNotification } from '@/lib/send-reminder';
 
-const VALID_TYPES = ['bug', 'change_request', 'idea'] as const;
+// 'message' = the open "Message Management" channel (operators can tell the
+// office anything — not just bugs/ideas).
+const VALID_TYPES = ['bug', 'change_request', 'idea', 'message'] as const;
 type FeedbackType = (typeof VALID_TYPES)[number];
 
 const MAX_TITLE = 200;
@@ -62,7 +65,7 @@ export async function POST(request: NextRequest) {
   // ── Resolve reporter tenant + role from THEIR profile (never client) ────
   const { data: profile, error: profileErr } = await supabaseAdmin
     .from('profiles')
-    .select('tenant_id, role')
+    .select('tenant_id, role, full_name')
     .eq('id', auth.userId)
     .single();
 
@@ -123,13 +126,33 @@ export async function POST(request: NextRequest) {
   });
 
   // ── Post-response: notify tenant admins/ops (best-effort) ───────────────
+  // Goes through sendNotification() so each manager's push/email preferences
+  // are honored (the old raw insert was bell-only). The FULL text lives in
+  // feedback_submissions; non-message types notify with a ~140-char preview,
+  // 'message' notifies with the full text (see below).
   after(async () => {
     try {
-      const truncated = text.length > 60 ? text.slice(0, 57) + '...' : text;
+      const PREVIEW_MAX = 140;
+      const reporterName = profile.full_name || profile.role || 'A team member';
+      const isMessage = type === 'message';
+      // 'message' carries the FULL text: the settings/feedback page a manager
+      // lands on lists only their OWN submissions, so the notification body is
+      // the only place a tenant admin can read the operator's words. The inbox
+      // renders full messages; sendPushToUser caps its own payload at ~1500.
+      const preview = isMessage
+        ? text
+        : text.length > PREVIEW_MAX ? text.slice(0, PREVIEW_MAX - 1) + '…' : text;
       const typeLabel =
-        type === 'bug' ? 'a bug' : type === 'change_request' ? 'a change request' : 'an idea';
-      const notifTitle = 'New Feedback Submitted';
-      const message = `${profile.role ?? 'A user'} reported ${typeLabel}: ${title || truncated}`;
+        type === 'bug' ? 'a bug'
+        : type === 'change_request' ? 'a change request'
+        : type === 'idea' ? 'an idea'
+        : 'a message';
+      const notifTitle = isMessage
+        ? `💬 New message from ${reporterName}`
+        : 'New Feedback Submitted';
+      const message = isMessage
+        ? (title ? `${title} — ${preview}` : preview)
+        : `${reporterName} reported ${typeLabel}: ${title ? `${title} — ${preview}` : preview}`;
 
       const { data: managers } = await supabaseAdmin
         .from('profiles')
@@ -138,18 +161,24 @@ export async function POST(request: NextRequest) {
         .in('role', ['admin', 'super_admin', 'operations_manager']);
 
       if (managers && managers.length > 0) {
-        const rows = managers.map((m: { id: string }) => ({
-          user_id: m.id,
-          tenant_id: insert.tenant_id,
-          type: 'info',
-          title: notifTitle,
-          message,
-          notification_type: 'feedback',
-          related_entity_type: 'feedback_submission',
-          related_entity_id: data.id,
-          action_url: '/dashboard/platform/feedback',
-        }));
-        await supabaseAdmin.from('notifications').insert(rows);
+        await Promise.allSettled(
+          managers.map((m: { id: string }) =>
+            sendNotification({
+              userId: m.id,
+              tenantId: insert.tenant_id,
+              category: 'general',
+              title: notifTitle,
+              message,
+              inAppType: 'info',
+              notificationType: 'feedback',
+              relatedEntityType: 'feedback_submission',
+              relatedEntityId: data.id,
+              // Tenant admin inbox — /dashboard/platform/feedback is
+              // super-admin-only and bounced tenant admins.
+              actionUrl: '/dashboard/admin/settings/feedback',
+            })
+          )
+        );
       }
     } catch {
       /* best-effort */

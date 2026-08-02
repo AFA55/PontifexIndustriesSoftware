@@ -46,13 +46,21 @@ export default function NotificationBanner() {
   const handleDismiss = async () => {
     setDismissed(true);
 
-    // Mark notifications as read
+    // Mark as read through the bearer-auth API. The old public-client
+    // .update() was a SILENT NO-OP (no UPDATE policy on the table), so the
+    // same banner re-appeared on every visit.
     try {
       const ids = notifications.map(n => n.id);
-      await supabase
-        .from('schedule_notifications')
-        .update({ read: true })
-        .in('id', ids);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch('/api/notifications/mark-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ schedule_ids: ids }),
+      });
     } catch {
       // Non-critical
     }

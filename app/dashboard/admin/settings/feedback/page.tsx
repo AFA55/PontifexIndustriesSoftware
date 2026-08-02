@@ -9,6 +9,7 @@ import {
   Sparkles,
   Lightbulb,
   Send,
+  MessageSquare,
   MessageSquareWarning,
   Inbox,
 } from 'lucide-react';
@@ -26,7 +27,7 @@ import {
 import type { BadgeVariant } from '@/components/ui';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type FeedbackType = 'bug' | 'change_request' | 'idea';
+type FeedbackType = 'bug' | 'change_request' | 'idea' | 'message';
 type FeedbackStatus = 'open' | 'in_review' | 'planned' | 'done' | 'declined';
 
 interface FeedbackItem {
@@ -55,6 +56,7 @@ const TYPE_OPTIONS: {
   { value: 'bug', label: 'Bug', emoji: '🐛', icon: Bug, hint: 'Something is broken' },
   { value: 'change_request', label: 'Change request', emoji: '✨', icon: Sparkles, hint: 'Tweak how something works' },
   { value: 'idea', label: 'Idea', emoji: '💡', icon: Lightbulb, hint: 'A new feature or suggestion' },
+  { value: 'message', label: 'Message', emoji: '💬', icon: MessageSquare, hint: 'A message to management' },
 ];
 
 // ─── Status display config ────────────────────────────────────────────────────

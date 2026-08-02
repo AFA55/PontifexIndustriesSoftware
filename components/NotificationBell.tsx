@@ -2,18 +2,19 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Bell, X, AlertCircle, CheckCircle, Clock, MessageSquare, Send, ChevronRight, BellOff } from 'lucide-react';
+import { Bell, X, AlertCircle, CheckCircle, Clock, MessageSquare, Send, ChevronRight, BellOff, Truck } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 
 interface Notification {
   id: string;
+  /** Which table the row came from — unified feed. Absent = 'notifications'. */
+  source?: 'notifications' | 'schedule';
   type: string;
   title: string;
   message: string | null;
   action_url: string | null;
-  bypass_nfc: boolean;
   is_read: boolean;
   created_at: string;
   metadata?: Record<string, unknown>;
@@ -87,8 +88,10 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
       });
       if (res.ok) {
         const json = await res.json();
-        setNotifications(json.data || []);
-        setUnreadCount(json.unread_count || 0);
+        // Unified shape: { data: { notifications, unread_count } } (legacy flat
+        // array kept as a fallback so a stale deploy doesn't blank the bell).
+        setNotifications(json.data?.notifications ?? (Array.isArray(json.data) ? json.data : []));
+        setUnreadCount(json.data?.unread_count ?? json.unread_count ?? 0);
       }
     } catch {
       // silently fail
@@ -114,10 +117,14 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const markRead = async (ids: string[]) => {
+  const markRead = async (targets: Pick<Notification, 'id' | 'source'>[]) => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
+
+      // Split per source table; bare ids default to the personal table.
+      const notification_ids = targets.filter(t => t.source !== 'schedule').map(t => t.id);
+      const schedule_ids = targets.filter(t => t.source === 'schedule').map(t => t.id);
 
       await fetch('/api/notifications/mark-read', {
         method: 'POST',
@@ -125,13 +132,17 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ notification_ids: ids }),
+        body: JSON.stringify({
+          ...(notification_ids.length > 0 ? { notification_ids } : {}),
+          ...(schedule_ids.length > 0 ? { schedule_ids } : {}),
+        }),
       });
 
+      const ids = targets.map(t => t.id);
       setNotifications(prev =>
         prev.map(n => ids.includes(n.id) ? { ...n, is_read: true } : n)
       );
-      setUnreadCount(prev => Math.max(0, prev - ids.length));
+      setUnreadCount(prev => Math.max(0, prev - targets.length));
     } catch {
       // silently fail
     }
@@ -160,10 +171,20 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
     setLoading(false);
   };
 
+  // Row tap → the INBOX with this item focused/expanded (full message —
+  // truncated bell rows were unreadable). The small "View" chip still
+  // deep-links to action_url for the quick jump.
   const handleNotificationClick = (notif: Notification) => {
     if (!notif.is_read) {
-      markRead([notif.id]);
+      markRead([notif]);
     }
+    setOpen(false);
+    router.push(`/dashboard/notifications?focus=${notif.source || 'notifications'}:${notif.id}`);
+  };
+
+  const handleActionClick = (e: React.MouseEvent, notif: Notification) => {
+    e.stopPropagation();
+    if (!notif.is_read) markRead([notif]);
     if (notif.action_url) {
       setOpen(false);
       router.push(notif.action_url);
@@ -180,6 +201,16 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
         return <AlertCircle className="w-4 h-4 text-red-400" />;
       case 'reminder':
         return <Bell className="w-4 h-4 text-yellow-400" />;
+      case 'auto_clock_out':
+      case 'auto_clock_out_admin':
+        return <Clock className="w-4 h-4 text-red-400" />;
+      case 'late_arrival':
+        return <AlertCircle className="w-4 h-4 text-amber-400" />;
+      case 'job_assigned':
+      case 'assigned':
+      case 'dispatched':
+        // Truck, matching the inbox's icon for the same types (cross-surface coherence)
+        return <Truck className="w-4 h-4 text-sky-400" />;
       case 'system':
         return <Send className="w-4 h-4 text-blue-400" />;
       default:
@@ -259,7 +290,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
             ) : (
               notifications.map(notif => (
                 <div
-                  key={notif.id}
+                  key={`${notif.source || 'notifications'}:${notif.id}`}
                   className={`px-4 py-3 border-b border-gray-100 dark:border-white/5 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors cursor-pointer flex items-start gap-3 ${
                     !notif.is_read ? 'bg-brand/5 dark:bg-brand/10' : ''
                   }`}
@@ -285,7 +316,12 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
                     <div className="flex items-center gap-2 mt-1">
                       <p className="text-[10px] text-gray-400 dark:text-gray-500">{timeAgo(notif.created_at)}</p>
                       {notif.action_url && (
-                        <span className="text-[10px] text-brand font-semibold">View</span>
+                        <button
+                          onClick={(e) => handleActionClick(e, notif)}
+                          className="text-[10px] text-brand font-semibold hover:opacity-80 transition-opacity px-1 py-0.5 -my-0.5"
+                        >
+                          View
+                        </button>
                       )}
                     </div>
                   </div>
@@ -297,20 +333,19 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
             )}
           </div>
 
-          {/* Footer */}
-          {notifications.length > 0 && (
-            <div className="px-4 py-2.5 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-slate-800/50">
-              <button
-                onClick={() => {
-                  setOpen(false);
-                  router.push('/dashboard/notifications');
-                }}
-                className="w-full text-center text-xs text-brand hover:opacity-80 font-semibold transition-colors"
-              >
-                View all notifications
-              </button>
-            </div>
-          )}
+          {/* Footer — ALWAYS rendered so the inbox stays reachable even when
+              the list is empty (it was invisible-when-empty before). */}
+          <div className="px-4 py-2.5 border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-slate-800/50">
+            <button
+              onClick={() => {
+                setOpen(false);
+                router.push('/dashboard/notifications');
+              }}
+              className="w-full text-center min-h-[36px] text-xs text-brand hover:opacity-80 font-semibold transition-colors"
+            >
+              View all notifications
+            </button>
+          </div>
         </div>,
         document.body
       )}
