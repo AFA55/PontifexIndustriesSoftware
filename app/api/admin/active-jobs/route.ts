@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireScheduleViewer } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { todayInTz } from '@/lib/reminder-timing';
 
 // Roles that see ALL active jobs in their tenant. Everyone else (salesman,
 // supervisor, ...) is forced to a created_by=self filter on the server.
@@ -69,11 +70,42 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Per-day assignment overrides (job_daily_assignments) — multi-day jobs
+    // can be reassigned per day; job_orders.assigned_to alone would show the
+    // day-1 operator forever. Resolve TODAY's operator (tenant-local date).
+    const jobIdsForJda = jobs.map((j: any) => j.id);
+    let tenantTz = 'America/New_York';
+    try {
+      const { data: tzRow } = await supabaseAdmin
+        .from('tenants')
+        .select('timezone')
+        .eq('id', auth.tenantId)
+        .maybeSingle();
+      if (tzRow?.timezone) tenantTz = tzRow.timezone;
+    } catch { /* default tz */ }
+    const todayLocal = todayInTz(tenantTz);
+    const todaysOperatorByJob = new Map<string, { id: string | null; name: string | null }>();
+    try {
+      // Tenant scoping comes from jobIdsForJda (the main query is already
+      // tenant-filtered) — don't assume a tenant_id column on JDA.
+      const { data: jdaRows } = await supabaseAdmin
+        .from('job_daily_assignments')
+        .select('job_order_id, operator_id, operator_name')
+        .eq('assignment_date', todayLocal)
+        .in('job_order_id', jobIdsForJda);
+      for (const r of (jdaRows || []) as Array<{ job_order_id: string; operator_id: string | null; operator_name: string | null }>) {
+        if (r.operator_id || r.operator_name) {
+          todaysOperatorByJob.set(r.job_order_id, { id: r.operator_id, name: r.operator_name });
+        }
+      }
+    } catch { /* table optional — fall back to assigned_to */ }
+
     // Fetch operator names
     const operatorIds = [...new Set(jobs.map((j: any) => j.assigned_to).filter(Boolean))];
+    const jdaOperatorIds = [...new Set(Array.from(todaysOperatorByJob.values()).map((v) => v.id).filter(Boolean))] as string[];
     const helperIds = [...new Set(jobs.map((j: any) => j.helper_assigned_to).filter(Boolean))];
     const creatorIds = [...new Set(jobs.map((j: any) => j.created_by).filter(Boolean))];
-    const allProfileIds = [...new Set([...operatorIds, ...helperIds, ...creatorIds])];
+    const allProfileIds = [...new Set([...operatorIds, ...jdaOperatorIds, ...helperIds, ...creatorIds])];
 
     let profileMap: Record<string, string> = {};
     if (allProfileIds.length > 0) {
@@ -121,7 +153,12 @@ export async function GET(request: NextRequest) {
       notesCounts[n.job_order_id] = (notesCounts[n.job_order_id] || 0) + 1;
     });
 
-    const result = jobs.map((j: any) => ({
+    const result = jobs.map((j: any) => {
+      const jda = todaysOperatorByJob.get(j.id);
+      const todaysOperatorName = jda
+        ? ((jda.id ? profileMap[jda.id] : null) ?? jda.name ?? null)
+        : null;
+      return {
       id: j.id,
       job_number: j.job_number,
       title: j.title,
@@ -132,12 +169,15 @@ export async function GET(request: NextRequest) {
       customer_name: j.customer_name,
       address: j.address || j.location,
       assigned_operator_name: j.assigned_to ? (profileMap[j.assigned_to] ?? null) : null,
+      // Today's per-day override (job_daily_assignments), when present.
+      todays_operator_name: todaysOperatorName,
       helper_assigned_name: j.helper_assigned_to ? (profileMap[j.helper_assigned_to] ?? null) : null,
       created_by_name: j.created_by ? (profileMap[j.created_by] ?? null) : null,
       pending_change_requests: changeRequestCounts[j.id] || 0,
       pending_completion_approval: completionPendingSet.has(j.id),
       operator_notes_count: notesCounts[j.id] || 0,
-    }));
+      };
+    });
 
     return NextResponse.json({
       success: true,

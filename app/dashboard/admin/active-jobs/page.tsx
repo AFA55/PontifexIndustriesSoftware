@@ -12,7 +12,10 @@ import {
   Calendar,
   ArrowRight,
   AlertCircle,
+  ChevronDown,
   ChevronRight,
+  ListChecks,
+  Loader2,
   MapPin,
   RefreshCw,
   StickyNote,
@@ -20,6 +23,7 @@ import {
   X,
   Copy,
 } from 'lucide-react';
+import WorkItemsSummary, { type WorkItemRow } from '@/components/WorkItemsSummary';
 
 interface ActiveJob {
   id: string;
@@ -32,6 +36,8 @@ interface ActiveJob {
   customer_name?: string;
   address?: string;
   assigned_operator_name?: string;
+  /** Today's per-day reassignment (job_daily_assignments), when it differs. */
+  todays_operator_name?: string | null;
   helper_assigned_name?: string | null;
   created_by_name?: string;
   pending_change_requests?: number;
@@ -104,6 +110,41 @@ export default function ActiveJobsPage() {
   const [deleting, setDeleting] = useState(false);
   const [scopeMeta, setScopeMeta] = useState<ScopeMeta | null>(null);
   const [progressMap, setProgressMap] = useState<Record<string, JobProgress>>({});
+
+  // ── Per-card "Daily work" expandable (multi-day aware) ────────────────────
+  // Lazy-fetched per expand via /api/job-orders/[id]/work-history so the list
+  // itself stays a single fast query.
+  const [dailyWorkOpen, setDailyWorkOpen] = useState<Record<string, boolean>>({});
+  const [dailyWorkData, setDailyWorkData] = useState<Record<string, { loading: boolean; days: { day_number: number; items: WorkItemRow[] }[] }>>({});
+
+  const toggleDailyWork = async (jobId: string) => {
+    const willOpen = !dailyWorkOpen[jobId];
+    setDailyWorkOpen(prev => ({ ...prev, [jobId]: willOpen }));
+    if (!willOpen || dailyWorkData[jobId]) return; // already fetched
+
+    setDailyWorkData(prev => ({ ...prev, [jobId]: { loading: true, days: [] } }));
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch(`/api/job-orders/${jobId}/work-history`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const json = res.ok ? await res.json() : null;
+      const items: WorkItemRow[] = json?.data?.work_items || [];
+      const byDay = new Map<number, WorkItemRow[]>();
+      for (const it of items) {
+        const day = Number(it.day_number) || 1;
+        if (!byDay.has(day)) byDay.set(day, []);
+        byDay.get(day)!.push(it);
+      }
+      const days = Array.from(byDay.keys())
+        .sort((a, b) => a - b)
+        .map(day_number => ({ day_number, items: byDay.get(day_number)! }));
+      setDailyWorkData(prev => ({ ...prev, [jobId]: { loading: false, days } }));
+    } catch {
+      setDailyWorkData(prev => ({ ...prev, [jobId]: { loading: false, days: [] } }));
+    }
+  };
 
   // ── Duplicate modal state ────────────────────────────────────────────────
   const [duplicateTarget, setDuplicateTarget] = useState<ActiveJob | null>(null);
@@ -910,6 +951,16 @@ export default function ActiveJobsPage() {
                               {job.assigned_operator_name.trim().charAt(0).toUpperCase()}
                             </span>
                             {job.assigned_operator_name}
+                            {job.todays_operator_name &&
+                              job.todays_operator_name !== job.assigned_operator_name && (
+                              <span className="
+                                text-xs px-1.5 py-0.5 rounded-full font-medium ml-1
+                                bg-violet-100 text-violet-700 ring-1 ring-violet-200
+                                dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-400/30
+                              ">
+                                today: {job.todays_operator_name}
+                              </span>
+                            )}
                             {job.helper_assigned_name && (
                               <span className="text-xs text-slate-500 dark:text-white/50 ml-1">
                                 + {job.helper_assigned_name}
@@ -970,6 +1021,55 @@ export default function ActiveJobsPage() {
                         aria-hidden
                       />
                     </div>
+                  </div>
+
+                  {/* ── Daily work (what the operator logged, day by day) ── */}
+                  <div
+                    className="mt-3"
+                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  >
+                    <button
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleDailyWork(job.id); }}
+                      className="
+                        inline-flex items-center gap-1.5 min-h-[44px] px-3 -ml-1 rounded-lg text-xs font-semibold
+                        text-slate-500 hover:text-brand hover:bg-brand/5
+                        dark:text-white/50 dark:hover:text-brand dark:hover:bg-brand/10 transition-colors
+                      "
+                      aria-expanded={!!dailyWorkOpen[job.id]}
+                    >
+                      <ListChecks className="w-3.5 h-3.5" />
+                      Daily work
+                      <ChevronDown
+                        className={`w-3.5 h-3.5 transition-transform ${dailyWorkOpen[job.id] ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {dailyWorkOpen[job.id] && (
+                      <div className="mt-1 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-white/5 p-3 cursor-default">
+                        {dailyWorkData[job.id]?.loading ? (
+                          <p className="text-xs text-slate-400 dark:text-white/35 flex items-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" /> Loading daily work…
+                          </p>
+                        ) : (dailyWorkData[job.id]?.days.length ?? 0) === 0 ? (
+                          <p className="text-xs text-slate-400 dark:text-white/35 italic">
+                            No work logged yet.
+                          </p>
+                        ) : (
+                          <div className="space-y-3">
+                            {dailyWorkData[job.id]!.days.map((d) => (
+                              <div key={d.day_number}>
+                                {dailyWorkData[job.id]!.days.length > 1 && (
+                                  <p className="text-[10px] font-bold text-slate-400 dark:text-white/35 uppercase tracking-wide mb-1">
+                                    Day {d.day_number}
+                                  </p>
+                                )}
+                                <WorkItemsSummary items={d.items} />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </Link>
               );

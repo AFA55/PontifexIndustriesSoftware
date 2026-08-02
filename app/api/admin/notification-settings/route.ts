@@ -39,10 +39,16 @@ export async function GET(request: NextRequest) {
       data = {
         auto_clock_in_reminder: true,
         clock_in_reminder_time: '07:30',
+        auto_midday_work_reminder: true,
+        midday_work_reminder_time: '11:55',
         auto_overtime_alert: false,
         overtime_alert_threshold: 40,
         auto_timecard_approval_reminder: true,
       };
+    } else {
+      // Older rows predate the midday columns — surface the defaults.
+      data.auto_midday_work_reminder = data.auto_midday_work_reminder ?? true;
+      data.midday_work_reminder_time = data.midday_work_reminder_time ?? '11:55';
     }
 
     return NextResponse.json({ success: true, data });
@@ -61,6 +67,8 @@ export async function PUT(request: NextRequest) {
     const {
       auto_clock_in_reminder,
       clock_in_reminder_time,
+      auto_midday_work_reminder,
+      midday_work_reminder_time,
       auto_overtime_alert,
       overtime_alert_threshold,
       auto_timecard_approval_reminder,
@@ -81,6 +89,8 @@ export async function PUT(request: NextRequest) {
     const settingsData = {
       auto_clock_in_reminder: auto_clock_in_reminder ?? true,
       clock_in_reminder_time: clock_in_reminder_time ?? '07:30',
+      auto_midday_work_reminder: auto_midday_work_reminder ?? true,
+      midday_work_reminder_time: midday_work_reminder_time ?? '11:55',
       auto_overtime_alert: auto_overtime_alert ?? false,
       overtime_alert_threshold: overtime_alert_threshold ?? 40,
       auto_timecard_approval_reminder: auto_timecard_approval_reminder ?? true,

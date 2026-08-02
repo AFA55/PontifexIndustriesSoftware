@@ -528,6 +528,7 @@ interface FormData {
   orientation_datetime: string;
   badging_required: boolean;
   badging_type: string;
+  photos_prohibited: boolean;
   special_instructions: string;
   compliance_attachment_urls: string[];
   permit_required: boolean;
@@ -622,6 +623,7 @@ const initialFormData: FormData = {
   orientation_datetime: '',
   badging_required: false,
   badging_type: '',
+  photos_prohibited: false,
   special_instructions: '',
   compliance_attachment_urls: [],
   permit_required: false,
@@ -1886,6 +1888,9 @@ export default function ScheduleFormPage() {
           orientation_datetime: form.orientation_datetime || null,
           badging_required: form.badging_required,
           badging_type: form.badging_type || null,
+          // Secure-facility flag: operators' photo requirement is waived (with
+          // an explicit skip acknowledgment) when this is true.
+          photos_prohibited: form.photos_prohibited,
           special_instructions: form.special_instructions || null,
           attachment_urls: form.compliance_attachment_urls.length > 0 ? form.compliance_attachment_urls : undefined,
           facility_id: form.facility_id || null,
@@ -4273,6 +4278,19 @@ export default function ScheduleFormPage() {
                     />
                   )}
                 </div>
+              )}
+
+              <Toggle
+                checked={form.photos_prohibited}
+                onChange={v => updateForm({ photos_prohibited: v })}
+                label="Photos not allowed on this jobsite (secure facility)?"
+                icon={Eye}
+              />
+              {form.photos_prohibited && (
+                <p className="pl-4 border-l-2 border-amber-200 ml-2 text-xs text-amber-600 dark:text-amber-400">
+                  Operators will NOT be required to take job photos — they&apos;ll see a &ldquo;photos not
+                  permitted&rdquo; notice and confirm the skip instead.
+                </p>
               )}
             </SectionCard>
 

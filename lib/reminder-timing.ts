@@ -60,6 +60,15 @@ export function workReminderPhase(hoursIn: number): 'lunch' | 'overdue' | null {
   return null;
 }
 
+/**
+ * Whether the wall-clock midday "log your morning work" reminder is due.
+ * Window is [target-7, target+8] so an every-15-minute cron can never
+ * straddle-miss the target (mirrors the clock-in pre-window sizing).
+ */
+export function middayReminderDue(nowMin: number, targetMin: number): boolean {
+  return nowMin >= targetMin - 7 && nowMin <= targetMin + 8;
+}
+
 /** Format minutes-since-midnight as a 12-hour clock label, e.g. 450 → "7:30 AM". */
 export function minutesToLabel(mins: number): string {
   const h = Math.floor(mins / 60);

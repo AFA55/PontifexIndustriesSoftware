@@ -171,7 +171,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         notes,
         day_number,
         core_quantity,
+        core_size,
+        core_depth_inches,
         linear_feet_cut,
+        cut_depth_inches,
+        accessibility_rating,
+        accessibility_description,
         details_json,
         created_at
       `)
@@ -360,6 +365,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
       };
     }
 
+    // ── 7b. Full operator submissions grouped by day ───────────────────────
+    // The admin job page renders these next to the ORIGINAL scope: every hole
+    // size/depth, cuts/LF/wet-dry, per-item notes and the difficulty pick live
+    // in details_json + the accessibility columns (not in the lossy summary).
+    const workItemsByDayMap = new Map<number, any[]>();
+    for (const wi of workItems || []) {
+      const day = Number((wi as any).day_number) || 1;
+      if (!workItemsByDayMap.has(day)) workItemsByDayMap.set(day, []);
+      workItemsByDayMap.get(day)!.push({
+        ...(wi as any),
+        operator_name:
+          workItemOperatorMap[(wi as any).operator_id] ??
+          (operatorProfile?.full_name ?? null),
+      });
+    }
+    const workItemsByDay = Array.from(workItemsByDayMap.keys())
+      .sort((a, b) => a - b)
+      .map((day) => ({ day_number: day, items: workItemsByDayMap.get(day)! }));
+
     // ── 8. Determine is_last_day ────────────────────────────────────────────
     const todayStr = new Date().toISOString().split('T')[0];
     const isLastDay =
@@ -470,7 +494,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
               review_notes: completionRequest.review_notes,
             }
           : null,
-        photos: Array.isArray((job as any).photo_urls) ? (job as any).photo_urls : [],
+        work_items_by_day: workItemsByDay,
+        // job-photos bucket is PRIVATE (security F1) but photo_urls stores
+        // public-style URLs — sign them server-side or every <img> 404s.
+        photos: await (async () => {
+          const { signStoredUrls } = await import('@/lib/storage-url-server');
+          return signStoredUrls(Array.isArray((job as any).photo_urls) ? (job as any).photo_urls : []);
+        })(),
         is_last_day: isLastDay,
       },
     });

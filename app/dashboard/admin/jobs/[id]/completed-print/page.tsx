@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useBranding } from '@/lib/branding-context';
+import { workItemDetailLine } from '@/lib/work-items-format';
 
 interface SummaryJob {
   job_number: string;
@@ -36,10 +37,12 @@ interface WorkItem {
   quantity: number | null;
   linear_feet_cut: number | null;
   core_quantity: number | null;
+  core_size?: string | null;
   cut_depth_inches: number | null;
   core_depth_inches: number | null;
   notes: string | null;
-  details_json: { description?: string } | null;
+  day_number?: number | null;
+  details_json: ({ description?: string } & Record<string, unknown>) | null;
 }
 
 interface Timecard {
@@ -274,14 +277,20 @@ export default function CompletedTicketPrintPage({ params }: { params: Promise<{
           {workItems.length > 0 && (
             <ul className="text-sm space-y-0.5 mb-2">
               {workItems.map((w) => {
+                // Expand details_json (every hole size/depth, LF @ depth,
+                // wet/dry) instead of the bare qty/LF totals.
+                const detail = workItemDetailLine(w);
                 const parts = [
                   w.work_type || w.details_json?.description || 'Work',
                   w.quantity != null && Number(w.quantity) > 0 ? `qty ${w.quantity}` : null,
-                  Number(w.linear_feet_cut) > 0 ? `${w.linear_feet_cut} LF` : null,
-                  Number(w.core_quantity) > 0 ? `${w.core_quantity} cores` : null,
+                  detail || null,
                   w.notes || null,
                 ].filter(Boolean);
-                return <li key={w.id}>• {parts.join(' — ')}</li>;
+                return (
+                  <li key={w.id}>
+                    • {w.day_number ? `Day ${w.day_number}: ` : ''}{parts.join(' — ')}
+                  </li>
+                );
               })}
             </ul>
           )}

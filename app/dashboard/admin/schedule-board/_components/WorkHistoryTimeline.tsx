@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Clock, FileText, Loader2, CalendarDays, Wrench, MessageSquare } from 'lucide-react';
+import { workItemDetailLine } from '@/lib/work-items-format';
 
 interface DayLog {
   id: string;
@@ -20,10 +21,27 @@ interface DayLog {
 
 interface WorkItem {
   id: string;
-  description: string;
+  description?: string;
+  work_type?: string | null;
   quantity: number | null;
-  unit: string | null;
+  unit?: string | null;
+  core_quantity?: number | null;
+  core_size?: string | null;
+  core_depth_inches?: number | null;
+  linear_feet_cut?: number | null;
+  cut_depth_inches?: number | null;
+  notes?: string | null;
+  details_json?: any;
+  day_number?: number | null;
   created_at: string;
+}
+
+/** Compact "(qty/size/LF)" suffix for a list row — never raw JSON. */
+function itemDetailSuffix(item: WorkItem): string | null {
+  const detail = workItemDetailLine(item);
+  if (detail) return detail;
+  if (item.quantity && item.unit) return `${item.quantity} ${item.unit}`;
+  return null;
 }
 
 interface WorkHistoryTimelineProps {
@@ -110,18 +128,25 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
       {/* Day-by-day timeline */}
       {logs.map((log, idx) => {
         const workPerformed = log.work_performed;
-        const workList: { description: string; quantity?: number; unit?: string }[] = [];
+        const workList: { description: string; quantity?: number; unit?: string; detail?: string }[] = [];
 
         if (Array.isArray(workPerformed)) {
           workPerformed.forEach((item: any) => {
             if (typeof item === 'string') {
               workList.push({ description: item });
             } else if (item && typeof item === 'object') {
+              // `name` is the work-performed flow's label key and was missing
+              // from this chain — those items fell through to JSON.stringify
+              // blobs. Never render raw JSON; unknown shapes get a generic label.
+              const compact = workItemDetailLine(item);
               workList.push({
-                description: item.description || item.task || item.item || JSON.stringify(item),
+                description:
+                  item.name || item.description || item.task || item.item ||
+                  item.work_type || item.type || 'Work item',
                 quantity: item.quantity,
-                unit: item.unit,
-              });
+                unit: item.unit || (compact ? undefined : item.unit),
+                ...(compact ? { detail: compact } : {}),
+              } as any);
             }
           });
         } else if (workPerformed && typeof workPerformed === 'object') {
@@ -197,8 +222,13 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
                       {workList.map((item, i) => (
                         <li key={i} className="text-xs text-gray-700 dark:text-white/70 list-disc">
                           {item.description}
-                          {item.quantity && item.unit && (
+                          {item.quantity && item.unit ? (
                             <span className="text-gray-400 dark:text-white/30 ml-1">({item.quantity} {item.unit})</span>
+                          ) : item.quantity && item.quantity > 1 ? (
+                            <span className="text-gray-400 dark:text-white/30 ml-1">×{item.quantity}</span>
+                          ) : null}
+                          {item.detail && (
+                            <span className="text-gray-400 dark:text-white/30 ml-1">— {item.detail}</span>
                           )}
                         </li>
                       ))}
@@ -226,14 +256,24 @@ export default function WorkHistoryTimeline({ jobOrderId }: WorkHistoryTimelineP
             <FileText className="w-3 h-3" /> Work Items
           </div>
           <ul className="space-y-1 pl-4">
-            {workItems.map((item) => (
-              <li key={item.id} className="text-xs text-gray-700 dark:text-white/70 list-disc">
-                {item.description}
-                {item.quantity && item.unit && (
-                  <span className="text-gray-400 dark:text-white/30 ml-1">({item.quantity} {item.unit})</span>
-                )}
-              </li>
-            ))}
+            {workItems.map((item) => {
+              const suffix = itemDetailSuffix(item);
+              return (
+                <li key={item.id} className="text-xs text-gray-700 dark:text-white/70 list-disc">
+                  {/* work_items rows carry work_type, not description */}
+                  {item.work_type || item.description || 'Work item'}
+                  {item.quantity && Number(item.quantity) > 1 && (
+                    <span className="text-gray-400 dark:text-white/30 ml-1">×{item.quantity}</span>
+                  )}
+                  {suffix && (
+                    <span className="text-gray-400 dark:text-white/30 ml-1">— {suffix}</span>
+                  )}
+                  {item.notes && (
+                    <span className="text-gray-400 dark:text-white/30 ml-1 italic">“{item.notes}”</span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}

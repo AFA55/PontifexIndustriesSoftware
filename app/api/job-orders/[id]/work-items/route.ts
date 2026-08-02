@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { buildWorkPerformedSummary, difficultyToRating } from '@/lib/work-items-format';
 
 export async function POST(
   request: NextRequest,
@@ -23,7 +24,10 @@ export async function POST(
 
     const { id: jobId } = await params;
     const body = await request.json();
-    const { items, dayNumber } = body;
+    // `notes` = the job-level typed/voice day note; `difficulty` +
+    // `difficultyNotes` = the per-submission difficulty pick. `workDate` =
+    // the operator's local YYYY-MM-DD (anchors the day-note daily_job_logs row).
+    const { items, dayNumber, notes: dayNote, difficulty, difficultyNotes, workDate } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -61,16 +65,30 @@ export async function POST(
       .eq('job_order_id', jobId)
       .eq('day_number', effectiveDay);
 
+    // Per-submission difficulty → the 1–5 accessibility columns (same label
+    // map the daily-log route uses). Applied to every row of this submission.
+    const submissionRating = difficultyToRating(difficulty);
+    const submissionDifficultyNote =
+      typeof difficultyNotes === 'string' && difficultyNotes.trim()
+        ? difficultyNotes.trim()
+        : null;
+
     // Map frontend work items to database rows
     const workItemRows = items.map((item: any) => {
       const row: any = {
         job_order_id: jobId,
         operator_id: auth.userId,
+        // tenant_id has NO auto-set trigger — without stamping it here, every
+        // tenant-scoped admin read (summary, completion-summary) silently
+        // drops these rows.
+        tenant_id: job.tenant_id ?? callerTenantId ?? null,
         work_type: item.name,
         quantity: item.quantity || 1,
         notes: item.notes || null,
         day_number: effectiveDay,
         details_json: null,
+        accessibility_rating: submissionRating,
+        accessibility_description: submissionDifficultyNote,
       };
 
       // Extract specific fields from details based on work type
@@ -110,44 +128,16 @@ export async function POST(
     }
 
     // Build a comprehensive work_performed summary from ALL days (not just today)
-    // This prevents multi-day jobs from losing previous days' summaries
+    // — prevents multi-day jobs from losing previous days' summaries. The
+    // builder expands details_json (all hole sizes/depths, LF, wet/dry, notes)
+    // instead of the old lossy "Core Drilling x1". Feeds invoices + portal.
     const { data: allWorkItems } = await supabaseAdmin
       .from('work_items')
-      .select('work_type, quantity, core_quantity, linear_feet_cut, day_number')
+      .select('work_type, quantity, core_quantity, core_size, core_depth_inches, linear_feet_cut, cut_depth_inches, notes, details_json, day_number')
       .eq('job_order_id', jobId)
       .order('day_number', { ascending: true });
 
-    let workSummary = '';
-    if (allWorkItems && allWorkItems.length > 0) {
-      // Group by day
-      const byDay: Record<number, typeof allWorkItems> = {};
-      allWorkItems.forEach(wi => {
-        const d = wi.day_number || 1;
-        if (!byDay[d]) byDay[d] = [];
-        byDay[d].push(wi);
-      });
-
-      const dayKeys = Object.keys(byDay).map(Number).sort((a, b) => a - b);
-      if (dayKeys.length === 1) {
-        // Single day — no prefix
-        workSummary = byDay[dayKeys[0]].map(wi => {
-          let desc = `${wi.work_type} x${wi.quantity || 1}`;
-          if (wi.core_quantity) desc += ` (${wi.core_quantity} cores)`;
-          if (wi.linear_feet_cut) desc += ` (${wi.linear_feet_cut} LF)`;
-          return desc;
-        }).join('; ');
-      } else {
-        // Multi-day — prefix each day
-        workSummary = dayKeys.map(d =>
-          `Day ${d}: ${byDay[d].map(wi => {
-            let desc = `${wi.work_type} x${wi.quantity || 1}`;
-            if (wi.core_quantity) desc += ` (${wi.core_quantity} cores)`;
-            if (wi.linear_feet_cut) desc += ` (${wi.linear_feet_cut} LF)`;
-            return desc;
-          }).join(', ')}`
-        ).join(' | ');
-      }
-    }
+    const workSummary = buildWorkPerformedSummary(allWorkItems || []);
 
     {
       let summaryUpdate = supabaseAdmin
@@ -156,6 +146,43 @@ export async function POST(
         .eq('id', jobId);
       if (callerTenantId) summaryUpdate = summaryUpdate.eq('tenant_id', callerTenantId);
       await summaryUpdate;
+    }
+
+    // ── Persist the job-level day note (was silently dropped before) ─────────
+    // Stored on the operator's daily_job_logs row for today so it lives next
+    // to the day's work. Upsert touches ONLY `notes`; the day-complete flow
+    // later MERGES its own note onto this instead of overwriting (see
+    // /api/job-orders/[id]/daily-log). A resubmit from this page replaces the
+    // page's own previous note — intended.
+    if (typeof dayNote === 'string' && dayNote.trim()) {
+      let logDate =
+        typeof workDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(workDate) ? workDate : null;
+      if (!logDate) {
+        // Fall back to the tenant-local calendar date (never toISOString —
+        // that's the recurring UTC-off-by-a-day bug).
+        const { data: tenantRow } = job.tenant_id
+          ? await supabaseAdmin.from('tenants').select('timezone').eq('id', job.tenant_id).maybeSingle()
+          : { data: null };
+        const tz = (tenantRow as { timezone: string | null } | null)?.timezone || 'America/New_York';
+        logDate = new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
+      }
+      await supabaseAdmin
+        .from('daily_job_logs')
+        .upsert(
+          {
+            job_order_id: jobId,
+            operator_id: auth.userId,
+            log_date: logDate,
+            notes: dayNote.trim(),
+            // Stamp tenant_id: no trigger sets it, and tenant-filtered admin
+            // reads (completion-summary) silently drop unstamped rows.
+            tenant_id: job.tenant_id ?? callerTenantId ?? null,
+          },
+          { onConflict: 'job_order_id,operator_id,log_date' }
+        )
+        .then(({ error }) => {
+          if (error) console.error('Error saving day note to daily_job_logs:', error);
+        });
     }
 
     // ── Notify tenant admins (fire-and-forget) ────────────────────────────────

@@ -33,6 +33,8 @@ interface SentNotification {
 interface NotificationSettings {
   auto_clock_in_reminder: boolean;
   clock_in_reminder_time: string;
+  auto_midday_work_reminder: boolean;
+  midday_work_reminder_time: string;
   auto_overtime_alert: boolean;
   overtime_alert_threshold: number;
   auto_timecard_approval_reminder: boolean;
@@ -64,6 +66,8 @@ export default function AdminNotificationsPage() {
   const [settings, setSettings] = useState<NotificationSettings>({
     auto_clock_in_reminder: true,
     clock_in_reminder_time: '07:30',
+    auto_midday_work_reminder: true,
+    midday_work_reminder_time: '11:55',
     auto_overtime_alert: false,
     overtime_alert_threshold: 40,
     auto_timecard_approval_reminder: true,
@@ -589,6 +593,42 @@ export default function AdminNotificationsPage() {
                   />
                   <p className="text-xs text-gray-400 dark:text-white/40 mt-1.5">
                     All scheduled operators get the reminder around this time (your company timezone).
+                  </p>
+                </div>
+              )}
+
+              {/* Auto Midday Work Reminder — LIVE working control */}
+              <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-white/5 rounded-xl border border-gray-200 dark:border-white/10">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-white">Midday Work-Log Reminder</p>
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1">
+                    Around lunch, nudge clocked-in operators on an active job who haven&apos;t logged
+                    their morning work yet: &ldquo;log the work you&apos;ve done this morning.&rdquo;
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSettings(s => ({ ...s, auto_midday_work_reminder: !s.auto_midday_work_reminder }))}
+                  className={`p-1 rounded-lg transition-colors ${settings.auto_midday_work_reminder ? 'text-blue-600 dark:text-blue-400' : 'text-gray-400 dark:text-white/30'}`}
+                  aria-pressed={settings.auto_midday_work_reminder}
+                >
+                  {settings.auto_midday_work_reminder
+                    ? <ToggleRight className="w-8 h-8" />
+                    : <ToggleLeft className="w-8 h-8" />
+                  }
+                </button>
+              </div>
+
+              {settings.auto_midday_work_reminder && (
+                <div className="pl-4">
+                  <label className="text-xs text-gray-500 dark:text-white/40 font-semibold mb-1.5 block">Reminder Time</label>
+                  <input
+                    type="time"
+                    value={settings.midday_work_reminder_time}
+                    onChange={e => setSettings(s => ({ ...s, midday_work_reminder_time: e.target.value }))}
+                    className="px-4 py-2.5 bg-white border border-gray-300 rounded-xl text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:bg-white/5 dark:border-white/10 dark:text-white"
+                  />
+                  <p className="text-xs text-gray-400 dark:text-white/40 mt-1.5">
+                    Fires around this time (your company timezone) — only to operators who haven&apos;t logged work yet.
                   </p>
                 </div>
               )}

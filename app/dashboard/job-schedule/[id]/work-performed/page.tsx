@@ -7,6 +7,7 @@ import dynamicImport from 'next/dynamic';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { toLocalYMD } from '@/lib/dates';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import { Camera, Mic, Save, Zap, Home, CheckCircle2, ChevronDown, ChevronUp, Send, Loader2, MessageSquarePlus, Clock } from 'lucide-react';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
@@ -241,16 +242,23 @@ export default function WorkPerformed() {
   const [equipmentUsageEntries, setEquipmentUsageEntries] = useState<any[]>([]);
   const [showEquipmentForm, setShowEquipmentForm] = useState(false);
   const [savingEquipment, setSavingEquipment] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [jobDifficultyRating, setJobDifficultyRating] = useState<number>(0);
-  const [jobAccessRating, setJobAccessRating] = useState<number>(0);
+  // Per-submission difficulty (replaces the old dead rating states) — sent
+  // with the work items and stored on work_items.accessibility_rating/_description.
+  const [difficulty, setDifficulty] = useState<'' | 'easy' | 'moderate' | 'difficult'>('');
   const [difficultyNotes, setDifficultyNotes] = useState('');
-  const [accessNotes, setAccessNotes] = useState('');
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [jobType, setJobType] = useState<string>('');
   const [currentDayNumber, setCurrentDayNumber] = useState<number>(1);
   const [jobPhotos, setJobPhotos] = useState<string[]>([]);
   const [voiceNotes, setVoiceNotes] = useState<string>('');
+
+  // ─── Photo requirement gate ─────────────────────────────────────────────
+  // Photos are MANDATORY unless the office flagged the jobsite as
+  // photos-prohibited (job_orders.site_compliance.photos_prohibited). When
+  // flagged, the operator must explicitly acknowledge the skip instead.
+  const [photosProhibited, setPhotosProhibited] = useState(false);
+  const [photosSkipAcknowledged, setPhotosSkipAcknowledged] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
 
   // ─── Day lock state (read-only if today's daily log already submitted) ──────
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
@@ -302,6 +310,9 @@ export default function WorkPerformed() {
             return;
           }
           if (found?.job_type) setJobType(found.job_type);
+          // Photos-prohibited flag set by the office on the schedule form
+          // (site_compliance jsonb) — drives the mandatory-photo gate below.
+          setPhotosProhibited(found?.site_compliance?.photos_prohibited === true);
           // Calculate the current day number: total_days_worked + 1 (today is a new day)
           const daysWorked = found?.total_days_worked || 0;
           setCurrentDayNumber(daysWorked + 1);
@@ -1405,6 +1416,23 @@ export default function WorkPerformed() {
       return;
     }
 
+    // Photo gate: at least one photo is REQUIRED unless the jobsite is
+    // flagged photos-prohibited — and then the operator must explicitly
+    // acknowledge the skip (no silent self-exemption).
+    if (!photosProhibited && jobPhotos.length === 0) {
+      setPhotoError('At least one job photo is required before submitting.');
+      showNotification('Add at least one job photo before submitting', 'warning');
+      document.getElementById('job-photos-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (photosProhibited && !photosSkipAcknowledged) {
+      setPhotoError('Confirm that photos are not allowed on this jobsite.');
+      showNotification('Please confirm the photo skip for this jobsite', 'warning');
+      document.getElementById('job-photos-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    setPhotoError(null);
+
     if (isSubmitting) return;
     setIsSubmitting(true);
 
@@ -1422,7 +1450,12 @@ export default function WorkPerformed() {
           body: JSON.stringify({
             items: selectedItems,
             dayNumber: currentDayNumber,
-            notes: voiceNotes || undefined
+            notes: voiceNotes || undefined,
+            difficulty: difficulty || undefined,
+            difficultyNotes: difficultyNotes.trim() || undefined,
+            // Operator-local calendar date — anchors the day-note row
+            // (never toISOString; UTC shifts the day).
+            workDate: toLocalYMD(new Date()),
           })
         });
 
@@ -2215,36 +2248,72 @@ export default function WorkPerformed() {
 
         {!dayAlreadySubmitted && (
           <>
-            {/* Job Photos Section */}
-            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
+            {/* Job Photos Section — REQUIRED unless the office flagged the
+                jobsite photos-prohibited (then an explicit skip is required) */}
+            <div id="job-photos-section" className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
               <div className="flex items-center gap-2 mb-3">
                 <Camera className="w-5 h-5 text-brand" />
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Photos</h3>
-                <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
+                  Job Photos {!photosProhibited && <span className="text-red-500">*</span>}
+                </h3>
+                {!photosProhibited && (
+                  <span className="text-xs text-gray-400 dark:text-white/40">(required)</span>
+                )}
               </div>
-              <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
-                Document your work — site conditions, before/after, and your team in action
-              </p>
-              <PhotoUploader
-                bucket="job-photos"
-                pathPrefix={params.id as string}
-                photos={jobPhotos}
-                onPhotosChange={setJobPhotos}
-                maxPhotos={10}
-                label="Add Job Photos"
-                lightMode={true}
-                captureLocation
-                jobId={params.id as string}
-              />
-              <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
-                <span className="text-blue-500 text-lg flex-shrink-0">📸</span>
-                <div>
-                  <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Showcase your work!</p>
-                  <p className="text-xs text-blue-700 dark:text-blue-400">
-                    Photos of you and your crew working are encouraged — they demonstrate professionalism and effort to the customer.
+
+              {photosProhibited ? (
+                <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-3">
+                  <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                    Photos are not permitted at this jobsite
                   </p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 mb-3">
+                    The office flagged this site as photo-prohibited (secure facility). Confirm to skip photos for this submission.
+                  </p>
+                  {photosSkipAcknowledged ? (
+                    <p className="text-xs font-semibold text-green-700 dark:text-green-400 flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4" /> Photos skipped — not allowed on site
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { setPhotosSkipAcknowledged(true); setPhotoError(null); }}
+                      className="min-h-[44px] px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-sm font-semibold transition-colors"
+                    >
+                      Skip photos (not allowed on site)
+                    </button>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
+                    Document your work — site conditions, before/after, and your team in action. At least one photo is required.
+                  </p>
+                  <PhotoUploader
+                    bucket="job-photos"
+                    pathPrefix={params.id as string}
+                    photos={jobPhotos}
+                    onPhotosChange={(p) => { setJobPhotos(p); if (p.length > 0) setPhotoError(null); }}
+                    maxPhotos={10}
+                    label="Add Job Photos"
+                    lightMode={true}
+                    captureLocation
+                    jobId={params.id as string}
+                  />
+                  <div className="mt-3 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 flex items-start gap-2">
+                    <span className="text-blue-500 text-lg flex-shrink-0">📸</span>
+                    <div>
+                      <p className="text-xs font-semibold text-blue-800 dark:text-blue-300">Showcase your work!</p>
+                      <p className="text-xs text-blue-700 dark:text-blue-400">
+                        Photos of you and your crew working are encouraged — they demonstrate professionalism and effort to the customer.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {photoError && (
+                <p className="mt-3 text-xs font-semibold text-red-600 dark:text-red-400">{photoError}</p>
+              )}
             </div>
 
             {/* Voice Memo Notes */}
@@ -2262,6 +2331,45 @@ export default function WorkPerformed() {
                 onNotesChange={setVoiceNotes}
                 placeholder="Tap the mic and describe what you did today..."
               />
+            </div>
+
+            {/* Job Difficulty — one tap, stored with the work items so the
+                office sees how hard the site actually was */}
+            <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-5 h-5 text-brand" />
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">How difficult was this work?</h3>
+                <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {([
+                  { value: 'easy', label: 'Easy', active: 'bg-green-500 text-white ring-1 ring-green-400' },
+                  { value: 'moderate', label: 'Moderate', active: 'bg-amber-500 text-white ring-1 ring-amber-400' },
+                  { value: 'difficult', label: 'Difficult', active: 'bg-red-500 text-white ring-1 ring-red-400' },
+                ] as const).map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setDifficulty(difficulty === opt.value ? '' : opt.value)}
+                    className={`min-h-[44px] px-3 py-2.5 rounded-xl text-sm font-semibold transition-all ${
+                      difficulty === opt.value
+                        ? opt.active
+                        : 'bg-gray-50 dark:bg-white/[0.05] text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              {difficulty && (
+                <input
+                  type="text"
+                  value={difficultyNotes}
+                  onChange={(e) => setDifficultyNotes(e.target.value)}
+                  placeholder="What made it that way? (optional)"
+                  className="mt-3 w-full px-4 py-3 bg-gray-50 dark:bg-white/[0.05] border border-gray-200 dark:border-white/10 rounded-xl text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                />
+              )}
             </div>
           </>
         )}

@@ -44,7 +44,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
         expected_scope,
         billing_type,
         actual_end_date,
-        completion_submitted_at
+        completion_submitted_at,
+        photo_urls
       `)
       .eq('id', jobId);
 
@@ -149,7 +150,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // PDF buckets (completion-pdfs, contracts) are private (security F1) —
     // sign the doc URLs so the admin viewer can load them. signStoredUrl only
     // touches private-bucket URLs; others pass through unchanged.
-    const { signStoredUrl } = await import('@/lib/storage-url-server');
+    const { signStoredUrl, signStoredUrls } = await import('@/lib/storage-url-server');
     const j = job as any;
     const [completionPdf, liabilityPdf, workOrderPdf, silicaPdf] = await Promise.all([
       signStoredUrl(j.completion_pdf_url),
@@ -189,6 +190,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
           salesperson_id: null,
         },
         work_items: workItems || [],
+        // Operator job photos, SIGNED (job-photos bucket is private). The
+        // Completed Job Ticket page previously got no photos key and fell back
+        // to a nonexistent `job_photos` table — photos never showed.
+        photos: (
+          await signStoredUrls(Array.isArray(j.photo_urls) ? j.photo_urls : [])
+        ).map((url: string, i: number) => ({
+          id: `${(job as any).id}-photo-${i}`,
+          url,
+          caption: null,
+          uploaded_at: (job as any).completion_submitted_at ?? '',
+        })),
         daily_logs: dailyLogs || [],
         timecards: timecards || [],
         invoices,

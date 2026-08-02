@@ -215,7 +215,10 @@ export default function CompletedJobSummaryPage() {
       try { const { data: ms } = await supabase.from('billing_milestones').select('*').eq('job_order_id', jobId).order('milestone_percent', { ascending: true }); setMilestones((ms || []) as BillingMilestone[]); } catch (_) {}
       const { data: docs } = await supabase.from('pdf_documents').select('*').eq('job_id', jobId).eq('is_latest', true).order('generated_at', { ascending: false });
       setDocuments(docs || []);
-      try { const { data: ph } = await supabase.from('job_photos').select('*').eq('job_order_id', jobId).order('uploaded_at', { ascending: false }); setPhotos((ph || []) as Photo[]); } catch (_) {}
+      // Photos come from job_orders.photo_urls (signed) via the
+      // completion-summary API — there is no `job_photos` table. In this raw
+      // Supabase fallback the bucket is private, so leave photos empty rather
+      // than render broken unsigned URLs.
     } catch (err) { console.error('Error loading job summary:', err); } finally { setLoading(false); }
   };
 

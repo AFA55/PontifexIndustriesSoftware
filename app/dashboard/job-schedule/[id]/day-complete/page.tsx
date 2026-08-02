@@ -67,6 +67,9 @@ export default function DayCompletePage() {
   const [surveySubmitted, setSurveySubmitted] = useState(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
   const [completionPhotos, setCompletionPhotos] = useState<string[]>([]);
+  // Derived from job_orders.site_compliance.photos_prohibited (set by the
+  // office on the schedule form) — operators can no longer self-exempt via a
+  // local checkbox. Flag true → photo gate auto-satisfied + notice shown.
   const [photosProhibited, setPhotosProhibited] = useState(false);
   const [esignConsented, setEsignConsented] = useState(false);
   const [pdfSaved, setPdfSaved] = useState(false);
@@ -163,6 +166,9 @@ export default function DayCompletePage() {
         const data = await res.json();
         const jobData = data.data || data;
         setJob(jobData);
+        // Office-set photos-prohibited flag drives the photo gate — replaces
+        // the old operator-facing "photos prohibited" checkbox.
+        setPhotosProhibited(jobData?.site_compliance?.photos_prohibited === true);
         // Pre-fill phone from job data
         const phone = jobData.site_contact_phone || jobData.foreman_phone || '';
         setRemotePhone(phone);
@@ -1079,11 +1085,26 @@ export default function DayCompletePage() {
               <Camera className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">Completion Photos <span className="text-red-500">*</span></h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Required — before/after photos, site conditions</p>
+              <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">
+                Completion Photos {!photosProhibited && <span className="text-red-500">*</span>}
+              </h3>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                {photosProhibited ? 'Not allowed at this jobsite' : 'Required — before/after photos, site conditions'}
+              </p>
             </div>
           </div>
-          {!photosProhibited && (
+          {photosProhibited ? (
+            // Office flagged this jobsite photo-prohibited (secure facility) —
+            // the photo requirement is auto-waived; operators cannot self-exempt.
+            <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-xl p-3">
+              <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                Photos are not permitted at this jobsite
+              </p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+                This site is flagged photo-prohibited by the office — the photo requirement is skipped.
+              </p>
+            </div>
+          ) : (
             <PhotoUploader
               bucket="job-photos"
               pathPrefix={`${jobId}/completion`}
@@ -1096,16 +1117,6 @@ export default function DayCompletePage() {
               jobId={jobId}
             />
           )}
-          {/* Escape hatch: some sites (secure facilities) prohibit photos. */}
-          <label className="mt-3 flex items-center gap-2.5 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={photosProhibited}
-              onChange={(e) => { setPhotosProhibited(e.target.checked); if (e.target.checked) setCompletionPhotos([]); }}
-              className="w-5 h-5 rounded border-gray-300 text-brand focus:ring-brand"
-            />
-            <span className="text-sm text-gray-600 dark:text-gray-300">Photos prohibited on this site (no photos allowed)</span>
-          </label>
         </div>
 
         {/* ── Job Progress (against office-set targets; renders only if targets exist) ── */}

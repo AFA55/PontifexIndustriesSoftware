@@ -9,6 +9,10 @@ export const dynamic = 'force-dynamic';
  *
  *   - "Lunch" reminder ~4 hours into their shift
  *   - "Overdue" reminder once they hit ~7 hours and still haven't logged work
+ *   - "Midday" reminder at a tenant-configurable WALL-CLOCK time (default
+ *     11:55 tenant-local; notification_settings.auto_midday_work_reminder +
+ *     midday_work_reminder_time) for clocked-in operators on an active
+ *     dispatched job who haven't logged any work items yet today.
  *
  * Each fires at most once per operator per day (reminder_log dedup). Respects
  * per-user notification_preferences.
@@ -19,7 +23,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
-import { todayInTz, workReminderPhase } from '@/lib/reminder-timing';
+import { todayInTz, workReminderPhase, parseHHMM, nowMinutesInTz, middayReminderDue } from '@/lib/reminder-timing';
 
 const ACTIVE_STATUSES = ['scheduled', 'assigned', 'dispatched', 'in_route', 'in_progress', 'on_site'];
 
@@ -86,6 +90,56 @@ export async function GET(request: NextRequest) {
       const phoneMap = new Map<string, string | null>(
         (profiles || []).map((p: { id: string; phone: string | null; phone_number: string | null }) => [p.id, p.phone || p.phone_number || null])
       );
+
+      // ── Wall-clock MIDDAY phase (admin-configurable, default 11:55) ────────
+      // Separate from the shift-relative lunch/overdue phases below. Targets
+      // clocked-in operators on an active dispatched job who have NOT logged
+      // any work items today. "Submitted today" signal: a work_items row for
+      // their open job created since tenant-local midnight — cheap (one query
+      // per tenant) and reliable because the work-performed page writes
+      // work_items on every submit.
+      const { data: settingsRow } = await supabaseAdmin
+        .from('notification_settings')
+        .select('auto_midday_work_reminder, midday_work_reminder_time')
+        .eq('tenant_id', tenant.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const middayEnabled =
+        (settingsRow as { auto_midday_work_reminder: boolean | null } | null)?.auto_midday_work_reminder ?? true;
+      const middayTargetMin =
+        parseHHMM((settingsRow as { midday_work_reminder_time: string | null } | null)?.midday_work_reminder_time ?? null) ??
+        parseHHMM('11:55')!;
+      const nowMin = nowMinutesInTz(tz);
+
+      if (middayEnabled && middayReminderDue(nowMin, middayTargetMin) && jobByOp.size > 0) {
+        // Tenant-local midnight as a UTC instant (±1 min): now minus
+        // minutes-since-local-midnight. Never parse date strings as UTC here.
+        const localMidnightIso = new Date(nowMs - nowMin * 60_000).toISOString();
+        const { data: todayItems } = await supabaseAdmin
+          .from('work_items')
+          .select('operator_id')
+          .in('job_order_id', Array.from(new Set(jobByOp.values())))
+          .in('operator_id', Array.from(jobByOp.keys()))
+          .gte('created_at', localMidnightIso);
+        const loggedToday = new Set((todayItems || []).map((r: { operator_id: string }) => r.operator_id));
+
+        for (const [opId, jobId] of jobByOp) {
+          if (loggedToday.has(opId)) continue;
+          const res = await sendReminderOnce(`work_midday:${today}`, {
+            userId: opId,
+            tenantId: tenant.id,
+            category: 'work_performed_reminder',
+            inAppType: 'reminder',
+            title: 'Lunch check-in',
+            message: "Lunch check-in: log the work you've done this morning.",
+            jobOrderId: jobId,
+            actionUrl: `/dashboard/job-schedule/${jobId}/work-performed`,
+            smsPhone: phoneMap.get(opId) ?? null,
+          });
+          if (res) remindersSent++;
+        }
+      }
 
       for (const o of onClock) {
         const jobId = jobByOp.get(o.userId);

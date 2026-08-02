@@ -75,12 +75,14 @@ export async function GET(request: NextRequest) {
     const jobIds = jobs.map((j: any) => j.id);
     let workCountMap: Record<string, number> = {};
     if (jobIds.length > 0) {
+      // Column is job_order_id — the old `job_id` filter errored silently and
+      // left work_items_count permanently 0 on the dashboard card.
       const { data: workItems } = await supabaseAdmin
         .from('work_items')
-        .select('job_id')
-        .in('job_id', jobIds);
+        .select('job_order_id')
+        .in('job_order_id', jobIds);
       for (const wi of workItems ?? []) {
-        workCountMap[wi.job_id] = (workCountMap[wi.job_id] ?? 0) + 1;
+        workCountMap[wi.job_order_id] = (workCountMap[wi.job_order_id] ?? 0) + 1;
       }
     }
 

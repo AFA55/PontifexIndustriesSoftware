@@ -226,6 +226,28 @@ export async function POST(
       }
     }
 
+    // Merge notes instead of overwriting: the work-performed page may have
+    // already stored the operator's typed/voice day note on this row (see
+    // /api/job-orders/[id]/work-items). Append this flow's note to it rather
+    // than clobbering the morning's note; skip the append if it's already there
+    // (idempotent resubmit).
+    let mergedNotes: string | null = notes || null;
+    try {
+      const { data: priorLog } = await supabaseAdmin
+        .from('daily_job_logs')
+        .select('notes')
+        .eq('job_order_id', jobId)
+        .eq('operator_id', user.id)
+        .eq('log_date', effectiveDate)
+        .maybeSingle();
+      const prior = (priorLog as { notes: string | null } | null)?.notes || null;
+      if (prior && mergedNotes && prior !== mergedNotes && !prior.includes(mergedNotes)) {
+        mergedNotes = `${prior} | ${mergedNotes}`;
+      } else if (prior && !mergedNotes) {
+        mergedNotes = prior;
+      }
+    } catch { /* best-effort merge — fall back to the incoming note */ }
+
     // Create daily log entry — gracefully handle missing table
     let dailyLog = null;
     const { data: logData, error: logError } = await supabaseAdmin
@@ -236,11 +258,14 @@ export async function POST(
         job_order_id: jobId,
         operator_id: user.id,
         log_date: effectiveDate,
+        // Stamp tenant_id: no trigger sets it; unstamped rows vanish from
+        // tenant-filtered admin reads (undercounted hours on completed tickets).
+        tenant_id: job.tenant_id ?? null,
         route_started_at: job.route_started_at,
         work_started_at: job.work_started_at,
         day_completed_at: now,
         work_performed: workPerformed || [],
-        notes: notes || null,
+        notes: mergedNotes,
         hours_worked: Number(hoursWorked.toFixed(2)),
         daily_signer_name: signerName || null,
         daily_signature_data: signatureData || null,
@@ -275,6 +300,28 @@ export async function POST(
     // double-bills, and surface failures instead of silently producing a $0 invoice.
     if (workPerformed && Array.isArray(workPerformed) && workPerformed.length > 0) {
       const dayNum = dailyLog?.day_number ?? 1;
+
+      // GUARD against detail loss: the work-performed page already wrote this
+      // day's rows WITH details_json (all hole sizes/depths, cuts, wet/dry).
+      // The day-complete hydrate only carries flattened fields, so a blind
+      // delete+reinsert here would strip that richness minutes after it was
+      // captured. If richer rows already exist and this payload carries no
+      // details_json, keep the existing rows.
+      const payloadHasDetails = workPerformed.some((it: any) => it && it.details_json);
+      let skipRewrite = false;
+      if (!payloadHasDetails) {
+        const { data: existingRows } = await supabaseAdmin
+          .from('work_items')
+          .select('id, details_json')
+          .eq('job_order_id', jobId)
+          .eq('operator_id', user.id)
+          .eq('day_number', dayNum)
+          .limit(50);
+        // Existing rows are richer than the incoming payload — keep them.
+        skipRewrite = (existingRows || []).some((r: any) => r.details_json);
+      }
+
+      if (!skipRewrite) {
       const workItemRows = workPerformed.map((item: any) => {
         // The work-performed flow carries the category in `item.name` (see
         // /api/job-orders/[id]/work-items, which maps `work_type: item.name`).
@@ -291,6 +338,9 @@ export async function POST(
         return {
         job_order_id: jobId,
         operator_id: user.id,
+        // tenant_id has no auto-set trigger; without it, tenant-scoped admin
+        // reads silently drop these rows.
+        tenant_id: job.tenant_id ?? tenantId ?? null,
         day_number: dayNum,
         work_type: resolvedWorkType || 'unspecified',
         quantity: Number(item.quantity) || 1,
@@ -299,6 +349,7 @@ export async function POST(
         core_depth_inches: item.core_depth_inches ? Number(item.core_depth_inches) : null,
         linear_feet_cut: item.linear_feet_cut ? Number(item.linear_feet_cut) : null,
         cut_depth_inches: item.cut_depth_inches ? Number(item.cut_depth_inches) : null,
+        details_json: item.details_json ?? null,
         accessibility_rating: typeof item.accessibility_rating === 'string'
           ? ({ easy: 1, moderate: 2, medium: 3, difficult: 4, hard: 5 } as Record<string, number>)[item.accessibility_rating] || null
           : item.accessibility_rating ? Number(item.accessibility_rating) : null,
@@ -319,6 +370,7 @@ export async function POST(
         console.error('Error saving work items to DB:', wiError);
         return NextResponse.json({ error: 'Failed to save work items' }, { status: 500 });
       }
+      } // end !skipRewrite
     }
 
     if (continueNextDay) {

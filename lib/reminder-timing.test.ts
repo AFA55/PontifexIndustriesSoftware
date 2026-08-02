@@ -7,6 +7,7 @@ import {
   parseHHMM,
   clockInReminderPhase,
   workReminderPhase,
+  middayReminderDue,
   minutesToLabel,
   nowMinutesInTz,
   LUNCH_HOURS,
@@ -77,6 +78,34 @@ describe('minutesToLabel', () => {
     expect(minutesToLabel(720)).toBe('12:00 PM');
     expect(minutesToLabel(780)).toBe('1:00 PM');
     expect(minutesToLabel(1380)).toBe('11:00 PM');
+  });
+});
+
+describe('middayReminderDue', () => {
+  const TARGET = parseHHMM('11:55')!; // 715
+
+  it('is due inside the [target-7, target+8] window', () => {
+    expect(middayReminderDue(TARGET, TARGET)).toBe(true);        // 11:55 exactly
+    expect(middayReminderDue(TARGET - 7, TARGET)).toBe(true);    // 11:48 edge
+    expect(middayReminderDue(TARGET + 8, TARGET)).toBe(true);    // 12:03 edge
+  });
+
+  it('is NOT due outside the window', () => {
+    expect(middayReminderDue(TARGET - 8, TARGET)).toBe(false);   // 11:47
+    expect(middayReminderDue(TARGET + 9, TARGET)).toBe(false);   // 12:04
+    expect(middayReminderDue(0, TARGET)).toBe(false);            // midnight
+    expect(middayReminderDue(TARGET + 300, TARGET)).toBe(false); // late afternoon
+  });
+
+  it('every-15-min cron cannot straddle-miss the target (window spans 16 min)', () => {
+    // For any cron offset 0..14, at least one run lands in the window.
+    for (let offset = 0; offset < 15; offset++) {
+      let hits = 0;
+      for (let t = offset; t < 24 * 60; t += 15) {
+        if (middayReminderDue(t, TARGET)) hits++;
+      }
+      expect(hits).toBeGreaterThanOrEqual(1);
+    }
   });
 });
 

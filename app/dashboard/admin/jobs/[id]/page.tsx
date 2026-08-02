@@ -42,6 +42,8 @@ import {
 } from 'lucide-react';
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import SendOptInRequestButton from '@/components/SendOptInRequestButton';
+import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
+import WorkItemsSummary, { type WorkItemRow } from '@/components/WorkItemsSummary';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
@@ -105,6 +107,13 @@ interface JobSummary {
   utility_waiver_signer_name?: string | null;
   utility_waiver_signed_at?: string | null;
   commission_rate?: number | null;
+  scope_details?: Record<string, Record<string, string>> | null;
+  jobsite_conditions?: { overcutting_allowed?: boolean } | null;
+}
+
+interface WorkItemsDay {
+  day_number: number;
+  items: WorkItemRow[];
 }
 
 interface ActivityEntry {
@@ -421,6 +430,9 @@ export default function AdminJobDetailPage({
   // Photos uploaded by the operator
   const [photos, setPhotos] = useState<string[]>([]);
 
+  // Full operator work submissions, grouped by day (from /summary)
+  const [workItemsByDay, setWorkItemsByDay] = useState<WorkItemsDay[]>([]);
+
   // Edit timestamp modal
   const [editTimestampField, setEditTimestampField] = useState<{
     field: EditableTimestampField;
@@ -516,6 +528,7 @@ export default function AdminJobDetailPage({
       const json = await res.json();
       setJob(json.data.job);
       setPhotos(Array.isArray(json.data?.photos) ? json.data.photos : []);
+      setWorkItemsByDay(Array.isArray(json.data?.work_items_by_day) ? json.data.work_items_by_day : []);
     } catch {
       setPageError({ message: 'Network error loading job.' });
     }
@@ -1340,6 +1353,42 @@ export default function AdminJobDetailPage({
 
             <JobProgressChart jobId={jobId} scopeItems={scopeItems} />
 
+            {/* ── Original Scope vs Work Performed — adjacent so the office can
+                 compare what was SOLD against what the operator REPORTED
+                 (side-by-side on xl, stacked on mobile) ── */}
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-start">
+
+            {/* ── Original Scope (from the schedule form) ── */}
+            <div className="
+              relative overflow-hidden rounded-2xl p-6 shadow-sm
+              bg-white border border-slate-200
+              dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+              dark:border-white/10 dark:backdrop-blur
+            ">
+              <span className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-brand via-brand-secondary to-brand-accent" aria-hidden />
+              <div className="flex items-center gap-2 mb-4">
+                <span className="inline-flex items-center justify-center w-8 h-8 rounded-xl bg-brand/10 text-brand dark:bg-brand/15 dark:text-brand">
+                  <FileText className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Original Scope</h2>
+                <span className="ml-auto text-[10px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/35">
+                  As scheduled
+                </span>
+              </div>
+              {job.scope_details && Object.keys(job.scope_details).length > 0 ? (
+                <ScopeDetailsDisplay
+                  scopeDetails={job.scope_details}
+                  fallbackOvercutAllowed={job.jobsite_conditions?.overcutting_allowed === true}
+                />
+              ) : job.description ? (
+                <p className="text-sm text-slate-600 dark:text-white/65 whitespace-pre-wrap">{job.description}</p>
+              ) : (
+                <p className="text-sm text-slate-400 dark:text-white/35 italic">
+                  No structured scope was entered on the schedule form.
+                </p>
+              )}
+            </div>
+
             {/* ── Daily Progress Section ── */}
             <div
               id="daily-progress-section"
@@ -1361,12 +1410,12 @@ export default function AdminJobDetailPage({
                 )}
               </div>
 
-              {dailyLogs.length === 0 ? (
+              {dailyLogs.length === 0 && workItemsByDay.length === 0 ? (
                 <div className="text-center py-8">
                   <Activity className="w-10 h-10 text-slate-200 dark:text-white/15 mx-auto mb-3" />
                   <p className="text-sm text-slate-500 dark:text-white/50">No progress logged yet.</p>
                   <p className="text-xs text-slate-400 dark:text-white/35 mt-1">
-                    Data appears here after the operator submits &ldquo;Done for Today&rdquo;.
+                    Data appears here as soon as the operator logs work performed.
                   </p>
                 </div>
               ) : (
@@ -1457,56 +1506,71 @@ export default function AdminJobDetailPage({
                             </div>
                           )}
 
-                          {/* Work performed items */}
-                          {workItems.length > 0 ? (
-                            <div>
-                              <p className="text-xs font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wide mb-2 flex items-center gap-1">
-                                <ListChecks className="w-3.5 h-3.5" />
-                                Work Performed
-                              </p>
-                              <ul className="space-y-1.5">
-                                {workItems.map((item, itemIdx) => {
-                                  const label =
-                                    item.name ||
-                                    item.work_type ||
-                                    item.type ||
-                                    'Work Item';
-                                  const qty = item.quantity
-                                    ? `× ${item.quantity}`
-                                    : item.linear_feet_cut
-                                    ? `${item.linear_feet_cut} lin ft`
-                                    : item.core_quantity
-                                    ? `${item.core_quantity} cores${item.core_size ? ` (${item.core_size})` : ''}`
-                                    : null;
-                                  const detail = item.details || item.notes;
-                                  return (
-                                    <li key={itemIdx} className="flex items-start gap-2 text-sm">
-                                      <span className="w-1.5 h-1.5 mt-2 rounded-full bg-brand-accent flex-shrink-0" />
-                                      <div>
-                                        <span className="font-medium text-slate-800 dark:text-white/85">
-                                          {label}
-                                        </span>
-                                        {qty && (
-                                          <span className="ml-1.5 text-xs font-mono text-brand dark:text-brand">
-                                            {qty}
-                                          </span>
-                                        )}
-                                        {detail && (
-                                          <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5">
-                                            {detail}
-                                          </p>
-                                        )}
-                                      </div>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          ) : (
-                            <p className="text-xs text-slate-400 dark:text-white/35 italic">
-                              No work items recorded for this day.
-                            </p>
-                          )}
+                          {/* Work performed items — sourced from work_items
+                              (details_json expanded: every hole size/depth,
+                              LF, wet/dry, notes, difficulty). The old render
+                              off log.work_performed showed only "label × qty"
+                              and printed the details OBJECT as garbage. */}
+                          {(() => {
+                            const dayItems =
+                              workItemsByDay.find((d) => d.day_number === dayNum)?.items ?? [];
+                            if (dayItems.length === 0 && workItems.length === 0) {
+                              return (
+                                <p className="text-xs text-slate-400 dark:text-white/35 italic">
+                                  No work items recorded for this day.
+                                </p>
+                              );
+                            }
+                            return (
+                              <div>
+                                <p className="text-xs font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wide mb-2 flex items-center gap-1">
+                                  <ListChecks className="w-3.5 h-3.5" />
+                                  Work Performed
+                                </p>
+                                {dayItems.length > 0 ? (
+                                  <WorkItemsSummary items={dayItems} />
+                                ) : (
+                                  // Legacy fallback: log.work_performed JSON for
+                                  // rows predating the work_items pipeline. Never
+                                  // render the details object raw.
+                                  <ul className="space-y-1.5">
+                                    {workItems.map((item, itemIdx) => {
+                                      const label = item.name || item.work_type || item.type || 'Work Item';
+                                      const qty = item.quantity
+                                        ? `× ${item.quantity}`
+                                        : item.linear_feet_cut
+                                        ? `${item.linear_feet_cut} lin ft`
+                                        : item.core_quantity
+                                        ? `${item.core_quantity} cores${item.core_size ? ` (${item.core_size})` : ''}`
+                                        : null;
+                                      const detail =
+                                        typeof item.details === 'string' ? item.details : item.notes;
+                                      return (
+                                        <li key={itemIdx} className="flex items-start gap-2 text-sm">
+                                          <span className="w-1.5 h-1.5 mt-2 rounded-full bg-brand-accent flex-shrink-0" />
+                                          <div>
+                                            <span className="font-medium text-slate-800 dark:text-white/85">
+                                              {label}
+                                            </span>
+                                            {qty && (
+                                              <span className="ml-1.5 text-xs font-mono text-brand dark:text-brand">
+                                                {qty}
+                                              </span>
+                                            )}
+                                            {detail && (
+                                              <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5">
+                                                {detail}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </li>
+                                      );
+                                    })}
+                                  </ul>
+                                )}
+                              </div>
+                            );
+                          })()}
 
                           {/* Notes */}
                           {log.notes && (
@@ -1532,9 +1596,42 @@ export default function AdminJobDetailPage({
                       </div>
                     );
                   })}
+
+                  {/* Days with submitted work but no completed daily log yet
+                      (operator logged work midday, hasn't hit Done for Today) */}
+                  {workItemsByDay
+                    .filter((d) => !dailyLogs.some((l, idx) => (l.day_number ?? idx + 1) === d.day_number))
+                    .map((d) => (
+                      <div
+                        key={`wip-${d.day_number}`}
+                        className="rounded-xl border border-dashed border-amber-300 dark:border-amber-400/40 overflow-hidden"
+                      >
+                        <div className="flex items-center gap-3 px-4 py-3 bg-amber-50/60 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-400/20">
+                          <span className="
+                            inline-flex items-center justify-center w-8 h-8 rounded-lg text-sm font-bold
+                            bg-gradient-to-br from-amber-400 to-orange-500 text-white flex-shrink-0
+                          ">
+                            {d.day_number}
+                          </span>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-slate-800 dark:text-white">
+                              Day {d.day_number} — in progress
+                            </p>
+                            <p className="text-xs text-amber-600 dark:text-amber-400">
+                              Work logged; day not wrapped up yet
+                            </p>
+                          </div>
+                        </div>
+                        <div className="px-4 py-3">
+                          <WorkItemsSummary items={d.items} />
+                        </div>
+                      </div>
+                    ))}
                 </div>
               )}
             </div>
+
+            </div>{/* end Original Scope / Daily Progress grid */}
 
             {/* ── Job Photos Section ── */}
             <div className="
