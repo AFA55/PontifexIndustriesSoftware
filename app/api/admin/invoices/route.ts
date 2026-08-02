@@ -318,6 +318,10 @@ export async function POST(request: NextRequest) {
       );
     };
 
+    // The BILLING rate for T&M labor lines. Internal labor COST (wages ×
+    // burden, /api/admin/job-pnl/[id]) is deliberately NOT used for invoice
+    // amounts — cost ≠ price. A tenant-configurable labor_billing_rate is the
+    // future upgrade; until then this matches the long-standing behavior.
     const DEFAULT_LABOR_RATE = 125; // $/hr
 
     // Build line items — routed by billing_type to avoid double-billing
@@ -343,7 +347,13 @@ export async function POST(request: NextRequest) {
       subtotal += amount;
 
     } else if (billingType === 'time_and_material') {
-      // T&M: labor hours only — per-unit rates are already embedded
+      // T&M: labor hours only — per-unit rates are already embedded.
+      // ⚠️ Labor COST ≠ labor PRICE (guardian catch): the customer is billed
+      // at the BILLING rate, never at internal wages+burden — billing at
+      // burdened payroll cost would silently cut T&M invoices ~60% the day
+      // wages get entered. Wages+burden power the P&L/cost displays ONLY.
+      // Quantity stays the legacy daily-log hours so amounts are unchanged;
+      // switching the billed quantity to bounded hours is a founder decision.
       if (laborHours > 0) {
         const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
         lineItems.push({

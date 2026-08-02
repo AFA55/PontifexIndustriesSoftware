@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import UserAvatar from '@/components/UserAvatar';
+import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
 import {
   ArrowLeft, Clock, DollarSign, Users, TrendingUp, TrendingDown,
   CheckCircle, AlertTriangle, BarChart3, Calendar, User as UserIcon,
@@ -114,6 +115,8 @@ export default function JobPnlDetailPage() {
   const [workerSummary, setWorkerSummary] = useState<WorkerSummary[]>([]);
   const [totals, setTotals] = useState<Totals | null>(null);
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
+  const [labor, setLabor] = useState<LaborBreakdownDTO | null>(null);
+  const [showLaborModal, setShowLaborModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const params = useParams();
@@ -146,6 +149,7 @@ export default function JobPnlDetailPage() {
         setWorkerSummary(result.data.workerSummary);
         setTotals(result.data.totals);
         setCostBreakdown(result.data.costBreakdown);
+        setLabor(result.data.labor || null);
       }
     } catch (err) {
       console.error('Job P&L detail fetch error:', err);
@@ -252,7 +256,17 @@ export default function JobPnlDetailPage() {
                   </div>
                   <div>
                     <p className="opacity-60 mb-0.5">Labor Cost</p>
-                    <p className="font-bold">${fmt(totals.totalLaborCost)}</p>
+                    {/* Clickable — opens the full who/hours/rate/burden breakdown */}
+                    <button
+                      type="button"
+                      onClick={() => setShowLaborModal(true)}
+                      className="font-bold underline decoration-dotted underline-offset-2 hover:opacity-80 transition-opacity text-left min-h-[28px]"
+                      title="View labor cost breakdown"
+                    >
+                      {labor && labor.totals.line_count > 0 && labor.totals.any_rate_missing
+                        ? 'rates not set'
+                        : `$${fmt(totals.totalLaborCost)}`}
+                    </button>
                   </div>
                   {job.track_financials && (
                     <div>
@@ -528,6 +542,13 @@ export default function JobPnlDetailPage() {
           </div>
         )}
       </div>
+
+      <LaborCostBreakdown
+        open={showLaborModal}
+        onClose={() => setShowLaborModal(false)}
+        jobNumber={job?.job_number}
+        labor={labor}
+      />
     </div>
   );
 }

@@ -11,7 +11,7 @@ import {
   Bell, Minus, Plus, Palette, ChevronRight,
   CreditCard, ExternalLink, ArrowUpRight, MessageSquareWarning,
   Building2, Shield, Wifi, Coins, CalendarDays, DatabaseBackup,
-  DollarSign, Car,
+  DollarSign, Car, Percent,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
@@ -269,6 +269,8 @@ interface JobCostStandards {
   default_mileage_rate: number;
   default_equipment_cost: number;
   default_other_cost: number;
+  /** % markup on raw wages for labor-cost math (taxes, comp, insurance). 0–100. */
+  labor_burden_pct: number;
 }
 
 function JobCostStandardsSection({ userRole }: { userRole: string }) {
@@ -385,21 +387,46 @@ function JobCostStandardsSection({ userRole }: { userRole: string }) {
           other cost tracking can be added later if you want it.
         </p>
 
-        <div className="max-w-xs">
-          <div className="flex items-center gap-2 mb-1.5">
-            <Car className="w-4 h-4 text-brand" />
-            <label className="text-xs font-bold text-gray-600 dark:text-white/60">Mileage Rate ($/mile)</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-2xl">
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Car className="w-4 h-4 text-brand" />
+              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Mileage Rate ($/mile)</label>
+            </div>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
+              <input
+                type="number"
+                min={0}
+                step={0.01}
+                value={standards.default_mileage_rate}
+                onChange={(e) => update('default_mileage_rate', e.target.value)}
+                className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
+              />
+            </div>
           </div>
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
-            <input
-              type="number"
-              min={0}
-              step={0.01}
-              value={standards.default_mileage_rate}
-              onChange={(e) => update('default_mileage_rate', e.target.value)}
-              className="w-full pl-7 pr-3 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
-            />
+
+          <div>
+            <div className="flex items-center gap-2 mb-1.5">
+              <Percent className="w-4 h-4 text-brand" />
+              <label className="text-xs font-bold text-gray-600 dark:text-white/60">Labor Burden (%)</label>
+            </div>
+            <div className="relative">
+              <input
+                type="number"
+                min={0}
+                max={100}
+                step={1}
+                value={standards.labor_burden_pct}
+                onChange={(e) => update('labor_burden_pct', e.target.value)}
+                className="w-full pl-3 pr-8 py-2.5 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-brand focus:border-transparent dark:bg-white/5 dark:border-white/10 dark:text-white"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+            </div>
+            <p className="text-[11px] text-gray-500 dark:text-white/50 mt-1.5">
+              Markup on raw wages for TRUE labor cost (payroll taxes, workers comp, insurance).
+              Default 25%. Used everywhere labor cost is shown or invoiced.
+            </p>
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import { buildLaborBreakdown, getTenantLaborBurdenPct } from '@/lib/labor-cost-server';
 
 export async function GET(
   request: NextRequest,
@@ -30,7 +31,7 @@ export async function GET(
     // Fetch job details (tenant-scoped — this response includes payroll/hourly-rate data)
     let jobQuery = supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate')
+      .select('id, tenant_id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate, work_started_at, route_started_at, work_completed_at')
       .eq('id', jobId)
       .is('deleted_at', null);
     if (authResult.role !== 'super_admin') {
@@ -157,8 +158,30 @@ export async function GET(
     }
 
     const totalLaborHours = [...timecardEntries, ...helperEntries].reduce((s, e) => s + (e.total_hours || 0), 0);
-    const totalLaborCost  = [...timecardEntries, ...helperEntries].reduce((s, e) => s + (e.labor_cost  || 0), 0);
+    const legacyLaborCost = [...timecardEntries, ...helperEntries].reduce((s, e) => s + (e.labor_cost  || 0), 0);
     const jobQuote = job.job_quote || 0;
+
+    // ── TRUE labor cost (lib/labor-cost) — the ONE source every screen reads ──
+    // Bounded job hours per card × the worker's wage × (1 + tenant burden %).
+    // Replaces the per-screen hardcoded rate ladders ($75 / $125–187.5) that
+    // showed three different labor costs for the same job (founder, Aug 1).
+    const burdenPct = await getTenantLaborBurdenPct(
+      (job as { tenant_id?: string | null }).tenant_id ?? authResult.tenantId ?? null
+    );
+    const labor = buildLaborBreakdown({
+      job: {
+        work_started_at: (job as any).work_started_at ?? null,
+        route_started_at: (job as any).route_started_at ?? null,
+        work_completed_at: (job as any).work_completed_at ?? null,
+      },
+      timecards: timecards || [],
+      helperLogs: helperLogs || [],
+      burdenPct,
+    });
+    // Prefer the burdened bounded cost when wages exist; the legacy trigger
+    // figure (timecards.labor_cost) is $0 until wages are set, so this is the
+    // upgrade path, not a silent change.
+    const totalLaborCost = labor.totals.total > 0 ? labor.totals.total : legacyLaborCost;
 
     // track_financials gates the non-labor cost fields; jobs created before this
     // feature default to false and must reduce to the original labor-only formula.
@@ -190,6 +213,7 @@ export async function GET(
         },
         timecardEntries,
         helperEntries,
+        labor,
         workerSummary: Object.values(workerMap).sort((a, b) => b.total_hours - a.total_hours),
         costBreakdown: trackFinancials ? {
           driveDistanceMiles: job.drive_distance_miles ?? 0,

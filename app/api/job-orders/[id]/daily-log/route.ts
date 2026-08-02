@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { boundedJobHours, clampDailyLogHours, MAX_DAILY_LOG_HOURS } from '@/lib/labor-cost';
 
 export async function POST(
   request: NextRequest,
@@ -182,29 +183,28 @@ export async function POST(
       }
     }
 
-    // Calculate hours worked today.
-    // Prefer the operator's timecard for the day (clock_in / clock_out / total_hours)
-    // because it accounts for breaks/lunch. If no timecard exists yet (operator
-    // submitting day-complete before clocking out), fall back to wall-clock since
-    // work_started_at — flagged so admins know to verify.
+    // Calculate hours worked today — BOUNDED (founder Aug 1: the "57-hour job").
+    // Prefer the operator's timecards for the day, but never book a whole card
+    // to the job: each card contributes only boundedJobHours() — the
+    // intersection of its clocked span with the job's activity window
+    // (work_started_at ?? route_started_at → work_completed_at ?? clock-out),
+    // shop-flagged cards contribute 0, and hours are capped at the card's
+    // lunch-adjusted total_hours. Summing ALL of the day's cards also fixes the
+    // old first-card-only read (a morning shop card used to book its shop
+    // hours to the job). Rules + tests live in lib/labor-cost.ts.
     let hoursWorked = 0;
     let hoursSource: 'timecard' | 'wall_clock' = 'wall_clock';
     try {
-      const { data: tc } = await supabaseAdmin
+      const { data: dayCards } = await supabaseAdmin
         .from('timecards')
-        .select('clock_in_time, clock_out_time, total_hours')
+        .select('clock_in_time, clock_out_time, total_hours, is_shop_hours, work_location')
         .eq('user_id', user.id)
         .eq('date', effectiveDate)
-        .order('clock_in_time', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (tc?.total_hours != null) {
-        hoursWorked = Number(tc.total_hours);
-        hoursSource = 'timecard';
-      } else if (tc?.clock_in_time && tc?.clock_out_time) {
-        hoursWorked =
-          (new Date(tc.clock_out_time).getTime() - new Date(tc.clock_in_time).getTime()) /
-          3600000;
+        .order('clock_in_time', { ascending: true });
+      if (dayCards && dayCards.length > 0) {
+        hoursWorked = dayCards.reduce((sum, tc) => sum + boundedJobHours(tc, job), 0);
+        // A timecard day of ONLY shop cards legitimately books 0 job hours —
+        // do NOT fall through to wall-clock in that case.
         hoursSource = 'timecard';
       }
     } catch {
@@ -217,12 +217,37 @@ export async function POST(
         // admins reconcile hours from the timecard side.
         hoursWorked = 0;
       } else {
+        // Wall-clock fallback (no timecard yet), now BOUNDED TO TODAY. The
+        // verified 52.59h prod row happened here: work_started_at survived
+        // from 2 days earlier (operator skipped the "continue next day" path
+        // that clears it), so now − work_started_at crossed calendar days.
+        // Rule: hours can never exceed (a) time since the TENANT-LOCAL
+        // midnight (a same-day log cannot contain yesterday), nor
+        // (b) MAX_DAILY_LOG_HOURS (16h hard ceiling).
         const routeStarted = job.route_started_at ? new Date(job.route_started_at) : null;
         const workStarted = job.work_started_at ? new Date(job.work_started_at) : null;
         const startTime = workStarted || routeStarted;
-        hoursWorked = startTime
+        const rawHours = startTime
           ? (new Date().getTime() - startTime.getTime()) / 3600000
           : 0;
+        let sinceLocalMidnight = MAX_DAILY_LOG_HOURS;
+        try {
+          const parts = new Intl.DateTimeFormat('en-US', {
+            timeZone: tenantTz,
+            hourCycle: 'h23',
+            hour: '2-digit',
+            minute: '2-digit',
+          }).formatToParts(new Date());
+          const hh = Number(parts.find((p) => p.type === 'hour')?.value ?? NaN);
+          const mm = Number(parts.find((p) => p.type === 'minute')?.value ?? NaN);
+          if (Number.isFinite(hh) && Number.isFinite(mm)) {
+            sinceLocalMidnight = hh + mm / 60;
+          }
+        } catch { /* keep the 16h ceiling */ }
+        hoursWorked = clampDailyLogHours(
+          Math.min(rawHours, sinceLocalMidnight),
+          MAX_DAILY_LOG_HOURS
+        );
       }
     }
 

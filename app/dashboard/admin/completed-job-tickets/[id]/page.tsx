@@ -7,6 +7,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
 import { CompletedJobTicketSkeleton } from './_skeleton';
 import { RevealSection } from '@/components/ui/Skeleton';
 import {
@@ -40,9 +41,10 @@ interface ScopeMetric { label: string; actual: number; expected: number; pct: nu
 interface Photo { id: string; url: string; caption: string | null; uploaded_at: string; }
 interface SigRequest { id: string; token: string; contact_name: string | null; contact_email: string | null; status: string; sent_at: string | null; signed_at: string | null; expires_at: string; signing_url: string; is_expired: boolean; }
 
-const RATE_REGULAR = 125;
-const RATE_OT = 187.5;
-const RATE_NS = 150;
+// Labor COST comes exclusively from /api/admin/job-pnl/[id] (bounded hours ×
+// real wages × (1 + tenant burden %)) — the old hardcoded $125/$187.5/$150
+// ladder invented a different labor cost than every other screen. When wages
+// aren't set we show "rates not set", never a made-up dollar figure.
 
 async function getToken() {
   const { data } = await supabase.auth.getSession();
@@ -137,6 +139,7 @@ export default function CompletedJobSummaryPage() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<CompletionSummary | null>(null);
   const [laborRows, setLaborRows] = useState<LaborRow[]>([]);
+  const [labor, setLabor] = useState<LaborBreakdownDTO | null>(null);
   const [milestones, setMilestones] = useState<BillingMilestone[]>([]);
   const [scopeMetrics, setScopeMetrics] = useState<ScopeMetric[]>([]);
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -181,11 +184,26 @@ export default function CompletedJobSummaryPage() {
 
   const loadData = async () => {
     setLoading(true);
+    loadLaborBreakdown(); // fire-and-forget — labor cost renders when it lands
     try {
       const res = await apiFetch(`/api/admin/jobs/${jobId}/completion-summary`);
       if (res.ok) { const data = await res.json(); hydrate(data.data); return; }
     } catch (_) {}
     await loadFromSupabase();
+  };
+
+  // TRUE labor cost (bounded hours × wages × (1 + burden %)) from the job P&L
+  // API — single source shared with the P&L page and completed-jobs archive.
+  // 403 for salesmen (payroll data is admin-only) → labor stays null → the
+  // page shows hours without dollar figures.
+  const loadLaborBreakdown = async () => {
+    try {
+      const res = await apiFetch(`/api/admin/job-pnl/${jobId}`);
+      if (res.ok) {
+        const json = await res.json();
+        setLabor(json?.data?.labor ?? null);
+      }
+    } catch (_) { /* keep null — no invented numbers */ }
   };
 
   const hydrate = (data: any) => {
@@ -366,7 +384,11 @@ export default function CompletedJobSummaryPage() {
   const totalOT = laborRows.reduce((s, r) => s + r.ot_hrs, 0);
   const totalNS = laborRows.reduce((s, r) => s + r.ns_hrs, 0);
   const totalHrs = laborRows.reduce((s, r) => s + r.total, 0);
-  const laborCost = totalRegular * RATE_REGULAR + totalOT * RATE_OT + totalNS * RATE_NS;
+  // Labor cost strictly from the API. ratesMissing → show a badge, not a number.
+  const laborRatesMissing = !!labor && labor.totals.line_count > 0 && labor.totals.any_rate_missing;
+  const laborCost = labor && labor.totals.line_count > 0 && !labor.totals.any_rate_missing
+    ? labor.totals.total
+    : 0;
   const remoteSignedReq = sigRequests.find(r => r.status === 'signed');
   const pendingReq = sigRequests.find(r => (r.status === 'sent' || r.status === 'opened') && !r.is_expired);
 
@@ -558,6 +580,8 @@ export default function CompletedJobSummaryPage() {
                   ? `$${Number(summary.actual_cost).toLocaleString()}`
                   : laborCost > 0
                   ? `$${laborCost.toFixed(0)} (labor est.)`
+                  : laborRatesMissing
+                  ? 'rates not set'
                   : '--'}
               </p>
             </div>
@@ -662,30 +686,32 @@ export default function CompletedJobSummaryPage() {
               </table>
             </div>
           )}
-          {laborCost > 0 && (
+          {laborCost > 0 && labor && (
             <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10 flex flex-wrap gap-3">
               <div className="rounded-lg px-3 py-2 text-sm bg-sky-50 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:ring-sky-400/30">
-                <span className="text-slate-600 dark:text-white/60">Regular: </span>
-                <span className="font-semibold text-sky-700 dark:text-sky-300">${(totalRegular * RATE_REGULAR).toFixed(0)}</span>
-                <span className="text-slate-400 dark:text-white/40 ml-1">@ ${RATE_REGULAR}/hr</span>
+                <span className="text-slate-600 dark:text-white/60">Base wages: </span>
+                <span className="font-semibold text-sky-700 dark:text-sky-300">${labor.totals.base.toFixed(2)}</span>
+                <span className="text-slate-400 dark:text-white/40 ml-1">({labor.totals.bounded_hours.toFixed(1)}h on job)</span>
               </div>
-              {totalOT > 0 && (
-                <div className="rounded-lg px-3 py-2 text-sm bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/30">
-                  <span className="text-slate-600 dark:text-white/60">OT: </span>
-                  <span className="font-semibold text-amber-700 dark:text-amber-300">${(totalOT * RATE_OT).toFixed(0)}</span>
-                  <span className="text-slate-400 dark:text-white/40 ml-1">@ ${RATE_OT}/hr</span>
-                </div>
-              )}
-              {totalNS > 0 && (
-                <div className="rounded-lg px-3 py-2 text-sm bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:ring-violet-400/30">
-                  <span className="text-slate-600 dark:text-white/60">Night Shift: </span>
-                  <span className="font-semibold text-violet-700 dark:text-violet-300">${(totalNS * RATE_NS).toFixed(0)}</span>
-                  <span className="text-slate-400 dark:text-white/40 ml-1">@ ${RATE_NS}/hr</span>
-                </div>
-              )}
+              <div className="rounded-lg px-3 py-2 text-sm bg-amber-50 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:ring-amber-400/30">
+                <span className="text-slate-600 dark:text-white/60">Labor burden: </span>
+                <span className="font-semibold text-amber-700 dark:text-amber-300">${labor.totals.burden.toFixed(2)}</span>
+                <span className="text-slate-400 dark:text-white/40 ml-1">@ {labor.burden_pct}%</span>
+              </div>
               <div className="rounded-lg px-3 py-2 text-sm font-bold bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30">
                 <span className="text-slate-600 dark:text-white/60">Total Labor Cost: </span>
-                <span className="text-emerald-700 dark:text-emerald-300">${laborCost.toFixed(0)}</span>
+                <span className="text-emerald-700 dark:text-emerald-300">${laborCost.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+          {laborRatesMissing && (
+            <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/10">
+              <div className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-amber-50 ring-1 ring-amber-200 text-amber-800 dark:bg-amber-500/10 dark:ring-amber-400/30 dark:text-amber-300">
+                <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                <span>
+                  <strong>Labor cost unavailable — wages not set.</strong> Add hourly rates in
+                  Operator Profiles to see real labor cost here (no default rates are assumed).
+                </span>
               </div>
             </div>
           )}

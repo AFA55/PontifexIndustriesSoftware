@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
+import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
 import {
   FileText,
   Clock,
@@ -78,7 +79,12 @@ interface JobDetails {
   totalStandbyHours: number;
   totalStandbyCost: number;
   totalJobHours: number;
-  laborCost: number;
+  /**
+   * TRUE labor cost from /api/admin/job-pnl/[id] (bounded hours × wages ×
+   * (1 + burden %)). null when the fetch fails or the caller lacks admin
+   * access (e.g. salesman) — the tile then shows "—", never an invented rate.
+   */
+  labor: LaborBreakdownDTO | null;
   documents: any[];
   // Multi-day metrics
   dailyLogs: any[];
@@ -108,6 +114,7 @@ export default function CompletedJobsArchivePage() {
     created_at: string;
   }>>([]);
   const [loadingNotes, setLoadingNotes] = useState(false);
+  const [showLaborModal, setShowLaborModal] = useState(false);
 
   const handleDeleteJob = async (jobId: string, jobNumber: string) => {
     const confirmed = window.confirm(
@@ -304,7 +311,23 @@ export default function CompletedJobsArchivePage() {
         const endTime = new Date(job.completion_signed_at || job.work_completed_at || new Date());
         totalJobHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
       }
-      const laborCost = totalJobHours * 75;
+
+      // TRUE labor cost from the job P&L API (bounded hours × real wages ×
+      // (1 + tenant burden %)). The old `totalJobHours * 75` invented a rate —
+      // if this fetch fails (network / non-admin role) we show "—", never a
+      // made-up dollar figure.
+      let labor: LaborBreakdownDTO | null = null;
+      try {
+        const pnlRes = await fetch(`/api/admin/job-pnl/${job.id}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (pnlRes.ok) {
+          const pnlJson = await pnlRes.json();
+          labor = pnlJson?.data?.labor ?? null;
+        }
+      } catch {
+        labor = null;
+      }
 
       let documents: any[] = [];
       try {
@@ -352,7 +375,7 @@ export default function CompletedJobsArchivePage() {
         totalStandbyHours,
         totalStandbyCost,
         totalJobHours,
-        laborCost,
+        labor,
         documents: signedDocs,
         dailyLogs,
         totalDaysWorked,
@@ -767,12 +790,6 @@ export default function CompletedJobsArchivePage() {
                             value: `${selectedJobDetails.totalStandbyHours.toFixed(1)}h`,
                             tile: 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-amber-500/30 ring-amber-400/30',
                           },
-                          {
-                            icon: DollarSign,
-                            label: 'Labor Cost',
-                            value: `$${selectedJobDetails.laborCost.toFixed(0)}`,
-                            tile: 'bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30 ring-emerald-400/30',
-                          },
                         ].map((m) => (
                           <div
                             key={m.label}
@@ -789,6 +806,49 @@ export default function CompletedJobsArchivePage() {
                             <p className="text-3xl font-bold tabular-nums text-white">{m.value}</p>
                           </div>
                         ))}
+
+                        {/* Labor Cost — REAL math from /api/admin/job-pnl/[id]
+                            (bounded hours × wages × (1 + burden %)); clickable
+                            for the full per-worker breakdown. Never shows an
+                            invented rate: no wages → "rates not set"; no data
+                            or no access → "—". */}
+                        <button
+                          type="button"
+                          onClick={() => setShowLaborModal(true)}
+                          disabled={!selectedJobDetails.labor}
+                          className="rounded-xl p-4 ring-1 text-white text-left bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg shadow-emerald-500/30 ring-emerald-400/30 transition-transform enabled:hover:scale-[1.02] enabled:active:scale-[0.99] disabled:cursor-default min-h-[44px]"
+                          title={selectedJobDetails.labor ? 'View labor cost breakdown' : undefined}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-white/85 text-xs font-semibold uppercase tracking-wide">
+                              Labor Cost
+                            </span>
+                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-white/20 backdrop-blur-sm ring-1 ring-white/30">
+                              <DollarSign className="w-4 h-4 text-white" />
+                            </span>
+                          </div>
+                          {selectedJobDetails.labor && selectedJobDetails.labor.totals.line_count > 0 ? (
+                            selectedJobDetails.labor.totals.any_rate_missing ? (
+                              <p className="text-sm font-bold text-white leading-tight">
+                                rates not set
+                                <span className="block text-[11px] font-medium text-white/75 mt-0.5">
+                                  set wages in Operator Profiles
+                                </span>
+                              </p>
+                            ) : (
+                              <p className="text-3xl font-bold tabular-nums text-white">
+                                ${selectedJobDetails.labor.totals.total.toFixed(0)}
+                              </p>
+                            )
+                          ) : (
+                            <p className="text-3xl font-bold tabular-nums text-white">—</p>
+                          )}
+                          {selectedJobDetails.labor && selectedJobDetails.labor.totals.line_count > 0 && (
+                            <span className="block text-[11px] font-medium text-white/75 mt-1 underline decoration-dotted underline-offset-2">
+                              tap for breakdown
+                            </span>
+                          )}
+                        </button>
                       </div>
 
                       {/* Date range for multi-day jobs */}
@@ -1229,6 +1289,13 @@ export default function CompletedJobsArchivePage() {
           </>
         )}
       </div>
+
+      <LaborCostBreakdown
+        open={showLaborModal && !!selectedJobDetails}
+        onClose={() => setShowLaborModal(false)}
+        jobNumber={selectedJobDetails?.job.job_number}
+        labor={selectedJobDetails?.labor ?? null}
+      />
     </div>
   );
 }

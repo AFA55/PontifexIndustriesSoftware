@@ -115,6 +115,8 @@ export async function POST(request: NextRequest) {
       'Removal': { rate: 150, unit: 'hours' },
       'Hauling': { rate: 125, unit: 'hours' },
     };
+    // The BILLING rate for T&M labor (mirrors the parent route). Internal
+    // labor COST (wages × burden) is never used for invoice amounts.
     const DEFAULT_LABOR_RATE = 125;
 
     const lineItems: any[] = [];
@@ -137,6 +139,9 @@ export async function POST(request: NextRequest) {
       });
       subtotal += amount;
     } else if (billingType === 'time_and_material') {
+      // Mirrors /api/admin/invoices exactly. Labor COST ≠ labor PRICE
+      // (guardian catch): customers are billed at the BILLING rate, never at
+      // internal wages+burden — cost math is for the P&L displays only.
       if (laborHours > 0) {
         const laborAmount = Number(laborHours.toFixed(2)) * DEFAULT_LABOR_RATE;
         lineItems.push({
