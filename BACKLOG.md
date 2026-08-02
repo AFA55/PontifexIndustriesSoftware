@@ -16,8 +16,17 @@
 | **In flight** | Twilio toll-free resubmission (founder correcting Company Type off Sole Proprietor) · Jarvis Phase 2 (Claude brain, text) — awaiting founder AI-Gateway greenlight |
 | **Dev engine** | ⚡ Jul 1: worktree-builder + implementation-fidelity-reviewer team pattern proven on 4 parallel live-blocker fixes. See `docs/plans/JULY1_LAUNCH_BLOCKERS_TEAM_PLAN.md`. Prior: parallel-burndown Workflow + Playwright MCP (Jun 27), `docs/playbooks/PARALLEL_BURNDOWN.md` + `TOOLING_EVALUATION.md` Batch 3. |
 | **Blocked on founder** | 🤖 Google Play review (auto-notifies) + support ticket reply · Twilio resubmission confirm · Sentry DSN · (AI-Gateway greenlight for Jarvis) |
-| **Unpushed commits** | ✅ none — pushed through `ff40da25` (Jul 1 live-blocker sweep) |
-| **Last groomed** | Jul 1, 2026 |
+| **Unpushed commits** | ⚠️ 4 — `af70f1f3` (docs) + `9c709ab7` (tenant-branded timecard PDFs) + `8770a37b` (smart clock-out reminder + notifications RLS hardening) + `2bce062b` (operator notifications inbox). Gate green (clean build + tsc + 215 jest); awaiting founder push confirm. |
+| **Last groomed** | Aug 2, 2026 |
+
+## 🆕 Aug 1–2 — founder batch (timecard PDF branding · smart clock-out · operator inbox) — ✅ BUILT, guardian-clean, unpushed
+
+- [x] ~~**Timecard PDF says "Pontifex Industries" / generic design**~~ — ✅ FIXED (`9c709ab7`). ROOT CAUSE: 4 PDF routes fetched `tenant_branding` with NO tenant_id filter (arbitrary tenant's row). New `lib/pdf-branding.ts` (tenant-scoped + logo fetch w/ https/2MB/5s guards); TimecardPDF redesigned formal (logo, red WEEKLY TIMECARD, accent table, DT box, subset footnote, signatures); batch export composes shared `TimecardPage` (170-line duplicate deleted); web download buttons were DEAD (window.open w/o bearer → 401) → fetch+blob w/ error alert; annual report print header + dark-mode print fix. Live-verified against prod data (real Patriot logo/red/navy, OT math correct). Guardian PASS.
+- [x] ~~**Smart clock-out reminder (operators forget to clock out)**~~ — ✅ BUILT (`8770a37b`). 4th trigger in the 15-min cron: all jobs done → drive-aware delay (max(30, drive+10), cap 120) → push (closed-app) + bell + SMS-per-prefs; admin escalation +60 min; helpers/crew covered (guardian caught + fixed helper `on_hold` silence bug); 32 unit tests. Near-shop geofence trigger = Phase C (already built, founder-gated native build). Founder heads-up: an operator legitimately doing shop work after their last field job still gets the nudge + escalation once — flag if it annoys.
+- [x] ~~**Operators can't see full notifications / "view more" → timecard page**~~ — ✅ BUILT (`2bce062b`). Unified feed (notifications + schedule_notifications — 118 previously-INVISIBLE rows incl. all auto-clockout/late-arrival notices now render), inbox redesign (full-message expandable cards, focus deep-link from bell, pagination, brand tokens), banner dismiss no-op fixed, sidebar shop-role trap fixed, "Message Management" channel (full text, push/email prefs). RLS: dropped forged-insert hole on schedule_notifications (migration `20260801` APPLIED, auditor PASS); one-time prod sweep marked 14d+ backlog read (re-run at deploy).
+- [ ] **P2 — RLS sweep: 6 more `WITH CHECK (true)` INSERT policies open to public/authenticated** (found during the notifications RLS audit): `audit_log`, `audit_logs` (forgeable audit trails), `login_attempts`, `error_logs` (×2 duplicate), `job_orders_history` (any user can fabricate history), `equipment_checkout_sessions`. Same drop-and-let-supabaseAdmin-write fix as `20260801`, but EACH needs a client-write-path check first (access_requests/consent_records/customer_surveys are intentionally public — leave). rls-policy-auditor behind it.
+- [ ] **P3 — batch nits from the Aug 1–2 guardians/design review**: compound `(created_at,id)` cursor for the feed (zero ties in prod today); mark-read/DELETE 100-id cap vs success message; bell rows `role="button"`+keyboard; jest `TextEncoder` polyfill (2 email suites have failed silently for weeks); batch-export "Unknown" page for missing profile → skip/flag on payroll doc; holiday/subsistence boxes on TimecardPDF breakdown; migrate liability-release / work-order-agreement / generate-completion-pdf branding fetches to `lib/pdf-branding` (they re-declare PDFBranding); night-shift post-midnight "Done for Today" invisible to reminder (same log_date quirk as clock-out gate — fold into shop-tickets work); backfill `tenant_id` on both notification tables then drop the `tenant_id IS NULL` escape in tenant_isolation policies.
+- [x] ~~BACKLOG stale item: "APNs: wire lib/send-push.ts into /api/push/route.ts"~~ — audit confirmed ALREADY DONE (route imports + calls sendPushToUser; APNs/FCM wired end-to-end). Removed from P3 list below.
 
 ## 🆕 Jul 30 — founder field requests (from live paper-ticket workflow)
 
@@ -429,7 +438,7 @@ Founder's payroll "final touches." Phased (payroll = highest scrutiny). Decision
 
 
 
-- [ ] **APNs**: wire `lib/send-push.ts` into `/api/push/route.ts` end-to-end + confirm token registration.
+- [x] ~~**APNs**: wire `lib/send-push.ts` into `/api/push/route.ts` end-to-end~~ — ✅ already done (verified Aug 2: route calls sendPushToUser; APNs/FCM + deep-link registration all wired). Remaining founder check: confirm the 4 APNs env vars in Vercel if push ever looks dead in prod.
 - [ ] **Android app** (`npx cap add android`, $25 Google Play) — after iOS settles.
 - [ ] **CSP nonce-based** (replace unsafe-inline, MED-5).
 - [ ] **codegraph pilot** — local MCP code index (~47% token savings for agents). Stage after

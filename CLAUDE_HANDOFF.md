@@ -1,6 +1,13 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Jul 31, 2026 (Opus 4.8) | **Branch:** `main` | **Prod:** ✅ LIVE through `4a6d0a56`.
+**Last updated:** Aug 2, 2026 (Fable 5) | **Branch:** `main` | **Prod:** ✅ LIVE through `4a6d0a56`. | **⚠️ 4 unpushed commits** (`af70f1f3` docs + `9c709ab7` + `8770a37b` + `2bce062b`) — gate green, awaiting founder push confirm (~$1–2).
+
+> ## 📌 Aug 1–2 session (Fable 5) — founder batch #1: PDF branding · smart clock-out · operator inbox — BUILT, guardian-clean, UNPUSHED
+> Loop ran fully: 3 builders → 3 guardians (2 real BLOCKING sets caught + fixed + re-reviewed) → design-consistency review → rls-policy-auditor → live browser verify vs prod data → gate (clean build + tsc + 215 jest). Detail per feature in BACKLOG "Aug 1–2" block. Key facts a next session needs:
+> - **Timecard PDFs (`9c709ab7`)**: root cause was 4 routes fetching `tenant_branding` UNSCOPED (arbitrary tenant's brand — why founder saw "Pontifex Industries"). ALL PDF branding now goes through `lib/pdf-branding.ts` (tenant-scoped, logo-safe). TimecardPDF exports reusable `TimecardPage`; batch export composes it. Web PDF download buttons were dead (bare window.open → 401) — now fetch+blob. Verified live: real Patriot logo/red/navy + correct OT math.
+> - **Smart clock-out (`8770a37b`)**: new completion-aware trigger in `/api/cron/clock-out-reminders` (pure logic in `lib/clock-out-reminder.ts`, 32 tests): all-jobs-done → delay clamp(max(30, drive+10),30,120) → push/bell/SMS + admin escalation +60min. Slot-aware status lists (helper excludes `on_hold` — guardian catch). Near-shop trigger stays Phase C (founder-gated). Founder flag: post-job SHOP work still gets the nudge+escalation once per shift.
+> - **Notifications (`2bce062b`)**: `/api/notifications` merges BOTH tables (schedule_notifications was rendered by NOTHING — 118 invisible rows incl. every auto-clockout notice ever). Inbox = full-message expandable cards + `?focus=` from bell. RLS migration `20260801_notifications_rls_hardening` APPLIED to prod (dropped public forge-INSERT hole). One-time sweep marked 14d+ backlog read — **RE-RUN the same idempotent sweep right before/after the deploy push** (`UPDATE schedule_notifications SET read=true, read_at=now() WHERE read=false AND created_at < now() - interval '14 days'`). "Message Management" = feedback type `message`, full text in the notification.
+> - **New backlog**: P2 = 6 more `WITH CHECK(true)` INSERT policies (audit tables, login_attempts, job_orders_history, equipment_checkout_sessions — check client write paths first); P3 nits batch. BACKLOG's stale APNs item closed (push is fully wired; only env-var presence in Vercel unverified).
 
 > ### 🧭 NEW SESSION START HERE
 > 1. **[docs/reference/OPERATING_MANUAL.md](docs/reference/OPERATING_MANUAL.md)** — the one-page orientation:
