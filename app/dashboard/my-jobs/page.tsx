@@ -134,7 +134,7 @@ export default function MyJobsPage() {
           // the job for this date (e.g. day-2 operator of a multi-day job
           // before assigned_to syncs over) — keep those rows too.
           const onCrew = (j: any) =>
-            j.assigned_to === uidRef || j.helper_assigned_to === uidRef || j.viewer_is_helper === true || j.viewer_is_daily === true;
+            j.assigned_to === uidRef || j.helper_assigned_to === uidRef || j.viewer_is_helper === true || j.viewer_is_co_operator === true || j.viewer_is_daily === true;
           const visible = ((json.data || []) as any[]).filter(onCrew);
 
           const enriched = visible.map((j: any) => ({
@@ -225,7 +225,7 @@ export default function MyJobsPage() {
       // Slot-based, not role-based (see today-list note): on-crew in either slot
       // OR crewed on the job (viewer_is_helper from the server).
       const isPrimaryOrHelper = (j: any) =>
-        j.assigned_to === uid || j.helper_assigned_to === uid || j.viewer_is_helper === true;
+        j.assigned_to === uid || j.helper_assigned_to === uid || j.viewer_is_helper === true || j.viewer_is_co_operator === true;
       const all = [...onHoldData, ...inProgressData, ...pendingCompletionData, ...staleSingles].filter((j: any) => {
         const isPastDate = j.scheduled_date && j.scheduled_date < today;
         return isPrimaryOrHelper(j) && isPastDate;
@@ -269,7 +269,7 @@ export default function MyJobsPage() {
         const json = await res.json();
         const uid = session.user.id;
         const completed = (json.data || []).filter((j: any) => {
-          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid || j.viewer_is_helper === true;
+          const isAssigned = j.assigned_to === uid || j.helper_assigned_to === uid || j.viewer_is_helper === true || j.viewer_is_co_operator === true;
           const isCompletedStatus = j.status === 'completed' || j.status === 'pending_completion';
           return isAssigned && isCompletedStatus;
         });

@@ -266,8 +266,12 @@ export default function JobDetailPage() {
   // Staged location reveal (founder Jul 14): a HELPER sees the address once the
   // operator taps In Route — helpers don't run the equipment checklist, so
   // gating them on it would hide the location forever. The OPERATOR keeps the
-  // equipment-loaded + route gate.
-  const locationUnlocked = job?.isHelper ? inRouteReached : (equipmentAllChecked && inRouteReached);
+  // equipment-loaded + route gate. Crew CO-OPERATORS ride the lead's route the
+  // same way helpers do (the lead's checklist gates the truck, not theirs).
+  const locationUnlocked =
+    job?.isHelper || (job as any)?.viewer_is_co_operator === true
+      ? inRouteReached
+      : equipmentAllChecked && inRouteReached;
 
   const isCompleted = job?.status === 'completed';
   const isOnHold = job?.status === 'on_hold';
@@ -280,6 +284,11 @@ export default function JobDetailPage() {
   // A helper/apprentice put in the assigned_to (operator) slot gets the full operator view.
   // Only users in the helper_assigned_to slot see the simplified helper view.
   const jobIsHelper = !!job?.isHelper;
+  // Crew CO-OPERATOR (job_crew role='operator'): full operator view + full
+  // work-performed input, but the LEAD alone drives status transitions and
+  // day-complete. Their CTA goes straight to the jobsite/work-log instead of
+  // Start Route / Job Not Ready.
+  const isCoOperator = !jobIsHelper && (job as any)?.viewer_is_co_operator === true;
 
   // Split documents into admin-attached and operator-uploaded
   const adminDocs = documents.filter(d => d.uploaded_by !== userId);
@@ -672,12 +681,15 @@ export default function JobDetailPage() {
                 >
                   <CheckCircle2 className="w-6 h-6" /> Continue to Job Site
                 </button>
-                <button
-                  onClick={() => setShowNotReady(true)}
-                  className="w-full py-4 rounded-2xl font-bold text-base transition-all border-2 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 flex items-center justify-center gap-2"
-                >
-                  <AlertTriangle className="w-5 h-5" /> Job Not Ready
-                </button>
+                {/* Job Not Ready is a ticket-state action — lead-only. */}
+                {!isCoOperator && (
+                  <button
+                    onClick={() => setShowNotReady(true)}
+                    className="w-full py-4 rounded-2xl font-bold text-base transition-all border-2 border-red-300 dark:border-red-500/40 text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 hover:bg-red-100 dark:hover:bg-red-500/20 flex items-center justify-center gap-2"
+                  >
+                    <AlertTriangle className="w-5 h-5" /> Job Not Ready
+                  </button>
+                )}
               </div>
             )}
           </>
@@ -872,6 +884,11 @@ export default function JobDetailPage() {
           {jobIsHelper && (
             <span className="text-sm px-3 py-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-full font-bold border border-emerald-200 dark:border-emerald-500/30">
               Team Member
+            </span>
+          )}
+          {isCoOperator && (
+            <span className="text-sm px-3 py-1.5 bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300 rounded-full font-bold border border-indigo-200 dark:border-indigo-500/30">
+              Crew Operator
             </span>
           )}
           {job.priority === 'urgent' && (
@@ -1363,8 +1380,28 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* Co-operator action — full input, but the LEAD drives status. No
+            Start Route / Job Not Ready; go straight to jobsite + work log. */}
+        {!isCompleted && !isOnHold && isCoOperator && (
+          <div className="pt-2 space-y-3">
+            <div className="px-4 py-3 bg-indigo-50 dark:bg-indigo-500/10 border border-indigo-200 dark:border-indigo-500/30 rounded-2xl">
+              <p className="text-sm text-indigo-800 dark:text-indigo-300 font-medium">
+                <strong>{job.operator_name || 'The lead operator'}</strong> leads this ticket.
+                Log the full work YOU perform — {job.operator_name || 'the lead'} completes the day.
+              </p>
+            </div>
+            <button
+              onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
+              className="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
+            >
+              <PlayCircle className="w-6 h-6" />
+              {isPendingCompletion ? 'View Jobsite & My Work Log' : 'Jobsite & Log My Work'}
+            </button>
+          </div>
+        )}
+
         {/* Action Buttons */}
-        {!isCompleted && !isOnHold && !jobIsHelper && (
+        {!isCompleted && !isOnHold && !jobIsHelper && !isCoOperator && (
           <div className="pt-2">
             {isInProgress ? (
               <button
@@ -1398,8 +1435,9 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Job Not Ready — arrived on-site but the contractor/site wasn't ready */}
-        {!isCompleted && !isOnHold && !jobIsHelper && (
+        {/* Job Not Ready — arrived on-site but the contractor/site wasn't ready.
+            Lead-only: co-operators don't drive ticket state. */}
+        {!isCompleted && !isOnHold && !jobIsHelper && !isCoOperator && (
           <div className="pt-2">
             <button
               onClick={() => setShowNotReady(true)}
@@ -1410,8 +1448,8 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Resume On-Hold Job */}
-        {isOnHold && !jobIsHelper && (
+        {/* Resume On-Hold Job (lead-only — resuming is a status transition) */}
+        {isOnHold && !jobIsHelper && !isCoOperator && (
           <div className="pt-2">
             <button
               onClick={handleResumeJob}

@@ -6,6 +6,20 @@ import { requireAuth } from '@/lib/api-auth';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor'];
 
+/** Crew membership (job_crew, any role) — co-operators attach their work photos
+ *  and helpers can view them. Crew rows are created tenant-scoped server-side,
+ *  so a (job, user) match cannot cross tenants. */
+async function isCrewMember(jobId: string, userId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('job_crew')
+    .select('id')
+    .eq('job_order_id', jobId)
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -32,11 +46,14 @@ export async function POST(
       .eq('id', auth.userId)
       .single();
 
-    const isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
+    let isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
     // Admin branch must ALSO be same-tenant — otherwise an admin in tenant A
     // could append photos to tenant B's job by id (security audit M1 IDOR).
     const isAdmin = ADMIN_ROLES.includes(profile?.role || '')
       && (!auth.tenantId || job.tenant_id === auth.tenantId);
+    if (!isAssigned && !isAdmin) {
+      isAssigned = await isCrewMember(jobId, auth.userId);
+    }
     if (!isAssigned && !isAdmin) {
       return NextResponse.json({ error: 'You are not authorized to upload photos for this job' }, { status: 403 });
     }
@@ -93,8 +110,11 @@ export async function GET(
       .eq('id', auth.userId)
       .single();
 
-    const isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
+    let isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
     const isAdmin = ADMIN_ROLES.includes(profile?.role || '');
+    if (!isAssigned && !isAdmin) {
+      isAssigned = await isCrewMember(jobId, auth.userId);
+    }
     if (!isAssigned && !isAdmin) {
       return NextResponse.json({ error: 'You are not authorized to view photos for this job' }, { status: 403 });
     }

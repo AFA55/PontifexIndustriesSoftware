@@ -264,6 +264,13 @@ export default function WorkPerformed() {
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // ─── Crew co-operator (job_crew role='operator') ────────────────────────────
+  // Full work-performed input, but NO day-complete/survey — the LEAD completes
+  // the ticket. After submit they get a confirmation instead of the survey nav.
+  const [isCoOperator, setIsCoOperator] = useState(false);
+  const [leadName, setLeadName] = useState<string | null>(null);
+  const [coOpSubmitted, setCoOpSubmitted] = useState(false);
+
   // ─── Amendment note state (shown when day is already submitted) ──────────
   const [showNoteForm, setShowNoteForm] = useState(false);
   const [noteContent, setNoteContent] = useState('');
@@ -303,12 +310,19 @@ export default function WorkPerformed() {
         if (res.ok) {
           const json = await res.json();
           const found = (json.data || [])[0];
-          // Helpers (apprentice in the helper slot) are read-only — they do NOT fill
-          // out the work ticket. Bounce them back to the read-only job ticket.
-          if (found && found.helper_assigned_to === session.user.id && found.assigned_to !== session.user.id) {
+          // Helpers (helper slot OR crewed as helper) do NOT fill out the full
+          // work ticket — they have the light work-log. Bounce them back.
+          if (
+            found &&
+            (found.viewer_is_helper === true ||
+              (found.helper_assigned_to === session.user.id && found.assigned_to !== session.user.id))
+          ) {
             router.replace(`/dashboard/my-jobs/${params.id}`);
             return;
           }
+          // Crew co-operator: full input here, but the LEAD runs day-complete.
+          setIsCoOperator(found?.viewer_is_co_operator === true);
+          setLeadName(found?.operator_name || null);
           if (found?.job_type) setJobType(found.job_type);
           // Photos-prohibited flag set by the office on the schedule form
           // (site_compliance jsonb) — drives the mandatory-photo gate below.
@@ -1526,6 +1540,14 @@ export default function WorkPerformed() {
       // Clear resume-last-position marker on successful submission
       localStorage.removeItem(`job_last_page_${params.id}`);
 
+      // Crew co-operator: NO day-complete/survey — the lead completes the
+      // ticket. Show the submitted confirmation instead of navigating.
+      if (isCoOperator) {
+        setCoOpSubmitted(true);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
       // Navigate to day completion page (done for today vs fully complete)
       setTimeout(() => {
         router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
@@ -1543,7 +1565,12 @@ export default function WorkPerformed() {
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
       localStorage.removeItem(`job_last_page_${params.id}`);
       // NOTE: draft preserved on purpose — see comment in success path above.
-      router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
+      if (isCoOperator) {
+        // Co-operators never go to day-complete — back to their ticket instead.
+        router.push(`/dashboard/my-jobs/${params.id}`);
+      } else {
+        router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -1613,6 +1640,35 @@ export default function WorkPerformed() {
       <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
+
+        {/* ─── Crew co-operator: work submitted confirmation ───────────── */}
+        {coOpSubmitted && (
+          <div className="mb-6 bg-white dark:bg-white/[0.05] rounded-2xl border border-indigo-200 dark:border-indigo-500/40 shadow-sm overflow-hidden">
+            <div className="bg-gradient-to-r from-indigo-500 to-blue-600 px-5 py-4 flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                <CheckCircle2 className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-bold text-base">Your work is submitted ✓</p>
+                <p className="text-indigo-100 text-xs mt-0.5">
+                  {leadName ? `${leadName} completes the ticket.` : 'The lead operator completes the ticket.'}
+                </p>
+              </div>
+            </div>
+            <div className="px-5 py-4">
+              <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                Your items are on the ticket under your name. You can come back and
+                resubmit to update what YOU logged — other crew members&apos; work is untouched.
+              </p>
+              <button
+                onClick={goBack}
+                className="w-full min-h-[44px] py-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-colors"
+              >
+                Back to Job
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* ─── Day Already Submitted — Locked Card ───────────────────── */}
         {dayAlreadySubmitted && (
@@ -2375,25 +2431,33 @@ export default function WorkPerformed() {
         )}
 
         {/* Submit Button */}
-        {selectedItems.length > 0 && !dayAlreadySubmitted && (
+        {selectedItems.length > 0 && !dayAlreadySubmitted && !coOpSubmitted && (
           <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-safe z-50">
-            <div className="container mx-auto max-w-lg flex gap-3">
-              <button
-                onClick={goBack}
-                className="flex-shrink-0 px-5 py-3.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-sm border border-gray-200 dark:border-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-                className="flex-1 py-3.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand/90 hover:to-brand-accent/90 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                </svg>
-                {isSubmitting ? 'Saving...' : 'Next: Job Survey'}
-              </button>
+            <div className="container mx-auto max-w-lg">
+              {/* Co-operator: submit YOUR work — the lead runs day-complete. */}
+              {isCoOperator && (
+                <p className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 text-center mb-2">
+                  Submit your work — {leadName || 'the lead operator'} completes the ticket
+                </p>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={goBack}
+                  className="flex-shrink-0 px-5 py-3.5 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold text-sm border border-gray-200 dark:border-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3.5 bg-gradient-to-r from-brand to-brand-accent hover:from-brand/90 hover:to-brand-accent/90 text-white rounded-xl font-bold text-sm transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                  {isSubmitting ? 'Saving...' : isCoOperator ? 'Submit My Work' : 'Next: Job Survey'}
+                </button>
+              </div>
             </div>
           </div>
         )}

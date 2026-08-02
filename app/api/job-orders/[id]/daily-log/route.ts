@@ -10,6 +10,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { boundedJobHours, clampDailyLogHours, MAX_DAILY_LOG_HOURS } from '@/lib/labor-cost';
+import { dayCompletePermission } from '@/lib/day-complete-auth';
 
 export async function POST(
   request: NextRequest,
@@ -96,18 +97,42 @@ export async function POST(
       const isAdmin = profile && adminRoles.includes(profile.role);
 
       if (!isAdmin) {
-        // Fallback: allow if user has existing daily_job_logs for this job
-        // (handles edge cases where assignment changed after work started)
-        const { data: existingLog } = await supabaseAdmin
-          .from('daily_job_logs')
-          .select('id')
-          .eq('job_order_id', jobId)
-          .eq('operator_id', user.id)
-          .limit(1)
-          .maybeSingle();
-        if (!existingLog) {
+        // Crew members (job_crew, ANY role) never complete the ticket — that's
+        // the LEAD's job. Checked BEFORE the existing-log fallback: the crew
+        // flow gives them daily_job_logs rows (day notes / drafts), and those
+        // must not unlock day-complete. The fallback below stays for genuine
+        // ex-leads only (logged work, no longer in any slot, NOT crewed).
+        const [{ data: crewRow }, { data: existingLog }] = await Promise.all([
+          supabaseAdmin
+            .from('job_crew')
+            .select('id')
+            .eq('job_order_id', jobId)
+            .eq('user_id', user.id)
+            .limit(1)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('daily_job_logs')
+            .select('id')
+            .eq('job_order_id', jobId)
+            .eq('operator_id', user.id)
+            .limit(1)
+            .maybeSingle(),
+        ]);
+        const decision = dayCompletePermission({
+          isLead: isOperator,
+          isHelperSlot: isHelper,
+          isAdmin: false,
+          isCrewMember: !!crewRow,
+          hasExistingLog: !!existingLog,
+        });
+        if (!decision.allowed) {
           return NextResponse.json(
-            { error: 'You are not assigned to this job' },
+            {
+              error:
+                decision.reason === 'crew_not_lead'
+                  ? 'Only the lead completes the ticket. Your submitted work is already on it.'
+                  : 'You are not assigned to this job',
+            },
             { status: 403 }
           );
         }

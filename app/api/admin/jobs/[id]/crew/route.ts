@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * Crew management for a job — additional operators beyond the LEAD (assigned_to).
- * These are stored in job_crew with role='helper' and get the light helper-ticket
- * flow. One full completion (the lead) + N short descriptions (the crew).
+ * Crew management for a job — additional crew beyond the LEAD (assigned_to).
+ * Stored in job_crew with role 'operator' (full work-performed input; the lead
+ * still completes the ticket) or 'helper' (light helper-work-log flow).
+ * One day-complete per job (the lead) + full input from each co-operator +
+ * short descriptions from helpers.
  *
  * GET    — list crew members (user_id, role, full_name)
- * POST   — add a crew member { user_id } (role helper); tenant-checked
+ * POST   — add a crew member { user_id, role? } (role 'helper' default,
+ *          'operator' allowed); tenant-checked
  * DELETE — remove a crew member (?userId=)
  *
  * Management only (requireScheduleBoardAccess); tenant-scoped.
@@ -77,6 +80,13 @@ export async function POST(request: NextRequest, context: RouteContext) {
     if (!userId || typeof userId !== 'string') {
       return NextResponse.json({ error: 'user_id is required' }, { status: 400 });
     }
+    // Crew role: 'helper' (default, light work-log) or 'operator' (full
+    // work-performed input). 'lead' is NOT a crew role — the lead lives on
+    // job_orders.assigned_to and changes only via the /assign reassignment path.
+    const role = body.role === undefined || body.role === null ? 'helper' : body.role;
+    if (role !== 'helper' && role !== 'operator') {
+      return NextResponse.json({ error: "role must be 'helper' or 'operator'" }, { status: 400 });
+    }
 
     const job = await loadJob(jobId, tenantId);
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -99,7 +109,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { error } = await supabaseAdmin
       .from('job_crew')
       .upsert(
-        { tenant_id: tenantId, job_order_id: jobId, user_id: userId, role: 'helper', added_by: auth.userId },
+        { tenant_id: tenantId, job_order_id: jobId, user_id: userId, role, added_by: auth.userId },
         { onConflict: 'job_order_id,user_id' },
       );
     if (error) {
@@ -107,20 +117,24 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Failed to add crew member' }, { status: 500 });
     }
 
-    // Notify the added operator they've been crewed (best-effort, in-app).
+    // Notify the added crew member (best-effort, in-app). Same shape for both
+    // roles, role-aware copy — operators get the full-input instruction.
     // Mirrors the schedule-board assign route (schedule_notifications.recipient_id).
     Promise.resolve(
       supabaseAdmin.from('schedule_notifications').insert({
         recipient_id: userId,
         job_order_id: jobId,
         type: 'job_assigned',
-        title: 'Added to a job as crew',
-        message: 'You were added to a job. Open My Jobs to log your work.',
-        metadata: { job_order_id: jobId, is_helper: true, role: 'helper' },
+        title: role === 'operator' ? 'Added to a job as crew operator' : 'Added to a job as crew',
+        message:
+          role === 'operator'
+            ? 'You were added to a job as an operator. Open My Jobs to log the full work you perform — the lead completes the ticket.'
+            : 'You were added to a job. Open My Jobs to log your work.',
+        metadata: { job_order_id: jobId, is_helper: role === 'helper', role },
       }),
     ).catch(() => {});
 
-    return NextResponse.json({ success: true, data: { user_id: userId, full_name: addUser.full_name, role: 'helper' } });
+    return NextResponse.json({ success: true, data: { user_id: userId, full_name: addUser.full_name, role } });
   } catch (error) {
     console.error('Error in POST /crew:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

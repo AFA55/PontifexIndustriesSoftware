@@ -42,15 +42,21 @@ export default function JobsitePage() {
         if (json.success) {
           const found = (json.data || [])[0];
           if (found && found.id === jobId) {
-            // Helpers (apprentice in the helper slot) are read-only — they cannot
-            // proceed to the jobsite or advance status. Send them to the ticket.
-            if (found.helper_assigned_to === session.user.id && found.assigned_to !== session.user.id) {
+            // Helpers (helper slot OR crewed as helper) are read-only — they
+            // cannot proceed to the jobsite or advance status. Send them to
+            // the ticket.
+            if (
+              found.viewer_is_helper === true ||
+              (found.helper_assigned_to === session.user.id && found.assigned_to !== session.user.id)
+            ) {
               router.replace(`/dashboard/my-jobs/${jobId}`);
               return;
             }
             setJob(found);
-            // If status is still in_route, update to in_progress (arrived at site)
-            if (found.status === 'in_route') {
+            // If status is still in_route, update to in_progress (arrived at
+            // site). LEAD-only: crew co-operators don't drive ticket status
+            // (the server would 403 this anyway — don't even fire it).
+            if (found.status === 'in_route' && found.viewer_is_co_operator !== true) {
               fetch(`/api/job-orders/${jobId}/status`, {
                 method: 'POST',
                 headers: {

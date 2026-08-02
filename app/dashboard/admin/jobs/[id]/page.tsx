@@ -39,6 +39,8 @@ import {
   Pencil,
   ChevronDown,
   Printer,
+  Users,
+  Crown,
 } from 'lucide-react';
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import SendOptInRequestButton from '@/components/SendOptInRequestButton';
@@ -109,6 +111,30 @@ interface JobSummary {
   commission_rate?: number | null;
   scope_details?: Record<string, Record<string, string>> | null;
   jobsite_conditions?: { overcutting_allowed?: boolean } | null;
+  // Job-level route/on-site stamps — driven by the LEAD.
+  in_route_at?: string | null;
+  arrived_at_jobsite_at?: string | null;
+  route_started_at?: string | null;
+}
+
+interface CrewListMember {
+  user_id: string;
+  role: string; // 'operator' | 'helper'
+  full_name: string | null;
+}
+
+interface CrewTimecardEntry {
+  user_id: string;
+  full_name: string | null;
+  clock_in_time: string | null;
+  clock_out_time: string | null;
+  total_hours: number | null;
+  job_linked: boolean;
+}
+
+interface CrewTimecardDay {
+  date: string;
+  entries: CrewTimecardEntry[];
 }
 
 interface WorkItemsDay {
@@ -433,6 +459,10 @@ export default function AdminJobDetailPage({
   // Full operator work submissions, grouped by day (from /summary)
   const [workItemsByDay, setWorkItemsByDay] = useState<WorkItemsDay[]>([]);
 
+  // Crew (job_crew beyond lead/helper) + per-member clock-ins (from /summary)
+  const [crew, setCrew] = useState<CrewListMember[]>([]);
+  const [crewTimecards, setCrewTimecards] = useState<CrewTimecardDay[]>([]);
+
   // Edit timestamp modal
   const [editTimestampField, setEditTimestampField] = useState<{
     field: EditableTimestampField;
@@ -529,6 +559,8 @@ export default function AdminJobDetailPage({
       setJob(json.data.job);
       setPhotos(Array.isArray(json.data?.photos) ? json.data.photos : []);
       setWorkItemsByDay(Array.isArray(json.data?.work_items_by_day) ? json.data.work_items_by_day : []);
+      setCrew(Array.isArray(json.data?.crew) ? json.data.crew : []);
+      setCrewTimecards(Array.isArray(json.data?.crew_timecards) ? json.data.crew_timecards : []);
     } catch {
       setPageError({ message: 'Network error loading job.' });
     }
@@ -1528,7 +1560,9 @@ export default function AdminJobDetailPage({
                                   Work Performed
                                 </p>
                                 {dayItems.length > 0 ? (
-                                  <WorkItemsSummary items={dayItems} />
+                                  // showOperator: with crew co-operators, one day can
+                                  // carry multiple people's submissions — attribute each.
+                                  <WorkItemsSummary items={dayItems} showOperator />
                                 ) : (
                                   // Legacy fallback: log.work_performed JSON for
                                   // rows predating the work_items pipeline. Never
@@ -1623,7 +1657,7 @@ export default function AdminJobDetailPage({
                           </div>
                         </div>
                         <div className="px-4 py-3">
-                          <WorkItemsSummary items={d.items} />
+                          <WorkItemsSummary items={d.items} showOperator />
                         </div>
                       </div>
                     ))}
@@ -2182,6 +2216,110 @@ export default function AdminJobDetailPage({
                 )}
               </dl>
             </div>
+
+            {/* ── Crew & Clock-Ins — the whole crew on ONE ticket ─────────────
+                Lead + helper slots + job_crew members with role badges, the
+                job-level in-route/on-site stamps (lead-driven), and each
+                member's clock-in/out per day. Cards not clocked to this job
+                are labeled "(day card)". */}
+            {(job.operator_name || job.helper_name || crew.length > 0) && (
+              <div className="
+                rounded-2xl p-5 shadow-sm
+                bg-white border border-slate-200
+                dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+                dark:border-white/10 dark:backdrop-blur
+              ">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300">
+                    <Users className="w-4 h-4" />
+                  </span>
+                  <h2 className="text-base font-semibold text-slate-900 dark:text-white">Crew &amp; Clock-Ins</h2>
+                </div>
+
+                {/* Members: Lead → Operators → Helpers */}
+                <div className="flex flex-wrap gap-1.5 mb-4">
+                  {job.operator_name && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:border-amber-400/30">
+                      <Crown className="w-3 h-3" /> {job.operator_name} · Lead
+                    </span>
+                  )}
+                  {crew.filter((c) => c.role === 'operator').map((c) => (
+                    <span key={c.user_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-200 dark:border-indigo-400/30">
+                      <Wrench className="w-3 h-3" /> {c.full_name || 'Operator'} · Operator
+                    </span>
+                  ))}
+                  {job.helper_name && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-400/30">
+                      <HardHat className="w-3 h-3" /> {job.helper_name} · Helper
+                    </span>
+                  )}
+                  {crew.filter((c) => c.role !== 'operator').map((c) => (
+                    <span key={c.user_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-400/30">
+                      <HardHat className="w-3 h-3" /> {c.full_name || 'Helper'} · Helper
+                    </span>
+                  ))}
+                </div>
+
+                {/* Job-level route stamps — the lead drives these */}
+                {(job.in_route_at || job.route_started_at || job.arrived_at_jobsite_at) && (
+                  <div className="flex flex-wrap gap-x-5 gap-y-1.5 mb-4 text-xs text-slate-600 dark:text-white/70">
+                    {(job.in_route_at || job.route_started_at) && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Navigation className="w-3.5 h-3.5 text-blue-500" />
+                        In route {formatTimeFromISO(job.in_route_at || job.route_started_at || null)}
+                        <span className="text-slate-400 dark:text-white/40">(lead)</span>
+                      </span>
+                    )}
+                    {job.arrived_at_jobsite_at && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-teal-500" />
+                        On site {formatTimeFromISO(job.arrived_at_jobsite_at)}
+                        <span className="text-slate-400 dark:text-white/40">(lead)</span>
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Per-member clock-in / clock-out by day */}
+                {crewTimecards.length > 0 ? (
+                  <div className="space-y-3">
+                    {crewTimecards.map((day) => (
+                      <div key={day.date}>
+                        <p className="text-xs font-bold text-slate-400 dark:text-white/45 uppercase tracking-wide mb-1.5">
+                          {formatDate(day.date)}
+                        </p>
+                        <div className="space-y-1">
+                          {day.entries.map((e, i) => (
+                            <div
+                              key={`${e.user_id}-${i}`}
+                              className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 text-sm"
+                            >
+                              <span className="font-medium text-slate-800 dark:text-white/85 truncate">
+                                {e.full_name || 'Team member'}
+                                {!e.job_linked && (
+                                  <span className="ml-1.5 text-[11px] font-semibold text-slate-400 dark:text-white/40">(day card)</span>
+                                )}
+                              </span>
+                              <span className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-white/70 tabular-nums flex-shrink-0">
+                                <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-white/40" />
+                                {e.clock_in_time ? formatTimeFromISO(e.clock_in_time) : '—'}
+                                <span className="text-slate-300 dark:text-white/30">→</span>
+                                {e.clock_out_time ? formatTimeFromISO(e.clock_out_time) : 'on the clock'}
+                                {e.total_hours != null && (
+                                  <span className="ml-1 font-semibold text-slate-700 dark:text-white/80">{Number(e.total_hours).toFixed(1)}h</span>
+                                )}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-slate-400 dark:text-white/40">No clock-ins recorded for this job&apos;s dates yet.</p>
+                )}
+              </div>
+            )}
 
             {/* Change Requests */}
             <div className="

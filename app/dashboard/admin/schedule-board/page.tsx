@@ -199,7 +199,7 @@ export default function ScheduleBoardPage() {
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
-  const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null } | null>(null);
+  const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null; focusCrew?: boolean } | null>(null);
 
   // ═══ SMS CONFIG WARNING STATE ═══
   const [smsConfigured, setSmsConfigured] = useState<boolean | null>(null);
@@ -2086,6 +2086,7 @@ export default function ScheduleBoardPage() {
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}
                 onEditJob={(job) => canEdit ? setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper }) : setEditTarget({ job, rowIndex: idx })}
+                onAddCrewJob={canEdit ? (job) => setJobDetailTarget({ job, rowIndex: idx, operatorName: rowAssignments[idx]?.operator, helperName: rowAssignments[idx]?.helper, focusCrew: true }) : undefined}
                 onRequestChange={(job) => setChangeRequestTarget(job)}
                 onViewNotes={(job) => handleViewNotes(job)}
                 onRemoveJob={(job) => setCancelJobTarget(job)}
@@ -2317,6 +2318,7 @@ export default function ScheduleBoardPage() {
           userRole={userRole}
           boardDate={selectedDate}
           canReassign={canEdit}
+          focusCrew={jobDetailTarget.focusCrew}
           onClose={() => setJobDetailTarget(null)}
           onEdit={() => {
             const target = jobDetailTarget;

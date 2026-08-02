@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2, Trash2, Navigation, MapPinned, Hammer } from 'lucide-react';
+import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2, Trash2, Navigation, MapPinned, Hammer, UserPlus } from 'lucide-react';
 import { getDisplayName } from '@/lib/equipment-map';
 
 export interface JobCardData {
@@ -152,9 +152,12 @@ interface JobCardProps {
   onRequestChange?: (job: JobCardData) => void;
   onViewNotes?: (job: JobCardData) => void;
   onRemove?: (job: JobCardData) => void;
+  /** "+" affordance: add crew (2nd operator / helper) to this job — opens the
+   *  detail panel focused on the Crew section. */
+  onAddCrew?: (job: JobCardData) => void;
 }
 
-export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes, onRemove }: JobCardProps) {
+export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes, onRemove, onAddCrew }: JobCardProps) {
   const router = useRouter();
   const isCompleted = job.status === 'completed';
   const statusColor = getStatusColor(job);
@@ -253,8 +256,21 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
             </div>
           </div>
 
-          {/* Action icons — hidden for completed jobs */}
-          {!isCompleted && <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {/* Action icons — hidden for completed jobs. The "+" (add crew) stays
+              visible on touch devices (no hover) and appears on hover elsewhere;
+              44px tap target for gloved hands. */}
+          {!isCompleted && <div className="flex items-center gap-1">
+            {canEdit && onAddCrew && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onAddCrew(job); }}
+                className="flex items-center justify-center min-w-[44px] min-h-[44px] -my-2 rounded-lg hover:bg-indigo-100 dark:hover:bg-white/10 text-indigo-600 dark:text-indigo-400 transition-all opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                title="Add crew — 2nd operator or helper on this job"
+                aria-label="Add crew member to this job"
+              >
+                <UserPlus className="w-4 h-4" />
+              </button>
+            )}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             {canEdit ? (
               <button
                 onClick={(e) => { e.stopPropagation(); onEdit?.(job); }}
@@ -281,6 +297,7 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
                 <Trash2 className="w-4 h-4" />
               </button>
             )}
+            </div>
           </div>}
         </div>
 

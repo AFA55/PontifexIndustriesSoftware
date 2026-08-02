@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import Link from 'next/link';
 import {
   X, Printer, Edit3, MapPin, Wrench, Clock, Calendar, Users, FileText,
@@ -29,6 +29,8 @@ interface JobDetailViewProps {
   boardDate?: string;
   /** Whether the viewer may reassign operators (board canEdit). */
   canReassign?: boolean;
+  /** Opened via the card's "+" — scroll/focus the Crew section on load. */
+  focusCrew?: boolean;
   onClose: () => void;
   onEdit: () => void;
   onRemove?: () => void;
@@ -191,9 +193,18 @@ function StatusTimeline({ data }: { data: FullJobData }) {
   );
 }
 
-export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, boardDate, canReassign, onClose, onEdit, onRemove, onSaved }: JobDetailViewProps) {
+export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, boardDate, canReassign, focusCrew, onClose, onEdit, onRemove, onSaved }: JobDetailViewProps) {
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
+  // "+" on the card → scroll the crew panel into view once loaded.
+  const crewSectionRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!focusCrew || loading) return;
+    const t = setTimeout(() => {
+      crewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [focusCrew, loading]);
   const [printingPdf, setPrintingPdf] = useState(false);
   // Move-to-Pending flow
   const [showParkConfirm, setShowParkConfirm] = useState(false);
@@ -951,13 +962,28 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     )}
                   </SectionCard>
 
-                  {/* ---- Crew (additional operators beyond the lead) ---- */}
+                  {/* ---- Crew (operators + helpers beyond the lead) ---- */}
                   {!isEditing && (
-                    <JobCrewPanel
-                      jobId={job.id}
-                      leadId={(fullData?.assigned_to as string) || (job as any).assigned_to || null}
-                      leadName={fullData?.operator_name || operatorName || null}
-                    />
+                    <div ref={crewSectionRef}>
+                      <JobCrewPanel
+                        jobId={job.id}
+                        leadId={(fullData?.assigned_to as string) || (job as any).assigned_to || null}
+                        leadName={fullData?.operator_name || operatorName || null}
+                        helperId={(fullData?.helper_assigned_to as string) ?? null}
+                        scheduledDate={fullData?.scheduled_date || job.scheduled_date || null}
+                        endDate={fullData?.end_date || job.end_date || null}
+                        boardDate={boardDate || null}
+                        canPromote={!!canReassign}
+                        autoOpenAdd={focusCrew}
+                        onLeadChanged={(newLeadId, newLeadName) => {
+                          // Keep the panel's lead display in sync + let the board refetch.
+                          setFullData(prev =>
+                            prev ? { ...prev, assigned_to: newLeadId, operator_name: newLeadName } : prev
+                          );
+                          onSaved?.();
+                        }}
+                      />
+                    </div>
                   )}
 
                   {/* ---- Scope of Work ---- */}

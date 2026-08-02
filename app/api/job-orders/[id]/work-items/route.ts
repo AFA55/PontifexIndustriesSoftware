@@ -50,20 +50,37 @@ export async function POST(
     }
 
     // Verify user is assigned to this job (operator or helper) or is admin
-    const isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
+    let isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
     const isAdmin = ['admin', 'super_admin', 'operations_manager'].includes(auth.role);
+
+    // Crew members (job_crew, any role) also submit work — co-operators the
+    // full flow, helpers via their work-log. The job row above is already
+    // tenant-scoped, so this membership check inherits the tenant boundary.
+    if (!isAssigned && !isAdmin) {
+      const { data: crewRow } = await supabaseAdmin
+        .from('job_crew')
+        .select('id')
+        .eq('job_order_id', jobId)
+        .eq('user_id', auth.userId)
+        .limit(1)
+        .maybeSingle();
+      isAssigned = !!crewRow;
+    }
 
     if (!isAssigned && !isAdmin) {
       return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
     }
 
-    // Delete existing work items for this job + day (replace pattern)
+    // Delete existing work items for this job + day (replace pattern) — ONLY
+    // this submitter's rows. Without the operator filter, one crew member's
+    // resubmit wiped every other crew member's items for the day.
     const effectiveDay = dayNumber || 1;
     await supabaseAdmin
       .from('work_items')
       .delete()
       .eq('job_order_id', jobId)
-      .eq('day_number', effectiveDay);
+      .eq('day_number', effectiveDay)
+      .eq('operator_id', auth.userId);
 
     // Per-submission difficulty → the 1–5 accessibility columns (same label
     // map the daily-log route uses). Applied to every row of this submission.

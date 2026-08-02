@@ -31,6 +31,8 @@ interface OperatorRowProps {
   onViewNotes?: (job: JobCardData) => void;
   onRemoveJob?: (job: JobCardData) => void;
   onPreviewJob?: (job: JobCardData) => void;
+  /** "+" on the card — open the detail panel focused on the Crew section. */
+  onAddCrewJob?: (job: JobCardData) => void;
   onAssignJob?: () => void;
   onChangeOperator?: (name: string | null) => void;
   onChangeHelper?: (name: string | null) => void;
@@ -173,6 +175,7 @@ export default function OperatorRow({
   busyOperators,
   busyHelpers,
   onEditJob,
+  onAddCrewJob,
   onRequestChange,
   onViewNotes,
   onRemoveJob,
@@ -496,6 +499,7 @@ export default function OperatorRow({
                   assignedOperator={operatorName}
                   assignedHelper={helperName}
                   onEdit={onEditJob}
+                  onAddCrew={onAddCrewJob}
                   onRequestChange={onRequestChange}
                   onViewNotes={onViewNotes}
                   onRemove={onRemoveJob}

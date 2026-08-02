@@ -23,6 +23,21 @@ import { getTenantId } from '@/lib/get-tenant-id';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
+/** Crew membership (job_crew, any role) — co-operators run the full
+ *  work-performed flow, so their autosave must work too. The job row is
+ *  fetched tenant-scoped by the caller, so this inherits the tenant boundary
+ *  (crew rows are created tenant-scoped server-side). */
+async function isCrewMember(jobId: string, userId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('job_crew')
+    .select('id')
+    .eq('job_order_id', jobId)
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
 // ---------------------------------------------------------------------------
 // GET — retrieve the latest draft for the calling operator
 // ---------------------------------------------------------------------------
@@ -49,9 +64,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Only the assigned operator (or helper) may read their own draft
-    const isAssigned =
+    // Only the assigned operator, helper, or a crew member may read their own draft
+    let isAssigned =
       job.assigned_to === userId || job.helper_assigned_to === userId;
+    if (!isAssigned) isAssigned = await isCrewMember(jobId, userId);
     if (!isAssigned) {
       return NextResponse.json(
         { error: 'You are not assigned to this job' },
@@ -131,8 +147,9 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    const isAssigned =
+    let isAssigned =
       job.assigned_to === userId || job.helper_assigned_to === userId;
+    if (!isAssigned) isAssigned = await isCrewMember(jobId, userId);
     if (!isAssigned) {
       return NextResponse.json(
         { error: 'You are not assigned to this job' },

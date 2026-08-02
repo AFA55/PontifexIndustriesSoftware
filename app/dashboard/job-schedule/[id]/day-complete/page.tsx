@@ -58,6 +58,10 @@ export default function DayCompletePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [isAdminViewing, setIsAdminViewing] = useState(false);
+  // One ticket, whole crew: crew members (co-operator or helper) never run
+  // day-complete — the LEAD does. When detected, show a short message and
+  // bounce back to the job ticket (server enforces this too).
+  const [crewBlocked, setCrewBlocked] = useState(false);
   const [showSignature, setShowSignature] = useState(false);
   const [signerName, setSignerName] = useState('');
   const [signatureData, setSignatureData] = useState('');
@@ -114,6 +118,36 @@ export default function DayCompletePage() {
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
+
+  // Crew gate — same redirect the jobsite + work-performed pages apply. The
+  // flagged list endpoint marks viewer_is_co_operator / viewer_is_helper;
+  // the raw /api/job-orders/[id] GET used by fetchJob doesn't carry flags.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(
+          `/api/job-orders?id=${jobId}&include_helper_jobs=true&includeCompleted=true`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
+        if (!res.ok) return; // fail open here — the daily-log API still 403s
+        const json = await res.json();
+        const found = (json.data || [])[0];
+        if (
+          !cancelled &&
+          found &&
+          (found.viewer_is_co_operator === true || found.viewer_is_helper === true)
+        ) {
+          setCrewBlocked(true);
+          setTimeout(() => router.replace(`/dashboard/my-jobs/${jobId}`), 2000);
+        }
+      } catch { /* server still enforces */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
 
   useEffect(() => {
     fetchJob();
@@ -933,6 +967,27 @@ export default function DayCompletePage() {
             }`}
           >
             Back to My Jobs
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Crew member (co-operator/helper) landed here — message + bounce.
+  if (crewBlocked) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618] flex items-center justify-center p-4">
+        <div className="bg-white dark:bg-white/[0.05] rounded-2xl shadow-xl border border-indigo-200 dark:border-indigo-500/30 p-8 max-w-sm w-full text-center">
+          <CheckCircle2 className="w-12 h-12 text-indigo-500 dark:text-indigo-400 mx-auto mb-4" />
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">The lead completes the ticket</h2>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+            Your submitted work is already on the ticket. Taking you back to the job…
+          </p>
+          <button
+            onClick={() => router.replace(`/dashboard/my-jobs/${jobId}`)}
+            className="w-full min-h-[44px] bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold transition-colors"
+          >
+            Back to Job
           </button>
         </div>
       </div>

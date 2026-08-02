@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { crewTimecardSpan, groupCrewTimecards } from '@/lib/crew-timecards';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -82,7 +83,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         scope_photo_urls,
         difficulty_rating,
         additional_info,
-        project_manager_id
+        project_manager_id,
+        in_route_at,
+        arrived_at_jobsite_at,
+        route_started_at,
+        work_started_at,
+        work_completed_at
       `)
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
@@ -116,6 +122,81 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .eq('id', (job as any).helper_assigned_to)
         .maybeSingle();
       helperProfile = helperProf;
+    }
+
+    // ── 1b. Crew (job_crew) + per-member timecards for the job's date span ──
+    // "One ticket, whole crew": the admin sees every crew member's role plus
+    // their clock-in/out times per day. Timecards NOT linked to this job are
+    // still returned (job_linked=false → "(day card)" label) so the office
+    // sees the person's day even when the card wasn't clocked to the job.
+    let crew: Array<{ user_id: string; role: string; full_name: string | null }> = [];
+    let crewTimecards: ReturnType<typeof groupCrewTimecards> = [];
+    try {
+      const { data: crewRows } = await supabaseAdmin
+        .from('job_crew')
+        .select('user_id, role')
+        .eq('job_order_id', jobId);
+
+      const memberIds = new Set<string>();
+      if ((job as any).assigned_to) memberIds.add((job as any).assigned_to);
+      if ((job as any).helper_assigned_to) memberIds.add((job as any).helper_assigned_to);
+      for (const r of crewRows || []) memberIds.add(r.user_id);
+
+      const nameByUserId = new Map<string, string | null>();
+      if (memberIds.size > 0) {
+        const { data: memberProfiles } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', Array.from(memberIds));
+        for (const p of memberProfiles || []) nameByUserId.set(p.id, p.full_name ?? null);
+      }
+
+      crew = (crewRows || []).map((r) => ({
+        user_id: r.user_id,
+        role: r.role,
+        full_name: nameByUserId.get(r.user_id) ?? null,
+      }));
+
+      // Tenant-calendar "today" — the server runs UTC on Vercel; a bare local
+      // date would extend/shrink the span around midnight (same idiom as the
+      // daily-log route).
+      let tenantTz = 'America/New_York';
+      try {
+        if (tenantId) {
+          const { data: tzRow } = await supabaseAdmin
+            .from('tenants')
+            .select('timezone')
+            .eq('id', tenantId)
+            .maybeSingle();
+          if (tzRow?.timezone) tenantTz = tzRow.timezone;
+        }
+      } catch { /* default tz */ }
+      const todayTz = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
+
+      const span = crewTimecardSpan(
+        {
+          scheduled_date: (job as any).scheduled_date ?? null,
+          end_date: (job as any).end_date ?? null,
+          scheduled_end_date: (job as any).scheduled_end_date ?? null,
+          actual_end_date: (job as any).actual_end_date ?? null,
+          status: (job as any).status ?? null,
+        },
+        todayTz
+      );
+      if (span && memberIds.size > 0) {
+        let tcQuery = supabaseAdmin
+          .from('timecards')
+          .select('user_id, date, clock_in_time, clock_out_time, total_hours, job_order_id')
+          .in('user_id', Array.from(memberIds))
+          .gte('date', span.from)
+          .lte('date', span.to);
+        if (tenantId) tcQuery = tcQuery.eq('tenant_id', tenantId);
+        const { data: tcRows } = await tcQuery.order('date', { ascending: true });
+        crewTimecards = groupCrewTimecards(tcRows || [], nameByUserId, jobId);
+      }
+    } catch (e) {
+      // Non-critical — the rest of the summary still renders.
+      console.error('[summary] crew/timecards fetch failed:', e);
     }
 
     // Fetch the project manager's name (project_manager_id → profiles).
@@ -473,7 +554,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
           // Project manager (office owner of the job).
           project_manager_id: (job as any).project_manager_id ?? null,
           project_manager_name: pmProfile?.full_name ?? null,
+          // Job-level route/on-site stamps (the LEAD drives these — the client
+          // labels them as the lead's).
+          in_route_at: (job as any).in_route_at ?? null,
+          arrived_at_jobsite_at: (job as any).arrived_at_jobsite_at ?? null,
+          route_started_at: (job as any).route_started_at ?? null,
+          work_started_at: (job as any).work_started_at ?? null,
+          work_completed_at: (job as any).work_completed_at ?? null,
         },
+        // Crew beyond the lead/helper slots (job_crew): role 'operator' = full
+        // input co-operator; role 'helper' = light work-log.
+        crew,
+        // Per-member clock-in/out grouped by date across the job's span.
+        // job_linked=false entries are general day cards, label as "(day card)".
+        crew_timecards: crewTimecards,
         scope: {
           items: enrichedScopeItems,
           overall_pct: overallPct,
