@@ -266,18 +266,28 @@ function TimecardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleClockOut = useCallback(async () => {
+  // `skipDailyReportGate` exists because the gate's own "Clock Out Anyway"
+  // escape used to call setDailyReportSubmitted(true) then handleClockOut() —
+  // but this callback closes over the PRE-update value, so it re-queried, saw
+  // "not submitted", and re-opened the gate. The escape looped and the operator
+  // could not clock out. An explicit argument can't go stale.
+  const handleClockOut = useCallback(async (opts?: { skipDailyReportGate?: boolean }) => {
     setClockingAction(true);
     try {
       // Gate: check if daily report was submitted today (operator/apprentice/shop_help/shop_manager)
       const REPORT_ROLES = ['operator', 'apprentice', 'shop_help', 'shop_manager'];
       const currentUser = getCurrentUser();
-      if (currentUser && REPORT_ROLES.includes(currentUser.role) && dailyReportSubmitted !== true) {
+      if (
+        !opts?.skipDailyReportGate &&
+        currentUser && REPORT_ROLES.includes(currentUser.role) && dailyReportSubmitted !== true
+      ) {
         // Haven't confirmed report yet — check the API
         try {
           const { data: { session: sess } } = await supabase.auth.getSession();
           if (sess) {
-            const today = new Date().toISOString().slice(0, 10);
+            // LOCAL date — toISOString() is UTC, so after ~7pm ET this asked
+            // about TOMORROW's report and gated an operator who had filed today's.
+            const today = toLocalDateStr(new Date());
             const r = await fetch(`/api/operator/daily-report?date=${today}`, {
               headers: { Authorization: `Bearer ${sess.access_token}` },
             });
@@ -692,7 +702,10 @@ function TimecardPage() {
               )}
 
               <button
-                onClick={handleClockOut}
+                // Wrapped: a bare handler would pass React's click event as the
+                // options object, and `event.skipDailyReportGate` is undefined —
+                // harmless today, but a trap if the shape ever grows.
+                onClick={() => handleClockOut()}
                 disabled={clockingAction}
                 className="w-full max-w-xs mx-auto py-4 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
               >
@@ -1315,7 +1328,9 @@ function TimecardPage() {
                 onClick={() => {
                   setShowDailyReportGate(false);
                   setDailyReportSubmitted(true); // allow skip once
-                  handleClockOut();
+                  // Pass the bypass explicitly — the state set above hasn't
+                  // flushed into this callback's closure yet (see handleClockOut).
+                  handleClockOut({ skipDailyReportGate: true });
                 }}
                 className="w-full py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-gray-500 dark:text-white/50 text-sm"
               >
