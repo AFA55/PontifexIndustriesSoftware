@@ -16,6 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { tenantToday } from '@/lib/tenant-timezone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +35,9 @@ export async function POST(request: NextRequest) {
       operator_review_comment,  // optional text
     } = body;
 
-    const today = log_date || new Date().toISOString().split('T')[0];
+    // Tenant wall-clock date, NOT UTC: a helper submitting at 6pm ET was being
+    // filed under TOMORROW, so the office saw work logged on a day nobody worked.
+    const today = log_date || (await tenantToday(tenantId));
     const now = new Date().toISOString();
 
     // ── SHOP TICKET ──
@@ -301,7 +304,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const jobOrderId = searchParams.get('job_order_id');
-    const logDate = searchParams.get('log_date') || new Date().toISOString().split('T')[0];
+    const logDate = searchParams.get('log_date') || (await tenantToday(tenantId));
     const allToday = searchParams.get('all_today') === 'true';
 
     // Fetch all logs for today (for time summary)

@@ -130,6 +130,71 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching will-call jobs:', wcError);
     }
 
+    // ── 4. Crew overlay (Aug 2026) ──────────────────────────────────────────
+    // The board card only ever showed the lead (assigned_to) + the helper seat
+    // (helper_assigned_to), so a 3rd/4th person added through job_crew was
+    // INVISIBLE on the board even though the detail panel listed them. Attach
+    // the crew here.
+    //
+    // TWO queries total for the whole board, never one per card:
+    //   1. job_crew for every visible job id (tenant-scoped)
+    //   2. profiles for the distinct user ids on those rows (tenant-scoped)
+    const boardJobs = [...(jobs || []), ...(pendingJobs || []), ...(willCallJobs || [])];
+    const boardJobIds = Array.from(new Set(boardJobs.map((j: any) => j.id).filter(Boolean)));
+
+    if (boardJobIds.length > 0) {
+      const { data: crewRows, error: crewError } = await supabaseAdmin
+        .from('job_crew')
+        .select('job_order_id, user_id, role')
+        .eq('tenant_id', tenantId)
+        .in('job_order_id', boardJobIds);
+
+      if (crewError) {
+        // Non-fatal: the board still renders with lead + helper only.
+        console.error('Error fetching board crew:', crewError);
+      }
+
+      const nameById = new Map<string, string>();
+      const userIds = Array.from(new Set((crewRows || []).map((r) => r.user_id).filter(Boolean)));
+      if (userIds.length > 0) {
+        const { data: profs } = await supabaseAdmin
+          .from('profiles')
+          .select('id, full_name')
+          .eq('tenant_id', tenantId)
+          .in('id', userIds);
+        for (const p of profs || []) nameById.set(p.id, p.full_name || 'Crew member');
+      }
+
+      const crewByJob = new Map<string, { user_id: string; name: string; role: string }[]>();
+      for (const row of crewRows || []) {
+        const list = crewByJob.get(row.job_order_id) || [];
+        list.push({
+          user_id: row.user_id,
+          name: nameById.get(row.user_id) || 'Crew member',
+          role: row.role === 'operator' ? 'operator' : 'helper',
+        });
+        crewByJob.set(row.job_order_id, list);
+      }
+
+      for (const job of boardJobs as any[]) {
+        const list = crewByJob.get(job.id) || [];
+        // Don't print anyone twice: the card already renders the lead (after
+        // the per-day overlay above) and the helper seat.
+        const leadId = job.assigned_to ?? null;
+        const helperId = job.helper_id != null ? job.helper_id : job.helper_assigned_to ?? null;
+        job.crew = list
+          .filter((m) => m.user_id !== leadId && m.user_id !== helperId)
+          // Operators first (they run equipment), then helpers, each A→Z.
+          .sort((a, b) =>
+            a.role === b.role
+              ? a.name.localeCompare(b.name)
+              : a.role === 'operator'
+                ? -1
+                : 1
+          );
+      }
+    }
+
     // Group date-filtered jobs
     const assigned: typeof jobs = [];
     const unassigned: typeof jobs = [];

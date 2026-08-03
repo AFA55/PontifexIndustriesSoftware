@@ -1,7 +1,8 @@
 'use client';
 
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Users } from 'lucide-react';
 import type { JobCardData } from './JobCard';
+import { crewSummary } from './JobCard';
 import { parseLocalDate, toDateString } from './helpers';
 
 interface WeeklyViewProps {
@@ -71,7 +72,18 @@ export default function WeeklyView({
                   {jobs.length === 0 ? (
                     <p className="text-xs text-gray-400 dark:text-white/50 text-center py-6 italic">No jobs</p>
                   ) : (
-                    jobs.map(job => (
+                    jobs.map(job => {
+                    // Week cells are thin, so the crew shows as "Lead +N" with
+                    // the full roster (names + roles) in the tooltip — the day
+                    // views carry the expandable list.
+                    const crew = job.crew ?? [];
+                    const people = [
+                      job.operator_name ? `${job.operator_name} (lead)` : null,
+                      job.helper_name ? `${job.helper_name} (helper)` : null,
+                      crew.length ? crewSummary(crew) : null,
+                    ].filter(Boolean).join(', ');
+                    const extraCount = (job.helper_name ? 1 : 0) + crew.length;
+                    return (
                       <div
                         key={job.id}
                         draggable={canEdit}
@@ -103,6 +115,18 @@ export default function WeeklyView({
                         {job.arrival_time && (
                           <p className="text-[10px] text-gray-400 mt-0.5">⏰ {job.arrival_time}</p>
                         )}
+                        {people && (
+                          <p
+                            className={`flex items-center gap-1 text-[10px] text-gray-500 dark:text-white/60 mt-0.5 min-w-0 ${canEdit && onAddCrewJob ? 'pr-9' : ''}`}
+                            title={`Crew: ${people}`}
+                          >
+                            <Users className="w-2.5 h-2.5 flex-shrink-0 text-gray-400 dark:text-white/40" />
+                            <span className="truncate">{job.operator_name || 'Unassigned'}</span>
+                            {extraCount > 0 && (
+                              <span className="flex-shrink-0 font-semibold text-indigo-600 dark:text-indigo-300">+{extraCount}</span>
+                            )}
+                          </p>
+                        )}
                         <div className="flex flex-wrap gap-0.5 mt-1">
                           {job.equipment_needed.slice(0, 3).map(eq => (
                             <span key={eq} className="px-1 py-0.5 bg-indigo-50 rounded text-[8px] text-indigo-600 font-medium">{eq}</span>
@@ -112,7 +136,8 @@ export default function WeeklyView({
                           )}
                         </div>
                       </div>
-                    ))
+                    );
+                    })
                   )}
                 </div>
               </div>

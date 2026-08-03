@@ -73,6 +73,12 @@ export function toJobCard(job: any, viewDate?: string): JobCardData {
     notes_count: job.notes_count || 0,
     change_requests_count: job.pending_change_requests_count || 0,
     helper_names: job.helper_name ? [job.helper_name] : [],
+    // People the board can show without another fetch. operator_name/helper_name
+    // come straight from schedule_board_view (+ the per-day overlay); `crew` is
+    // the extra job_crew members the board GET now attaches.
+    operator_name: job.operator_name || null,
+    helper_name: job.helper_name || null,
+    crew: Array.isArray(job.crew) ? job.crew : [],
     po_number: job.po_number || null,
     day_label: computeDayLabel(job, viewDate),
     // Same-day sequencing (from the board GET's per-day-ledger overlay)

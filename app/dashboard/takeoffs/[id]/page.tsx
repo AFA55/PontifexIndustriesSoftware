@@ -22,13 +22,15 @@ import { useParams, useRouter } from 'next/navigation';
 import {
   ArrowLeft, Ruler, MousePointer2, Crosshair, Hash, Sparkles, Loader2,
   Trash2, Plus, ZoomIn, ZoomOut, X, ChevronLeft, ChevronRight,
-  Square, Undo2, Magnet, Tag,
+  Square, Undo2, Magnet, Tag, RotateCcw, RotateCw,
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { takeoffsFetch, TAKEOFF_ROLES_CLIENT } from '@/components/takeoffs/api';
 import {
-  feetPerPointFromScale, formatFeetInches, formatSqFeet, NAMED_SCALES,
-  polylineLengthPt, polygonAreaPt, snapAngle, snapToNamedScale, type TakeoffGeometry,
+  addRotation, feetPerPointFromScale, formatFeetInches, formatSqFeet, NAMED_SCALES,
+  normalizeRotation, polylineLengthPt, polygonAreaPt, rotatedPageSize, snapAngle,
+  snapToNamedScale, toDisplayPoint, toDisplayPoints, toNativePoint,
+  type TakeoffGeometry, type ViewRotation,
 } from '@/lib/takeoffs/geometry';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
@@ -39,6 +41,8 @@ interface PageRow {
   sheet_number: string | null; sheet_title: string | null; discipline: string | null;
   scale_feet_per_point: number | null; scale_label: string | null; ai_page_summary: string | null;
   user_unit: number;
+  /** Estimator's quarter-turn for VIEWING this sheet. Never rotates geometry. */
+  view_rotation?: number | null;
 }
 interface ConditionRow {
   id: string; name: string; measure_type: 'count' | 'linear' | 'area'; unit: string;
@@ -142,6 +146,41 @@ export default function TakeoffViewerPage() {
     [payload, page]
   );
 
+  // ── Sheet orientation (render-only) ──────────────────────────────────────
+  // Measurements are ALWAYS stored in the sheet's native PDF-point space. A
+  // turn only changes what pdf.js paints and how we map points on the way in
+  // and out: native→display to draw, display→native for every click. So a
+  // sheet calibrated and measured before the turn still reads the same after
+  // it — rotation is a rigid motion (proof: lib/takeoffs/rotation.test.ts).
+  const nativeW = Number(page?.width_pt ?? 0);
+  const nativeH = Number(page?.height_pt ?? 0);
+  const viewRotation: ViewRotation = normalizeRotation(page?.view_rotation);
+  const disp = rotatedPageSize(nativeW, nativeH, viewRotation);
+  const toDisplay = (p: [number, number]) => toDisplayPoint(p, nativeW, nativeH, viewRotation);
+  const toDisplayAll = (pts: [number, number][]) => toDisplayPoints(pts, nativeW, nativeH, viewRotation);
+
+  const rotateSheet = async (delta: number, allSheets = false) => {
+    if (!page || !payload) return;
+    const next = allSheets ? viewRotation : addRotation(viewRotation, delta);
+    const targets = allSheets ? new Set(payload.pages.map((p) => p.id)) : new Set([page.id]);
+    // Optimistic: the turn has to feel instant — the PATCH is bookkeeping.
+    setPayload((p) => p && {
+      ...p,
+      pages: p.pages.map((pg) => (targets.has(pg.id) ? { ...pg, view_rotation: next } : pg)),
+    });
+    try {
+      await takeoffsFetch(`/api/takeoffs/pages/${page.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ view_rotation: next, apply_to_all: allSheets }),
+      });
+      setError(null);
+    } catch {
+      // Keep the sheet turned — he needs to read it NOW. Just be honest that
+      // the orientation won't be remembered next time it's opened.
+      setError('Turned this sheet, but the orientation could not be saved for next time.');
+    }
+  };
+
   // AI suggestions are per-sheet; clear them when the sheet changes, and track
   // the current sheet id so an in-flight analysis can't land on the wrong page.
   const pageIdRef = useRef<string | undefined>(undefined);
@@ -183,20 +222,26 @@ export default function TakeoffViewerPage() {
       try {
         const pdfPage = await pdf.getPage(page.page_number);
         if (cancelled) return;
-        const baseScale = (containerW - 16) / Number(page.width_pt);
+        // pdf.js rotates natively — a CSS-rotated canvas would break the
+        // hit-testing the SVG overlay depends on. The page's own /Rotate is
+        // already baked into width_pt/height_pt, so the estimator's turn is
+        // added on top of it.
+        const rotation = (pdfPage.rotate + viewRotation) % 360;
+        // Fit-to-width uses the ROTATED width — that is what's on screen.
+        const baseScale = (containerW - 16) / disp.width;
         const scale = baseScale * zoom;
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
         let renderScale = scale * dpr;
-        const pixels = Number(page.width_pt) * Number(page.height_pt) * renderScale * renderScale;
+        const pixels = disp.width * disp.height * renderScale * renderScale;
         if (pixels > MAX_CANVAS_PIXELS) {
-          renderScale = Math.sqrt(MAX_CANVAS_PIXELS / (Number(page.width_pt) * Number(page.height_pt)));
+          renderScale = Math.sqrt(MAX_CANVAS_PIXELS / (disp.width * disp.height));
         }
-        const viewport = pdfPage.getViewport({ scale: renderScale });
+        const viewport = pdfPage.getViewport({ scale: renderScale, rotation });
         const canvas = canvasRef.current!;
         canvas.width = Math.floor(viewport.width);
         canvas.height = Math.floor(viewport.height);
-        const cssW = Number(page.width_pt) * scale;
-        const cssH = Number(page.height_pt) * scale;
+        const cssW = disp.width * scale;
+        const cssH = disp.height * scale;
         canvas.style.width = `${cssW}px`;
         canvas.style.height = `${cssH}px`;
         setCssSize({ w: cssW, h: cssH });
@@ -212,16 +257,19 @@ export default function TakeoffViewerPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [pdf, page, zoom, containerW]);
+  }, [pdf, page, zoom, containerW, viewRotation, disp.width, disp.height]);
 
-  // ── Pointer → page coordinates ───────────────────────────────────────────
+  // ── Pointer → NATIVE page coordinates ────────────────────────────────────
+  // The pointer lands in rotated display space; everything downstream (draft,
+  // calibration, saved geometry) works in native space, so un-rotate here —
+  // one place, so no tool has to know the sheet is turned.
   const toPageCoords = (e: React.MouseEvent): [number, number] | null => {
     if (!canvasRef.current || !page) return null;
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = ((e.clientX - rect.left) / rect.width) * Number(page.width_pt);
-    const y = ((e.clientY - rect.top) / rect.height) * Number(page.height_pt);
-    if (x < 0 || y < 0 || x > Number(page.width_pt) || y > Number(page.height_pt)) return null;
-    return [x, y];
+    const dx = ((e.clientX - rect.left) / rect.width) * disp.width;
+    const dy = ((e.clientY - rect.top) / rect.height) * disp.height;
+    if (dx < 0 || dy < 0 || dx > disp.width || dy > disp.height) return null;
+    return toNativePoint([dx, dy], nativeW, nativeH, viewRotation);
   };
 
   // ── Tool interactions ────────────────────────────────────────────────────
@@ -370,6 +418,12 @@ export default function TakeoffViewerPage() {
       if (e.key === 'Shift') setShiftHeld(true);
       if (e.key === 'Escape') { setDraft([]); setCursor(null); setCalibratePts([]); setSelectedMeasurementId(null); }
       if (e.key === 'Enter' && draft.length >= (tool === 'area' ? 3 : 2)) finishDraft();
+      // R turns the sheet a quarter clockwise — but never while a modal input
+      // (condition name, calibration length) has focus.
+      if ((e.key === 'r' || e.key === 'R') && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const tag = (e.target as HTMLElement | null)?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') rotateSheet(90);
+      }
       // Backspace/Delete undoes the last placed point mid-draw; only deletes a
       // selected measurement when there is no draft in progress.
       if (e.key === 'Backspace' || e.key === 'Delete') {
@@ -382,7 +436,7 @@ export default function TakeoffViewerPage() {
     window.addEventListener('keyup', onKeyUp);
     return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('keyup', onKeyUp); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [draft, selectedMeasurementId, page?.id, activeConditionId, tool]);
+  }, [draft, selectedMeasurementId, page?.id, page?.view_rotation, activeConditionId, tool]);
 
   const deleteMeasurement = async (id: string) => {
     try {
@@ -462,12 +516,17 @@ export default function TakeoffViewerPage() {
   // ── Per-sheet AI soft markup ─────────────────────────────────────────────
   // Render just the current page to an image (offscreen, fixed resolution) so
   // the vision model sees the drawing; geometry comes back in PDF-point coords.
-  const renderPageToImage = async (pageNumber: number, maxEdge = 1600): Promise<string | null> => {
+  const renderPageToImage = async (
+    pageNumber: number, rotation: ViewRotation, maxEdge = 1600
+  ): Promise<string | null> => {
     if (!pdf) return null;
     const pdfPage = await pdf.getPage(pageNumber);
     const b = pdfPage.getViewport({ scale: 1 });
     const scale = Math.min(4, maxEdge / Math.max(b.width, b.height));
-    const viewport = pdfPage.getViewport({ scale });
+    // Send the model the sheet the way the estimator is looking at it — a
+    // sideways drawing turned upright reads far better. The route un-rotates
+    // the returned coords back into native space (normalizedToNativePoint).
+    const viewport = pdfPage.getViewport({ scale, rotation: (pdfPage.rotate + rotation) % 360 });
     const canvas = document.createElement('canvas');
     canvas.width = Math.floor(viewport.width);
     canvas.height = Math.floor(viewport.height);
@@ -490,11 +549,12 @@ export default function TakeoffViewerPage() {
     setPageSuggestions([]);
     setPageSummary('');
     try {
-      const image = await renderPageToImage(page.page_number);
+      const reqRotation = viewRotation;
+      const image = await renderPageToImage(page.page_number, reqRotation);
       if (!image) throw new Error('Could not render this sheet');
       const res = await takeoffsFetch<{ pageSummary: string; suggestions: any[] }>(
         `/api/takeoffs/documents/${docId}/mark-page`,
-        { method: 'POST', body: JSON.stringify({ page_id: reqPageId, image }) }
+        { method: 'POST', body: JSON.stringify({ page_id: reqPageId, image, view_rotation: reqRotation }) }
       );
       // Discard if the estimator navigated to another sheet while this ran —
       // otherwise sheet A's geometry would render/accept onto sheet B.
@@ -566,7 +626,7 @@ export default function TakeoffViewerPage() {
   const activeBucketTotal = activeConditionId ? conditionTotals[activeConditionId] ?? 0 : 0;
   // Constant-on-screen label sizing: SVG text is in page units, so divide the
   // target px by the page→px factor to keep labels legible at any zoom.
-  const pageToPx = page && cssSize.w > 0 ? cssSize.w / Number(page.width_pt) : 1;
+  const pageToPx = page && cssSize.w > 0 && disp.width > 0 ? cssSize.w / disp.width : 1;
   const labelFs = 11 / pageToPx;
 
   if (error && !payload) {
@@ -671,6 +731,46 @@ export default function TakeoffViewerPage() {
           </button>
         </div>
 
+        {/* Rotate the sheet (view only — never touches a measurement) */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => rotateSheet(-90)}
+            title="Turn this sheet left 90° (view only — measurements are unaffected)"
+            aria-label="Rotate sheet left"
+            className="p-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 min-h-[44px] min-w-[44px] transition-colors"
+          >
+            <RotateCcw className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => rotateSheet(90)}
+            title="Turn this sheet right 90° (view only — measurements are unaffected). Shortcut: R"
+            aria-label="Rotate sheet right"
+            className="p-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 min-h-[44px] min-w-[44px] transition-colors"
+          >
+            <RotateCw className="w-4 h-4" />
+          </button>
+          {viewRotation !== 0 && (
+            <>
+              <button
+                onClick={() => rotateSheet(-viewRotation)}
+                title="Back to the sheet's original orientation"
+                className="px-2 rounded-lg text-[11px] font-bold text-violet-600 bg-violet-50 dark:bg-violet-500/10 min-h-[44px]"
+              >
+                {viewRotation}° ✕
+              </button>
+              {payload.pages.length > 1 && (
+                <button
+                  onClick={() => rotateSheet(0, true)}
+                  title="Turn every sheet in this set the same way"
+                  className="px-2 rounded-lg text-[11px] font-semibold text-slate-500 hover:text-violet-600 min-h-[44px] hidden sm:block"
+                >
+                  All sheets
+                </button>
+              )}
+            </>
+          )}
+        </div>
+
         {/* Zoom */}
         <div className="flex items-center gap-1">
           <button onClick={() => setZoom((z) => Math.max(0.5, z / 1.25))} className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 min-h-[44px] min-w-[44px]" aria-label="Zoom out"><ZoomOut className="w-4 h-4" /></button>
@@ -739,7 +839,10 @@ export default function TakeoffViewerPage() {
                 className="absolute inset-0"
                 width={cssSize.w}
                 height={cssSize.h}
-                viewBox={`0 0 ${page.width_pt} ${page.height_pt}`}
+                // Display (rotated) space. Every point below is mapped through
+                // toDisplay() — geometry itself stays native, and labels stay
+                // upright because we rotate the POINTS, not the SVG.
+                viewBox={`0 0 ${disp.width} ${disp.height}`}
                 onClick={handleCanvasClick}
                 onDoubleClick={(e) => { e.preventDefault(); if (tool === 'linear' || tool === 'area') finishDraft(); }}
                 onContextMenu={(e) => {
@@ -766,8 +869,11 @@ export default function TakeoffViewerPage() {
                   const cond = conditions.find((c) => c.id === m.condition_id);
                   const color = cond?.color ?? '#7C3AED';
                   const selected = m.id === selectedMeasurementId;
-                  // Follow the cursor while a vertex of THIS markup is being dragged.
-                  const pts: [number, number][] = vertexDrag?.id === m.id ? vertexDrag.points : m.geometry.points;
+                  // Follow the cursor while a vertex of THIS markup is being
+                  // dragged. `nativePts` is what gets saved; `pts` is only for
+                  // painting at the current sheet orientation.
+                  const nativePts: [number, number][] = vertexDrag?.id === m.id ? vertexDrag.points : m.geometry.points;
+                  const pts = toDisplayAll(nativePts);
                   const editable = selected && tool === 'select';
                   const handleR = 5 / pageToPx;
                   const hitR = 14 / pageToPx;
@@ -807,7 +913,7 @@ export default function TakeoffViewerPage() {
                             stroke={editable ? '#0EA5E9' : 'none'} strokeWidth={editable ? 1.5 : 0}
                             vectorEffect="non-scaling-stroke"
                             style={{ pointerEvents: editable ? 'all' : 'none', cursor: editable ? 'grab' : 'default' }}
-                            onMouseDown={(e) => { if (editable) { e.stopPropagation(); setVertexDrag({ id: m.id, index: i, points: pts.map((q) => [q[0], q[1]] as [number, number]) }); } }}
+                            onMouseDown={(e) => { if (editable) { e.stopPropagation(); setVertexDrag({ id: m.id, index: i, points: nativePts.map((q) => [q[0], q[1]] as [number, number]) }); } }}
                             onClick={(e) => e.stopPropagation()}
                           />
                         ))}
@@ -838,7 +944,8 @@ export default function TakeoffViewerPage() {
                 {/* AI soft-markup suggestions (dashed + distinct — confirm in the panel) */}
                 {pageSuggestions.filter((s) => s.status === 'suggested' && s.page_id === page.id).map((s) => {
                   const color = WORK_COLORS[s.work_type] ?? '#7C3AED';
-                  const ptsStr = s.geometry.points.map((p) => p.join(',')).join(' ');
+                  const sPts = toDisplayAll(s.geometry.points);
+                  const ptsStr = sPts.map((p) => p.join(',')).join(' ');
                   if (s.geometry.type === 'polygon') {
                     return <polygon key={s.sid} points={ptsStr} fill={color} fillOpacity={0.12} stroke={color} strokeWidth={2.5} strokeDasharray="8 5" vectorEffect="non-scaling-stroke" pointerEvents="none" />;
                   }
@@ -847,7 +954,7 @@ export default function TakeoffViewerPage() {
                   }
                   return (
                     <g key={s.sid} pointerEvents="none">
-                      {s.geometry.points.map((p, i) => (
+                      {sPts.map((p, i) => (
                         <circle key={i} cx={p[0]} cy={p[1]} r={9} fill={color} fillOpacity={0.15} stroke={color} strokeWidth={2.5} strokeDasharray="4 3" vectorEffect="non-scaling-stroke" />
                       ))}
                     </g>
@@ -859,33 +966,34 @@ export default function TakeoffViewerPage() {
                   <g pointerEvents="none">
                     {tool === 'area' ? (
                       <polygon
-                        points={draftPts.map((p) => p.join(',')).join(' ')}
+                        points={toDisplayAll(draftPts).map((p) => p.join(',')).join(' ')}
                         fill={activeCondition?.color ?? '#0EA5E9'} fillOpacity={0.18}
                         stroke={activeCondition?.color ?? '#0EA5E9'} strokeWidth={2.5}
                         strokeDasharray="6 4" vectorEffect="non-scaling-stroke"
                       />
                     ) : (
                       <polyline
-                        points={draftPts.map((p) => p.join(',')).join(' ')}
+                        points={toDisplayAll(draftPts).map((p) => p.join(',')).join(' ')}
                         fill="none" stroke={activeCondition?.color ?? '#0EA5E9'} strokeWidth={2.5}
                         strokeDasharray="6 4" vectorEffect="non-scaling-stroke"
                       />
                     )}
-                    {draft.map((p, i) => (
+                    {toDisplayAll(draft).map((p, i) => (
                       <circle key={i} cx={p[0]} cy={p[1]} r={4} fill={activeCondition?.color ?? '#0EA5E9'} vectorEffect="non-scaling-stroke" />
                     ))}
                   </g>
                 )}
 
                 {/* Calibration points */}
-                {calibratePts.map((p, i) => (
+                {toDisplayAll(calibratePts).map((p, i) => (
                   <g key={i} pointerEvents="none">
                     <circle cx={p[0]} cy={p[1]} r={7} fill="none" stroke="#F59E0B" strokeWidth={2.5} />
                     <circle cx={p[0]} cy={p[1]} r={1.8} fill="#F59E0B" />
                   </g>
                 ))}
                 {calibratePts.length === 2 && (
-                  <line x1={calibratePts[0][0]} y1={calibratePts[0][1]} x2={calibratePts[1][0]} y2={calibratePts[1][1]}
+                  <line x1={toDisplay(calibratePts[0])[0]} y1={toDisplay(calibratePts[0])[1]}
+                    x2={toDisplay(calibratePts[1])[0]} y2={toDisplay(calibratePts[1])[1]}
                     stroke="#F59E0B" strokeWidth={2.5} strokeDasharray="8 4" vectorEffect="non-scaling-stroke" pointerEvents="none" />
                 )}
               </svg>

@@ -1,8 +1,17 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, Edit3, FileText, Users, CheckCircle2, Trash2, Navigation, MapPinned, Hammer, UserPlus } from 'lucide-react';
+import { MapPin, Wrench, Clock, MessageSquare, Phone, AlertTriangle, ChevronRight, ChevronDown, Edit3, FileText, Users, CheckCircle2, Trash2, Navigation, MapPinned, Hammer, UserPlus } from 'lucide-react';
 import { getDisplayName } from '@/lib/equipment-map';
+
+/** An extra crew member on a job, beyond the lead + the helper seat. */
+export interface JobCrewMember {
+  user_id: string;
+  name: string;
+  /** 'operator' = full work-performed input · 'helper' = light work-log form */
+  role: string;
+}
 
 export interface JobCardData {
   id: string;
@@ -22,6 +31,12 @@ export interface JobCardData {
   change_requests_count: number;
   helper_names: string[];
   po_number: string | null;
+  /** Lead + helper names as the board resolved them (view + per-day overlay). */
+  operator_name?: string | null;
+  helper_name?: string | null;
+  /** Extra crew (job_crew) beyond the lead + helper seat — already de-duped
+   *  against those two by the board GET. Empty for jobs with no extra crew. */
+  crew?: JobCrewMember[];
   day_label?: string; // e.g. "Day 2 of 5"
   // Same-day sequencing (Aug 2026): this job's position within its operator's
   // day + how many jobs that operator holds this day. Badge shows when > 1.
@@ -95,6 +110,21 @@ export function jobLiveStatus(
   return null;
 }
 
+// ─── Crew role presentation ──────────────────────────────────────────────
+// The founder has to tell an operator from a helper AT A GLANCE, so every
+// extra crew member carries both a colour and a word — colour alone is not
+// enough (and would fail for colour-blind users).
+export const CREW_ROLE_LABEL: Record<string, string> = { operator: 'op', helper: 'helper' };
+
+export function crewRoleLabel(role: string): string {
+  return CREW_ROLE_LABEL[role] || role;
+}
+
+/** "Aiden (op), Luis (helper)" — the compact one-line summary. */
+export function crewSummary(crew: { name: string; role: string }[]): string {
+  return crew.map((m) => `${m.name} (${crewRoleLabel(m.role)})`).join(', ');
+}
+
 /** "1st" / "2nd" / "3rd" / "4th" … for the same-day sequence badge. */
 export function ordinalLabel(n: number): string {
   const rem10 = n % 10;
@@ -159,11 +189,16 @@ interface JobCardProps {
 
 export default function JobCard({ job, colorScheme, canEdit, assignedOperator, assignedHelper, onEdit, onRequestChange, onViewNotes, onRemove, onAddCrew }: JobCardProps) {
   const router = useRouter();
+  const [crewExpanded, setCrewExpanded] = useState(false);
   const isCompleted = job.status === 'completed';
   const statusColor = getStatusColor(job);
   const statusLabel = STATUS_LABELS[job.status || ''] || '';
   // Live operator-progress pill. Suppressed when the COMPLETED badge already covers it.
   const liveStatus = isCompleted ? null : jobLiveStatus(job);
+  // Extra crew beyond the lead + helper seat (already de-duped server-side).
+  const crew = job.crew ?? [];
+  const crewCount = crew.length;
+  const crewNames = crewSummary(crew);
 
   const formatTime = (time: string | null) => {
     if (!time) return null;
@@ -309,16 +344,80 @@ export default function JobCard({ job, colorScheme, canEdit, assignedOperator, a
           </div>
         )}
 
-        {/* Operator/Helper info — shown inside the card */}
-        {assignedOperator && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/60 mb-2 bg-gray-50 dark:bg-white/5 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-white/10">
-            <Users className="w-3.5 h-3.5 text-gray-400 dark:text-white/40 flex-shrink-0" />
-            <span className="font-medium text-gray-700 dark:text-white/80">{assignedOperator}</span>
-            {assignedHelper && (
-              <>
-                <span className="text-gray-300 dark:text-white/20">+</span>
-                <span className="text-gray-500 dark:text-white/60">{assignedHelper}</span>
-              </>
+        {/* ── Who is on this job ────────────────────────────────────────────
+            Lead + helper seat as before, PLUS every extra job_crew member
+            (Aug 2026 — a 3rd/4th person used to be invisible here). Names are
+            always visible; the "+N" chip swaps the truncated one-liner for a
+            stacked list so long names survive a 256px card. */}
+        {(assignedOperator || crewCount > 0) && (
+          <div className="mb-2 bg-gray-50 dark:bg-white/5 rounded-lg px-2 py-1.5 border border-gray-100 dark:border-white/10">
+            <div className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-white/60 min-w-0">
+              <Users className="w-3.5 h-3.5 text-gray-400 dark:text-white/40 flex-shrink-0" />
+              <span className="font-medium text-gray-700 dark:text-white/80 truncate">
+                {assignedOperator || 'Unassigned'}
+              </span>
+              {assignedHelper && (
+                <>
+                  <span className="text-gray-300 dark:text-white/20 flex-shrink-0">+</span>
+                  <span className="text-gray-500 dark:text-white/60 truncate">{assignedHelper}</span>
+                </>
+              )}
+              {crewCount > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setCrewExpanded(v => !v); }}
+                  aria-expanded={crewExpanded}
+                  aria-label={`${crewCount} more crew: ${crewNames}`}
+                  title={`Also on this job: ${crewNames}`}
+                  className="ml-auto flex items-center justify-center gap-0.5 min-w-[44px] min-h-[44px] -my-1.5 flex-shrink-0 rounded-lg text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-white/10 transition-colors font-bold"
+                >
+                  +{crewCount}
+                  {crewExpanded
+                    ? <ChevronDown className="w-3 h-3" />
+                    : <ChevronRight className="w-3 h-3" />}
+                </button>
+              )}
+            </div>
+
+            {crewCount > 0 && !crewExpanded && (
+              <p
+                className="mt-1 text-[11px] text-gray-500 dark:text-white/60 truncate"
+                title={crewNames}
+              >
+                {crew.map((m, i) => (
+                  <span key={m.user_id}>
+                    {i > 0 && <span className="text-gray-300 dark:text-white/20">, </span>}
+                    <span className={m.role === 'operator' ? 'text-indigo-600 dark:text-indigo-300 font-medium' : ''}>
+                      {m.name}
+                    </span>
+                    <span className="text-gray-400 dark:text-white/40"> ({crewRoleLabel(m.role)})</span>
+                  </span>
+                ))}
+              </p>
+            )}
+
+            {crewCount > 0 && crewExpanded && (
+              <ul className="mt-1 space-y-0.5">
+                {crew.map((m) => (
+                  <li key={m.user_id} className="flex items-center gap-1.5 text-[11px] min-w-0">
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                        m.role === 'operator' ? 'bg-indigo-500' : 'bg-slate-400'
+                      }`}
+                    />
+                    <span className="text-gray-700 dark:text-white/80 truncate">{m.name}</span>
+                    <span
+                      className={`ml-auto flex-shrink-0 px-1.5 py-0.5 rounded-full font-semibold ${
+                        m.role === 'operator'
+                          ? 'bg-indigo-100 dark:bg-indigo-500/20 text-indigo-700 dark:text-indigo-300'
+                          : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/60'
+                      }`}
+                    >
+                      {crewRoleLabel(m.role)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
         )}

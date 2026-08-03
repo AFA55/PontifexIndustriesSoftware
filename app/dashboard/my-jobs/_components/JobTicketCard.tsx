@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, MapPin, Wrench, ChevronRight } from 'lucide-react';
+import { Clock, MapPin, Wrench, ChevronRight, CheckCircle2 } from 'lucide-react';
 
 export interface JobTicketData {
   id: string;
@@ -80,6 +80,12 @@ interface JobTicketCardProps {
   job: JobTicketData;
   /** True when the operator already submitted "Done for Today" on this job today */
   doneToday?: boolean;
+  /**
+   * Helper cards only: whether this helper has already submitted today's work
+   * log. undefined = not a helper card / status unknown. Drives the
+   * "Submit your work log" prompt so helpers don't have to know to tap in.
+   */
+  helperLogSubmitted?: boolean;
 }
 
 function formatTime(time: string | null) {
@@ -115,7 +121,7 @@ function getPriorityIndicator(priority: string) {
   }
 }
 
-export default function JobTicketCard({ job, doneToday }: JobTicketCardProps) {
+export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: JobTicketCardProps) {
   const arrivalDisplay = formatTime(job.arrival_time);
   const shopArrival = formatTime(job.shop_arrival_time);
   const priorityInfo = getPriorityIndicator(job.priority);
@@ -201,6 +207,28 @@ export default function JobTicketCard({ job, doneToday }: JobTicketCardProps) {
 
           <ChevronRight className="w-5 h-5 text-gray-400 dark:text-white/40 flex-shrink-0" />
         </div>
+
+        {/* HELPER CALL-TO-ACTION. A helper's only job on the ticket is the work
+            log, but the card used to show nothing but a passive "Team Member"
+            pill — so they had no reason to tap in and nothing was ever
+            submitted. Say it plainly on the card. */}
+        {job.isHelper && !isCompleted && helperLogSubmitted === false && (
+          <div className="mt-3 flex items-center gap-2 px-4 py-3 bg-orange-50 dark:bg-orange-500/10 border-2 border-orange-300 dark:border-orange-500/40 rounded-xl">
+            <Wrench className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+            <span className="text-sm font-bold text-orange-800 dark:text-orange-300 flex-1">
+              Tap to submit your work log
+            </span>
+            <ChevronRight className="w-4 h-4 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+          </div>
+        )}
+        {job.isHelper && helperLogSubmitted === true && (
+          <div className="mt-3 flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-300 dark:border-emerald-500/40 rounded-xl">
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+            <span className="text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+              Work log submitted
+            </span>
+          </div>
+        )}
       </div>
     </Link>
   );

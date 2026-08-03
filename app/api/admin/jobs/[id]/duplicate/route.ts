@@ -11,6 +11,14 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { insertJobOrderCopy, describeInsertError } from '@/lib/duplicate-job-order';
+
+// NOTE (Aug 2026): unlike /api/admin/job-orders/[id]/duplicate, this route was
+// NOT broken by the GENERATED columns (`total_cost`, `gross_profit`) — it names
+// an explicit allowlist of columns instead of spreading the source row, and
+// neither generated column is on it. It still goes through insertJobOrderCopy
+// so that if someone ever adds a generated column to the list below, the insert
+// self-heals and the error message names the column instead of "Failed".
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -39,7 +47,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
     .select('*')
     .eq('id', jobId)
     .eq('tenant_id', tenantId)
-    .single();
+    // A copy of a soft-deleted job would be invisible everywhere.
+    .is('deleted_at', null)
+    .maybeSingle();
 
   if (fetchErr || !original) {
     return NextResponse.json({ error: 'Job not found' }, { status: 404 });
@@ -58,9 +68,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
   const parentId: string = original.parent_job_id ?? original.id;
 
   // ── 4. Insert duplicate ──────────────────────────────────────────────────
-  const { data: newJob, error: insertErr } = await supabaseAdmin
-    .from('job_orders')
-    .insert({
+  const { data: newJob, error: insertErr } = await insertJobOrderCopy(
+    supabaseAdmin as any,
+    {
       tenant_id: tenantId,
       job_number: jobNumber,
       title: original.title,
@@ -96,14 +106,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
       require_waiver_signature: original.require_waiver_signature,
       parent_job_id: parentId,
       created_by: auth.userId,
-      salesman_id: original.salesman_id,
-    })
-    .select('id, job_number')
-    .single();
+      // `salesman_id` does not exist on job_orders — the sale is attributed by
+      // name/email. (The old key was silently dropped as undefined.)
+      salesman_name: original.salesman_name,
+      salesperson_email: original.salesperson_email,
+    },
+    'id, job_number'
+  );
 
   if (insertErr || !newJob) {
     console.error('[duplicate] insert error:', insertErr);
-    return NextResponse.json({ error: 'Failed to create duplicate' }, { status: 500 });
+    return NextResponse.json(
+      { error: describeInsertError(insertErr, 'Failed to create duplicate') },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ success: true, data: newJob }, { status: 201 });

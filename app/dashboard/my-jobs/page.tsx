@@ -53,6 +53,9 @@ export default function MyJobsPage() {
   const [pastJobsOpen, setPastJobsOpen] = useState(false);
   const [pastJobsLoading, setPastJobsLoading] = useState(false);
   const [doneTodayMap, setDoneTodayMap] = useState<Record<string, boolean>>({});
+  // jobId → true when THIS user (as a helper) already submitted today's work
+  // log. Drives the "Tap to submit your work log" prompt on helper cards.
+  const [helperLogMap, setHelperLogMap] = useState<Record<string, boolean>>({});
 
   // Peer ratings
   const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([]);
@@ -96,6 +99,27 @@ export default function MyJobsPage() {
       setDoneTodayMap(map);
     } catch {
       // silent
+    }
+  }, []);
+
+  // One request for all of today's helper work logs (the endpoint is scoped to
+  // the caller), so each helper card can say whether it still needs a log.
+  const fetchHelperLogStatus = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await fetch('/api/helper-work-log?all_today=true', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const json = await res.json();
+      const map: Record<string, boolean> = {};
+      for (const log of json.data || []) {
+        if (log.job_order_id) map[log.job_order_id] = !!log.completed_at;
+      }
+      setHelperLogMap(map);
+    } catch {
+      // silent — the card just falls back to no prompt
     }
   }, []);
 
@@ -145,6 +169,7 @@ export default function MyJobsPage() {
           // Fetch done-for-today status when viewing today's schedule
           if (date === toDateString(new Date())) {
             fetchDoneTodayStatus(enriched);
+            if (enriched.some((j: any) => j.isHelper)) fetchHelperLogStatus();
           }
         }
       }
@@ -154,7 +179,7 @@ export default function MyJobsPage() {
     } finally {
       setLoading(false);
     }
-  }, [router, fetchDoneTodayStatus]);
+  }, [router, fetchDoneTodayStatus, fetchHelperLogStatus]);
 
   // Check for long-duration jobs (>3 days) for 7-day lookahead
   const checkLongDurationJobs = useCallback(async () => {
@@ -664,7 +689,15 @@ export default function MyJobsPage() {
                     </div>
                   )}
                   <div className={lockedBy ? 'opacity-60 saturate-50' : ''}>
-                    <JobTicketCard job={job} doneToday={!!doneTodayMap[job.id]} />
+                    <JobTicketCard
+                      job={job}
+                      doneToday={!!doneTodayMap[job.id]}
+                      helperLogSubmitted={
+                        job.isHelper && selectedDate === toDateString(new Date())
+                          ? !!helperLogMap[job.id]
+                          : undefined
+                      }
+                    />
                   </div>
                 </div>
               );

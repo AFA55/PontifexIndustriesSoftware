@@ -375,14 +375,25 @@ export default function WorkPerformed() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const today = new Date().toISOString().split('T')[0];
+        // LOCAL calendar date — toISOString() is UTC, so after ~5pm PT it
+        // returns TOMORROW and this lookup misses the log the operator just
+        // filed (see CLAUDE.md, lib/dates.ts).
+        const today = toLocalYMD();
         const res = await fetch(`/api/job-orders/${params.id}/daily-log`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
         if (res.ok) {
           const json = await res.json();
-          // Check if any log for today already has day_completed_at set
-          const todayLog = (json.logs || []).find((l: any) => l.log_date === today && l.day_completed_at);
+          // Has THIS user already closed out today? The daily-log endpoint
+          // returns every operator's log for the job, so matching on date
+          // alone locked a crew CO-OPERATOR out the moment the lead completed
+          // the day — the item picker and submit bar both hang off
+          // dayAlreadySubmitted, leaving them no way to log their own work.
+          // Day-complete is lead-only, so scope this to the caller's own log.
+          const todayLog = (json.logs || []).find(
+            (l: any) =>
+              l.log_date === today && l.day_completed_at && l.operator_id === session.user.id,
+          );
           if (todayLog) {
             setDayAlreadySubmitted(true);
             // Also fetch any existing amendment notes for this job today
@@ -512,7 +523,15 @@ export default function WorkPerformed() {
             });
             if (histRes.ok) {
               const histJson = await histRes.json();
-              const allItems: any[] = histJson?.data?.work_items || [];
+              // ONLY this user's rows. /work-history returns every crew
+              // member's work_items for the job; hydrating from all of them
+              // pre-filled a co-operator's form with the LEAD's items, and
+              // submitting re-inserted them stamped with the co-operator's
+              // operator_id — silently duplicating the lead's work under
+              // someone else's name and defeating per-person attribution.
+              const allItems: any[] = (histJson?.data?.work_items || []).filter(
+                (wi: any) => wi.operator_id === session.user.id,
+              );
               if (allItems.length > 0) {
                 // The latest day_number rows are today's submitted items.
                 // Mirrors the POST handler in /work-items which deletes-and-replaces

@@ -173,7 +173,9 @@ export default function JobCrewPanel({
           const keepRes = await fetch(`/api/admin/jobs/${jobId}/crew`, {
             method: 'POST',
             headers: authHeaders,
-            body: JSON.stringify({ user_id: oldLeadId, role: 'operator' }),
+            // reason:'lead_change' → the API words it as a demotion and does NOT
+            // text them a fresh dispatch for the job they were already leading.
+            body: JSON.stringify({ user_id: oldLeadId, role: 'operator', reason: 'lead_change' }),
           });
           if (!keepRes.ok) {
             warnings.push(`Lead changed, but ${leadName || 'the previous lead'} could not be kept on the crew — add them back manually if they're still working this job.`);

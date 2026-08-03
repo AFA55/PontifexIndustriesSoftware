@@ -26,30 +26,21 @@ import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { buildCrewCopyRows } from '@/lib/duplicate-crew';
+import {
+  buildDuplicatePayload,
+  insertJobOrderCopy,
+  describeInsertError,
+} from '@/lib/duplicate-job-order';
 
-const EXCLUDED_FIELDS = new Set([
-  'id',
-  'job_number',
-  'created_at',
-  'updated_at',
-  'status',
-  // The copy lands UNASSIGNED. A duplicate means "a SECOND CREW runs this same
-  // job" — crew B is different people than crew A, so inheriting crew A's lead
-  // and helper would be wrong (and would create a double-assignment to undo).
-  // `copyCrew: true` re-adds helper_assigned_to explicitly below; the lead
-  // (assigned_to) is never copied.
-  'assigned_to',
-  'helper_assigned_to',
-  'dispatched_at',
-  'completed_at',
-  'customer_signature',
-  'customer_signed_at',
-  'loading_started_at',
-  'en_route_at',
-  'in_progress_at',
-  'done_for_day_at',
-  'daily_job_logs',
-]);
+// The copy-rules live in lib/duplicate-job-order.ts, unit-tested there. TWO
+// separate bugs met in this route:
+//   1. it copied EVERY column off the source row, including the generated
+//      `total_cost` / `gross_profit` — Postgres rejected the INSERT, so
+//      duplicating was 100% broken from Jul 2 to Aug 2026 (0 of 11 prod rows
+//      had parent_job_id);
+//   2. once that was fixed, copying every column would have carried the
+//      customer's signature, the previous crew's work log, billing state and
+//      the live-progress timestamps onto the new ticket. Hence the ALLOWLIST.
 
 function generateJobNumber(): string {
   const year = new Date().getFullYear();
@@ -83,13 +74,16 @@ export async function POST(
       );
     }
 
-    // Fetch the original job order
+    // Fetch the original job order. `deleted_at IS NULL`: duplicating a
+    // soft-deleted job produced a copy nobody could see anywhere, while the
+    // office got a "Duplicated" success toast.
     let origQuery = supabaseAdmin
       .from('job_orders')
       .select('*')
-      .eq('id', id);
+      .eq('id', id)
+      .is('deleted_at', null);
     origQuery = origQuery.eq('tenant_id', tenantId);
-    const { data: original, error: fetchError } = await origQuery.single();
+    const { data: original, error: fetchError } = await origQuery.maybeSingle();
 
     if (fetchError || !original) {
       return NextResponse.json(
@@ -98,45 +92,31 @@ export async function POST(
       );
     }
 
-    // Build the new job order by copying non-excluded fields
-    const newJobOrder: Record<string, any> = {};
-    for (const [key, value] of Object.entries(original)) {
-      if (!EXCLUDED_FIELDS.has(key)) {
-        newJobOrder[key] = value;
-      }
-    }
+    // Build the new job order: business exclusions + generated columns dropped.
+    // "Same crew, another day" (copyCrew) carries the helper seat over; the
+    // lead stays empty either way.
+    const newJobOrder = buildDuplicatePayload(original, {
+      jobNumber: generateJobNumber(),
+      scheduledDate: scheduled_date,
+      endDate: end_date,
+      parentJobId: id,
+      copyCrew,
+      notes,
+      createdBy: auth.userId,
+    });
 
-    // Set new values
-    newJobOrder.job_number = generateJobNumber();
-    newJobOrder.scheduled_date = scheduled_date;
-    newJobOrder.end_date = end_date || null;
-    newJobOrder.status = 'scheduled';
-    newJobOrder.parent_job_id = id;
+    const { data: created, error: insertError } = await insertJobOrderCopy(
+      supabaseAdmin as any,
+      newJobOrder
+    );
 
-    // "Same crew, another day" — carry the helper seat over. The lead stays
-    // empty either way.
-    if (copyCrew) {
-      newJobOrder.helper_assigned_to = original.helper_assigned_to ?? null;
-    }
-
-    // Append notes if provided
-    if (notes) {
-      const existing = newJobOrder.notes || '';
-      newJobOrder.notes = existing
-        ? `${existing}\n---\nDuplicated: ${notes}`
-        : `Duplicated: ${notes}`;
-    }
-
-    const { data: created, error: insertError } = await supabaseAdmin
-      .from('job_orders')
-      .insert(newJobOrder)
-      .select()
-      .single();
-
-    if (insertError) {
+    if (insertError || !created) {
       console.error('Error duplicating job order:', insertError);
+      // Surface the real Postgres message — a bare "Failed to duplicate" told
+      // the founder nothing when the generated-column bug hit. Management-only
+      // route, so there is no meaningful information disclosure here.
       return NextResponse.json(
-        { error: 'Failed to duplicate job order' },
+        { error: describeInsertError(insertError, 'Failed to duplicate job order') },
         { status: 500 }
       );
     }

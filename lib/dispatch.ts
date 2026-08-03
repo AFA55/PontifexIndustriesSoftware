@@ -15,6 +15,7 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendSMS } from '@/lib/sms';
 import { sendNotification } from '@/lib/send-reminder';
+import { resolveDispatchRecipients } from '@/lib/dispatch-recipients';
 
 export interface DispatchResult {
   dispatched_count: number;
@@ -128,12 +129,33 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
 
   const jobsToNotify = firstTimeJobs.filter((j) => claimedIds.has(j.id));
 
+  // ── Extra crew (job_crew) on the jobs being dispatched ───────────────────
+  // The single assigned_to / helper_assigned_to slots are not the whole crew:
+  // additional operators and helpers live in job_crew. They must get the same
+  // ticket + text as the slot holders, or a 3-person crew only ever hears from
+  // dispatch twice (founder: "is it actually still going to send the operator
+  // ticket?"). Tenant-scoped — supabaseAdmin bypasses RLS.
+  const crewByJob = new Map<string, { user_id: string; role: string }[]>();
+  if (jobsToNotify.length > 0) {
+    const { data: crewRows } = await supabaseAdmin
+      .from('job_crew')
+      .select('job_order_id, user_id, role')
+      .eq('tenant_id', tenantId)
+      .in('job_order_id', jobsToNotify.map((j) => j.id));
+    for (const r of crewRows || []) {
+      const list = crewByJob.get(r.job_order_id) || [];
+      list.push({ user_id: r.user_id, role: r.role });
+      crewByJob.set(r.job_order_id, list);
+    }
+  }
+
   // Names + phones for the operators/helpers being notified (incl. incoming
   // operators on already-dispatched jobs that were reassigned via the ledger).
   const allUserIds = new Set<string>();
   jobsToNotify.forEach((j) => {
     if (j.assigned_to) allUserIds.add(j.assigned_to);
     if (j.helper_assigned_to) allUserIds.add(j.helper_assigned_to);
+    for (const c of crewByJob.get(j.id) || []) allUserIds.add(c.user_id);
   });
   reassignedAlreadyDispatched.forEach((j) => {
     if (j.assigned_to) allUserIds.add(j.assigned_to);
@@ -162,18 +184,15 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
       job_number: job.job_number, customer_name: job.customer_name, location: job.location,
       job_type: job.job_type, arrival_time: job.arrival_time, dispatch_date: targetDate, is_multi_day: isMultiDay,
     };
-    if (job.assigned_to) {
+    // Lead + helper slot + every extra job_crew member, de-duplicated.
+    for (const r of resolveDispatchRecipients(job, crewByJob.get(job.id) || [])) {
+      const asHelper = r.role === 'helper';
       notifications.push({
-        ...base, recipient_id: job.assigned_to,
-        message: `You have been assigned to ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
-        metadata: meta,
-      });
-    }
-    if (job.helper_assigned_to) {
-      notifications.push({
-        ...base, recipient_id: job.helper_assigned_to,
-        message: `You have been assigned as helper for ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
-        metadata: { ...meta, is_helper: true },
+        ...base, recipient_id: r.userId,
+        message: asHelper
+          ? `You have been assigned as helper for ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`
+          : `You have been assigned to ${job.customer_name} at ${job.location} on ${formattedDate}.${isMultiDay ? ' (Multi-day job)' : ''}`,
+        metadata: asHelper ? { ...meta, is_helper: true } : meta,
       });
     }
   }
@@ -208,11 +227,17 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
     ].filter(Boolean).join('\n');
 
   for (const job of jobsToNotify) {
-    if (job.assigned_to && phoneMap.has(job.assigned_to)) {
-      smsPromises.push(sendSMS({ to: phoneMap.get(job.assigned_to)!, message: buildMsg(job, 'operator'), jobId: job.id }).catch((e) => console.error('dispatch SMS failed:', e)));
-    }
-    if (job.helper_assigned_to && phoneMap.has(job.helper_assigned_to)) {
-      smsPromises.push(sendSMS({ to: phoneMap.get(job.helper_assigned_to)!, message: buildMsg(job, 'helper'), jobId: job.id }).catch((e) => console.error('dispatch SMS failed:', e)));
+    // Same recipient set as the in-app notifications above — every crew member
+    // with a phone gets the ticket text, not just the two slot holders.
+    for (const r of resolveDispatchRecipients(job, crewByJob.get(job.id) || [])) {
+      if (!phoneMap.has(r.userId)) continue;
+      smsPromises.push(
+        sendSMS({
+          to: phoneMap.get(r.userId)!,
+          message: buildMsg(job, r.role),
+          jobId: job.id,
+        }).catch((e) => console.error('dispatch SMS failed:', e)),
+      );
     }
   }
 

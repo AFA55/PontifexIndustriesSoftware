@@ -11,6 +11,30 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireTakeoffsAccess } from '@/lib/takeoffs/api-guard';
 
+const PAGE_COLUMNS =
+  'id, page_number, width_pt, height_pt, rotation, user_unit, sheet_number, sheet_title, discipline, scale_feet_per_point, scale_label, ai_page_summary';
+
+/**
+ * Pages for the viewer. `view_rotation` (the estimator's quarter-turn) arrived
+ * with migration 20260803b; if that migration has not landed on this database
+ * yet PostgREST rejects the unknown column, so fall back to the older column
+ * set rather than taking the whole takeoffs module down over a view preference.
+ */
+async function loadPages(documentId: string, tenantId: string) {
+  const query = (columns: string) =>
+    supabaseAdmin
+      .from('takeoff_pages')
+      .select(columns)
+      .eq('document_id', documentId)
+      .eq('tenant_id', tenantId)
+      .order('page_number');
+
+  const withRotation = await query(`${PAGE_COLUMNS}, view_rotation`);
+  if (!withRotation.error) return withRotation;
+  console.warn('takeoffs: view_rotation column missing — run migration 20260803b');
+  return query(PAGE_COLUMNS);
+}
+
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const guard = await requireTakeoffsAccess(request);
   if (!guard.ok) return guard.response;
@@ -25,12 +49,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   if (error || !doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 });
 
   const [{ data: pages }, { data: conditions }, { data: signed }] = await Promise.all([
-    supabaseAdmin
-      .from('takeoff_pages')
-      .select('id, page_number, width_pt, height_pt, rotation, user_unit, sheet_number, sheet_title, discipline, scale_feet_per_point, scale_label, ai_page_summary')
-      .eq('document_id', id)
-      .eq('tenant_id', guard.tenantId)
-      .order('page_number'),
+    loadPages(id, guard.tenantId),
     supabaseAdmin
       .from('takeoff_conditions')
       .select('*')

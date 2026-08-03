@@ -50,6 +50,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const update: Record<string, any> = {};
+  // View rotation: a RENDER-ONLY preference (0/90/180/270 clockwise). Stored
+  // geometry stays in the sheet's native PDF-point space, so there is nothing
+  // to recompute here — see lib/takeoffs/geometry.ts + rotation.test.ts.
+  if (body.view_rotation !== undefined) {
+    const rot = Number(body.view_rotation);
+    if (![0, 90, 180, 270].includes(rot)) {
+      return NextResponse.json({ error: 'view_rotation must be 0, 90, 180 or 270' }, { status: 400 });
+    }
+    update.view_rotation = rot;
+  }
   if (typeof body.sheet_number === 'string') update.sheet_number = body.sheet_number.trim().slice(0, 40) || null;
   if (typeof body.sheet_title === 'string') update.sheet_title = body.sheet_title.trim().slice(0, 200) || null;
   if (typeof body.discipline === 'string') update.discipline = body.discipline.trim().slice(0, 40) || null;
@@ -66,6 +76,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   if (Object.keys(update).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+
+  // A sideways SET is common (whole PDF saved rotated), so a turn can be
+  // applied to every sheet at once. Purely visual — no geometry is touched.
+  if (update.view_rotation !== undefined && body.apply_to_all === true) {
+    const { error } = await supabaseAdmin
+      .from('takeoff_pages')
+      .update({ view_rotation: update.view_rotation })
+      .eq('document_id', page.document_id)
+      .eq('tenant_id', guard.tenantId);
+    if (error) {
+      console.error('takeoffs: view_rotation update failed (migration 20260803b applied?)', error);
+      return NextResponse.json({ error: 'Could not save the sheet rotation' }, { status: 500 });
+    }
+    delete update.view_rotation;
+    if (Object.keys(update).length === 0) return NextResponse.json({ success: true });
+  }
 
   const applyToAll = scaleChanged && body.apply_to_all === true;
   if (applyToAll) {
@@ -94,7 +120,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       .update(update)
       .eq('id', id)
       .eq('tenant_id', guard.tenantId);
-    if (error) return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    if (error) {
+      console.error('takeoffs page update failed:', error);
+      return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+    }
     if (scaleChanged) await recomputePages(guard.tenantId, [id], update.scale_feet_per_point);
   }
 

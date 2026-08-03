@@ -19,6 +19,7 @@ export const maxDuration = 90;
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireTakeoffsAccess } from '@/lib/takeoffs/api-guard';
+import { normalizeRotation, normalizedToNativePoint } from '@/lib/takeoffs/geometry';
 
 // Cheap in-instance guard against double-fired billed vision calls (double-click,
 // two tabs on the same warm lambda). Not a global limiter — just kills the
@@ -40,6 +41,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const pageId = (body?.page_id ?? '').toString();
   const image: string = (body?.image ?? '').toString();
   const instructions: string = (body?.instructions ?? '').toString().slice(0, 500);
+  // The client renders the image the way the estimator is LOOKING at the sheet
+  // (a sideways sheet turned upright reads far better to the model), so the
+  // model's normalized coords are in that rotated frame — un-rotate them below.
+  const viewRotation = normalizeRotation(body?.view_rotation);
   if (!pageId) return NextResponse.json({ error: 'page_id is required' }, { status: 400 });
   if (!image.startsWith('data:image/')) return NextResponse.json({ error: 'A rendered page image is required' }, { status: 400 });
   if (image.length > 12_000_000) return NextResponse.json({ error: 'Page image too large' }, { status: 413 });
@@ -114,7 +119,6 @@ ${(page.page_text ?? '(no extractable text — rely on the image)').slice(0, 120
 
     const W = Number(page.width_pt);
     const H = Number(page.height_pt);
-    const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
     const geomType = (mt: string) => (mt === 'linear' ? 'polyline' : mt === 'area' ? 'polygon' : 'count');
     const minPts = (mt: string) => (mt === 'area' ? 3 : mt === 'linear' ? 2 : 1);
 
@@ -122,7 +126,9 @@ ${(page.page_text ?? '(no extractable text — rely on the image)').slice(0, 120
       .map((s: any) => {
         const pts = (s.points ?? [])
           .filter((p: any) => p && Number.isFinite(p.x) && Number.isFinite(p.y))
-          .map((p: any) => [clamp01(p.x) * W, clamp01(p.y) * H] as [number, number]);
+          // Normalized coords on the (possibly rotated) render → native sheet
+          // points, which is the ONLY space measurements are ever stored in.
+          .map((p: any) => normalizedToNativePoint(p.x, p.y, W, H, viewRotation));
         return {
           name: (s.name ?? 'Suggested scope').toString().slice(0, 120),
           measure_type: s.measure_type,

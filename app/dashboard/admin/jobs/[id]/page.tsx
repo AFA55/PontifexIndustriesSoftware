@@ -53,6 +53,7 @@ import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import type { ScopeItem } from '@/components/JobScopePanel';
+import { formatDay } from '@/lib/dates';
 
 const JobScopePanel = dynamicImport(() => import('@/components/JobScopePanel'), {
   ssr: false,
@@ -2875,7 +2876,9 @@ export default function AdminJobDetailPage({
                         <p className="text-slate-600 dark:text-white/70 text-xs leading-relaxed whitespace-pre-line">
                           {log.work_description || <span className="italic text-slate-400">No description provided.</span>}
                         </p>
-                        <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1.5">{log.log_date}</p>
+                        <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1.5">
+                          {log.log_date ? formatDay(log.log_date) : ''}
+                        </p>
                       </div>
                     );
                   })}

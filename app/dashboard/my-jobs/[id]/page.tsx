@@ -712,6 +712,19 @@ export default function JobDetailPage() {
               </div>
             </div>
 
+            {/* THE HELPER'S TICKET — first thing on the page, not buried under
+                the read-only cards. It used to sit below location/work details/
+                equipment/site contact, so helpers never scrolled to it and
+                helper_work_logs stayed empty. Address + equipment follow below;
+                this is the only thing they have to DO. */}
+            <HelperWorkLog
+              jobId={job.id}
+              jobNumber={job.job_number}
+              customerName={job.customer_name}
+              jobTitle={job.title}
+              job={job}
+            />
+
             {/* Job location — show once in_route or further */}
             {['in_route', 'in_progress', 'pending_completion', 'completed'].includes(job.status) && (job.address || job.location) && (
               <div className="bg-white/90 dark:bg-white/[0.05] rounded-2xl border border-gray-200/50 dark:border-white/10 p-5">
@@ -794,29 +807,6 @@ export default function JobDetailPage() {
                     </a>
                   )}
                 </div>
-              </div>
-            )}
-
-            {/* Team-member work log — the helper's short "what I did today" entry
-                (+ the operator rating step). This is the crew helper's primary action. */}
-            {!isCompleted && (
-              <HelperWorkLog
-                jobId={job.id}
-                jobNumber={job.job_number}
-                customerName={job.customer_name}
-                jobTitle={job.title}
-                job={job}
-              />
-            )}
-            {isCompleted && (
-              <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-green-200 dark:border-white/10 p-4">
-                <HelperWorkLog
-                  jobId={job.id}
-                  jobNumber={job.job_number}
-                  customerName={job.customer_name}
-                  jobTitle={job.title}
-                  job={job}
-                />
               </div>
             )}
 

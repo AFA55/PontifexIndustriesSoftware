@@ -14,6 +14,92 @@ export type TakeoffGeometry =
   | { type: 'polygon'; points: [number, number][] }
   | { type: 'count'; points: [number, number][] };
 
+// ── View rotation ───────────────────────────────────────────────────────────
+// The estimator can turn a sheet 90° at a time when a set was saved sideways.
+// This is a RENDER-ONLY transform: stored geometry never leaves the sheet's
+// native PDF-point space (the space width_pt/height_pt describe), so rotating
+// can never corrupt a calibration or an existing measurement.
+//
+// The mapping below is the exact composition pdf.js applies when you bump a
+// viewport's rotation by 90° (derived from PageViewport's rotateA..D matrix in
+// pdfjs-dist/build/pdf.mjs — see lib/takeoffs/rotation.test.ts, which replays
+// that matrix and asserts these helpers agree with it):
+//   native (x, y) in a W×H sheet, y DOWN, origin top-left
+//     0°   → (x,      y    )   display W×H
+//     90°  → (H - y,  x    )   display H×W   (clockwise)
+//     180° → (W - x,  H - y)   display W×H
+//     270° → (y,      W - x)   display H×W
+// Rotations are rigid motions, so every length and area is invariant — that is
+// the whole reason we can rotate the render and leave the numbers alone.
+
+export type ViewRotation = 0 | 90 | 180 | 270;
+
+/** Coerce anything (DB value, query param, stale state) to a legal rotation. */
+export function normalizeRotation(value: unknown): ViewRotation {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return 0;
+  const m = ((n % 360) + 360) % 360;
+  return m === 90 || m === 180 || m === 270 ? m : 0;
+}
+
+/** Add a quarter-turn (or several) to a rotation, wrapping at 360. */
+export function addRotation(rotation: ViewRotation, delta: number): ViewRotation {
+  return normalizeRotation(rotation + delta);
+}
+
+/** On-screen size of a W×H sheet at a rotation (90/270 swap the axes). */
+export function rotatedPageSize(
+  width: number, height: number, rotation: ViewRotation
+): { width: number; height: number } {
+  return rotation === 90 || rotation === 270
+    ? { width: height, height: width }
+    : { width, height };
+}
+
+/** Native sheet coords → rotated display coords. */
+export function toDisplayPoint(
+  point: [number, number], width: number, height: number, rotation: ViewRotation
+): [number, number] {
+  const [x, y] = point;
+  switch (rotation) {
+    case 90: return [height - y, x];
+    case 180: return [width - x, height - y];
+    case 270: return [y, width - x];
+    default: return [x, y];
+  }
+}
+
+/** Rotated display coords → native sheet coords (the exact inverse). */
+export function toNativePoint(
+  point: [number, number], width: number, height: number, rotation: ViewRotation
+): [number, number] {
+  const [dx, dy] = point;
+  switch (rotation) {
+    case 90: return [dy, height - dx];
+    case 180: return [width - dx, height - dy];
+    case 270: return [width - dy, dx];
+    default: return [dx, dy];
+  }
+}
+
+export function toDisplayPoints(
+  points: [number, number][], width: number, height: number, rotation: ViewRotation
+): [number, number][] {
+  return rotation === 0 ? points : points.map((p) => toDisplayPoint(p, width, height, rotation));
+}
+
+/**
+ * Normalized [0..1] coords measured on a ROTATED render of the sheet (what the
+ * vision model sees when the estimator has turned the page) → native PDF pts.
+ */
+export function normalizedToNativePoint(
+  xNorm: number, yNorm: number, width: number, height: number, rotation: ViewRotation
+): [number, number] {
+  const clamp01 = (n: number) => (Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0);
+  const size = rotatedPageSize(width, height, rotation);
+  return toNativePoint([clamp01(xNorm) * size.width, clamp01(yNorm) * size.height], width, height, rotation);
+}
+
 /** Length of a polyline in PDF points (scale-free). */
 export function polylineLengthPt(points: [number, number][]): number {
   let len = 0;
