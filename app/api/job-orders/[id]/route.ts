@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { requireAuth, requireScheduleBoardAccess } from '@/lib/api-auth';
+import { filterJobEditFields, describeJobEditError } from '@/lib/job-edit-fields';
 
 export async function GET(
   request: NextRequest,
@@ -58,19 +59,16 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Allowlist of updatable fields
-    const ALLOWED_FIELDS = [
-      'customer_name', 'customer_contact', 'site_contact_phone', 'foreman_phone',
-      'address', 'location', 'estimated_cost', 'po_number', 'salesman_name',
-      'scheduled_date', 'end_date', 'arrival_time', 'description', 'additional_info',
-      'directions', 'jobsite_conditions', 'site_compliance', 'job_type', 'is_will_call',
-      'scope_details', 'equipment_needed', 'equipment_rentals',
-    ];
+    // Rebuild the update from the KNOWN editable columns (lib/job-edit-fields.ts).
+    // A PostgREST update is all-or-nothing: one phantom key rejects the whole
+    // statement and every field silently fails to save. Unknown keys are
+    // dropped + logged instead of poisoning the save.
+    const { updates: updateData, dropped } = filterJobEditFields(body);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const updateData: Record<string, any> = {};
-    for (const key of ALLOWED_FIELDS) {
-      if (key in body) updateData[key] = body[key];
+    if (dropped.length > 0) {
+      console.warn(
+        `[PATCH /api/job-orders/${id}] ignored ${dropped.length} non-editable field(s): ${dropped.join(', ')}`
+      );
     }
 
     if (Object.keys(updateData).length === 0) {
@@ -106,7 +104,12 @@ export async function PATCH(
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      // Name the offending column when PostgREST/PG rejects an unknown field,
+      // so a phantom column is diagnosable from the UI instead of opaque.
+      console.error(`[PATCH /api/job-orders/${id}] update failed:`, error);
+      return NextResponse.json({ error: describeJobEditError(error) }, { status: 500 });
+    }
 
     return NextResponse.json({ success: true, data });
   } catch {

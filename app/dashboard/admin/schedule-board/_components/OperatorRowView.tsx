@@ -6,6 +6,7 @@ import DroppableOperatorRow from './DroppableOperatorRow';
 import UserAvatar from '@/components/UserAvatar';
 import DraggableJobCard from './DraggableJobCard';
 import JobCard from './JobCard';
+import RowDuplicateButton from './RowDuplicateButton';
 import type { JobCardData } from './JobCard';
 
 interface OperatorInfo {
@@ -33,6 +34,9 @@ interface OperatorRowViewProps {
    *  Same affordance as the slots view; rowIndex is null when the job's
    *  operator has no board row (unassigned, or an operator off-row). */
   onAddCrewJob?: (job: JobCardData, rowIndex: number | null) => void;
+  /** Duplicate a job on this row — a SECOND ticket so a second crew can be
+   *  dispatched to the same job (the copy lands unassigned). */
+  onDuplicateJob?: (job: JobCardData) => Promise<void> | void;
 }
 
 const TIME_OFF_LABELS: Record<string, string> = {
@@ -70,6 +74,7 @@ export default function OperatorRowView({
   onViewNotes,
   onPreviewJob,
   onAddCrewJob,
+  onDuplicateJob,
 }: OperatorRowViewProps) {
   // Build operator list — show ALL operators, not just those with jobs
   const operators = useMemo(() => {
@@ -228,6 +233,11 @@ export default function OperatorRowView({
                         ? `${op.jobs.length} ${op.jobs.length === 1 ? 'job' : 'jobs'}`
                         : 'Available'}
                     </span>
+                  )}
+
+                  {/* Duplicate — second ticket on this job for a SECOND CREW */}
+                  {canEdit && onDuplicateJob && !(op as any).timeOff && (
+                    <RowDuplicateButton jobs={op.jobs} onDuplicate={onDuplicateJob} showLabel={false} />
                   )}
                 </div>
 

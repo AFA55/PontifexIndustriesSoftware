@@ -1672,6 +1672,37 @@ export default function ScheduleBoardPage() {
     fetchScheduleData(selectedDate);
   };
 
+  // ═══ DUPLICATE A JOB FROM AN OPERATOR ROW ═══
+  // A duplicate = a SECOND CREW on the same job. The copy deliberately lands
+  // unassigned with nobody on it (same flow the ticket panel uses); the office
+  // staffs it with the "+" on its card. Adding one more person to THIS crew is
+  // the card's "+", not this.
+  const handleDuplicateJob = useCallback(async (job: JobCardData) => {
+    try {
+      const res = await apiFetch(`/api/admin/job-orders/${job.id}/duplicate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          scheduled_date: job.scheduled_date || selectedDate,
+          ...(job.end_date ? { end_date: job.end_date } : {}),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json.success) {
+        addToast('error', 'Could not duplicate job', json?.error || 'Please try again.');
+        return;
+      }
+      addToast(
+        'success',
+        'Second ticket created',
+        `${job.customer_name} — the copy is unassigned. Staff the second crew with the "+" on its card.`
+      );
+      fetchScheduleData(selectedDate);
+    } catch (err) {
+      console.error('Error duplicating job:', err);
+      addToast('error', 'Could not duplicate job', 'Please try again.');
+    }
+  }, [selectedDate, addToast, fetchScheduleData]);
+
   const handleDeleteJob = async (jobId: string) => {
     const res = await apiFetch(`/api/admin/job-orders/${jobId}`, { method: 'DELETE' });
     if (!res.ok) {
@@ -2109,6 +2140,7 @@ export default function ScheduleBoardPage() {
                 onRemoveTimeOff={() => handleRemoveTimeOff(idx)}
                 onSaveRowNote={(note) => handleSaveRowNote(idx, note)}
                 onMarkUnavailable={rowAssignments[idx]?.operator ? () => setMarkOutTarget({ rowIdx: idx, operatorName: rowAssignments[idx].operator! }) : undefined}
+                onDuplicateJob={canEdit ? handleDuplicateJob : undefined}
               />
             ))}
           </>
@@ -2135,6 +2167,7 @@ export default function ScheduleBoardPage() {
               helperName: rowIndex != null ? (rowAssignments[rowIndex]?.helper ?? null) : null,
               focusCrew: true,
             }) : undefined}
+            onDuplicateJob={canEdit ? handleDuplicateJob : undefined}
           />
         )}
 

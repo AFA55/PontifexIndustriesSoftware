@@ -6,6 +6,7 @@ import {
   CalendarX, XCircle, UserX,
 } from 'lucide-react';
 import JobCard from './JobCard';
+import RowDuplicateButton from './RowDuplicateButton';
 import type { JobCardData } from './JobCard';
 
 interface OperatorRowProps {
@@ -44,6 +45,9 @@ interface OperatorRowProps {
   onRemoveTimeOff?: () => void;
   onSaveRowNote?: (note: string) => void;
   onMarkUnavailable?: () => void;
+  /** Duplicate a job on this row — a SECOND ticket so a second crew can be
+   *  dispatched to the same job (the copy lands unassigned). */
+  onDuplicateJob?: (job: JobCardData) => Promise<void> | void;
 }
 
 const TIME_OFF_LABELS: Record<string, string> = {
@@ -191,6 +195,7 @@ export default function OperatorRow({
   onRemoveTimeOff,
   onSaveRowNote,
   onMarkUnavailable,
+  onDuplicateJob,
 }: OperatorRowProps) {
   const hasJobs = jobs.length > 0;
   const isBlocked = !!timeOff && BLOCKED_TYPES.has(timeOff.type);
@@ -353,6 +358,13 @@ export default function OperatorRow({
               <div title="Operator unavailable — clear status first" className="p-1.5 rounded-lg text-gray-300 dark:text-white/20 cursor-not-allowed">
                 <Plus className="w-4 h-4" />
               </div>
+            )}
+
+            {/* Duplicate — second ticket on this job for a SECOND CREW */}
+            {/* Hidden while the row is on time off — its jobs aren't visible
+                either, and you shouldn't duplicate a ticket you can't see. */}
+            {canEdit && onDuplicateJob && !timeOff && (
+              <RowDuplicateButton jobs={jobs} onDuplicate={onDuplicateJob} />
             )}
 
             {/* Mark Out button — quick unavailability marking */}
