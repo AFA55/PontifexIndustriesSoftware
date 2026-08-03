@@ -46,16 +46,55 @@ interface PhotoUploaderProps {
   jobId?: string;
 }
 
-/** Get the current device position; null when denied/unavailable. */
+/**
+ * Get the current device position; null when denied/unavailable.
+ *
+ * WHY THIS IS FAST AND FORGIVING (founder, Aug 3 2026): an operator standing on
+ * a jobsite hit "took forever and never loaded" and then couldn't submit. The
+ * cause was here — a single high-accuracy fix with a 12s timeout. Inside a
+ * structure or against concrete, high-accuracy GPS routinely burns the whole
+ * 12 seconds and STILL fails, and the old caller then aborted the upload
+ * outright. Now: ask for a coarse cached fix first (near-instant when the phone
+ * already has one), only then try for a sharper one, and cap the whole thing at
+ * a few seconds. A missing position is never fatal — see the caller.
+ */
 function getPosition(): Promise<GeolocationPosition | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve(pos),
-      () => resolve(null),
-      { enableHighAccuracy: true, timeout: 12_000, maximumAge: 30_000 }
-    );
-  });
+  const attempt = (opts: PositionOptions) =>
+    new Promise<GeolocationPosition | null>((resolve) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
+      let settled = false;
+      const done = (p: GeolocationPosition | null) => {
+        if (settled) return;
+        settled = true;
+        resolve(p);
+      };
+      // Belt and braces: some mobile browsers ignore `timeout` when permission
+      // was granted but no fix is obtainable, and the callback never fires.
+      const guard = setTimeout(() => done(null), (opts.timeout ?? 5_000) + 500);
+      navigator.geolocation.getCurrentPosition(
+        (pos) => { clearTimeout(guard); done(pos); },
+        () => { clearTimeout(guard); done(null); },
+        opts
+      );
+    });
+
+  return (async () => {
+    // 1) Coarse + happily stale: usually returns immediately.
+    const quick = await attempt({ enableHighAccuracy: false, timeout: 3_000, maximumAge: 120_000 });
+    if (quick) return quick;
+    // 2) One short sharper try, then give up rather than hold the photo hostage.
+    return attempt({ enableHighAccuracy: true, timeout: 4_000, maximumAge: 60_000 });
+  })();
+}
+
+/** Reject a hung request instead of spinning forever on flaky site LTE. */
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${Math.round(ms / 1000)}s`)), ms)
+    ),
+  ]);
 }
 
 /**
@@ -75,6 +114,8 @@ export default function PhotoUploader({
   jobId,
 }: PhotoUploaderProps) {
   const [uploading, setUploading] = useState(false);
+  /** What's happening right now — a bare spinner reads as "frozen" in the field. */
+  const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
   const [lastStamp, setLastStamp] = useState<{ lat: number; lng: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -87,10 +128,13 @@ export default function PhotoUploader({
   // looks identical on screen. Non-images (PDFs) pass through untouched.
   // `imageOrientation: 'from-image'` also bakes in EXIF rotation so photos
   // aren't sideways.
+  // 1400px @0.7 instead of 1800 @0.82: roughly HALVES the bytes an operator has
+  // to push over site LTE, and a jobsite photo viewed on a phone or printed on a
+  // ticket is indistinguishable. Upload time is the whole complaint here.
   const compressImageFile = async (
     file: File,
-    maxEdge = 1800,
-    quality = 0.82,
+    maxEdge = 1400,
+    quality = 0.7,
   ): Promise<{ blob: Blob; ext: string; contentType: string }> => {
     const origExt = file.name.split('.').pop() || 'jpg';
     // Treat as an image by MIME OR extension — iPhone photos sometimes arrive
@@ -134,25 +178,30 @@ export default function PhotoUploader({
       return;
     }
 
-    // GPS-stamp mode: grab the position FIRST — no location, no upload.
+    // GPS stamp is BEST-EFFORT and must never hold the photo hostage.
+    // This used to abort the upload when no fix arrived, which is exactly what
+    // stranded an operator on site: 12s of waiting, then "Location is required",
+    // then no photo and no way to submit. The stamp is nice-to-have evidence;
+    // the photo is the thing that matters.
     let position: GeolocationPosition | null = null;
     if (captureLocation) {
       setUploading(true);
+      setProgress('Getting location…');
       position = await getPosition();
-      if (!position) {
-        setUploading(false);
-        setError('Location is required for jobsite photos. Enable location access and try again.');
-        if (fileInputRef.current) fileInputRef.current.value = '';
-        return;
+      if (position) {
+        setLastStamp({ lat: position.coords.latitude, lng: position.coords.longitude });
       }
-      setLastStamp({ lat: position.coords.latitude, lng: position.coords.longitude });
     }
 
     setUploading(true);
     const newUrls: string[] = [];
 
     try {
+      let index = 0;
       for (const file of files) {
+        index += 1;
+        const label = files.length > 1 ? `photo ${index} of ${files.length}` : 'photo';
+        setProgress(`Preparing ${label}…`);
         // Accept by MIME OR extension (iPhone files can have an empty MIME type).
         const isImage =
           file.type.startsWith('image/') ||
@@ -185,9 +234,26 @@ export default function PhotoUploader({
         const fileName = `${pathPrefix}-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
         const filePath = `${pathPrefix}/${fileName}`;
 
-        const { error: uploadError } = await supabase.storage
-          .from(bucket)
-          .upload(filePath, blob, { contentType });
+        setProgress(`Uploading ${label} (${Math.max(1, Math.round(blob.size / 1024))} KB)…`);
+
+        // Hard cap the request. On weak site LTE the storage call can hang with
+        // no error and no completion — which reads to the operator as "it never
+        // loaded" while the spinner turns forever.
+        let uploadError: { message?: string } | null = null;
+        try {
+          const res = await withTimeout(
+            supabase.storage.from(bucket).upload(filePath, blob, { contentType }),
+            45_000,
+            'Upload'
+          );
+          uploadError = res.error;
+        } catch (timeoutErr: unknown) {
+          uploadError = {
+            message:
+              'the connection is too slow right now. Your work is still saved — you can add photos later.',
+          };
+          console.error('Upload timed out:', timeoutErr);
+        }
 
         if (uploadError) {
           console.error('Upload error details:', {
@@ -197,7 +263,7 @@ export default function PhotoUploader({
             fileType: file.type,
             fileSize: file.size,
           });
-          setError(`Upload failed: ${uploadError.message || 'Please try again.'}`);
+          setError(`Photo didn't upload — ${uploadError.message || 'please try again.'}`);
           continue;
         }
 
@@ -241,6 +307,7 @@ export default function PhotoUploader({
       setError('Upload failed. Please try again.');
     } finally {
       setUploading(false);
+      setProgress('');
       // Reset file input
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
@@ -308,8 +375,8 @@ export default function PhotoUploader({
           >
             {uploading ? (
               <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Uploading...
+                <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                <span className="truncate">{progress || 'Uploading…'}</span>
               </>
             ) : (
               <>

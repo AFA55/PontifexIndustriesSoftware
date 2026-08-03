@@ -1541,21 +1541,12 @@ export default function WorkPerformed() {
       return;
     }
 
-    // Photo gate: at least one photo is REQUIRED unless the jobsite is
-    // flagged photos-prohibited — and then the operator must explicitly
-    // acknowledge the skip (no silent self-exemption).
-    if (!photosProhibited && jobPhotos.length === 0) {
-      setPhotoError('At least one job photo is required before submitting.');
-      showNotification('Add at least one job photo before submitting', 'warning');
-      document.getElementById('job-photos-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
-    if (photosProhibited && !photosSkipAcknowledged) {
-      setPhotoError('Confirm that photos are not allowed on this jobsite.');
-      showNotification('Please confirm the photo skip for this jobsite', 'warning');
-      document.getElementById('job-photos-section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
+    // PHOTOS ARE OPTIONAL HERE (founder, Aug 3 2026 — an operator was standing
+    // on a jobsite unable to submit his day). Requiring a photo to log work
+    // performed blocks the day's numbers on a slow upload over site LTE. The
+    // photo requirement lives at JOB COMPLETION, immediately before the
+    // customer signature — that's the record that actually needs evidence.
+    // Operators can still attach photos here whenever they want to.
     setPhotoError(null);
 
     if (isSubmitting) return;
@@ -2423,16 +2414,14 @@ export default function WorkPerformed() {
 
         {!dayAlreadySubmitted && (
           <>
-            {/* Job Photos Section — REQUIRED unless the office flagged the
-                jobsite photos-prohibited (then an explicit skip is required) */}
+            {/* Job Photos — OPTIONAL on this screen. The requirement lives at
+                job completion, before the customer signature. */}
             <div id="job-photos-section" className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
               <div className="flex items-center gap-2 mb-3">
                 <Camera className="w-5 h-5 text-brand" />
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">
-                  Job Photos {!photosProhibited && <span className="text-red-500">*</span>}
-                </h3>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Photos</h3>
                 {!photosProhibited && (
-                  <span className="text-xs text-gray-400 dark:text-white/40">(required)</span>
+                  <span className="text-xs text-gray-400 dark:text-white/40">(optional)</span>
                 )}
               </div>
 
@@ -2461,7 +2450,8 @@ export default function WorkPerformed() {
               ) : (
                 <>
                   <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
-                    Document your work — site conditions, before/after, and your team in action. At least one photo is required.
+                    Optional here — add them if you have them. Photos are required
+                    when you finish the job, right before the customer signs.
                   </p>
                   <PhotoUploader
                     bucket="job-photos"
