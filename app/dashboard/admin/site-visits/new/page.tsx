@@ -6,7 +6,7 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  ArrowLeft, ArrowRight, ClipboardCheck, User as UserIcon, Calendar,
+  ArrowLeft, ArrowRight, User as UserIcon, Calendar,
   Briefcase, MessageSquare, AlertTriangle, Star, Loader2, CheckCircle,
   MapPin, Wrench, Plus, Trash2, Check, Camera, X, ImageIcon,
 } from 'lucide-react';
@@ -36,6 +36,8 @@ interface EquipmentIssue {
   action: 'maintenance' | 'replace';
   photo_urls: string[];
   photoUploading?: boolean;
+  /** Surfaced inline — a failed upload must never look like a successful one. */
+  photoError?: string | null;
 }
 
 // Admins are read-only on visit reports (site_visits = 'view' in RBAC): they review
@@ -65,6 +67,10 @@ export default function NewSiteVisitPage() {
   const [operatorId, setOperatorId] = useState('');
   const [visitDate, setVisitDate] = useState(todayStr());
   const [jobOrderId, setJobOrderId] = useState('');
+  // An unlinked visit is legitimate (shop / yard / between jobs) but it must be
+  // a DELIBERATE choice — an unlinked report is invisible on the job page, which
+  // is how supervisor_visits ended up unused. Not a hard block, an explicit one.
+  const [notJobSpecific, setNotJobSpecific] = useState(false);
 
   // Step 2 — What You Saw
   const [observations, setObservations] = useState('');
@@ -82,6 +88,10 @@ export default function NewSiteVisitPage() {
   // Photos — site visit (step 2) + per-issue (step 3)
   const [sitePhotoUrls, setSitePhotoUrls] = useState<string[]>([]);
   const [sitePhotoUploading, setSitePhotoUploading] = useState(false);
+  // The persisted URL is the (private, non-resolving) public-form URL; this maps
+  // it to the short-lived signed URL used for the thumbnail in this session.
+  const [sitePhotoPreviews, setSitePhotoPreviews] = useState<Record<string, string>>({});
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const siteFileRef = useRef<HTMLInputElement>(null);
   const issueFileRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -127,10 +137,12 @@ export default function NewSiteVisitPage() {
     if (!operatorId || !visitDate) {
       setJobs([]);
       setJobOrderId('');
+      setNotJobSpecific(false);
       return;
     }
     (async () => {
       setJobsLoading(true);
+      setNotJobSpecific(false);
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
@@ -170,32 +182,60 @@ export default function NewSiteVisitPage() {
   }, [operators, helpers]);
 
   // ── step validation ─────────────────────────────────────────────────────
+  // When the operator HAS active jobs that day, the supervisor must either pick
+  // one or explicitly say the visit wasn't job-specific. Silence is no longer an
+  // accepted answer — an unlinked visit never shows up on the job.
+  const jobChoiceMade = jobs.length === 0 || !!jobOrderId || notJobSpecific;
+
   const canAdvanceFromStep = (s: 1 | 2 | 3): boolean => {
-    if (s === 1) return !!operatorId;
+    if (s === 1) return !!operatorId && jobChoiceMade;
     if (s === 2) return observations.trim().length > 0 || issues.trim().length > 0;
     return true;
   };
 
-  async function uploadPhoto(file: File, pathPrefix: string): Promise<string | null> {
-    const ext = file.name.split('.').pop() ?? 'jpg';
-    const path = `${pathPrefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-    const { error: upErr } = await supabase.storage
-      .from('maintenance-photos')
-      .upload(path, file, { contentType: file.type, upsert: false });
-    if (upErr) { console.error('Photo upload failed:', upErr); return null; }
-    const { data: signed } = await supabase.storage
-      .from('maintenance-photos')
-      .createSignedUrl(path, 60 * 60 * 24 * 30);
-    return signed?.signedUrl ?? null;
+  /**
+   * Upload via the SERVER (POST /api/admin/supervisor-visits/photo-upload).
+   *
+   * This used to upload straight from the browser into the `maintenance-photos`
+   * bucket — which did not exist. Every upload failed, the failure was swallowed
+   * into a console.error + `return null`, and the supervisor saw a normal-looking
+   * form with no photo and no warning. The bucket is now private with no storage
+   * policies (see 20260802b_maintenance_photos_bucket.sql), so uploads MUST go
+   * through the service-role route. Errors are RETURNED, never swallowed.
+   *
+   * Returns the URL to persist, or throws with a message worth showing a human.
+   */
+  async function uploadPhoto(file: File, kind: 'site' | 'issue'): Promise<{ stored: string; preview: string }> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) throw new Error('Your session expired. Log in again to attach photos.');
+
+    const form = new FormData();
+    form.append('photo', file);
+    form.append('kind', kind);
+
+    const res = await fetch('/api/admin/supervisor-visits/photo-upload', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: form,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json?.storedUrl) {
+      throw new Error(json?.error || 'Could not save the photo. Please try again.');
+    }
+    return { stored: json.storedUrl as string, preview: (json.url as string) || (json.storedUrl as string) };
   }
 
   async function handleSitePhotoSelect(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setSitePhotoUploading(true);
+    setPhotoError(null);
     try {
-      const url = await uploadPhoto(file, 'visits/site');
-      if (url) setSitePhotoUrls((prev) => [...prev, url]);
+      const { stored, preview } = await uploadPhoto(file, 'site');
+      setSitePhotoUrls((prev) => [...prev, stored]);
+      setSitePhotoPreviews((prev) => ({ ...prev, [stored]: preview }));
+    } catch (err) {
+      setPhotoError(err instanceof Error ? err.message : 'Could not save the photo. Please try again.');
     } finally {
       setSitePhotoUploading(false);
       if (siteFileRef.current) siteFileRef.current.value = '';
@@ -205,18 +245,18 @@ export default function NewSiteVisitPage() {
   async function handleIssuePhotoSelect(idx: number, e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
-    updateEquipmentIssue(idx, { photoUploading: true });
+    updateEquipmentIssue(idx, { photoUploading: true, photoError: null });
     try {
-      const url = await uploadPhoto(file, 'visits/issues');
-      if (url) {
-        setEquipmentIssues((prev) => prev.map((it, i) =>
-          i === idx ? { ...it, photo_urls: [...it.photo_urls, url], photoUploading: false } : it
-        ));
-      } else {
-        updateEquipmentIssue(idx, { photoUploading: false });
-      }
-    } catch {
-      updateEquipmentIssue(idx, { photoUploading: false });
+      const { stored, preview } = await uploadPhoto(file, 'issue');
+      setSitePhotoPreviews((prev) => ({ ...prev, [stored]: preview }));
+      setEquipmentIssues((prev) => prev.map((it, i) =>
+        i === idx ? { ...it, photo_urls: [...it.photo_urls, stored], photoUploading: false, photoError: null } : it
+      ));
+    } catch (err) {
+      updateEquipmentIssue(idx, {
+        photoUploading: false,
+        photoError: err instanceof Error ? err.message : 'Could not save the photo. Please try again.',
+      });
     } finally {
       const ref = issueFileRefs.current[idx];
       if (ref) ref.value = '';
@@ -241,6 +281,11 @@ export default function NewSiteVisitPage() {
     if (!operatorId) {
       setStep(1);
       setError('Please select an operator.');
+      return;
+    }
+    if (!jobChoiceMade) {
+      setStep(1);
+      setError('Pick the job you visited, or choose "Not job-specific".');
       return;
     }
     if (!observations.trim() && !issues.trim()) {
@@ -279,7 +324,13 @@ export default function NewSiteVisitPage() {
           safety_rating: safety,
           cleanliness_rating: cleanliness,
           photo_urls: sitePhotoUrls,
-          equipment_issues: cleanedIssues.map(({ photoUploading: _, ...rest }) => rest),
+          // Strip the UI-only fields; only the persisted shape goes to the API.
+          equipment_issues: cleanedIssues.map((it) => ({
+            equipment_name: it.equipment_name,
+            whats_wrong: it.whats_wrong,
+            action: it.action,
+            photo_urls: it.photo_urls,
+          })),
         }),
       });
 
@@ -415,10 +466,22 @@ export default function NewSiteVisitPage() {
             </section>
 
             {operatorId && (
-              <section className="bg-white dark:bg-slate-800 rounded-2xl border border-gray-200 dark:border-slate-700 p-5 space-y-3">
-                <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200">
-                  <Briefcase className="w-4 h-4 text-brand" /> Active job on that day
-                </label>
+              <section
+                className={`bg-white dark:bg-slate-800 rounded-2xl border-2 p-5 space-y-3 transition-colors ${
+                  jobChoiceMade
+                    ? 'border-gray-200 dark:border-slate-700'
+                    : 'border-brand/50 dark:border-brand/50 ring-2 ring-brand/10'
+                }`}
+              >
+                <div>
+                  <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 dark:text-slate-200">
+                    <Briefcase className="w-4 h-4 text-brand" /> Which job was this?
+                    {jobs.length > 0 && <span className="text-rose-500">*</span>}
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-slate-400 mt-1">
+                    Linking the report to a job is what makes it show up on that job&apos;s page for the office.
+                  </p>
+                </div>
 
                 {jobsLoading ? (
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-slate-400">
@@ -427,7 +490,7 @@ export default function NewSiteVisitPage() {
                   </div>
                 ) : jobs.length === 0 ? (
                   <p className="text-sm text-gray-500 dark:text-slate-400 italic">
-                    No active jobs found for this operator on {visitDate}. You can still file a report — it will be unlinked from a specific job.
+                    No active jobs found for this operator on {visitDate}. This report will be filed without a job link.
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -435,8 +498,11 @@ export default function NewSiteVisitPage() {
                       <button
                         type="button"
                         key={j.id}
-                        onClick={() => setJobOrderId(j.id === jobOrderId ? '' : j.id)}
-                        className={`w-full text-left p-3 rounded-lg border-2 transition ${
+                        onClick={() => {
+                          setJobOrderId(j.id === jobOrderId ? '' : j.id);
+                          setNotJobSpecific(false);
+                        }}
+                        className={`w-full min-h-[44px] text-left p-3 rounded-lg border-2 transition ${
                           j.id === jobOrderId
                             ? 'border-brand bg-brand/10 dark:bg-brand/20'
                             : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-brand/30'
@@ -458,12 +524,38 @@ export default function NewSiteVisitPage() {
                         )}
                       </button>
                     ))}
+
+                    {/* The deliberate opt-out. Legitimate, but never the default. */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNotJobSpecific((v) => !v);
+                        setJobOrderId('');
+                      }}
+                      className={`w-full min-h-[44px] text-left p-3 rounded-lg border-2 border-dashed transition ${
+                        notJobSpecific
+                          ? 'border-gray-500 bg-gray-100 dark:border-slate-400 dark:bg-slate-700'
+                          : 'border-gray-200 dark:border-slate-600 bg-white dark:bg-slate-700 hover:border-gray-400'
+                      }`}
+                    >
+                      <span className="text-sm font-semibold text-gray-900 dark:text-white">
+                        Not job-specific
+                      </span>
+                      <span className="block text-xs text-gray-500 dark:text-slate-400 mt-0.5">
+                        Shop, yard, or between jobs — this report won&apos;t appear on any job page.
+                      </span>
+                    </button>
                   </div>
                 )}
 
                 {selectedJob && (
                   <p className="text-xs text-brand dark:text-brand">
                     Linked to <strong>{selectedJob.job_number}</strong>
+                  </p>
+                )}
+                {!jobsLoading && jobs.length > 0 && !jobChoiceMade && (
+                  <p className="text-xs text-brand font-medium">
+                    Pick the job you visited, or choose &ldquo;Not job-specific&rdquo;.
                   </p>
                 )}
               </section>
@@ -541,7 +633,7 @@ export default function NewSiteVisitPage() {
                   {sitePhotoUrls.map((url, i) => (
                     <div key={i} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={url} alt={`Site photo ${i + 1}`} className="w-full h-full object-cover" />
+                      <img src={sitePhotoPreviews[url] || url} alt={`Site photo ${i + 1}`} className="w-full h-full object-cover" />
                       <button
                         type="button"
                         onClick={() => setSitePhotoUrls((prev) => prev.filter((_, j) => j !== i))}
@@ -574,6 +666,12 @@ export default function NewSiteVisitPage() {
                   <><Camera className="w-4 h-4" /> {sitePhotoUrls.length > 0 ? 'Add another photo' : 'Take or upload a jobsite photo'}</>
                 )}
               </button>
+              {photoError && (
+                <p className="flex items-start gap-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40 p-2.5 text-sm text-rose-700 dark:text-rose-300">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                  <span>{photoError} <strong>The photo was not attached.</strong></span>
+                </p>
+              )}
             </section>
           </div>
         )}
@@ -699,7 +797,7 @@ export default function NewSiteVisitPage() {
                           {it.photo_urls.map((url, pi) => (
                             <div key={pi} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img src={url} alt={`Issue ${idx + 1} photo`} className="w-full h-full object-cover" />
+                              <img src={sitePhotoPreviews[url] || url} alt={`Issue ${idx + 1} photo`} className="w-full h-full object-cover" />
                               <button
                                 type="button"
                                 onClick={() => setEquipmentIssues((prev) => prev.map((item, i) =>
@@ -734,6 +832,12 @@ export default function NewSiteVisitPage() {
                           <><Camera className="w-4 h-4" /> {it.photo_urls.length > 0 ? 'Add another photo' : 'Photo of broken equipment'}</>
                         )}
                       </button>
+                      {it.photoError && (
+                        <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40 p-2.5 text-sm text-rose-700 dark:text-rose-300">
+                          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                          <span>{it.photoError} <strong>The photo was not attached.</strong></span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -790,7 +894,13 @@ export default function NewSiteVisitPage() {
               onClick={() => {
                 setError(null);
                 if (!canAdvanceFromStep(step)) {
-                  setError(step === 1 ? 'Please select an operator first.' : 'Please add observations or flag at least one issue.');
+                  setError(
+                    step === 1
+                      ? !operatorId
+                        ? 'Please select an operator first.'
+                        : 'Pick the job you visited, or choose "Not job-specific".'
+                      : 'Please add observations or flag at least one issue.'
+                  );
                   return;
                 }
                 setStep((step + 1) as 1 | 2 | 3);

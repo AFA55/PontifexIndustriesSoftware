@@ -41,6 +41,9 @@ import {
   Printer,
   Users,
   Crown,
+  Star,
+  ClipboardCheck,
+  Flag,
 } from 'lucide-react';
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import SendOptInRequestButton from '@/components/SendOptInRequestButton';
@@ -218,6 +221,41 @@ interface OperatorNote {
   created_at: string;
 }
 
+/** A supervisor walkthrough filed against this job (GET /api/admin/supervisor-visits). */
+interface SiteVisitEquipmentIssue {
+  equipment_name?: string | null;
+  whats_wrong?: string | null;
+  action?: 'maintenance' | 'replace' | string;
+  status?: string;
+  photo_urls?: string[];
+}
+interface SiteVisitMaintenanceRequest {
+  id: string;
+  equipment_name: string | null;
+  status: string;
+  request_type: string | null;
+  priority: string | null;
+  resolved_at: string | null;
+}
+interface SiteVisitReport {
+  id: string;
+  visit_date: string;
+  supervisor_name: string | null;
+  operator_name: string | null;
+  arrival_time: string | null;
+  departure_time: string | null;
+  observations: string | null;
+  issues_flagged: string | null;
+  follow_up_required: boolean;
+  follow_up_notes: string | null;
+  performance_rating: number | null;
+  safety_rating: number | null;
+  cleanliness_rating: number | null;
+  photo_urls: string[];
+  equipment_issues: SiteVisitEquipmentIssue[];
+  maintenance_requests: SiteVisitMaintenanceRequest[];
+}
+
 interface StandbySegment {
   id: string;
   started_at: string;
@@ -291,6 +329,26 @@ function formatDate(dateStr: string | null) {
   if (!dateStr) return '—';
   const d = new Date(dateStr + 'T00:00:00');
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/** One 1-5 grade from a supervisor site visit, rendered as stars. */
+function VisitGrade({ label, value }: { label: string; value: number | null }) {
+  if (typeof value !== 'number') return null;
+  return (
+    <div className="px-3 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400 dark:text-white/40">{label}</p>
+      <div className="flex items-center gap-1 mt-0.5" aria-label={`${label}: ${value} out of 5`}>
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star
+            key={n}
+            className={`w-3.5 h-3.5 ${n <= value ? 'text-amber-500' : 'text-slate-200 dark:text-white/15'}`}
+            fill={n <= value ? 'currentColor' : 'none'}
+          />
+        ))}
+        <span className="ml-1 text-xs font-bold text-slate-700 dark:text-white/80 tabular-nums">{value}/5</span>
+      </div>
+    </div>
+  );
 }
 
 function formatDateTime(ts: string | null) {
@@ -448,6 +506,11 @@ export default function AdminJobDetailPage({
     log_date: string; hours_worked: number | null; completed: boolean;
   }>>([]);
   const [helperLogsLoading, setHelperLogsLoading] = useState(false);
+
+  // Supervisor site-visit reports filed against THIS job (walkthroughs + grades)
+  const [siteVisits, setSiteVisits] = useState<SiteVisitReport[]>([]);
+  const [siteVisitsLoading, setSiteVisitsLoading] = useState(false);
+  const [visitLightbox, setVisitLightbox] = useState<string | null>(null);
 
   // Live status
   const [liveStatus, setLiveStatus] = useState<LiveStatusData | null>(null);
@@ -669,6 +732,21 @@ export default function AdminJobDetailPage({
     }
   }, [jobId]);
 
+  // Site visit reports for this job. The API tenant-scopes + role-gates; a
+  // supervisor only ever gets back their own reports.
+  const fetchSiteVisits = useCallback(async () => {
+    setSiteVisitsLoading(true);
+    try {
+      const res = await apiFetch(`/api/admin/supervisor-visits?job_order_id=${jobId}&limit=50`);
+      if (res.ok) {
+        const json = await res.json();
+        setSiteVisits(Array.isArray(json.data) ? json.data : []);
+      }
+    } catch { /* ignore — non-critical */ } finally {
+      setSiteVisitsLoading(false);
+    }
+  }, [jobId]);
+
   const fetchLiveStatus = useCallback(async () => {
     try {
       const res = await apiFetch(`/api/admin/jobs/${jobId}/live-status`);
@@ -711,11 +789,11 @@ export default function AdminJobDetailPage({
   useEffect(() => {
     const load = async () => {
       setLoading(true);
-      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs(), fetchOperatorNotes(), fetchHelperLogs()]);
+      await Promise.all([fetchJob(), fetchScope(), fetchActivity(), fetchChangeRequests(), fetchCompletionRequest(), fetchDailyLogs(), fetchOperatorNotes(), fetchHelperLogs(), fetchSiteVisits()]);
       setLoading(false);
     };
     load();
-  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest, fetchDailyLogs, fetchOperatorNotes]);
+  }, [fetchJob, fetchScope, fetchActivity, fetchChangeRequests, fetchCompletionRequest, fetchDailyLogs, fetchOperatorNotes, fetchSiteVisits]);
 
   const handleApprove = async () => {
     if (!job) return;
@@ -2321,6 +2399,234 @@ export default function AdminJobDetailPage({
               </div>
             )}
 
+            {/* ── Site Visit Reports ───────────────────────────────────────
+                What the SUPERVISOR saw when they walked this jobsite, and how
+                they graded the operator. Photos arrive pre-signed from the API
+                (the maintenance-photos bucket is private). */}
+            <div
+              id="site-visit-reports"
+              className="
+                rounded-2xl p-5 shadow-sm scroll-mt-24
+                bg-white border border-slate-200
+                dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
+                dark:border-white/10 dark:backdrop-blur
+              "
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300">
+                  <ClipboardCheck className="w-4 h-4" />
+                </span>
+                <h2 className="text-base font-semibold text-slate-900 dark:text-white">Site Visit Reports</h2>
+                {siteVisits.length > 0 && (
+                  <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-bold bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300">
+                    {siteVisits.length}
+                  </span>
+                )}
+              </div>
+
+              {siteVisitsLoading ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-300 dark:text-white/30" />
+                </div>
+              ) : siteVisits.length === 0 ? (
+                <div className="text-center py-6">
+                  <ClipboardCheck className="w-8 h-8 text-slate-200 dark:text-white/15 mx-auto mb-2" />
+                  <p className="text-sm text-slate-500 dark:text-white/55">
+                    No supervisor has logged a walkthrough on this job yet.
+                  </p>
+                  <p className="text-xs text-slate-400 dark:text-white/40 mt-1">
+                    When a supervisor files a site visit and links it to this job, their observations,
+                    grades and photos appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {siteVisits.map((v) => {
+                    const grades = [v.performance_rating, v.safety_rating, v.cleanliness_rating]
+                      .filter((n): n is number => typeof n === 'number');
+                    const avg = grades.length
+                      ? Math.round((grades.reduce((a, b) => a + b, 0) / grades.length) * 10) / 10
+                      : null;
+                    const photos = Array.isArray(v.photo_urls) ? v.photo_urls : [];
+                    const issues = Array.isArray(v.equipment_issues) ? v.equipment_issues : [];
+                    const mrs = Array.isArray(v.maintenance_requests) ? v.maintenance_requests : [];
+
+                    return (
+                      <div
+                        key={v.id}
+                        className="rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-white/[0.03] p-4 space-y-3"
+                      >
+                        {/* Who / when */}
+                        <div className="flex items-start justify-between gap-3 flex-wrap">
+                          <div>
+                            <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                              {v.supervisor_name || 'Supervisor'}
+                              <span className="font-normal text-slate-400 dark:text-white/40"> visited </span>
+                              {v.operator_name || 'the crew'}
+                            </p>
+                            <p className="text-xs text-slate-500 dark:text-white/50 mt-0.5 flex items-center gap-2 flex-wrap">
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                {formatDate(v.visit_date)}
+                              </span>
+                              {(v.arrival_time || v.departure_time) && (
+                                <span className="inline-flex items-center gap-1">
+                                  <Clock className="w-3 h-3" />
+                                  {formatTimeFromISO(v.arrival_time)}
+                                  <span className="text-slate-300 dark:text-white/30">→</span>
+                                  {v.departure_time ? formatTimeFromISO(v.departure_time) : '—'}
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {v.follow_up_required && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-400/30">
+                                <Flag className="w-3 h-3" /> Follow-up
+                              </span>
+                            )}
+                            {avg !== null && (
+                              <span className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-200">
+                                <Star className="w-3 h-3" fill="currentColor" />
+                                {avg}/5 avg
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* The grades */}
+                        {grades.length > 0 && (
+                          <div className="grid sm:grid-cols-3 gap-2">
+                            <VisitGrade label="Performance" value={v.performance_rating} />
+                            <VisitGrade label="Safety" value={v.safety_rating} />
+                            <VisitGrade label="Cleanliness" value={v.cleanliness_rating} />
+                          </div>
+                        )}
+
+                        {v.observations && (
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-white/40 mb-1">
+                              Observations
+                            </p>
+                            <p className="text-sm text-slate-700 dark:text-white/80 whitespace-pre-wrap leading-relaxed">
+                              {v.observations}
+                            </p>
+                          </div>
+                        )}
+
+                        {v.issues_flagged && (
+                          <div className="rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-400/25 p-3">
+                            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1">
+                              <ShieldAlert className="w-3.5 h-3.5" /> Issues flagged
+                            </p>
+                            <p className="text-sm text-amber-800 dark:text-amber-200 whitespace-pre-wrap">
+                              {v.issues_flagged}
+                            </p>
+                          </div>
+                        )}
+
+                        {v.follow_up_required && (
+                          <div className="rounded-lg bg-amber-50/60 dark:bg-amber-500/[0.07] border border-amber-300 dark:border-amber-400/30 p-3">
+                            <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-300 mb-1">
+                              <Flag className="w-3.5 h-3.5" /> Follow-up required
+                            </p>
+                            <p className="text-sm text-slate-700 dark:text-white/80 whitespace-pre-wrap">
+                              {v.follow_up_notes || 'No notes were added.'}
+                            </p>
+                          </div>
+                        )}
+
+                        {/* Jobsite photos */}
+                        {photos.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-white/40 mb-1.5">
+                              Photos ({photos.length})
+                            </p>
+                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                              {photos.map((url, i) => (
+                                <button
+                                  key={`${v.id}-p-${i}`}
+                                  type="button"
+                                  onClick={() => setVisitLightbox(url)}
+                                  className="relative aspect-square rounded-lg overflow-hidden border border-slate-200 dark:border-white/10 hover:ring-2 hover:ring-violet-400 transition"
+                                  aria-label={`View site visit photo ${i + 1}`}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={url} alt={`Site visit photo ${i + 1}`} className="w-full h-full object-cover" />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Equipment issues + what the shop did about them */}
+                        {issues.length > 0 && (
+                          <div>
+                            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-400 dark:text-white/40 mb-1.5">
+                              Equipment flagged ({issues.length})
+                            </p>
+                            <div className="space-y-1.5">
+                              {issues.map((issue, i) => {
+                                // Match the shop's request back to the issue by equipment name;
+                                // fall back to the single request when there's only one.
+                                const mr =
+                                  mrs.find(
+                                    (m) =>
+                                      (m.equipment_name || '').trim().toLowerCase() ===
+                                      (issue.equipment_name || '').trim().toLowerCase()
+                                  ) ?? (mrs.length === 1 && issues.length === 1 ? mrs[0] : undefined);
+                                return (
+                                  <div
+                                    key={`${v.id}-e-${i}`}
+                                    className="flex items-start justify-between gap-2 px-3 py-2 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10"
+                                  >
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-medium text-slate-800 dark:text-white/85 truncate">
+                                        {issue.equipment_name || 'Unnamed equipment'}
+                                      </p>
+                                      {issue.whats_wrong && (
+                                        <p className="text-xs text-slate-500 dark:text-white/50">{issue.whats_wrong}</p>
+                                      )}
+                                    </div>
+                                    <span
+                                      className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold ${
+                                        mr?.status === 'done'
+                                          ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                                          : mr?.status === 'in_progress'
+                                          ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-300'
+                                          : mr
+                                          ? 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
+                                          : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-white/50'
+                                      }`}
+                                    >
+                                      <Wrench className="w-3 h-3" />
+                                      {mr
+                                        ? `${mr.request_type === 'replace' ? 'Replace' : 'Repair'} · ${String(mr.status).replace('_', ' ')}`
+                                        : issue.action === 'replace'
+                                        ? 'Replace requested'
+                                        : 'Repair requested'}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        <Link
+                          href={`/dashboard/admin/site-visits/${v.id}`}
+                          className="inline-flex items-center gap-1 min-h-[44px] text-xs font-semibold text-violet-600 dark:text-violet-300 hover:underline"
+                        >
+                          Open full report
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             {/* Change Requests */}
             <div className="
               rounded-2xl p-5 shadow-sm
@@ -2570,6 +2876,20 @@ export default function AdminJobDetailPage({
             ">
               <h3 className="text-xs font-semibold text-slate-500 dark:text-white/55 uppercase tracking-wide mb-3">Quick Links</h3>
               <div className="space-y-1">
+                <a
+                  href="#site-visit-reports"
+                  className="
+                    flex items-center justify-between px-3 py-2.5 rounded-lg text-sm transition-colors group
+                    text-slate-700 hover:bg-slate-50
+                    dark:text-white/80 dark:hover:bg-white/5
+                  "
+                >
+                  <span className="flex items-center gap-2">
+                    <ClipboardCheck className="w-4 h-4 text-slate-400 dark:text-white/45" />
+                    Site Visits ({siteVisits.length})
+                  </span>
+                  <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30 group-hover:text-slate-500 dark:group-hover:text-white/60" />
+                </a>
                 {job.status === 'completed' && (
                   <Link
                     href={`/dashboard/admin/completed-job-tickets/${jobId}`}
@@ -2605,6 +2925,31 @@ export default function AdminJobDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Site-visit photo lightbox */}
+      {visitLightbox && (
+        <div
+          className="fixed inset-0 z-[90] bg-black/90 flex items-center justify-center p-4"
+          onClick={() => setVisitLightbox(null)}
+          role="dialog"
+          aria-label="Site visit photo"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={visitLightbox}
+            alt="Site visit photo"
+            className="max-w-full max-h-full rounded-xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            onClick={() => setVisitLightbox(null)}
+            className="absolute top-4 right-4 w-11 h-11 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"
+            aria-label="Close photo"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      )}
 
       {/* Edit Schedule Modal */}
       {showEditSchedule && (

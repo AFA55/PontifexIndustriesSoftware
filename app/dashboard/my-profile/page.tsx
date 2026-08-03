@@ -16,6 +16,7 @@ import { isNativeApp } from '@/lib/is-native';
 import { BIOMETRIC_DECLINED_KEY, biometricDiagnostics, biometryLabel, disableBiometric, enrollBiometric, type BiometricDiagnostics } from '@/lib/biometric';
 import PasskeySettings from '@/components/auth/PasskeySettings';
 import Avatar from '@/components/Avatar';
+import EmployeeReviews from '@/components/reviews/EmployeeReviews';
 
 interface MyProfile {
   id: string;
@@ -391,6 +392,11 @@ export default function MyProfilePage() {
                 {uploadingAvatar && <p className="text-xs text-brand dark:text-brand mt-1">Uploading photo...</p>}
               </div>
             </div>
+
+            {/* My Reviews — the grades supervisors, customers and crew have left
+                for THIS person, plus their overall standing. Read-only, and the
+                API refuses to serve anyone else's reviews. */}
+            <EmployeeReviews employeeId={profile.id} variant="self" />
 
             {/* Editable Fields */}
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-200 dark:border-white/10 p-6 space-y-5 shadow-sm">

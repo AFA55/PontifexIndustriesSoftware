@@ -15,6 +15,7 @@ import { ChevronLeft, Printer, Loader2, Star, FileBarChart } from 'lucide-react'
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 import { useBranding } from '@/lib/branding-context';
+import { ratingBand, type OperatorRatingResult } from '@/lib/operator-rating';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -41,6 +42,18 @@ interface ReportData {
     count: number; averageRating: number | null;
     items: Array<{ createdAt: string; rating: number | null; comment: string | null; reviewer: string; jobNumber?: string; customer?: string }>;
   };
+  supervisorVisits?: {
+    count: number; averageRating: number | null;
+    items: Array<{
+      id: string; visitDate: string; supervisor: string | null; jobNumber: string | null; customer: string | null;
+      performance: number | null; safety: number | null; cleanliness: number | null;
+      observations: string | null; issuesFlagged: string | null;
+      followUpRequired: boolean; followUpNotes: string | null;
+    }>;
+  };
+  compositeRating?: OperatorRatingResult | null;
+  /** Names the sources that failed to load; when set, no composite is shown. */
+  compositeUnavailable?: string[] | null;
 }
 
 export default function OperatorAnnualReportPage() {
@@ -259,6 +272,137 @@ export default function OperatorAnnualReportPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Overall standing — the canonical composite across every grading
+              source (lib/operator-rating.ts). Computed on read, so it can never
+              drift from the reviews below it. */}
+          {data.compositeUnavailable && data.compositeUnavailable.length > 0 && (
+            <div className="rounded-2xl border border-amber-300 bg-amber-50 p-5 dark:border-amber-700/40 dark:bg-amber-900/15 print:border-slate-300">
+              <h3 className="text-sm font-bold text-amber-800 dark:text-amber-300">Overall Standing unavailable</h3>
+              <p className="mt-1 text-sm text-amber-800 dark:text-amber-200">
+                Could not load {data.compositeUnavailable.join(' + ')}. A score computed from the
+                remaining sources would be wrong, so none is shown. Reload to try again.
+              </p>
+            </div>
+          )}
+
+          {data.compositeRating && data.compositeRating.totalReviews > 0 && (
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03] print:border-slate-300">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-slate-900 dark:text-white">Overall Standing</h3>
+                <span className="text-xs text-slate-500 dark:text-white/50">
+                  {data.compositeRating.totalReviews} review{data.compositeRating.totalReviews === 1 ? '' : 's'} · all time
+                </span>
+              </div>
+              {data.compositeRating.provisional ? (
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+                  <p className="text-sm font-semibold text-slate-700 dark:text-white/80">
+                    Provisional — based on {data.compositeRating.totalReviews} review
+                    {data.compositeRating.totalReviews === 1 ? '' : 's'}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500 dark:text-white/55">
+                    {data.compositeRating.provisionalReason === 'single_source'
+                      ? 'Only one kind of reviewer has weighed in so far, so no overall score is published yet. The individual reviews are below.'
+                      : 'Too few reviews to publish an overall score yet. The individual reviews are below.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="flex flex-wrap items-end gap-4">
+                    <p className="font-mono text-3xl font-bold tabular-nums text-slate-900 dark:text-white">
+                      {data.compositeRating.composite?.toFixed(2) ?? '—'}
+                      <span className="text-base font-semibold text-slate-500 dark:text-white/50"> / 5</span>
+                    </p>
+                    <span className="pb-1 text-sm font-semibold text-slate-600 dark:text-white/70">
+                      {ratingBand(data.compositeRating.composite).label}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {(['supervisor', 'customer', 'helper'] as const)
+                      .filter((k) => data.compositeRating!.sources[k].average !== null)
+                      .map((k) => {
+                        const s = data.compositeRating!.sources[k];
+                        return (
+                          <span
+                            key={k}
+                            className="rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-white/10 dark:text-white/75"
+                          >
+                            {s.label}: {s.average?.toFixed(2)} ({Math.round(s.weight * 100)}%)
+                          </span>
+                        );
+                      })}
+                  </div>
+                  {data.compositeRating.weakest && (
+                    <p className="mt-2 text-xs text-slate-500 dark:text-white/55">
+                      Lowest area: <strong>{data.compositeRating.weakest.label}</strong> ({data.compositeRating.weakest.average}/5)
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Supervisor site visits — how management graded them in the field.
+              When the query itself failed, a bare "(0)" reads as "this employee
+              was never visited", which is a different and much worse claim than
+              "we couldn't load it". Say which one it is. */}
+          {(() => {
+            const visitsFailed = !!data.compositeUnavailable?.includes('supervisor visits');
+            return (
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03] print:border-slate-300">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Supervisor Visits{visitsFailed ? '' : ` (${data.supervisorVisits?.count ?? 0})`}
+              </h3>
+              {!visitsFailed && data.supervisorVisits?.averageRating != null && (
+                <span className="flex items-center gap-1 rounded-full bg-violet-50 px-3 py-1 text-sm font-bold text-violet-700">
+                  <Star className="h-4 w-4 fill-violet-400 text-violet-400" /> {data.supervisorVisits.averageRating} / 5 average
+                </span>
+              )}
+            </div>
+            {visitsFailed ? (
+              <p className="text-sm text-amber-700 dark:text-amber-300">
+                Could not load supervisor visits — this is <strong>not</strong> a count of zero. Reload to try again.
+              </p>
+            ) : !data.supervisorVisits || data.supervisorVisits.items.length === 0 ? (
+              <p className="text-sm text-slate-500 dark:text-white/50">No supervisor site visits logged for {data.year}.</p>
+            ) : (
+              <ul className="space-y-3">
+                {data.supervisorVisits.items.map((v) => (
+                  <li key={v.id} className="rounded-xl border border-slate-100 p-3.5 dark:border-white/5">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-800 dark:text-white/85">
+                        {v.supervisor ?? 'Supervisor'}{v.jobNumber ? ` · ${v.jobNumber}` : ''}
+                      </p>
+                      <span className="text-xs text-slate-400">
+                        {new Date(v.visitDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-white/55">
+                      {v.performance != null && <span>Performance <strong className="text-slate-700 dark:text-white/80">{v.performance}/5</strong></span>}
+                      {v.safety != null && <span>Safety <strong className="text-slate-700 dark:text-white/80">{v.safety}/5</strong></span>}
+                      {v.cleanliness != null && <span>Cleanliness <strong className="text-slate-700 dark:text-white/80">{v.cleanliness}/5</strong></span>}
+                    </div>
+                    {v.observations && (
+                      <p className="mt-1.5 text-sm leading-relaxed text-slate-600 dark:text-white/60">“{v.observations}”</p>
+                    )}
+                    {v.issuesFlagged && (
+                      <p className="mt-1.5 text-sm leading-relaxed text-amber-700 dark:text-amber-300">
+                        Issues: {v.issuesFlagged}
+                      </p>
+                    )}
+                    {v.followUpRequired && (
+                      <p className="mt-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        Follow-up required{v.followUpNotes ? ` — ${v.followUpNotes}` : ''}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+            );
+          })()}
 
           {/* Customer surveys */}
           <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-white/[0.03] print:border-slate-300">

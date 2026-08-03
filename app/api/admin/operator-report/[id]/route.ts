@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { computeOperatorRating } from '@/lib/operator-rating';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const auth = await requireAdmin(request);
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     .maybeSingle();
   if (!person) return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
 
-  const [cardsRes, timeOffRes, surveysRes, attendanceRes, helperReviewsRes, subsistenceRes] = await Promise.all([
+  const [cardsRes, timeOffRes, surveysRes, attendanceRes, helperReviewsRes, subsistenceRes, visitsRes] = await Promise.all([
     supabaseAdmin
       .from('timecards')
       .select('date, net_hours, total_hours, regular_hours, overtime_hours, is_late, late_minutes, out_of_town, is_shop_hours')
@@ -81,6 +82,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .eq('operator_id', id)
       .gte('night_date', start)
       .lte('night_date', end),
+    // Supervisor walkthroughs of THIS employee. Until now the report card
+    // claimed to be the operator's record while omitting the one grade filed by
+    // management itself.
+    supabaseAdmin
+      .from('supervisor_visits')
+      .select(
+        'id, visit_date, supervisor_name, job_order_id, job_number, customer_name, observations, issues_flagged, follow_up_required, follow_up_notes, performance_rating, safety_rating, cleanliness_rating'
+      )
+      .eq('tenant_id', auth.tenantId)
+      .eq('operator_id', id)
+      // Drafts are not filed grades — they must not show or move the score.
+      .eq('status', 'submitted')
+      .gte('visit_date', start)
+      .lte('visit_date', end)
+      .order('visit_date', { ascending: false }),
   ]);
   if (cardsRes.error) return NextResponse.json({ error: cardsRes.error.message }, { status: 500 });
 
@@ -195,6 +211,48 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const helperRatings = helperReviews.map((r: any) => Number(r.rating)).filter((n) => Number.isFinite(n) && n > 0);
   const helperAvg = helperRatings.length ? round(helperRatings.reduce((a, b) => a + b, 0) / helperRatings.length) : null;
 
+  // Supervisor site visits + the canonical composite standing. The composite is
+  // computed on read from lib/operator-rating.ts — one definition, nothing to
+  // drift out of sync with a stored rollup.
+  const visits = visitsRes?.data ?? [];
+
+  // A source that ERRORS must not be silently read as "no reviews": the
+  // composite renormalises its weights over the surviving sources, so a dropped
+  // source doesn't just lose detail, it changes the number. The rest of this
+  // report (attendance, hours, time off) is still useful, so instead of failing
+  // the whole request we withhold the composite and say why.
+  const compositeSourceErrors = [
+    visitsRes?.error ? 'supervisor visits' : null,
+    surveysRes?.error ? 'customer surveys' : null,
+    helperReviewsRes?.error ? 'helper reviews' : null,
+  ].filter((s): s is string => s !== null);
+  if (compositeSourceErrors.length > 0) {
+    console.error('operator-report composite source failure:', {
+      visits: visitsRes?.error?.message,
+      surveys: surveysRes?.error?.message,
+      helper: helperReviewsRes?.error?.message,
+    });
+  }
+  const visitRatings = visits
+    .map((v: any) =>
+      [v.performance_rating, v.safety_rating, v.cleanliness_rating]
+        .map(Number)
+        .filter((n) => Number.isFinite(n) && n >= 1 && n <= 5)
+    )
+    .filter((parts: number[]) => parts.length > 0)
+    .map((parts: number[]) => parts.reduce((a, b) => a + b, 0) / parts.length);
+  const visitAvg = visitRatings.length
+    ? round(visitRatings.reduce((a: number, b: number) => a + b, 0) / visitRatings.length)
+    : null;
+
+  const compositeRating = compositeSourceErrors.length > 0
+    ? null
+    : computeOperatorRating({
+        supervisorVisits: visits as never,
+        customerSurveys: surveys as never,
+        helperReviews: helperReviews as never,
+      });
+
   return NextResponse.json({
     success: true,
     data: {
@@ -226,6 +284,30 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           ...(reviewJobNumbers.get(r.job_order_id) ?? {}),
         })),
       },
+      supervisorVisits: {
+        count: visits.length,
+        averageRating: visitAvg,
+        items: visits.map((v: any) => ({
+          id: v.id,
+          visitDate: v.visit_date,
+          supervisor: v.supervisor_name,
+          jobNumber: v.job_number,
+          customer: v.customer_name,
+          performance: v.performance_rating,
+          safety: v.safety_rating,
+          cleanliness: v.cleanliness_rating,
+          observations: v.observations,
+          issuesFlagged: v.issues_flagged,
+          followUpRequired: !!v.follow_up_required,
+          followUpNotes: v.follow_up_notes,
+        })),
+      },
+      // Canonical composite across supervisor + customer + helper grades.
+      // See lib/operator-rating.ts for the weights and why. null when a source
+      // failed to load — `compositeUnavailable` names which, so the UI can say
+      // "couldn't compute" instead of rendering a wrong number.
+      compositeRating,
+      compositeUnavailable: compositeSourceErrors.length > 0 ? compositeSourceErrors : null,
     },
   });
 }

@@ -273,6 +273,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-amber-500',
     features: ['Rating form builder', 'Team performance scores', 'Anonymized feedback', 'Job-based reviews'],
   },
+  {
+    key: 'employee_reviews',
+    title: 'Previous Reviews',
+    description: 'Every grade an employee has received, and their overall standing',
+    icon: '🏅',
+    href: '/dashboard/admin/employee-reviews',
+    bgColor: 'from-rose-500 to-amber-500',
+    iconBg: 'bg-rose-500',
+    features: ['Supervisor walkthroughs', 'Customer surveys', 'Crew feedback', 'Composite standing'],
+  },
 ];
 
 // All card keys for iteration
@@ -410,6 +420,7 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     customer_profiles: 'full',
     site_visits: 'view',
     peer_ratings: 'full',
+    employee_reviews: 'view',
     hiring: 'full',
     contracts: 'full',
   }),
@@ -450,6 +461,10 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     customer_profiles: 'view',
     completed_jobs: 'view',
     contracts: 'submit',
+    // Founder intent: salespeople can READ an employee's previous reviews.
+    // This card carries names + reviews only — no DOB / emergency contacts —
+    // which is why sales gets it instead of Operator Profiles.
+    employee_reviews: 'view',
   }),
   inventory_manager: preset({
     schedule_board: 'view',

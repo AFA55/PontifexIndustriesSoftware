@@ -7,7 +7,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAuth, resolveTenantScope } from '@/lib/api-auth';
+import { signStoredUrlsBatch } from '@/lib/storage-url-server';
 
 // Read = anyone in management can VIEW visit reports (incl. plain admin + salesman).
 const READ_ROLES = new Set(['supervisor', 'admin', 'super_admin', 'operations_manager', 'salesman']);
@@ -25,21 +26,28 @@ export async function GET(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
   const operatorId = searchParams.get('operator_id');
+  const jobOrderId = searchParams.get('job_order_id');
   const startDate = searchParams.get('start_date');
   const endDate = searchParams.get('end_date');
   const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 200);
 
+  // Tenant scoping — UNCONDITIONAL. The previous shape
+  // (`if (role !== 'super_admin' && tenantId) .eq(...)`) is the documented
+  // unsafe pattern (lib/api-auth.ts:13-17): it dropped the filter entirely for
+  // super_admin, and a tenant-scoped super_admin (a client's own) could read
+  // another client's visit reports. resolveTenantScope confines non-platform
+  // super_admins to their own tenant and guarantees a non-null id.
+  const scope = await resolveTenantScope(request, auth);
+  if ('response' in scope) return scope.response;
+  const tenantId = scope.tenantId;
+
   let query = supabaseAdmin
     .from('supervisor_visits')
     .select('*')
+    .eq('tenant_id', tenantId)
     .order('visit_date', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(limit);
-
-  // Tenant scoping (super_admin sees all)
-  if (auth.role !== 'super_admin' && auth.tenantId) {
-    query = query.eq('tenant_id', auth.tenantId);
-  }
 
   // Supervisors only see their own
   if (auth.role === 'supervisor') {
@@ -47,6 +55,9 @@ export async function GET(request: NextRequest) {
   }
 
   if (operatorId) query = query.eq('operator_id', operatorId);
+  // Per-job visibility: the job detail page asks "which walkthroughs happened on
+  // THIS job?" (idx_supervisor_visits_job already covers this).
+  if (jobOrderId) query = query.eq('job_order_id', jobOrderId);
   if (startDate) query = query.gte('visit_date', startDate);
   if (endDate) query = query.lte('visit_date', endDate);
 
@@ -56,7 +67,61 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to load visits' }, { status: 500 });
   }
 
-  return NextResponse.json({ success: true, data: data ?? [] });
+  const visits = data ?? [];
+  if (visits.length === 0) return NextResponse.json({ success: true, data: [] });
+
+  // maintenance-photos is private and the stored URLs are 30-day signed links —
+  // re-sign on read or anything older than a month 404s in the browser.
+  // Batched: one storage round-trip for every photo in the response.
+  const photoValues: string[] = [];
+  for (const v of visits) {
+    if (Array.isArray(v.photo_urls)) photoValues.push(...v.photo_urls.filter((u: unknown) => typeof u === 'string'));
+    if (Array.isArray(v.equipment_issues)) {
+      for (const issue of v.equipment_issues) {
+        if (issue && Array.isArray(issue.photo_urls)) {
+          photoValues.push(...issue.photo_urls.filter((u: unknown) => typeof u === 'string'));
+        }
+      }
+    }
+  }
+  const signedMap = new Map<string, string>();
+  if (photoValues.length > 0) {
+    const signed = await signStoredUrlsBatch(photoValues);
+    photoValues.forEach((orig, i) => signedMap.set(orig, signed[i] ?? orig));
+  }
+  const sign = (list: unknown): string[] =>
+    Array.isArray(list)
+      ? list.filter((u): u is string => typeof u === 'string').map((u) => signedMap.get(u) ?? u)
+      : [];
+
+  // Equipment issues flagged on a visit become maintenance_requests. Surface the
+  // shop's status back on the visit so "flagged" vs "fixed" is visible in place.
+  const { data: mrRows } = await supabaseAdmin
+    .from('maintenance_requests')
+    .select('id, supervisor_visit_id, equipment_name, status, request_type, priority, resolved_at')
+    .eq('tenant_id', tenantId)
+    .in('supervisor_visit_id', visits.map((v) => v.id));
+
+  const mrByVisit = new Map<string, unknown[]>();
+  for (const mr of mrRows ?? []) {
+    if (!mr.supervisor_visit_id) continue;
+    const list = mrByVisit.get(mr.supervisor_visit_id) ?? [];
+    list.push(mr);
+    mrByVisit.set(mr.supervisor_visit_id, list);
+  }
+
+  const enriched = visits.map((v) => ({
+    ...v,
+    photo_urls: sign(v.photo_urls),
+    equipment_issues: Array.isArray(v.equipment_issues)
+      ? v.equipment_issues.map((issue: Record<string, unknown>) =>
+          issue && typeof issue === 'object' ? { ...issue, photo_urls: sign(issue.photo_urls) } : issue
+        )
+      : [],
+    maintenance_requests: mrByVisit.get(v.id) ?? [],
+  }));
+
+  return NextResponse.json({ success: true, data: enriched });
 }
 
 export async function POST(request: NextRequest) {
@@ -80,6 +145,14 @@ export async function POST(request: NextRequest) {
     ? body.visit_date
     : new Date().toISOString().split('T')[0];
 
+  // Tenant scoping — UNCONDITIONAL, same as the GET. The `role !== 'super_admin'`
+  // guards below used to be skipped entirely for super_admin, which made this a
+  // name-disclosure oracle: a tenant-scoped super_admin could probe another
+  // tenant's operator/job ids and read back the resolved names in the response.
+  const scope = await resolveTenantScope(request, auth);
+  if ('response' in scope) return scope.response;
+  const tenantId = scope.tenantId;
+
   // Look up supervisor + operator names. Verify operator exists in same tenant.
   const [{ data: supProfile }, { data: opProfile }] = await Promise.all([
     supabaseAdmin
@@ -91,19 +164,15 @@ export async function POST(request: NextRequest) {
       .from('profiles')
       .select('full_name, tenant_id, role')
       .eq('id', operatorId)
-      .single(),
+      .eq('tenant_id', tenantId)
+      .maybeSingle(),
   ]);
 
   if (!opProfile) {
     return NextResponse.json({ error: 'Operator not found' }, { status: 404 });
   }
 
-  // Tenant guard for non-super-admins
-  if (auth.role !== 'super_admin' && opProfile.tenant_id !== auth.tenantId) {
-    return NextResponse.json({ error: 'Operator outside your tenant' }, { status: 403 });
-  }
-
-  // Optional job context — verify it exists + (for non-super) is in tenant
+  // Optional job context — verify it exists in the caller's tenant
   let jobNumber: string | null = body.job_number ?? null;
   let customerName: string | null = body.customer_name ?? null;
   if (body.job_order_id) {
@@ -111,19 +180,17 @@ export async function POST(request: NextRequest) {
       .from('job_orders')
       .select('id, job_number, tenant_id, customer_name')
       .eq('id', body.job_order_id)
-      .single();
+      .eq('tenant_id', tenantId)
+      .maybeSingle();
     if (!job) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-    }
-    if (auth.role !== 'super_admin' && job.tenant_id !== auth.tenantId) {
-      return NextResponse.json({ error: 'Job outside your tenant' }, { status: 403 });
     }
     jobNumber = job.job_number ?? jobNumber;
     customerName = job.customer_name ?? customerName;
   }
 
   const insert: Record<string, unknown> = {
-    tenant_id: auth.tenantId ?? opProfile.tenant_id ?? null,
+    tenant_id: tenantId,
     supervisor_id: auth.userId,
     supervisor_name: supProfile?.full_name ?? auth.userEmail ?? '',
     operator_id: operatorId,

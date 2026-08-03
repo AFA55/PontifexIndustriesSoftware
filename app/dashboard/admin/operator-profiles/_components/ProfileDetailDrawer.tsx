@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { X, User, Mail, Phone, Calendar, Briefcase, MapPin, Clock, AlertCircle, Shield, BadgeCheck, Building2, ExternalLink, Loader2 } from 'lucide-react';
 import { jobStatusPillClasses, expiryStatusClasses } from '@/lib/status-colors';
+import EmployeeReviews from '@/components/reviews/EmployeeReviews';
 
 interface ProfileDetail {
   id: string;
@@ -172,6 +173,12 @@ export default function ProfileDetailDrawer({ profileId, onClose, apiFetch }: Pr
                   </div>
                 </div>
               )}
+
+              {/* Previous Reviews — every grade this employee has received,
+                  labelled by source (supervisor walkthrough / customer survey /
+                  crew feedback) plus the composite standing. Renders nothing if
+                  the API says this viewer may not read them. */}
+              <EmployeeReviews employeeId={profileId} variant="management" />
 
               {/* Facility Badges */}
               <div className="space-y-3">
