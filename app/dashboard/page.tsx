@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import OnboardingTour from '@/components/OnboardingTour';
 import NfcClockInModal from '@/components/NfcClockInModal';
 import NotificationBell from '@/components/NotificationBell';
+import ClockOutTicketWarning from '@/components/ClockOutTicketWarning';
 import { useBranding } from '@/lib/branding-context';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
@@ -649,83 +650,22 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Clock-Out Block Modal */}
+      {/* Clock-Out Block Modal — shared with /dashboard/timecard */}
       {clockOutBlock.show && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
-            <div className="text-center mb-6">
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">
-                {clockOutBlock.blockType === 'incomplete_tickets_warning' ? 'Finish your ticket?'
-                  : clockOutBlock.blockType === 'helper_work_log_warning' ? 'Add your work log?'
-                  : 'Cannot Clock Out'}
-              </h3>
-              <p className="text-gray-600 text-sm">
-                {clockOutBlock.blockType === 'incomplete_tickets_warning'
-                  ? "You haven't completed today's job ticket. Finish it now, or clock out and we'll remind you — your work will be logged to the day it was scheduled."
-                  : clockOutBlock.blockType === 'helper_work_log_warning'
-                  ? "You haven't added a work log for today's job. Add what you did now, or clock out and we'll remind you."
-                  : clockOutBlock.blockType === 'work_performed_required'
-                  ? 'You must complete work performed for all dispatched jobs before clocking out.'
-                  : 'You must submit a work log for all dispatched jobs before clocking out.'}
-              </p>
-            </div>
-
-            <div className="space-y-2 mb-6">
-              <p className="text-sm font-semibold text-gray-700">Incomplete jobs:</p>
-              {clockOutBlock.incompleteJobs.map((job) => (
-                <button
-                  key={job.id}
-                  onClick={() => {
-                    setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
-                    if (clockOutBlock.blockType === 'incomplete_tickets_warning' || clockOutBlock.blockType === 'helper_work_log_warning') {
-                      router.push(`/dashboard/my-jobs/${job.id}`);
-                    } else if (clockOutBlock.blockType === 'work_performed_required') {
-                      router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
-                    } else {
-                      router.push('/dashboard/my-jobs');
-                    }
-                  }}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition-all text-left"
-                >
-                  <div>
-                    <span className="text-sm font-bold text-gray-900">#{job.job_number}</span>
-                    <span className="text-sm text-gray-600 ml-2">{job.customer_name}</span>
-                  </div>
-                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              ))}
-            </div>
-
-            {(clockOutBlock.blockType === 'incomplete_tickets_warning' || clockOutBlock.blockType === 'helper_work_log_warning') && (
-              <button
-                onClick={async () => {
-                  setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
-                  const pending = pendingClockOutRef.current;
-                  pendingClockOutRef.current = null;
-                  if (pending) {
-                    try { await performClockOut({ ...pending, acknowledge_incomplete: true }); } catch { /* surfaced via clockMessage */ }
-                  }
-                }}
-                className="w-full px-6 py-3 mb-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all font-semibold min-h-[48px]"
-              >
-                Clock out anyway — remind me later
-              </button>
-            )}
-            <button
-              onClick={() => setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] })}
-              className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold"
-            >
-              {(clockOutBlock.blockType === 'incomplete_tickets_warning' || clockOutBlock.blockType === 'helper_work_log_warning') ? 'Go back — I\'ll add it now' : 'Close'}
-            </button>
-          </div>
-        </div>
+        <ClockOutTicketWarning
+          blockType={clockOutBlock.blockType}
+          jobs={clockOutBlock.incompleteJobs}
+          loading={clockLoading}
+          onGoBack={() => setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] })}
+          onClockOutAnyway={async () => {
+            setClockOutBlock({ show: false, blockType: '', incompleteJobs: [] });
+            const pending = pendingClockOutRef.current;
+            pendingClockOutRef.current = null;
+            if (pending) {
+              try { await performClockOut({ ...pending, acknowledge_incomplete: true }); } catch { /* surfaced via clockMessage */ }
+            }
+          }}
+        />
       )}
 
       {/* Morning gate: finish yesterday's ticket before starting today */}

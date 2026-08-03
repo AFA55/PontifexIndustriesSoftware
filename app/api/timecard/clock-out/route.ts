@@ -18,6 +18,51 @@ import {
   ShopOverride,
 } from '@/lib/geolocation';
 import { estimateDrive } from '@/lib/drive-time';
+import { findUnfinishedTickets, type UnfinishedTicketJob } from '@/lib/unfinished-tickets';
+
+/**
+ * Write one "you left this ticket unfinished" bell notification per job,
+ * AT MOST ONCE per (user, job, tenant-local day).
+ *
+ * Operators clock out several times a day (lunch, shop runs, second job), and
+ * every acknowledged clock-out used to insert a fresh identical row — so the
+ * bell filled up with duplicates. `reminder_log` has UNIQUE (user_id,
+ * reminder_key), so claiming the key first makes the dedup atomic and race-safe
+ * (same pattern as lib/send-reminder.ts `sendReminderOnce`); a claim that
+ * errors = already reminded today → skip that job.
+ *
+ * Best-effort throughout: a reminder must never break a clock-out.
+ */
+async function remindOnceForJobs(
+  userId: string,
+  tenantId: string | null | undefined,
+  today: string,
+  jobs: UnfinishedTicketJob[],
+  reminderKind: 'ticket_incomplete' | 'helper_log_missing',
+  title: string,
+  buildMessage: (job: UnfinishedTicketJob) => string,
+): Promise<void> {
+  const fresh: UnfinishedTicketJob[] = [];
+  for (const job of jobs) {
+    const { error } = await supabaseAdmin
+      .from('reminder_log')
+      .insert({ user_id: userId, reminder_key: `${reminderKind}:${job.id}:${today}` });
+    if (!error) fresh.push(job); // unique violation → already reminded today
+  }
+  if (fresh.length === 0) return;
+
+  await supabaseAdmin.from('notifications').insert(
+    fresh.map((j) => ({
+      user_id: userId,
+      tenant_id: tenantId ?? null,
+      type: 'ticket_incomplete_reminder',
+      title,
+      message: buildMessage(j),
+      job_id: j.id,
+      action_url: `/dashboard/my-jobs/${j.id}`,
+    }))
+  );
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -113,30 +158,19 @@ export async function POST(request: NextRequest) {
     if (['operator', 'apprentice'].includes(userRole)) {
       // Unfinished-ticket gate (founder Jul 20: WARN with a choice, don't
       // hard-block). A ticket counts as fulfilled for TODAY when the job is
-      // completed OR the operator submitted a daily log today ("Done for
-      // Today" on multi-day jobs must never trip this).
+      // completed OR the operator SUBMITTED the day (day_completed_at) — see
+      // lib/unfinished-tickets.ts. Draft-autosave / day-note skeleton rows no
+      // longer silence the warning, which was why it almost never fired.
+      // "Done for Today" on multi-day jobs stamps day_completed_at, so it
+      // still must never trip this.
       if (userRole === 'operator') {
-        const { data: candidateJobs } = await supabaseAdmin
-          .from('job_orders')
-          .select('id, job_number, customer_name')
-          .eq('assigned_to', auth.userId)
-          .lte('scheduled_date', today)
-          .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
-          .not('dispatched_at', 'is', null)
-          .is('work_completed_at', null)
-          .not('status', 'in', '("cancelled","completed","pending_completion")');
-
-        let incompleteJobs = candidateJobs ?? [];
-        if (incompleteJobs.length > 0) {
-          const { data: todaysLogs } = await supabaseAdmin
-            .from('daily_job_logs')
-            .select('job_order_id')
-            .eq('operator_id', auth.userId)
-            .eq('log_date', today)
-            .in('job_order_id', incompleteJobs.map((j: any) => j.id));
-          const loggedToday = new Set((todaysLogs ?? []).map((l: any) => l.job_order_id));
-          incompleteJobs = incompleteJobs.filter((j: any) => !loggedToday.has(j.id));
-        }
+        const found = await findUnfinishedTickets({
+          userId: auth.userId,
+          role: userRole,
+          tenantId: auth.tenantId,
+          today,
+        });
+        const incompleteJobs = found?.jobs ?? [];
 
         if (incompleteJobs.length > 0 && !acknowledgeIncomplete) {
           // Soft gate: the client shows "Complete now / Clock out anyway".
@@ -157,17 +191,20 @@ export async function POST(request: NextRequest) {
         if (incompleteJobs.length > 0 && acknowledgeIncomplete) {
           // They chose "finish later" — set the reminder NOW (in-app bell +
           // the ticket also lands in My Jobs' Unfinished section until done).
+          // Deduped to ONCE per (user, job, day) via reminder_log's UNIQUE
+          // (user_id, reminder_key): operators clock out several times a day,
+          // and now that the gate actually fires, an undeduped insert would
+          // stack identical bell rows on every single clock-out.
           // Fire-and-forget per platform logging convention.
           Promise.resolve(
-            supabaseAdmin.from('notifications').insert(
-              incompleteJobs.map((j: any) => ({
-                user_id: auth.userId,
-                type: 'ticket_incomplete_reminder',
-                title: 'Unfinished job ticket',
-                message: `You clocked out without completing the ticket for ${j.customer_name} (${j.job_number}). Open it in My Jobs to finish — your work will be logged to the day it was scheduled.`,
-                job_id: j.id,
-                action_url: `/dashboard/my-jobs/${j.id}`,
-              }))
+            remindOnceForJobs(
+              auth.userId,
+              auth.tenantId,
+              today,
+              incompleteJobs,
+              'ticket_incomplete',
+              'Unfinished job ticket',
+              (j) => `You clocked out without completing the ticket for ${j.customer_name} (${j.job_number}). Open it in My Jobs to finish — your work will be logged to the day it was scheduled.`,
             )
           ).then(() => {}).catch(() => {});
         }
@@ -180,29 +217,19 @@ export async function POST(request: NextRequest) {
         // Mirror the operator gate: multi-day aware, and EXCLUDE parked/terminal
         // states. A job parked to Pending (on_hold) — or completed/pending — must
         // NOT count as an outstanding helper ticket (that left helpers hard-stuck
-        // with "no ticket to complete"). Also make this a SOFT warning with a
-        // "clock out anyway" escape, like the operator's, instead of a hard 403.
-        const { data: helperJobs } = await supabaseAdmin
-          .from('job_orders')
-          .select('id, job_number, customer_name')
-          .eq('helper_assigned_to', auth.userId)
-          .lte('scheduled_date', today)
-          .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
-          .not('dispatched_at', 'is', null)
-          .not('status', 'in', '("cancelled","on_hold","pending_completion","completed")');
-
-        let missingLogs: any[] = [];
-        if (helperJobs && helperJobs.length > 0) {
-          const jobIds = helperJobs.map((j: any) => j.id);
-          const { data: workLogs } = await supabaseAdmin
-            .from('helper_work_logs')
-            .select('job_order_id')
-            .eq('helper_id', auth.userId)
-            .eq('log_date', today)
-            .in('job_order_id', jobIds);
-          const loggedJobIds = new Set((workLogs || []).map((l: any) => l.job_order_id));
-          missingLogs = helperJobs.filter((j: any) => !loggedJobIds.has(j.id));
-        }
+        // with "no ticket to complete"). Also a SOFT warning with a "clock out
+        // anyway" escape, like the operator's, instead of a hard 403.
+        // Same class of bug as the operator gate (fixed Aug 2026): the mere
+        // EXISTENCE of a helper_work_logs row used to count as "logged", but
+        // /api/helper-work-log inserts an empty row the moment a helper presses
+        // "start". A log now counts only once completed or described.
+        const found = await findUnfinishedTickets({
+          userId: auth.userId,
+          role: userRole,
+          tenantId: auth.tenantId,
+          today,
+        });
+        const missingLogs = found?.jobs ?? [];
 
         if (missingLogs.length > 0 && !acknowledgeIncomplete) {
           // Soft gate: client shows "Add your log now / Clock out anyway".
@@ -221,17 +248,17 @@ export async function POST(request: NextRequest) {
         }
 
         if (missingLogs.length > 0 && acknowledgeIncomplete) {
-          // They chose "clock out anyway" — leave a reminder to add the log later.
+          // They chose "clock out anyway" — leave a reminder to add the log
+          // later. Same once-per-(user, job, day) dedup as the operator path.
           Promise.resolve(
-            supabaseAdmin.from('notifications').insert(
-              missingLogs.map((j: any) => ({
-                user_id: auth.userId,
-                type: 'ticket_incomplete_reminder',
-                title: 'Work log needed',
-                message: `You clocked out without a work log for ${j.customer_name} (${j.job_number}). Open it in My Jobs to add what you did.`,
-                job_id: j.id,
-                action_url: `/dashboard/my-jobs/${j.id}`,
-              }))
+            remindOnceForJobs(
+              auth.userId,
+              auth.tenantId,
+              today,
+              missingLogs,
+              'helper_log_missing',
+              'Work log needed',
+              (j) => `You clocked out without a work log for ${j.customer_name} (${j.job_number}). Open it in My Jobs to add what you did.`,
             )
           ).then(() => {}).catch(() => {});
         }

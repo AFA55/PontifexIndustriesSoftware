@@ -27,27 +27,61 @@ export async function getTenantShopLocation(
   supabaseAdmin: SupabaseClient,
   tenantId: string | null,
 ): Promise<ShopOverride | undefined> {
-  if (!tenantId) return undefined;
+  return (await getTenantShopContext(supabaseAdmin, tenantId)).shop;
+}
+
+/** Default when a tenant hasn't configured one — matches every other caller. */
+export const DEFAULT_TENANT_TIMEZONE = 'America/New_York';
+
+export interface TenantShopContext {
+  /** Configured override, or undefined when the tenant hasn't set coordinates. */
+  shop: ShopOverride | undefined;
+  /** Always-present coordinates (falls back to SHOP_LOCATION). */
+  coords: { latitude: number; longitude: number };
+  /** tenants.timezone, or DEFAULT_TENANT_TIMEZONE. */
+  timezone: string;
+}
+
+/**
+ * ONE `tenants` read for callers that need both the shop pin and the tenant
+ * timezone (e.g. /api/timecard/current, which is polled every couple of minutes
+ * on native — it used to issue a second identical row read just for `timezone`).
+ * Never throws.
+ */
+export async function getTenantShopContext(
+  supabaseAdmin: SupabaseClient,
+  tenantId: string | null,
+): Promise<TenantShopContext> {
+  const fallback: TenantShopContext = {
+    shop: undefined,
+    coords: { latitude: SHOP_LOCATION.latitude, longitude: SHOP_LOCATION.longitude },
+    timezone: DEFAULT_TENANT_TIMEZONE,
+  };
+  if (!tenantId) return fallback;
+
   try {
     const { data: tenantRow } = await supabaseAdmin
       .from('tenants')
-      .select('shop_latitude, shop_longitude, shop_name, clock_in_radius_meters, clock_out_radius_meters')
+      .select('shop_latitude, shop_longitude, shop_name, clock_in_radius_meters, clock_out_radius_meters, timezone')
       .eq('id', tenantId)
       .maybeSingle();
 
+    const timezone = tenantRow?.timezone || DEFAULT_TENANT_TIMEZONE;
+
     if (tenantRow?.shop_latitude == null || tenantRow?.shop_longitude == null) {
-      return undefined;
+      return { ...fallback, timezone };
     }
 
-    return {
+    const shop: ShopOverride = {
       latitude: tenantRow.shop_latitude,
       longitude: tenantRow.shop_longitude,
       name: tenantRow.shop_name ?? SHOP_LOCATION.name,
       radius: tenantRow.clock_in_radius_meters ?? undefined,
       clockOutRadius: tenantRow.clock_out_radius_meters ?? undefined,
     };
+    return { shop, coords: { latitude: shop.latitude, longitude: shop.longitude }, timezone };
   } catch {
-    return undefined;
+    return fallback;
   }
 }
 

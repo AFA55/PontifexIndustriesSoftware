@@ -8,7 +8,8 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
-import { getTenantShopLocationOrDefault } from '@/lib/geolocation-server';
+import { getTenantShopContext, DEFAULT_TENANT_TIMEZONE } from '@/lib/geolocation-server';
+import { findUnfinishedTickets, type UnfinishedTicketJob, type ClockOutWarningType } from '@/lib/unfinished-tickets';
 
 export async function GET(request: NextRequest) {
   try {
@@ -90,12 +91,44 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Tenant shop coords for the native "back at shop → clock out?" geofence reminder.
+    // Tenant shop coords for the native "back at shop → clock out?" geofence
+    // reminder — plus the tenant timezone, from the SAME single `tenants` read
+    // (this endpoint is polled every couple of minutes on native).
     let shop: { lat: number; lng: number } | null = null;
+    let tenantTz = DEFAULT_TENANT_TIMEZONE;
     try {
-      const s = await getTenantShopLocationOrDefault(supabaseAdmin, auth.tenantId ?? null);
-      if (s) shop = { lat: s.latitude, lng: s.longitude };
+      const ctx = await getTenantShopContext(supabaseAdmin, auth.tenantId ?? null);
+      shop = { lat: ctx.coords.latitude, lng: ctx.coords.longitude };
+      tenantTz = ctx.timezone;
     } catch { /* non-critical */ }
+
+    // PRE-EMPTIVE nudge (founder Aug 2026: "before an operator clocks out,
+    // remind them to fill out the ticket"). The clock-out 409 stays the
+    // enforcement point; this rides along on a request the clock screens
+    // ALREADY make (no new poll) so the reminder can be shown BEFORE the
+    // Clock Out button is pressed. Same predicate as the gate — one source of
+    // truth in lib/unfinished-tickets.ts. Best-effort: never fail the timecard.
+    // Only field roles own tickets — skip the lookup entirely for everyone else
+    // (findUnfinishedTickets returns null for them anyway).
+    let unfinishedTickets: UnfinishedTicketJob[] = [];
+    let unfinishedType: ClockOutWarningType | null = null;
+    if (auth.role === 'operator' || auth.role === 'apprentice') {
+      try {
+        // Tenant-local calendar date (never toISOString — the recurring UTC
+        // off-by-a-day bug); must match the date the clock-out gate uses.
+        const localToday = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
+        const found = await findUnfinishedTickets({
+          userId: auth.userId,
+          role: auth.role,
+          tenantId: auth.tenantId,
+          today: localToday,
+        });
+        if (found && found.jobs.length > 0) {
+          unfinishedTickets = found.jobs;
+          unfinishedType = found.blockType;
+        }
+      } catch { /* non-critical — the 409 gate still catches it at clock-out */ }
+    }
 
     return NextResponse.json(
       {
@@ -120,6 +153,11 @@ export async function GET(request: NextRequest) {
           jobCustomerName: jobInfo?.customer_name || null,
           outOfTown: activeTimecard.out_of_town || false,
           shop,
+          // Today's unfinished tickets for THIS worker (operator/apprentice only;
+          // empty for every other role). Drives the inline "finish your ticket"
+          // hint next to Clock Out.
+          unfinishedTickets,
+          unfinishedType,
         },
       },
       { status: 200 }

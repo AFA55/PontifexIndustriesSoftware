@@ -14,6 +14,7 @@ import { viewPdfUrl } from '@/lib/open-pdf';
 import { isNativeApp } from '@/lib/is-native';
 import GpsClockIn, { type ClockInResult } from '@/components/NFCClockIn';
 import { requestLocation, LocationBlockedModal, type LocationErrorKind } from '@/components/ui/LocationPermissionGuard';
+import ClockOutTicketWarning, { type ClockOutWarningJob } from '@/components/ClockOutTicketWarning';
 
 interface TimecardEntry {
   id: string;
@@ -89,6 +90,18 @@ function TimecardPage() {
 
   const [showDailyReportGate, setShowDailyReportGate] = useState(false);
   const [dailyReportSubmitted, setDailyReportSubmitted] = useState<boolean | null>(null); // null = not checked yet
+
+  // Unfinished-ticket warning (soft 409 from /api/timecard/clock-out). This
+  // screen used to `alert(err.error)` — a dead end with no way to proceed.
+  // Now it shows the same modal the dashboard does and can replay the
+  // clock-out with acknowledge_incomplete (founder: WARNING, then let them out).
+  const [clockOutWarning, setClockOutWarning] = useState<{
+    blockType: string;
+    jobs: ClockOutWarningJob[];
+  } | null>(null);
+  // The exact clock-out payload (GPS + overnight answer) so "clock out anyway"
+  // replays it without re-prompting for location or the subsistence question.
+  const pendingClockOutRef = useRef<Record<string, unknown> | null>(null);
 
   // Correction request modal state
   const [correctionTarget, setCorrectionTarget] = useState<TimecardEntry | null>(null);
@@ -176,7 +189,9 @@ function TimecardPage() {
     if (isRedirecting.current) return;
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // No session → stop here, but STILL clear the spinner: clockLoading starts
+      // true, so the old bare `return` left the clock card spinning forever.
+      if (!session) { setClockLoading(false); return; }
       const res = await fetch('/api/timecard/current', {
         headers: { Authorization: `Bearer ${session.access_token}` }
       });
@@ -206,6 +221,50 @@ function TimecardPage() {
     const interval = setInterval(update, 30000);
     return () => clearInterval(interval);
   }, [activeTimecard]);
+
+  // POST the clock-out. Splitting this out of handleClockOut lets "clock out
+  // anyway" REPLAY the identical payload with acknowledge_incomplete — no
+  // second GPS prompt, no second out-of-town question.
+  const submitClockOut = useCallback(async (
+    payload: Record<string, unknown>,
+    acknowledgeIncomplete = false,
+  ) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) return;
+
+    const res = await fetch('/api/timecard/clock-out', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ ...payload, acknowledge_incomplete: acknowledgeIncomplete }),
+    });
+
+    if (res.ok) {
+      setClockOutWarning(null);
+      pendingClockOutRef.current = null;
+      setActiveTimecard(null);
+      fetchTimecards();
+      // Compliance: background location must stop the moment they clock out
+      // (not wait for the next status poll). Native-gated + web no-op.
+      void import('@/lib/native/geofence-service').then((m) => m.stopGeofencing()).catch(() => {});
+      return;
+    }
+
+    const err = await res.json().catch(() => ({} as Record<string, unknown>));
+    // SOFT gate: unfinished ticket / missing helper log. Warn with a choice
+    // instead of dead-ending on an alert — the founder's "WARNING, then allow
+    // them to clock out".
+    if (err.block_type === 'incomplete_tickets_warning' || err.block_type === 'helper_work_log_warning') {
+      pendingClockOutRef.current = payload;
+      setClockOutWarning({
+        blockType: err.block_type,
+        jobs: (err.incomplete_jobs || []) as ClockOutWarningJob[],
+      });
+      return;
+    }
+    alert(err.error || 'Clock-out failed');
+  // fetchTimecards is defined below; referenced at call time.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClockOut = useCallback(async () => {
     setClockingAction(true);
@@ -239,7 +298,9 @@ function TimecardPage() {
       }
 
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      // No session → nothing to submit. Clear the spinner (the old early return
+      // left the Clock Out button stuck mid-press).
+      if (!session) { setClockingAction(false); return; }
 
       // Out-of-town shift → ask whether they stayed overnight (adds a subsistence night).
       let stayedOvernight = false;
@@ -257,28 +318,13 @@ function TimecardPage() {
         accuracy = loc.accuracy;
       } catch { /* GPS optional for clock-out */ }
 
-      const res = await fetch('/api/timecard/clock-out', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ latitude, longitude, accuracy, stayed_overnight: stayedOvernight }),
-      });
-
-      if (res.ok) {
-        setActiveTimecard(null);
-        fetchTimecards();
-        // Compliance: background location must stop the moment they clock out
-        // (not wait for the next status poll). Native-gated + web no-op.
-        void import('@/lib/native/geofence-service').then((m) => m.stopGeofencing()).catch(() => {});
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Clock-out failed');
-      }
+      await submitClockOut({ latitude, longitude, accuracy, stayed_overnight: stayedOvernight });
     } catch (err: any) {
       alert(err.message || 'Clock-out failed');
     }
     setClockingAction(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dailyReportSubmitted]);
+  }, [dailyReportSubmitted, activeTimecard]);
 
   const fetchTimecards = useCallback(async () => {
     if (isRedirecting.current) return;
@@ -469,6 +515,31 @@ function TimecardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
+      {/* Unfinished-ticket warning (shared with the dashboard clock widget) */}
+      {clockOutWarning && (
+        <ClockOutTicketWarning
+          blockType={clockOutWarning.blockType}
+          jobs={clockOutWarning.jobs}
+          loading={clockingAction}
+          onGoBack={() => {
+            setClockOutWarning(null);
+            pendingClockOutRef.current = null;
+          }}
+          onClockOutAnyway={async () => {
+            const pending = pendingClockOutRef.current;
+            setClockOutWarning(null);
+            pendingClockOutRef.current = null;
+            setClockingAction(true);
+            try {
+              await submitClockOut(pending ?? {}, true);
+            } catch (err: any) {
+              alert(err.message || 'Clock-out failed');
+            }
+            setClockingAction(false);
+          }}
+        />
+      )}
+
       {/* Location permission modal — shows when GPS is blocked */}
       <LocationBlockedModal
         errorKind={locationErrorKind}
@@ -584,6 +655,38 @@ function TimecardPage() {
                     <span>4h</span>
                     <span>8h</span>
                     <span>10h</span>
+                  </div>
+                </div>
+              )}
+
+              {/* PRE-EMPTIVE reminder (founder Aug 2026: remind them BEFORE they
+                  clock out). Rides on the /api/timecard/current response this
+                  page already fetches — no extra poll. The 409 warning modal is
+                  still the enforcement point if they press Clock Out anyway. */}
+              {Array.isArray(activeTimecard?.unfinishedTickets) && activeTimecard.unfinishedTickets.length > 0 && (
+                <div className="max-w-sm mx-auto text-left rounded-xl border border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 p-3">
+                  <p className="flex items-start gap-2 text-sm font-semibold text-amber-800 dark:text-amber-300">
+                    <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                    <span>
+                      {activeTimecard.unfinishedType === 'helper_work_log_warning'
+                        ? "Before you clock out: add today's work log."
+                        : "Before you clock out: finish today's job ticket."}
+                    </span>
+                  </p>
+                  <div className="mt-2 space-y-1">
+                    {(activeTimecard.unfinishedTickets as ClockOutWarningJob[]).map((job) => (
+                      <Link
+                        key={job.id}
+                        href={`/dashboard/my-jobs/${job.id}`}
+                        className="flex items-center justify-between gap-2 min-h-[44px] px-3 rounded-lg bg-white dark:bg-white/5 border border-amber-200 dark:border-amber-500/30 hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                      >
+                        <span className="text-sm text-gray-800 dark:text-white/90">
+                          <span className="font-bold">#{job.job_number}</span>
+                          <span className="ml-2 text-gray-600 dark:text-white/60">{job.customer_name}</span>
+                        </span>
+                        <ChevronRight size={16} className="text-amber-600 dark:text-amber-400 shrink-0" />
+                      </Link>
+                    ))}
                   </div>
                 </div>
               )}
