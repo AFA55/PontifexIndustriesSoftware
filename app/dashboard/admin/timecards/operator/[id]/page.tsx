@@ -9,8 +9,9 @@ import {
   Briefcase, AlertTriangle, TrendingUp, Loader2, MapPin,
   ExternalLink, Users, Shield, MessageSquare, Send, Coffee,
   Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
-  RefreshCw, DollarSign, Zap, Timer, Camera, Plus, Minus, FileBarChart } from 'lucide-react';
+  RefreshCw, DollarSign, Zap, Timer, Camera, Plus, Minus, FileBarChart, Trash2, Layers } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
+import { isApprovedCard } from '@/lib/timecard-delete';
 import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
 import { defaultLunchMinutes } from '@/lib/lunch';
@@ -54,6 +55,15 @@ interface TimecardEntry {
   lunch_duration_minutes?: number | null;
   auto_lunch_applied?: boolean | null;
   is_approved: boolean;
+  /**
+   * The v2 approval column. Different write paths set different columns
+   * (`[id]/approve` sets is_approved; the v2 system writes approval_status),
+   * so anything gating on "is this approved" must consult BOTH — see
+   * `isApprovedCard` in lib/timecard-delete.ts. Reading only is_approved here
+   * previously hid the delete modal's approved-card warning and let the admin
+   * walk into a surprise 409.
+   */
+  approval_status?: string | null;
   is_shop_hours: boolean;
   is_night_shift: boolean;
   hour_type: string;
@@ -404,6 +414,14 @@ function OperatorTimecardDetailPageInner() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
 
+  // Delete-entry modal — removing ONE entry from a day that has several.
+  // Reason is mandatory (it is stored on the payroll audit + archive rows), so
+  // this is a modal rather than a window.confirm.
+  const [deleteTarget, setDeleteTarget] = useState<TimecardEntry | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteSaving, setDeleteSaving] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
   // Toast notifications (replaces alert() for clock-in-adjacent error paths)
   const [toasts, setToasts] = useState<ToastData[]>([]);
   const addToast = useCallback((type: ToastData['type'], title: string, message?: string) => {
@@ -649,6 +667,66 @@ function OperatorTimecardDetailPageInner() {
       console.error('Error approving entry:', error);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  // Open the delete confirmation for ONE entry. Multiples in a day are often
+  // legitimate (two jobs, or shop time after field time), so the admin decides
+  // which entry goes — nothing is flagged as a duplicate for them.
+  const openDeleteModal = (entry: TimecardEntry) => {
+    setDeleteTarget(entry);
+    setDeleteReason('');
+    setDeleteError(null);
+  };
+
+  // Remove one timecard entry. The API archives the full row to
+  // `deleted_timecards` before deleting, requires the reason, refuses an
+  // approved card unless the caller is a super_admin, and recomputes the job
+  // hours the entry fed.
+  const handleDeleteEntry = async () => {
+    if (!deleteTarget) return;
+    const reason = deleteReason.trim();
+    if (reason.length < 3) {
+      setDeleteError('Enter a reason (at least 3 characters). It is saved with the payroll record.');
+      return;
+    }
+    setDeleteSaving(true);
+    setDeleteError(null);
+    try {
+      const token = await getSessionToken();
+      if (!token) {
+        setDeleteError('Your session expired. Reload the page and sign in again.');
+        return;
+      }
+      const res = await fetch(`/api/admin/timecards/${deleteTarget.id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ reason }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteError(body.error || 'Failed to delete this entry.');
+        return;
+      }
+      setDeleteTarget(null);
+      setDeleteReason('');
+      if (body.warning) {
+        // The entry IS gone, but the job hours it fed could not be corrected —
+        // that job may still be billed for hours that no longer exist, and
+        // nothing else will surface it. Deliberately the 'error' tone (Toast has
+        // no 'warning' variant and this is not worth widening a shared
+        // component over): 'info' is far too quiet for a billing discrepancy.
+        // The title carries the nuance that the delete itself succeeded.
+        addToast('error', 'Deleted — Check Job Hours', body.warning);
+      } else {
+        addToast('success', 'Entry Deleted', 'The entry was archived and removed from the timecard.');
+      }
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting entry:', error);
+      setDeleteError('Network error occurred.');
+    } finally {
+      setDeleteSaving(false);
     }
   };
 
@@ -1652,6 +1730,10 @@ function OperatorTimecardDetailPageInner() {
               const hasPending = dayEntries.some(e => !e.is_approved);
               const isToday = date === new Date().toISOString().split('T')[0];
               const hasSubsistence = subsistenceNights.includes(date);
+              // More than one clock-in on this calendar day. Often legitimate
+              // (two-job days, shop time after field time) — surfaced so the
+              // office can review and remove one if it really is a mistake.
+              const isMultiEntry = dayEntries.length > 1;
 
               return (
                 <div
@@ -1712,6 +1794,17 @@ function OperatorTimecardDetailPageInner() {
                             title="Out-of-town overnight (subsistence)"
                           >
                             <Moon size={9} /> Subs.
+                          </span>
+                        )}
+                        {/* Multi-entry day. NOT a duplicate warning \u2014 two jobs in a
+                            day, or shop time after field time, are normal. It just
+                            says "there is more than one here, open it and look." */}
+                        {isMultiEntry && (
+                          <span
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/40"
+                            title={`${dayEntries.length} separate clock-ins on this day. This can be normal (two jobs, or shop time after field time) \u2014 expand to review each one.`}
+                          >
+                            <Layers size={9} /> {dayEntries.length} ENTRIES
                           </span>
                         )}
                       </div>
@@ -1809,6 +1902,43 @@ function OperatorTimecardDetailPageInner() {
                             entry.is_night_shift ? 'border-l-2 border-l-purple-400' : ''
                           }`}
                         >
+                          {/* Multi-entry day only: label each entry so the office
+                              can tell them apart before removing one. Shows how the
+                              person clocked in, whether the system closed the card
+                              for them (a common source of a stray entry), and where
+                              the time was booked. A single-entry day is unchanged. */}
+                          {isMultiEntry && (
+                            <div className="flex items-center gap-1.5 flex-wrap mb-2 pb-2 border-b border-dashed border-gray-200 dark:border-white/10">
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-500/40">
+                                ENTRY {entryIdx + 1} OF {dayEntries.length}
+                              </span>
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-slate-300">
+                                {(entry.is_shop_hours || (entry as any).is_shop_time) ? 'Shop' : 'Field'}
+                              </span>
+                              {entry.clock_in_method && (
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-slate-300"
+                                  title="How this entry was clocked in"
+                                >
+                                  {String(entry.clock_in_method).replace(/_/g, ' ')}
+                                </span>
+                              )}
+                              {(entry as any).auto_closed && (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-500/40"
+                                  title="The system clocked this entry out automatically — the person did not clock out themselves."
+                                >
+                                  <AlertTriangle size={9} /> Auto-closed
+                                </span>
+                              )}
+                              {entry.job_number && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-100 dark:bg-white/10 text-gray-600 dark:text-slate-300">
+                                  {entry.job_number}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
                           {/* Entry header */}
                           <div className="flex items-start justify-between gap-3 mb-2">
                             <div className="flex-1 min-w-0">
@@ -2013,7 +2143,7 @@ function OperatorTimecardDetailPageInner() {
 
                                 <button
                                   onClick={() => openEditModal(entry)}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-violet-500/15 hover:bg-blue-100 dark:hover:bg-violet-500/25 text-blue-700 dark:text-violet-300 border border-blue-200 dark:border-violet-500/30 text-xs font-semibold transition-colors"
+                                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-1.5 rounded-lg bg-blue-50 dark:bg-violet-500/15 hover:bg-blue-100 dark:hover:bg-violet-500/25 text-blue-700 dark:text-violet-300 border border-blue-200 dark:border-violet-500/30 text-xs font-semibold transition-colors"
                                   title="Edit entry"
                                   aria-label="Edit entry"
                                 >
@@ -2030,6 +2160,20 @@ function OperatorTimecardDetailPageInner() {
                                     {actionLoading === entry.id ? <Loader2 size={10} className="animate-spin" /> : 'Approve'}
                                   </button>
                                 )}
+
+                                {/* Delete THIS entry. The founder's case: someone
+                                    clocked in and out twice and one of them has to
+                                    go. Archived to `deleted_timecards` before it is
+                                    removed, so it stays recoverable and audited. */}
+                                <button
+                                  onClick={() => openDeleteModal(entry)}
+                                  className="inline-flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] px-3 py-1.5 rounded-lg bg-red-50 dark:bg-red-500/15 hover:bg-red-100 dark:hover:bg-red-500/25 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-500/30 text-xs font-semibold transition-colors"
+                                  title="Delete this entry"
+                                  aria-label={`Delete entry ${entryIdx + 1} of ${dayEntries.length} for ${date}`}
+                                >
+                                  <Trash2 size={14} />
+                                  Delete
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -2831,6 +2975,121 @@ function OperatorTimecardDetailPageInner() {
                   className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
                 >
                   {actionLoading === 'reject_week' ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Reject Week'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete-entry confirmation ──────────────────────────────────────
+          Shows exactly WHICH entry is about to go (times, hours, job, where)
+          so the office cannot remove the wrong one of a multi-entry day, and
+          requires a reason that is stored with the payroll audit record. */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-[#12082a] rounded-2xl shadow-2xl max-w-md w-full border border-slate-200 dark:border-white/10">
+            <div className="p-5 border-b border-gray-200 dark:border-white/10 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-red-500/10 flex items-center justify-center">
+                    <Trash2 size={14} className="text-red-400" />
+                  </div>
+                  Delete Timecard Entry
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-slate-400 mt-1 ml-9">
+                  {operator?.full_name} &middot; {formatDayName(deleteTarget.date)}
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
+                aria-label="Close"
+              >
+                <X size={18} className="text-gray-400 dark:text-slate-500" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              {/* The entry itself, restated. */}
+              <div className="rounded-lg border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 p-3 space-y-1.5">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">
+                    {formatTime(deleteTarget.clock_in_time)}
+                    <span className="text-gray-400 dark:text-slate-500 mx-1.5">&rarr;</span>
+                    {deleteTarget.clock_out_time ? formatTime(deleteTarget.clock_out_time) : 'Still active'}
+                  </span>
+                  <span className="text-sm font-bold text-gray-900 dark:text-white tabular-nums">
+                    {deleteTarget.total_hours !== null ? `${Number(deleteTarget.total_hours).toFixed(2)} hrs` : '—'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-slate-300">
+                    {(deleteTarget.is_shop_hours || (deleteTarget as any).is_shop_time) ? 'Shop' : 'Field'}
+                  </span>
+                  {deleteTarget.job_number && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-gray-200 dark:bg-white/10 text-gray-700 dark:text-slate-300">
+                      {deleteTarget.job_number}
+                    </span>
+                  )}
+                  {isApprovedCard(deleteTarget) && (
+                    <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300">
+                      Approved
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Consults BOTH approval columns — a card approved via
+                  approval_status used to show no warning here, so the admin hit
+                  an unexplained 409 on submit. */}
+              {isApprovedCard(deleteTarget) && (
+                <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30">
+                  <AlertTriangle size={14} className="text-amber-500 mt-0.5 flex-shrink-0" />
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                    This entry is already <strong>approved</strong> and may have been paid. Only a
+                    super admin can remove it — otherwise un-approve it first.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="delete-reason" className="block text-xs font-semibold text-gray-600 dark:text-slate-400 mb-1.5 uppercase tracking-wide">
+                  Reason <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  id="delete-reason"
+                  value={deleteReason}
+                  onChange={(e) => { setDeleteReason(e.target.value); setDeleteError(null); }}
+                  rows={3}
+                  placeholder="e.g. Duplicate clock-in — operator clocked in twice by mistake"
+                  className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-red-500/20 focus:border-red-400 text-sm text-gray-900 dark:text-white resize-none placeholder-gray-400 dark:placeholder-white/30 transition-all"
+                />
+                <p className="text-[10px] text-gray-400 dark:text-slate-500 mt-1">
+                  Saved to the payroll audit record. The entry is archived and stays recoverable;
+                  {' '}{operator?.full_name || 'the employee'} is notified that an entry was removed.
+                </p>
+              </div>
+
+              {deleteError && (
+                <div className="px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-500/30">
+                  <p className="text-[11px] text-red-700 dark:text-red-300">{deleteError}</p>
+                </div>
+              )}
+
+              <div className="flex gap-2.5 pt-1">
+                <button
+                  onClick={() => setDeleteTarget(null)}
+                  className="flex-1 min-h-[44px] px-4 py-2 bg-gray-100 dark:bg-white/5 hover:bg-gray-200 dark:hover:bg-white/10 text-gray-700 dark:text-slate-200 rounded-lg font-semibold text-sm transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteEntry}
+                  disabled={deleteSaving}
+                  className="flex-1 min-h-[44px] px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg font-semibold text-sm transition-all disabled:opacity-50"
+                >
+                  {deleteSaving ? <Loader2 size={14} className="animate-spin mx-auto" /> : 'Delete Entry'}
                 </button>
               </div>
             </div>
