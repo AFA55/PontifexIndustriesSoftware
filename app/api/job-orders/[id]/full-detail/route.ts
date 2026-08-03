@@ -68,6 +68,26 @@ export async function GET(
       project_manager_name = pmProfile?.full_name || null;
     }
 
+    // Linked tickets (parent_job_id). Two tickets on the same job = a SECOND
+    // CREW dispatched via Duplicate, or added scope. Surfacing the link stops
+    // the office reading a copy as a stray double-entry.
+    let linked_parent_job_number: string | null = null;
+    if (job.parent_job_id) {
+      let pq = supabaseAdmin
+        .from('job_orders')
+        .select('job_number')
+        .eq('id', job.parent_job_id);
+      if (tenantId) pq = pq.eq('tenant_id', tenantId);
+      const { data: parentRow } = await pq.maybeSingle();
+      linked_parent_job_number = parentRow?.job_number ?? null;
+    }
+    let copiesQuery = supabaseAdmin
+      .from('job_orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('parent_job_id', id);
+    if (tenantId) copiesQuery = copiesQuery.eq('tenant_id', tenantId);
+    const { count: linked_copies_count } = await copiesQuery;
+
     return NextResponse.json({
       success: true,
       data: {
@@ -75,6 +95,8 @@ export async function GET(
         operator_name,
         helper_name,
         project_manager_name,
+        linked_parent_job_number,
+        linked_copies_count: linked_copies_count ?? 0,
       },
     });
   } catch (error: unknown) {

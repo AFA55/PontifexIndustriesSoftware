@@ -2034,6 +2034,13 @@ export default function ScheduleBoardPage() {
           canEdit={canEdit}
           onDayClick={(date) => { setSelectedDate(date); setViewMode('day'); }}
           holidaysByDate={holidaysByDate}
+          onAddCrewJob={canEdit ? (job, date) => {
+            // Land on that job's day first — JobDetailView's crew writes anchor
+            // on boardDate (= selectedDate), so the board must be on the job's date.
+            setSelectedDate(date);
+            setViewMode('day');
+            setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null, focusCrew: true });
+          } : undefined}
         />
       )}
 
@@ -2121,6 +2128,13 @@ export default function ScheduleBoardPage() {
             onRequestChange={(job) => setChangeRequestTarget(job)}
             onViewNotes={(job) => handleViewNotes(job)}
             onPreviewJob={(job) => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
+            onAddCrewJob={canEdit ? (job, rowIndex) => setJobDetailTarget({
+              job,
+              rowIndex: rowIndex ?? null,
+              operatorName: rowIndex != null ? (rowAssignments[rowIndex]?.operator ?? null) : null,
+              helperName: rowIndex != null ? (rowAssignments[rowIndex]?.helper ?? null) : null,
+              focusCrew: true,
+            }) : undefined}
           />
         )}
 

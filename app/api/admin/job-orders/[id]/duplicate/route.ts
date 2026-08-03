@@ -4,16 +4,28 @@ export const dynamic = 'force-dynamic';
  * API Route: POST /api/admin/job-orders/[id]/duplicate
  * Duplicate a job order to a new date while maintaining project connection.
  *
- * Body: { scheduled_date: string, end_date?: string, notes?: string }
+ * Body: { scheduled_date: string, end_date?: string, notes?: string, copyCrew?: boolean }
  * - Copies all fields from original except transient/status fields
  * - Generates a new job number
  * - Links back to original via parent_job_id
+ *
+ * WHY duplicates exist (founder, Aug 2026): to dispatch a SECOND CREW to the
+ * same job. The normal multi-person case is ONE ticket with the whole crew on
+ * it (job_crew) — that needs no duplicate. So the copy deliberately lands with
+ * NO lead and NO crew: it is staffed with DIFFERENT people (crew B).
+ *
+ * `copyCrew` (default FALSE) is the opt-in escape hatch for the secondary case
+ * "same crew, another day/area". When true the source job's job_crew rows and
+ * the helper seat are carried over. The LEAD is never copied — the admin picks
+ * who runs the copy (and lead changes must go through /schedule-board/assign,
+ * which owns the per-day ledger + sequencing).
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { buildCrewCopyRows } from '@/lib/duplicate-crew';
 
 const EXCLUDED_FIELDS = new Set([
   'id',
@@ -21,10 +33,11 @@ const EXCLUDED_FIELDS = new Set([
   'created_at',
   'updated_at',
   'status',
-  // Duplicate lands UNASSIGNED so the admin can assign a DIFFERENT operator —
-  // this is the "same job, multiple operators" workflow (duplicate, then reassign
-  // each copy). Without this the copy inherits the original's operator/helper and
-  // creates a same-day double-assignment the admin then has to undo.
+  // The copy lands UNASSIGNED. A duplicate means "a SECOND CREW runs this same
+  // job" — crew B is different people than crew A, so inheriting crew A's lead
+  // and helper would be wrong (and would create a double-assignment to undo).
+  // `copyCrew: true` re-adds helper_assigned_to explicitly below; the lead
+  // (assigned_to) is never copied.
   'assigned_to',
   'helper_assigned_to',
   'dispatched_at',
@@ -59,6 +72,9 @@ export async function POST(
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
     const { scheduled_date, end_date, notes } = body;
+    // Opt-in only — existing callers that omit it get the byte-identical
+    // "empty copy for a second crew" behaviour.
+    const copyCrew = body.copyCrew === true;
 
     if (!scheduled_date) {
       return NextResponse.json(
@@ -97,6 +113,12 @@ export async function POST(
     newJobOrder.status = 'scheduled';
     newJobOrder.parent_job_id = id;
 
+    // "Same crew, another day" — carry the helper seat over. The lead stays
+    // empty either way.
+    if (copyCrew) {
+      newJobOrder.helper_assigned_to = original.helper_assigned_to ?? null;
+    }
+
     // Append notes if provided
     if (notes) {
       const existing = newJobOrder.notes || '';
@@ -119,6 +141,38 @@ export async function POST(
       );
     }
 
+    // ── Optional: carry the crew over ("same crew, another day/area") ───────
+    // Tenant-scoped read; rows are re-keyed to the NEW job and re-stamped with
+    // the caller as added_by. No job_daily_assignments rows are written here —
+    // JDA is per (job, date) and is created only by /schedule-board/assign when
+    // the copy gets its lead, so crew on two jobs the same day can't conflict.
+    let crewCopied = 0;
+    if (copyCrew) {
+      const { data: sourceCrew } = await supabaseAdmin
+        .from('job_crew')
+        .select('user_id, role')
+        .eq('job_order_id', id)
+        .eq('tenant_id', tenantId);
+
+      const rows = buildCrewCopyRows(sourceCrew, {
+        tenantId,
+        newJobId: created.id,
+        addedBy: auth.userId,
+      });
+
+      if (rows.length > 0) {
+        const { error: crewError } = await supabaseAdmin
+          .from('job_crew')
+          .upsert(rows, { onConflict: 'job_order_id,user_id', ignoreDuplicates: true });
+        if (crewError) {
+          // Non-fatal: the copy exists; the office can add crew from the card's "+".
+          console.error('Error copying crew to duplicated job:', crewError);
+        } else {
+          crewCopied = rows.length;
+        }
+      }
+    }
+
     // Audit log (fire-and-forget)
     Promise.resolve(
       supabaseAdmin.from('job_orders_history').insert({
@@ -133,12 +187,17 @@ export async function POST(
             id: original.id,
             job_number: original.job_number,
           },
+          copy_crew: copyCrew,
+          crew_copied: crewCopied,
         },
         snapshot: created,
       })
     ).catch(() => {});
 
-    return NextResponse.json({ success: true, data: created }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: { ...created, crew_copied: crewCopied } },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Unexpected error in duplicate route:', error);
     return NextResponse.json(

@@ -1,5 +1,6 @@
 'use client';
 
+import { UserPlus } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 import { parseLocalDate, toDateString } from './helpers';
 
@@ -10,6 +11,9 @@ interface WeeklyViewProps {
   canEdit: boolean;
   onDayClick: (date: string) => void;
   holidaysByDate?: Record<string, { id: string; name: string; pay_hours: number }>;
+  /** "+" on a week card — jump to that job's day and open its Crew section so
+   *  another person can be added without hunting for the job first. */
+  onAddCrewJob?: (job: JobCardData, date: string) => void;
 }
 
 export default function WeeklyView({
@@ -19,6 +23,7 @@ export default function WeeklyView({
   canEdit,
   onDayClick,
   holidaysByDate = {},
+  onAddCrewJob,
 }: WeeklyViewProps) {
   return (
     <div className="container mx-auto px-4 md:px-6 pb-6">
@@ -75,10 +80,26 @@ export default function WeeklyView({
                           e.dataTransfer.effectAllowed = 'move';
                         }}
                         onClick={() => onDayClick(date)}
-                        className="p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:shadow-md transition-all cursor-pointer group"
+                        className="relative min-h-[44px] p-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-slate-800 hover:shadow-md transition-all cursor-pointer group"
                       >
-                        <p className="text-xs font-bold text-gray-900 dark:text-white truncate">{job.customer_name}</p>
-                        <p className="text-[10px] text-purple-600 dark:text-purple-400 font-semibold truncate">{job.job_type?.split(',')[0]?.trim()}</p>
+                        {/* Add a person to this job — same affordance as the day
+                            views, so the week view isn't a dead end. 44px target. */}
+                        {canEdit && onAddCrewJob && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); onAddCrewJob(job, date); }}
+                            className="absolute top-0 right-0 flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-white/10 transition-colors"
+                            title="Add crew — another operator or helper on this job"
+                            aria-label="Add crew member to this job"
+                          >
+                            <UserPlus className="w-4 h-4" />
+                          </button>
+                        )}
+                        {/* pr-9 on BOTH lines: the 44px button is taller than the
+                            title alone, so without it the button's lower half sits
+                            over the job-type line and a tap there opens crew instead
+                            of the day. */}
+                        <p className={`text-xs font-bold text-gray-900 dark:text-white truncate ${canEdit && onAddCrewJob ? 'pr-9' : ''}`}>{job.customer_name}</p>
+                        <p className={`text-[10px] text-purple-600 dark:text-purple-400 font-semibold truncate ${canEdit && onAddCrewJob ? 'pr-9' : ''}`}>{job.job_type?.split(',')[0]?.trim()}</p>
                         {job.arrival_time && (
                           <p className="text-[10px] text-gray-400 mt-0.5">⏰ {job.arrival_time}</p>
                         )}

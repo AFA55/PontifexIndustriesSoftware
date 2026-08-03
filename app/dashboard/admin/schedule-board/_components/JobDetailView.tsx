@@ -604,6 +604,23 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                 <span className={`text-xs font-bold px-2.5 py-1 rounded-lg border ${statusStyle}`}>
                   {currentStatus.replace(/_/g, ' ').toUpperCase()}
                 </span>
+                {/* Linked tickets — same job, separate crew (Duplicate) or added
+                    scope. Without this a copy reads as a stray double-entry. */}
+                {fullData?.linked_parent_job_number ? (
+                  <span
+                    className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white/20 border border-white/30"
+                    title={`This is a SECOND ticket on the same job as ${fullData.linked_parent_job_number} — created by Duplicate (another crew works it) or by adding scope. Each ticket carries its own crew.`}
+                  >
+                    ⧉ 2nd ticket · {fullData.linked_parent_job_number}
+                  </span>
+                ) : (fullData?.linked_copies_count ?? 0) > 0 ? (
+                  <span
+                    className="text-xs font-bold px-2.5 py-1 rounded-lg bg-white/20 border border-white/30"
+                    title="This job has additional tickets — separate crews (Duplicate) or added scope on the same work. Each ticket carries its own crew."
+                  >
+                    ⧉ {fullData?.linked_copies_count} linked {fullData?.linked_copies_count === 1 ? 'ticket' : 'tickets'}
+                  </span>
+                ) : null}
               </div>
               <div className="flex items-center gap-1.5">
                 <button

@@ -29,6 +29,10 @@ interface OperatorRowViewProps {
   onRequestChange?: (job: JobCardData) => void;
   onViewNotes?: (job: JobCardData) => void;
   onPreviewJob?: (job: JobCardData) => void;
+  /** "+" on a card — add another person (crew operator / helper) to that job.
+   *  Same affordance as the slots view; rowIndex is null when the job's
+   *  operator has no board row (unassigned, or an operator off-row). */
+  onAddCrewJob?: (job: JobCardData, rowIndex: number | null) => void;
 }
 
 const TIME_OFF_LABELS: Record<string, string> = {
@@ -65,6 +69,7 @@ export default function OperatorRowView({
   onRequestChange,
   onViewNotes,
   onPreviewJob,
+  onAddCrewJob,
 }: OperatorRowViewProps) {
   // Build operator list — show ALL operators, not just those with jobs
   const operators = useMemo(() => {
@@ -153,6 +158,7 @@ export default function OperatorRowView({
                         onEdit={onEditJob ? (j) => onEditJob(j, null) : undefined}
                         onRequestChange={onRequestChange}
                         onViewNotes={onViewNotes}
+                        onAddCrew={onAddCrewJob ? (j) => onAddCrewJob(j, null) : undefined}
                       />
                     </DraggableJobCard>
                   </div>
@@ -251,6 +257,7 @@ export default function OperatorRowView({
                             onEdit={onEditJob ? (j) => onEditJob(j, op.rowIndex) : undefined}
                             onRequestChange={onRequestChange}
                             onViewNotes={onViewNotes}
+                            onAddCrew={onAddCrewJob ? (j) => onAddCrewJob(j, op.rowIndex >= 0 ? op.rowIndex : null) : undefined}
                           />
                         </DraggableJobCard>
                       </div>

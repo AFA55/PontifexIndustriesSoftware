@@ -100,6 +100,11 @@ export default function EditJobPanel({
   const [dupDate, setDupDate] = useState('');
   const [dupEndDate, setDupEndDate] = useState('');
   const [duplicating, setDuplicating] = useState(false);
+  // A duplicate = a SECOND CREW on the same job, so it starts with nobody on it
+  // by default. "Copy the crew" is the opt-in for the other case (same crew,
+  // another day/area). Count = job_crew members + the helper seat.
+  const [dupCopyCrew, setDupCopyCrew] = useState(false);
+  const [dupCrewCount, setDupCrewCount] = useState<number | null>(null);
 
   // ─── Active tab ───
   const [activeTab, setActiveTab] = useState<'details' | 'documents'>('details');
@@ -326,6 +331,31 @@ export default function EditJobPanel({
     }
   };
 
+  // How many people (beyond the lead) are on this job — only needed once the
+  // duplicate banner is open, so it costs nothing on a normal edit.
+  useEffect(() => {
+    if (!showDuplicate || dupCrewCount !== null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { supabase } = await import('@/lib/supabase');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(`/api/admin/jobs/${job.id}/crew`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const crewLen = Array.isArray(json.data) ? json.data.length : 0;
+        const hasHelper = !!(fullData?.helper_assigned_to || currentHelperName);
+        if (!cancelled) setDupCrewCount(crewLen + (hasHelper ? 1 : 0));
+      } catch {
+        /* count stays unknown — the checkbox just doesn't render */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [showDuplicate, dupCrewCount, job.id, fullData, currentHelperName]);
+
   const handleDuplicate = async () => {
     if (!dupDate) return;
     setDuplicating(true);
@@ -337,7 +367,7 @@ export default function EditJobPanel({
       const res = await fetch(`/api/admin/job-orders/${job.id}/duplicate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-        body: JSON.stringify({ scheduled_date: dupDate, end_date: dupEndDate || undefined }),
+        body: JSON.stringify({ scheduled_date: dupDate, end_date: dupEndDate || undefined, copyCrew: dupCopyCrew }),
       });
 
       if (res.ok) {
@@ -432,7 +462,7 @@ export default function EditJobPanel({
                 <button
                   onClick={() => setShowDuplicate(!showDuplicate)}
                   className="flex items-center gap-1.5 px-2.5 py-2 hover:bg-white/20 rounded-xl transition-colors text-sm font-semibold"
-                  title="Duplicate this job — create a copy for a return trip or additional scope on another date. (To change WHO runs this job, just change the Operator below — no duplicate needed.)"
+                  title="Duplicate this job — a second ticket so a SECOND CREW can be dispatched to the same job. (Adding one more person to THIS crew? Don't duplicate — use the + on the job card to add them to this ticket.)"
                 >
                   <Copy className="w-5 h-5" />
                   <span className="hidden sm:inline">Duplicate</span>
@@ -457,15 +487,32 @@ export default function EditJobPanel({
         {showDuplicate && (
           <div className="px-6 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-500/30 flex flex-wrap items-center gap-x-3 gap-y-2 flex-shrink-0">
             <Copy className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">Duplicate this job</span>
-            <span className="text-xs text-blue-600 dark:text-blue-400 basis-full sm:basis-auto">
-              Creates an unassigned copy for a return trip or added scope. (Wrong operator? Change it below instead.) Pick a date:
+            <span className="text-sm font-semibold text-blue-800 dark:text-blue-300">Duplicate — dispatch a second crew</span>
+            <span className="text-xs text-blue-600 dark:text-blue-400 basis-full">
+              Creates a second ticket for this same job so another crew can work it. It starts with nobody on it —
+              staff it with the &quot;+&quot; on its card. (Just adding one more person to THIS crew? Don&apos;t duplicate — use the
+              &quot;+&quot; on this job&apos;s card.)
             </span>
             <input type="date" value={dupDate} onChange={e => setDupDate(e.target.value)}
               className="px-3 py-1.5 border border-blue-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05]" />
             <input type="date" value={dupEndDate} onChange={e => setDupEndDate(e.target.value)}
               placeholder="End date (optional)"
               className="px-3 py-1.5 border border-blue-300 dark:border-white/10 rounded-lg text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05]" />
+            {/* Opt-in only. Default OFF: a duplicate is for a DIFFERENT crew. */}
+            {dupCrewCount !== null && dupCrewCount > 0 && (
+              <label className="flex items-center gap-2 min-h-[44px] px-1 cursor-pointer basis-full sm:basis-auto">
+                <input
+                  type="checkbox"
+                  checked={dupCopyCrew}
+                  onChange={e => setDupCopyCrew(e.target.checked)}
+                  className="w-5 h-5 rounded border-blue-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-xs text-blue-700 dark:text-blue-300">
+                  Same crew again? Copy this job&apos;s {dupCrewCount} crew {dupCrewCount === 1 ? 'member' : 'members'} onto the copy
+                  <span className="text-blue-500 dark:text-blue-400"> (leave unchecked for a different crew)</span>
+                </span>
+              </label>
+            )}
             <button onClick={handleDuplicate} disabled={!dupDate || duplicating}
               className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition-colors disabled:opacity-50 flex items-center gap-1.5">
               {duplicating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Copy className="w-3.5 h-3.5" />}
