@@ -1077,7 +1077,9 @@ export default function JobDetailPage() {
             <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${crewOpen ? 'rotate-180' : ''}`} />
           </button>
           {crewOpen && <div className="px-5 pb-5">
-          <div className="grid grid-cols-2 gap-3">
+          {/* ONE column on a phone: two columns at 375px truncated real names to
+              "Devin s…", which defeats the point of showing who's on the job. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-500/10 rounded-xl border border-blue-100 dark:border-blue-500/20">
               <div className="w-11 h-11 bg-blue-500 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0">
                 {(job.operator_name || 'O')[0].toUpperCase()}
@@ -1098,6 +1100,39 @@ export default function JobDetailPage() {
                 </div>
               </div>
             )}
+            {/* Everyone ELSE on this ticket. Multi-person jobs are staffed
+                through job_crew, so without this the 3rd person on site is
+                invisible to the crew they're standing next to. */}
+            {(job.crew || []).map((member) => (
+              <div
+                key={member.user_id}
+                className={`flex items-center gap-3 p-3 rounded-xl border ${
+                  member.role === 'helper'
+                    ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-100 dark:border-emerald-500/20'
+                    : 'bg-blue-50 dark:bg-blue-500/10 border-blue-100 dark:border-blue-500/20'
+                }`}
+              >
+                <div
+                  className={`w-11 h-11 text-white rounded-full flex items-center justify-center text-base font-bold flex-shrink-0 ${
+                    member.role === 'helper' ? 'bg-emerald-500' : 'bg-blue-500'
+                  }`}
+                >
+                  {(member.name || '?')[0].toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p
+                    className={`text-xs font-semibold uppercase tracking-wider ${
+                      member.role === 'helper'
+                        ? 'text-emerald-600 dark:text-emerald-400'
+                        : 'text-blue-600 dark:text-blue-400'
+                    }`}
+                  >
+                    {member.role === 'helper' ? 'Team Member' : 'Operator'}
+                  </p>
+                  <p className="text-base font-bold text-gray-900 dark:text-white truncate">{member.name}</p>
+                </div>
+              </div>
+            ))}
           </div>
           </div>}
         </div>

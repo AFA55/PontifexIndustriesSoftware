@@ -158,6 +158,10 @@ export default function TakeoffViewerPage() {
   const disp = rotatedPageSize(nativeW, nativeH, viewRotation);
   const toDisplay = (p: [number, number]) => toDisplayPoint(p, nativeW, nativeH, viewRotation);
   const toDisplayAll = (pts: [number, number][]) => toDisplayPoints(pts, nativeW, nativeH, viewRotation);
+  // Label the turn button by what the sheet looks like RIGHT NOW (as displayed,
+  // so it stays honest for a page whose intrinsic /Rotate already turned it):
+  // taller than wide → offer to lay it sideways, and vice versa.
+  const isSheetUpright = disp.height >= disp.width;
 
   const rotateSheet = async (delta: number, allSheets = false) => {
     if (!page || !payload) return;
@@ -731,23 +735,29 @@ export default function TakeoffViewerPage() {
           </button>
         </div>
 
-        {/* Rotate the sheet (view only — never touches a measurement) */}
+        {/* Turn the sheet. VIEW ONLY — stored measurements are never rotated.
+            Sits right next to zoom because that is where the founder looked for
+            it, and it is LABELLED: two bare circular-arrow icons read as "undo"
+            to anyone who isn't hunting for a rotate control. */}
         <div className="flex items-center gap-1">
           <button
-            onClick={() => rotateSheet(-90)}
-            title="Turn this sheet left 90° (view only — measurements are unaffected)"
-            aria-label="Rotate sheet left"
-            className="p-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 min-h-[44px] min-w-[44px] transition-colors"
+            onClick={() => rotateSheet(90)}
+            title="Turn this sheet a quarter turn — a drawing scanned sideways reads upright. View only; your measurements are unaffected. Shortcut: R"
+            aria-label={isSheetUpright ? 'Turn sheet to landscape' : 'Turn sheet to portrait'}
+            className="flex items-center gap-1.5 pl-2.5 pr-3 rounded-lg font-semibold text-xs text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-white/10 hover:bg-violet-100 dark:hover:bg-violet-500/20 hover:text-violet-700 dark:hover:text-violet-300 min-h-[44px] transition-colors"
           >
-            <RotateCcw className="w-4 h-4" />
+            <RotateCw className="w-4 h-4 flex-shrink-0" />
+            <span className="hidden sm:inline whitespace-nowrap">
+              {isSheetUpright ? 'Turn Sideways' : 'Turn Upright'}
+            </span>
           </button>
           <button
-            onClick={() => rotateSheet(90)}
-            title="Turn this sheet right 90° (view only — measurements are unaffected). Shortcut: R"
-            aria-label="Rotate sheet right"
-            className="p-2.5 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 min-h-[44px] min-w-[44px] transition-colors"
+            onClick={() => rotateSheet(-90)}
+            title="Turn the other way (view only — measurements are unaffected)"
+            aria-label="Turn sheet the other way"
+            className="p-2.5 rounded-lg text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 min-h-[44px] min-w-[44px] transition-colors"
           >
-            <RotateCw className="w-4 h-4" />
+            <RotateCcw className="w-4 h-4" />
           </button>
           {viewRotation !== 0 && (
             <>

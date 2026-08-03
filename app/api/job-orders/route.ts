@@ -24,6 +24,48 @@ function stripOfficeOnly<T extends Record<string, any>>(row: T): T {
   return c as T;
 }
 
+/**
+ * Attach EVERYONE on each ticket beyond the two legacy slots.
+ *
+ * THE BUG THIS FIXES: the ticket's Crew card read only `assigned_to` and
+ * `helper_assigned_to`, but multi-person jobs are staffed through `job_crew` —
+ * so the 3rd person on a job was invisible to the crew standing next to them
+ * (and the founder couldn't see them either). Two queries for the whole list,
+ * never one per job. Mutates in place.
+ */
+async function attachCrew(jobs: Array<Record<string, any>>): Promise<void> {
+  if (!jobs || jobs.length === 0) return;
+  const { data: allCrew } = await supabaseAdmin
+    .from('job_crew')
+    .select('job_order_id, user_id, role')
+    .in('job_order_id', jobs.map((j) => j.id));
+
+  const byJob = new Map<string, Array<{ user_id: string; role: string | null }>>();
+  const userIds = new Set<string>();
+  for (const row of allCrew || []) {
+    if (!byJob.has(row.job_order_id)) byJob.set(row.job_order_id, []);
+    byJob.get(row.job_order_id)!.push({ user_id: row.user_id, role: row.role });
+    userIds.add(row.user_id);
+  }
+
+  const names = new Map<string, string | null>();
+  if (userIds.size > 0) {
+    const { data: profs } = await supabaseAdmin
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', Array.from(userIds));
+    for (const p of profs || []) names.set(p.id, p.full_name ?? null);
+  }
+
+  for (const j of jobs) {
+    j.crew = (byJob.get(j.id) || []).map((c) => ({
+      user_id: c.user_id,
+      role: c.role === 'helper' ? 'helper' : 'operator',
+      name: names.get(c.user_id) || 'Crew member',
+    }));
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     // Get user from Supabase session (server-side)
@@ -240,6 +282,10 @@ export async function GET(request: NextRequest) {
         assignedOperatorProfile = assignedProfile;
       }
 
+      // Who else is on this ticket (job_crew) — the single-job path is what the
+      // operator's ticket screen actually calls, so it needs this too.
+      await attachCrew([specificJob]);
+
       // Operators/helpers must not see office-only money & estimate fields.
       const safeSpecificJob = isAdmin ? specificJob : stripOfficeOnly(specificJob);
 
@@ -424,6 +470,8 @@ export async function GET(request: NextRequest) {
         }
       } catch { /* best-effort — never hide work on an unexpected error */ }
     }
+
+    await attachCrew(filteredOrders);
 
     // Annotate helper-view flag per job so the client shows the light view for
     // crew members (not just the helper_assigned_to slot). viewer_is_daily

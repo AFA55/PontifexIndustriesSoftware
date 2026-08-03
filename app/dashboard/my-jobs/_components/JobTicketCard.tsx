@@ -33,6 +33,8 @@ export interface JobTicketData {
   helper_assigned_to: string | null;
   helper_name: string | null;
   operator_name: string | null;
+  /** Everyone on the ticket BEYOND the two legacy slots (job_crew). */
+  crew?: Array<{ user_id: string; role: 'operator' | 'helper'; name: string }>;
   created_by_name: string | null;
   created_by_email: string | null;
   route_started_at: string | null;
