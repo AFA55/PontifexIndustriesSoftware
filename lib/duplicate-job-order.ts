@@ -80,7 +80,14 @@ export const DUPLICATE_COPYABLE_COLUMNS: readonly string[] = [
   'schedule_color',
   'schedule_color_label',
   'scheduling_flexibility',
-  'created_via',
+  // NOT 'created_via' — it records HOW the row came to exist, and
+  // /api/admin/schedule-forms filters on `created_via = 'schedule_form'`, so a
+  // copy that inherited it would surface in the schedule-forms inbox as if a
+  // customer had submitted it. The builder stamps 'duplicate' instead.
+  // NOT 'job_quote' either — deliberately asymmetric with estimated_cost.
+  // Copying a COST estimate onto a second-crew ticket understates profit
+  // (conservative); copying the quoted REVENUE would count the same money twice
+  // in reporting. Never duplicate revenue.
   // Customer
   'customer_id',
   'customer_name',
@@ -197,6 +204,7 @@ export function buildDuplicatePayload(
   payload.end_date = opts.endDate || null;
   payload.status = 'scheduled';
   payload.parent_job_id = opts.parentJobId;
+  payload.created_via = 'duplicate';
   if (opts.createdBy) payload.created_by = opts.createdBy;
 
   if (opts.copyCrew) {

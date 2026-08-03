@@ -1679,11 +1679,18 @@ export default function ScheduleBoardPage() {
   // the card's "+", not this.
   const handleDuplicateJob = useCallback(async (job: JobCardData) => {
     try {
+      // The copy starts on the day you're LOOKING at, not the original's start
+      // date — you duplicate from the board on the day you're sending the second
+      // crew, and a copy that lands on a past day is invisible where you need it.
+      // The span is carried only when it still makes sense (prod has rows whose
+      // end_date is BEFORE their scheduled_date).
+      const startDate = selectedDate || job.scheduled_date;
+      const keepEnd = job.end_date && startDate && job.end_date >= startDate;
       const res = await apiFetch(`/api/admin/job-orders/${job.id}/duplicate`, {
         method: 'POST',
         body: JSON.stringify({
-          scheduled_date: job.scheduled_date || selectedDate,
-          ...(job.end_date ? { end_date: job.end_date } : {}),
+          scheduled_date: startDate,
+          ...(keepEnd ? { end_date: job.end_date } : {}),
         }),
       });
       const json = await res.json().catch(() => ({}));

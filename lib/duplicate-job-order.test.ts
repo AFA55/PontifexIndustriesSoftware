@@ -215,11 +215,23 @@ describe('buildDuplicatePayload — a copy must not inherit a job being DONE', (
     );
     expect(withNewColumn).not.toHaveProperty('some_future_migration_column');
 
-    const setByBuilder = new Set(['job_number', 'scheduled_date', 'end_date', 'status', 'parent_job_id', 'created_by', 'helper_assigned_to']);
+    const setByBuilder = new Set(['job_number', 'scheduled_date', 'end_date', 'status', 'parent_job_id', 'created_by', 'created_via', 'helper_assigned_to']);
     for (const key of Object.keys(withNewColumn)) {
       if (setByBuilder.has(key)) continue;
       expect(DUPLICATE_COPYABLE_COLUMNS).toContain(key);
     }
+  });
+
+  it("stamps created_via='duplicate' so the copy can't land in the schedule-forms inbox", () => {
+    // /api/admin/schedule-forms filters on created_via='schedule_form'.
+    const fromForm = buildDuplicatePayload({ ...original, created_via: 'schedule_form' }, opts);
+    expect(fromForm.created_via).toBe('duplicate');
+  });
+
+  it('never copies the quoted revenue (job_quote) even though it copies estimated_cost', () => {
+    const payload = buildDuplicatePayload({ ...original, job_quote: 9000, estimated_cost: 4000 }, opts);
+    expect(payload).not.toHaveProperty('job_quote');
+    expect(payload.estimated_cost).toBe(4000);
   });
 
   it('attributes the copy to whoever clicked Duplicate, not the original author', () => {
