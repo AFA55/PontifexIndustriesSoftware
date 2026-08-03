@@ -34,6 +34,7 @@ import {
   Clock,
   AlertTriangle,
 } from 'lucide-react';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface Invoice {
   id: string;
@@ -2279,11 +2280,10 @@ export default function BillingPage() {
                                     )}
                                   </td>
                                   <td className="px-3 py-2 text-right align-top">
-                                    <input
-                                      type="number"
+                                    <NumberInput
                                       step="0.01"
                                       value={li.quantity}
-                                      onChange={(e) => updateEditLineItem(i, { quantity: Number(e.target.value) })}
+                                      onValueChange={(nv) => updateEditLineItem(i, { quantity: nv})}
                                       className="
                                         w-full px-2 py-1.5 rounded-lg text-sm text-right tabular-nums
                                         bg-white border border-slate-200 text-slate-900
@@ -2291,6 +2291,8 @@ export default function BillingPage() {
                                         dark:bg-white/5 dark:border-white/10 dark:text-white
                                         dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
                                       "
+                                      emptyValue={0}
+                                      blankZero
                                     />
                                   </td>
                                   <td className="px-3 py-2 align-top">
@@ -2308,11 +2310,10 @@ export default function BillingPage() {
                                     />
                                   </td>
                                   <td className="px-3 py-2 text-right align-top">
-                                    <input
-                                      type="number"
+                                    <NumberInput
                                       step="0.01"
                                       value={li.unit_rate}
-                                      onChange={(e) => updateEditLineItem(i, { unit_rate: Number(e.target.value) })}
+                                      onValueChange={(nv) => updateEditLineItem(i, { unit_rate: nv})}
                                       className="
                                         w-full px-2 py-1.5 rounded-lg text-sm text-right tabular-nums
                                         bg-white border border-slate-200 text-slate-900
@@ -2320,6 +2321,8 @@ export default function BillingPage() {
                                         dark:bg-white/5 dark:border-white/10 dark:text-white
                                         dark:focus:border-emerald-400 dark:focus:ring-emerald-500/30
                                       "
+                                      emptyValue={0}
+                                      blankZero
                                     />
                                   </td>
                                   <td className="px-3 py-2 text-right align-top text-slate-900 dark:text-white font-medium tabular-nums">

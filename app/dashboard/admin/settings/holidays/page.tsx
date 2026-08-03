@@ -11,6 +11,7 @@ import {
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import { formatDayLong, toLocalYMD } from '@/lib/dates';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface Holiday {
   id: string;
@@ -27,7 +28,7 @@ const APPLIES_TO_LABEL: Record<string, string> = {
   shop: 'Shop staff',
 };
 
-function NumberInput({ label, value, onChange, unit, min, max, step }: {
+function LabeledNumberField({ label, value, onChange, unit, min, max, step }: {
   label?: string;
   value: number;
   onChange: (v: number) => void;
@@ -40,14 +41,15 @@ function NumberInput({ label, value, onChange, unit, min, max, step }: {
     <div>
       {label && <label className="block text-sm font-semibold text-slate-800 mb-1">{label}</label>}
       <div className="flex items-center gap-2">
-        <input
-          type="number"
+        <NumberInput
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onValueChange={(nv) => onChange(nv)}
           min={min}
           max={max}
           step={step || 1}
           className="w-20 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all tabular-nums"
+          emptyValue={0}
+          blankZero
         />
         {unit && <span className="text-sm text-slate-400">{unit}</span>}
       </div>
@@ -295,7 +297,7 @@ export default function HolidaysSettingsPage() {
                   className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
                 />
               </div>
-              <NumberInput label="Pay hours" value={newHours} onChange={setNewHours} unit="hrs" min={0} max={24} step={0.5} />
+              <LabeledNumberField label="Pay hours" value={newHours} onChange={setNewHours} unit="hrs" min={0} max={24} step={0.5} />
               <div>
                 <label className="block text-sm font-semibold text-slate-800 mb-1">Applies to</label>
                 <select
@@ -352,7 +354,7 @@ export default function HolidaysSettingsPage() {
                             className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                           />
                         </div>
-                        <NumberInput label="Pay hours" value={editHours} onChange={setEditHours} unit="hrs" min={0} max={24} step={0.5} />
+                        <LabeledNumberField label="Pay hours" value={editHours} onChange={setEditHours} unit="hrs" min={0} max={24} step={0.5} />
                         <div>
                           <label className="block text-sm font-semibold text-slate-800 mb-1">Applies to</label>
                           <select

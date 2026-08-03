@@ -9,6 +9,7 @@ import {
   Gauge, Calendar, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface TimecardSettings {
   // Hours & Overtime
@@ -105,7 +106,7 @@ function Toggle({ enabled, onChange, label, description }: {
   );
 }
 
-function NumberInput({ label, description, value, onChange, unit, min, max, step }: {
+function LabeledNumberField({ label, description, value, onChange, unit, min, max, step }: {
   label: string;
   description?: string;
   value: number;
@@ -120,14 +121,15 @@ function NumberInput({ label, description, value, onChange, unit, min, max, step
       <label className="block text-sm font-semibold text-slate-800 mb-1">{label}</label>
       {description && <p className="text-xs text-slate-400 mb-2">{description}</p>}
       <div className="flex items-center gap-2">
-        <input
-          type="number"
+        <NumberInput
           value={value}
-          onChange={(e) => onChange(Number(e.target.value))}
+          onValueChange={(nv) => onChange(nv)}
           min={min}
           max={max}
           step={step || 1}
           className="w-24 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-800 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all tabular-nums"
+          emptyValue={0}
+          blankZero
         />
         {unit && <span className="text-sm text-slate-400">{unit}</span>}
       </div>
@@ -309,7 +311,7 @@ export default function TimecardSettingsPage() {
           </div>
           <div className="p-6 space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              <NumberInput
+              <LabeledNumberField
                 label="Regular Hours / Day"
                 description="Standard daily work hours"
                 value={settings.regularHoursPerDay}
@@ -318,7 +320,7 @@ export default function TimecardSettingsPage() {
                 min={4}
                 max={12}
               />
-              <NumberInput
+              <LabeledNumberField
                 label="Daily OT Threshold"
                 description="Hours after which daily OT kicks in"
                 value={settings.dailyOTThreshold}
@@ -327,7 +329,7 @@ export default function TimecardSettingsPage() {
                 min={4}
                 max={16}
               />
-              <NumberInput
+              <LabeledNumberField
                 label="Weekly OT Threshold"
                 description="Hours per week before overtime"
                 value={settings.weeklyOTThreshold}
@@ -336,7 +338,7 @@ export default function TimecardSettingsPage() {
                 min={20}
                 max={60}
               />
-              <NumberInput
+              <LabeledNumberField
                 label="Double Time (Daily)"
                 description="Daily hours before double time"
                 value={settings.doubleTimeDaily}
@@ -345,7 +347,7 @@ export default function TimecardSettingsPage() {
                 min={8}
                 max={24}
               />
-              <NumberInput
+              <LabeledNumberField
                 label="Double Time (Weekly)"
                 description="Weekly hours before double time"
                 value={settings.doubleTimeWeekly}
@@ -359,7 +361,7 @@ export default function TimecardSettingsPage() {
             <div className="border-t border-slate-100 pt-6">
               <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">Multipliers</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <NumberInput
+                <LabeledNumberField
                   label="OT Multiplier"
                   description="Rate multiplied for overtime hours"
                   value={settings.otMultiplier}
@@ -369,7 +371,7 @@ export default function TimecardSettingsPage() {
                   max={3}
                   step={0.25}
                 />
-                <NumberInput
+                <LabeledNumberField
                   label="Double Time Multiplier"
                   description="Rate multiplied for double-time hours"
                   value={settings.doubleTimeMultiplier}
@@ -428,7 +430,7 @@ export default function TimecardSettingsPage() {
             {settings.autoDeductBreaks && (
               <div className="space-y-4 pl-4 border-l-2 border-blue-200 bg-blue-50/30 rounded-r-lg py-3 pr-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <NumberInput
+                  <LabeledNumberField
                     label="Break duration (minutes)"
                     description="Length of the auto-deducted lunch break"
                     value={settings.breakDuration}
@@ -437,7 +439,7 @@ export default function TimecardSettingsPage() {
                     min={15}
                     max={60}
                   />
-                  <NumberInput
+                  <LabeledNumberField
                     label="Deduct after working (hours)"
                     description="Only deduct break if total shift exceeds this many hours"
                     value={settings.breakAfterHours}
@@ -512,7 +514,7 @@ export default function TimecardSettingsPage() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <NumberInput
+              <LabeledNumberField
                 label="Late grace period"
                 description="Minutes past scheduled start before an operator is flagged late"
                 value={settings.lateGraceMinutes}
@@ -521,7 +523,7 @@ export default function TimecardSettingsPage() {
                 min={0}
                 max={60}
               />
-              <NumberInput
+              <LabeledNumberField
                 label="Subsistence rate ($/night)"
                 description="Per-diem pay per night away on out-of-town jobs. 0 = count nights only (no auto-computed pay)."
                 value={settings.subsistenceRate}
@@ -547,7 +549,7 @@ export default function TimecardSettingsPage() {
           </div>
           <div className="p-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <NumberInput
+              <LabeledNumberField
                 label="Max Hours / Day"
                 description="Warn if daily hours exceed this"
                 value={settings.maxHoursPerDay}
@@ -576,7 +578,7 @@ export default function TimecardSettingsPage() {
                   <span className="text-xs text-slate-600">Enable auto clock-out</span>
                 </label>
               </div>
-              <NumberInput
+              <LabeledNumberField
                 label="Lock After"
                 description="Days before timecards are locked"
                 value={settings.lockTimecardAfterDays}

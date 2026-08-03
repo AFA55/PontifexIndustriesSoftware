@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser, isAdmin } from '@/lib/auth';
 import { DEFAULT_PAY_CONFIG, type PayConfig } from '@/lib/pay-calculator';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 function hourToLabel(hour: number): string {
   if (hour === 0) return '12:00 AM';
@@ -156,14 +157,15 @@ export default function PayConfigPage() {
                   Weekly hour threshold
                 </label>
                 <div className="relative">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={80}
                     step={0.5}
                     value={config.overtime_threshold_hours}
-                    onChange={(e) => setConfig(c => ({ ...c, overtime_threshold_hours: Number(e.target.value) }))}
+                    onValueChange={(nv) => setConfig(c => ({ ...c, overtime_threshold_hours: nv}))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand"
+                    emptyValue={0}
+                    blankZero
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">hrs</span>
                 </div>
@@ -175,14 +177,15 @@ export default function PayConfigPage() {
                   Overtime rate multiplier
                 </label>
                 <div className="relative">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={3}
                     step={0.05}
                     value={config.overtime_rate}
-                    onChange={(e) => setConfig(c => ({ ...c, overtime_rate: Number(e.target.value) }))}
+                    onValueChange={(nv) => setConfig(c => ({ ...c, overtime_rate: nv}))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand"
+                    emptyValue={0}
+                    blankZero
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">×</span>
                 </div>
@@ -231,14 +234,15 @@ export default function PayConfigPage() {
                   Night shift rate multiplier
                 </label>
                 <div className="relative">
-                  <input
-                    type="number"
+                  <NumberInput
                     min={1}
                     max={2}
                     step={0.05}
                     value={config.night_shift_premium_rate}
-                    onChange={(e) => setConfig(c => ({ ...c, night_shift_premium_rate: Number(e.target.value) }))}
+                    onValueChange={(nv) => setConfig(c => ({ ...c, night_shift_premium_rate: nv}))}
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-slate-900 focus:outline-none focus:ring-2 focus:ring-brand"
+                    emptyValue={0}
+                    blankZero
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">×</span>
                 </div>

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Disc, Wrench } from 'lucide-react';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface Equipment {
   id: string;
@@ -272,12 +273,13 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Linear Feet Cut</label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.01"
                 value={formData.linear_feet_cut}
-                onChange={(e) => updateField('linear_feet_cut', parseFloat(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('linear_feet_cut', nv)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                blankZero
               />
             </div>
           </div>
@@ -330,11 +332,13 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Blades Used</label>
-              <input
-                type="number"
+              <NumberInput
                 value={formData.blades_used}
-                onChange={(e) => updateField('blades_used', parseInt(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('blades_used', nv)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-brand focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                integer
+                blankZero
               />
             </div>
             <div className="md:col-span-2">
@@ -356,32 +360,35 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Hydraulic Hose (ft)</label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.1"
                 value={formData.hydraulic_hose_used_ft}
-                onChange={(e) => updateField('hydraulic_hose_used_ft', parseFloat(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('hydraulic_hose_used_ft', nv)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                blankZero
               />
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Water Hose (ft)</label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.1"
                 value={formData.water_hose_used_ft}
-                onChange={(e) => updateField('water_hose_used_ft', parseFloat(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('water_hose_used_ft', nv)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                blankZero
               />
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Power (hours)</label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.1"
                 value={formData.power_hours}
-                onChange={(e) => updateField('power_hours', parseFloat(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('power_hours', nv)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                blankZero
               />
             </div>
           </div>
@@ -393,22 +400,25 @@ export default function EquipmentUsageForm({ onSave, onCancel, initialData }: Eq
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Location Changes</label>
-              <input
-                type="number"
+              <NumberInput
                 value={formData.location_changes}
-                onChange={(e) => updateField('location_changes', parseInt(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('location_changes', nv)}
                 placeholder="Times equipment was moved"
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-yellow-500 focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                integer
+                blankZero
               />
             </div>
             <div>
               <label className="block text-sm font-bold text-gray-700 mb-2">Setup Time (minutes)</label>
-              <input
-                type="number"
+              <NumberInput
                 step="0.1"
                 value={formData.setup_time_minutes}
-                onChange={(e) => updateField('setup_time_minutes', parseFloat(e.target.value) || 0)}
+                onValueChange={(nv) => updateField('setup_time_minutes', nv)}
                 className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-yellow-500 focus:outline-none font-semibold text-lg"
+                emptyValue={0}
+                blankZero
               />
             </div>
           </div>

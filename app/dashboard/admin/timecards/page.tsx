@@ -18,6 +18,7 @@ import { useModuleGate } from '@/components/ModuleGuard';
 import UserAvatar from '@/components/UserAvatar';
 import Toast from '@/components/Toast';
 import type { ToastData } from '@/components/Toast';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // ── Types ────────────────────────────────────────────────────
 interface DayInfo {
@@ -776,14 +777,14 @@ export default function AdminTimecardsPage() {
                   Night Shift Multiplier
                 </label>
                 <div className="flex items-center gap-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     min="1.0"
                     max="3.0"
                     step="0.05"
                     value={nightShiftMultiplier}
-                    onChange={(e) => setNightShiftMultiplier(parseFloat(e.target.value) || 1.25)}
+                    onValueChange={(nv) => setNightShiftMultiplier(nv)}
                     className="flex-1 px-3 py-2 bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg focus:ring-2 focus:ring-purple-500/20 dark:focus:ring-violet-500/20 focus:border-purple-400 dark:focus:border-violet-400 text-sm text-gray-900 dark:text-white transition-all"
+                    emptyValue={1.25}
                   />
                   <span className="text-sm font-bold text-gray-500 dark:text-white/40">×</span>
                 </div>

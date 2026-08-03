@@ -19,6 +19,7 @@ import UserAvatar from '@/components/UserAvatar';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import Toast from '@/components/Toast';
 import type { ToastData } from '@/components/Toast';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // ── Types ─────────────────────────────────────────────────────
 interface OperatorInfo {
@@ -2498,14 +2499,16 @@ function OperatorTimecardDetailPageInner() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <input
-                        type="number"
+                      <NumberInput
                         min="0"
                         max="480"
                         step="5"
                         value={editFormData.lunch_duration_minutes}
-                        onChange={(e) => setEditFormData({ ...editFormData, lunch_duration_minutes: parseInt(e.target.value, 10) || 0 })}
+                        onValueChange={(nv) => setEditFormData({ ...editFormData, lunch_duration_minutes: nv })}
                         className="w-20 px-3 py-2.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl focus:ring-2 focus:ring-brand/20 focus:border-brand dark:focus:border-brand text-sm text-slate-800 dark:text-white tabular-nums transition-all"
+                        emptyValue={0}
+                        integer
+                        blankZero
                       />
                       <span className="text-xs text-slate-500 dark:text-slate-400">min</span>
                       <div className="flex gap-2 ml-auto">

@@ -27,6 +27,7 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // Equipment category detection from work items
 function getEquipmentCategories(items: any[]): string[] {
@@ -917,14 +918,15 @@ function NumberField({
     <div>
       <label className="block text-xs font-semibold text-gray-700 dark:text-white/70 mb-1.5">{label}</label>
       <div className="relative">
-        <input
-          type="number"
+        <NumberInput
           inputMode="numeric"
           min="0"
           value={value}
-          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          onValueChange={(nv) => onChange(nv)}
           className={`w-full min-h-[48px] px-3 ${suffix ? 'pr-10' : ''} border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] rounded-xl text-base text-gray-900 dark:text-white font-semibold placeholder-gray-400 dark:placeholder-white/40 ${t.inputFocus} focus:ring-2 focus:outline-none transition`}
           placeholder={placeholder}
+          emptyValue={0}
+          blankZero
         />
         {suffix && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-gray-400 dark:text-white/40 pointer-events-none">

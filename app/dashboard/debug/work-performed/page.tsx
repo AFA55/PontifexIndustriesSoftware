@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface QuickEntryCut {
   numCuts: number;
@@ -366,28 +367,32 @@ export default function WorkPerformedDebugger() {
               <h2 className="text-xl font-bold text-blue-900 mb-4">Quick Entry (Slab/Wall/Hand Saw)</h2>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Cuts"
                     value={quickEntryNumCuts}
-                    onChange={(e) => setQuickEntryNumCuts(parseInt(e.target.value) || 0)}
+                    onValueChange={(nv) => setQuickEntryNumCuts(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    integer
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Length (ft)"
                     step="0.1"
                     value={quickEntryLengthFeet}
-                    onChange={(e) => setQuickEntryLengthFeet(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setQuickEntryLengthFeet(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Depth (in)"
                     step="0.25"
                     value={quickEntryDepth}
-                    onChange={(e) => setQuickEntryDepth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setQuickEntryDepth(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
                 <button
@@ -421,28 +426,32 @@ export default function WorkPerformedDebugger() {
               <h2 className="text-xl font-bold text-purple-900 mb-4">Chainsaw (Inches)</h2>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Cuts"
                     value={chainsawNumCuts}
-                    onChange={(e) => setChainsawNumCuts(parseInt(e.target.value) || 0)}
+                    onValueChange={(nv) => setChainsawNumCuts(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    integer
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Length (in)"
                     step="0.25"
                     value={chainsawLengthInches}
-                    onChange={(e) => setChainsawLengthInches(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setChainsawLengthInches(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Depth (in)"
                     step="0.25"
                     value={chainsawDepth}
-                    onChange={(e) => setChainsawDepth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setChainsawDepth(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
                 <button
@@ -476,29 +485,32 @@ export default function WorkPerformedDebugger() {
               <h2 className="text-xl font-bold text-red-900 mb-4">Break & Remove</h2>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Length (ft)"
                     step="0.1"
                     value={breakRemoveLength}
-                    onChange={(e) => setBreakRemoveLength(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setBreakRemoveLength(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Width (ft)"
                     step="0.1"
                     value={breakRemoveWidth}
-                    onChange={(e) => setBreakRemoveWidth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setBreakRemoveWidth(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Depth (in)"
                     step="0.25"
                     value={breakRemoveDepth}
-                    onChange={(e) => setBreakRemoveDepth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setBreakRemoveDepth(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
                 <select
@@ -573,21 +585,23 @@ export default function WorkPerformedDebugger() {
                   />
                 )}
                 <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Length (ft)"
                     step="0.1"
                     value={jackhammerLength}
-                    onChange={(e) => setJackhammerLength(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setJackhammerLength(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Width (ft)"
                     step="0.1"
                     value={jackhammerWidth}
-                    onChange={(e) => setJackhammerWidth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setJackhammerWidth(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
                 <button
@@ -618,29 +632,32 @@ export default function WorkPerformedDebugger() {
               <h2 className="text-xl font-bold text-gray-900 mb-4">Brokk</h2>
               <div className="space-y-3">
                 <div className="grid grid-cols-3 gap-2">
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Length (ft)"
                     step="0.1"
                     value={brokkLength}
-                    onChange={(e) => setBrokkLength(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setBrokkLength(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Width (ft)"
                     step="0.1"
                     value={brokkWidth}
-                    onChange={(e) => setBrokkWidth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setBrokkWidth(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
-                  <input
-                    type="number"
+                  <NumberInput
                     placeholder="Thick (in)"
                     step="0.25"
                     value={brokkThickness}
-                    onChange={(e) => setBrokkThickness(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setBrokkThickness(nv)}
                     className="px-3 py-2 border rounded-lg"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
                 <button

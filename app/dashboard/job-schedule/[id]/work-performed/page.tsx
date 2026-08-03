@@ -11,6 +11,7 @@ import { toLocalYMD } from '@/lib/dates';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import { Camera, Mic, Save, Zap, Home, CheckCircle2, ChevronDown, ChevronUp, Send, Loader2, MessageSquarePlus, Clock } from 'lucide-react';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 const EquipmentUsageForm = dynamicImport(() => import('@/components/EquipmentUsageForm'), {
   ssr: false,
@@ -2690,14 +2691,15 @@ export default function WorkPerformed() {
                             </svg>
                             Depth (in)
                           </label>
-                          <input
-                            type="number"
+                          <NumberInput
                             step="0.25"
                             min="0"
                             value={currentHole.depthInches || ''}
-                            onChange={(e) => setCurrentHole(prev => ({ ...prev, depthInches: parseFloat(e.target.value) || 0 }))}
+                            onValueChange={(nv) => setCurrentHole(prev => ({ ...prev, depthInches: nv }))}
                             className="w-full px-4 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-white/30"
                             placeholder="0.00"
+                            emptyValue={0}
+                            blankZero
                           />
                         </div>
 
@@ -2709,13 +2711,14 @@ export default function WorkPerformed() {
                             </svg>
                             Quantity
                           </label>
-                          <input
-                            type="number"
+                          <NumberInput
                             min="1"
                             value={currentHole.quantity}
-                            onChange={(e) => setCurrentHole(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                            onValueChange={(nv) => setCurrentHole(prev => ({ ...prev, quantity: nv }))}
                             className="w-full px-4 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none transition-all placeholder:text-gray-400 dark:placeholder:text-white/30"
                             placeholder="1"
+                            emptyValue={1}
+                            integer
                           />
                         </div>
                       </div>
@@ -2910,27 +2913,29 @@ export default function WorkPerformed() {
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
                                   <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Total Linear Feet</label>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="0.1"
                                     min="0"
                                     value={currentCut.linearFeet || ''}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                    onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, linearFeet: nv }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Total linear feet"
+                                    emptyValue={0}
+                                    blankZero
                                   />
                                   <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Use Quick Entry or type directly</p>
                                 </div>
                                 <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
                                   <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Cut Depth (in)</label>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="0.25"
                                     min="0"
                                     value={currentCut.cutDepth || ''}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
+                                    onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, cutDepth: nv }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Depth"
+                                    emptyValue={0}
+                                    blankZero
                                   />
                                   <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Auto-filled from Quick Entry or type directly</p>
                                 </div>
@@ -2955,27 +2960,29 @@ export default function WorkPerformed() {
                               <div className="grid grid-cols-2 gap-3">
                                 <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
                                   <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Total Linear Feet</label>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="0.1"
                                     min="0"
                                     value={currentCut.linearFeet || ''}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                    onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, linearFeet: nv }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Total linear feet"
+                                    emptyValue={0}
+                                    blankZero
                                   />
                                   <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Use Quick Entry or type directly</p>
                                 </div>
                                 <div className="bg-white dark:bg-white/[0.05] rounded-xl p-4 border-2 border-gray-200 dark:border-white/10">
                                   <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1.5 uppercase tracking-wide">Cut Depth (in)</label>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="0.25"
                                     min="0"
                                     value={currentCut.cutDepth || ''}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
+                                    onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, cutDepth: nv }))}
                                     className="w-full px-4 py-3 text-lg border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-bold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="Depth"
+                                    emptyValue={0}
+                                    blankZero
                                   />
                                   <p className="text-xs text-gray-500 dark:text-white/40 mt-1.5">Auto-filled from Quick Entry or type directly</p>
                                 </div>
@@ -2987,28 +2994,30 @@ export default function WorkPerformed() {
                               {/* Linear Feet */}
                               <div>
                                 <label className="block text-sm font-bold text-gray-900 dark:text-white mb-1">Linear Feet Cut</label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   step="0.1"
                                   min="0"
                                   value={currentCut.linearFeet || ''}
-                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, linearFeet: parseFloat(e.target.value) || 0 }))}
+                                  onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, linearFeet: nv }))}
                                   className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-semibold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Linear feet"
+                                  emptyValue={0}
+                                  blankZero
                                 />
                               </div>
 
                               {/* Cut Depth */}
                               <div>
                                 <label className="block text-sm font-bold text-gray-900 dark:text-white mb-1">Cut Depth (in)</label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   step="0.25"
                                   min="0"
                                   value={currentCut.cutDepth || ''}
-                                  onChange={(e) => setCurrentCut(prev => ({ ...prev, cutDepth: parseFloat(e.target.value) || 0 }))}
+                                  onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, cutDepth: nv }))}
                                   className="w-full px-3 py-2.5 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white font-semibold placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Depth"
+                                  emptyValue={0}
+                                  blankZero
                                 />
                               </div>
                             </div>
@@ -3036,25 +3045,28 @@ export default function WorkPerformed() {
                               <div className="grid grid-cols-2 gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                                 <div>
                                   <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Number of Areas</label>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     min="1"
                                     value={currentCut.chainsawAreas || ''}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, chainsawAreas: parseInt(e.target.value) || 0 }))}
+                                    onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, chainsawAreas: nv }))}
                                     className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="e.g., 5"
+                                    emptyValue={0}
+                                    integer
+                                    blankZero
                                   />
                                 </div>
                                 <div>
                                   <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Avg Width (inches)</label>
-                                  <input
-                                    type="number"
+                                  <NumberInput
                                     step="0.5"
                                     min="0"
                                     value={currentCut.chainsawWidthInches || ''}
-                                    onChange={(e) => setCurrentCut(prev => ({ ...prev, chainsawWidthInches: parseFloat(e.target.value) || 0 }))}
+                                    onValueChange={(nv) => setCurrentCut(prev => ({ ...prev, chainsawWidthInches: nv }))}
                                     className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                     placeholder="e.g., 3.5"
+                                    emptyValue={0}
+                                    blankZero
                                   />
                                 </div>
                               </div>
@@ -3106,49 +3118,53 @@ export default function WorkPerformed() {
                             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                               <div>
                                 <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Length (ft)</label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   step="0.1"
                                   min="0"
                                   value={currentArea.length}
-                                  onChange={(e) => setCurrentArea(prev => ({ ...prev, length: parseFloat(e.target.value) || 0 }))}
+                                  onValueChange={(nv) => setCurrentArea(prev => ({ ...prev, length: nv }))}
                                   className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Length"
+                                  emptyValue={0}
+                                  blankZero
                                 />
                               </div>
                               <div>
                                 <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Width (ft)</label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   step="0.1"
                                   min="0"
                                   value={currentArea.width}
-                                  onChange={(e) => setCurrentArea(prev => ({ ...prev, width: parseFloat(e.target.value) || 0 }))}
+                                  onValueChange={(nv) => setCurrentArea(prev => ({ ...prev, width: nv }))}
                                   className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Width"
+                                  emptyValue={0}
+                                  blankZero
                                 />
                               </div>
                               <div>
                                 <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Depth (in)</label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   step="0.25"
                                   min="0"
                                   value={currentArea.depth}
-                                  onChange={(e) => setCurrentArea(prev => ({ ...prev, depth: parseFloat(e.target.value) || 0 }))}
+                                  onValueChange={(nv) => setCurrentArea(prev => ({ ...prev, depth: nv }))}
                                   className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="Depth"
+                                  emptyValue={0}
+                                  blankZero
                                 />
                               </div>
                               <div>
                                 <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1">Qty</label>
-                                <input
-                                  type="number"
+                                <NumberInput
                                   min="1"
                                   value={currentArea.quantity}
-                                  onChange={(e) => setCurrentArea(prev => ({ ...prev, quantity: parseInt(e.target.value) || 1 }))}
+                                  onValueChange={(nv) => setCurrentArea(prev => ({ ...prev, quantity: nv }))}
                                   className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                   placeholder="1"
+                                  emptyValue={1}
+                                  integer
                                 />
                               </div>
                             </div>
@@ -3217,25 +3233,28 @@ export default function WorkPerformed() {
                                 <div className="grid grid-cols-2 gap-2 mt-3" onClick={(e) => e.stopPropagation()}>
                                   <div>
                                     <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Number of Areas</label>
-                                    <input
-                                      type="number"
+                                    <NumberInput
                                       min="1"
                                       value={currentArea.chainsawAreas || ''}
-                                      onChange={(e) => setCurrentArea(prev => ({ ...prev, chainsawAreas: parseInt(e.target.value) || 0 }))}
+                                      onValueChange={(nv) => setCurrentArea(prev => ({ ...prev, chainsawAreas: nv }))}
                                       className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                       placeholder="e.g., 5"
+                                      emptyValue={0}
+                                      integer
+                                      blankZero
                                     />
                                   </div>
                                   <div>
                                     <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Avg Width (inches)</label>
-                                    <input
-                                      type="number"
+                                    <NumberInput
                                       step="0.5"
                                       min="0"
                                       value={currentArea.chainsawWidthInches || ''}
-                                      onChange={(e) => setCurrentArea(prev => ({ ...prev, chainsawWidthInches: parseFloat(e.target.value) || 0 }))}
+                                      onValueChange={(nv) => setCurrentArea(prev => ({ ...prev, chainsawWidthInches: nv }))}
                                       className="w-full px-3 py-2 text-sm border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
                                       placeholder="e.g., 6"
+                                      emptyValue={0}
+                                      blankZero
                                     />
                                   </div>
                                 </div>
@@ -3753,13 +3772,14 @@ export default function WorkPerformed() {
                   <label className="block text-sm font-bold text-gray-800 mb-2">
                     Number of Cuts
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="1"
                     value={quickEntryNumCuts}
-                    onChange={(e) => setQuickEntryNumCuts(parseInt(e.target.value) || 1)}
+                    onValueChange={(nv) => setQuickEntryNumCuts(nv)}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white text-gray-900 font-semibold"
                     placeholder="e.g., 5"
+                    emptyValue={1}
+                    integer
                   />
                 </div>
 
@@ -3768,14 +3788,15 @@ export default function WorkPerformed() {
                   <label className="block text-sm font-bold text-gray-800 mb-2">
                     Length (ft)
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     min="0"
                     step="0.1"
                     value={quickEntryLengthFeet}
-                    onChange={(e) => setQuickEntryLengthFeet(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setQuickEntryLengthFeet(nv)}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white text-gray-900 font-semibold"
                     placeholder="e.g., 25.5"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
 
@@ -3784,14 +3805,15 @@ export default function WorkPerformed() {
                   <label className="block text-sm font-bold text-gray-800 mb-2">
                     Depth (in)
                   </label>
-                  <input
-                    type="number"
+                  <NumberInput
                     step="0.25"
                     min="0"
                     value={quickEntryDepth}
-                    onChange={(e) => setQuickEntryDepth(parseFloat(e.target.value) || 0)}
+                    onValueChange={(nv) => setQuickEntryDepth(nv)}
                     className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 focus:outline-none bg-white text-gray-900 font-semibold"
                     placeholder="e.g., 6"
+                    emptyValue={0}
+                    blankZero
                   />
                 </div>
               </div>
@@ -3930,13 +3952,14 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Number of Cuts
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="1"
                       value={chainsawNumCuts}
-                      onChange={(e) => setChainsawNumCuts(parseInt(e.target.value) || 1)}
+                      onValueChange={(nv) => setChainsawNumCuts(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 5"
+                      emptyValue={1}
+                      integer
                     />
                   </div>
 
@@ -3945,14 +3968,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Length (inches)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.25"
                       value={chainsawLengthInches}
-                      onChange={(e) => setChainsawLengthInches(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setChainsawLengthInches(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 48"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
 
@@ -3961,14 +3985,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Depth (in)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       step="0.25"
                       min="0"
                       value={chainsawDepth}
-                      onChange={(e) => setChainsawDepth(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setChainsawDepth(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 12"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
                 </div>
@@ -4095,14 +4120,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Length (ft)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.1"
                       value={breakRemoveLength}
-                      onChange={(e) => setBreakRemoveLength(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setBreakRemoveLength(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 10"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
 
@@ -4111,14 +4137,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Width (ft)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.1"
                       value={breakRemoveWidth}
-                      onChange={(e) => setBreakRemoveWidth(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setBreakRemoveWidth(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 8"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
 
@@ -4127,14 +4154,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Depth (in)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       step="0.25"
                       min="0"
                       value={breakRemoveDepth}
-                      onChange={(e) => setBreakRemoveDepth(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setBreakRemoveDepth(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-red-500 focus:ring-2 focus:ring-red-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 6"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
                 </div>
@@ -4356,14 +4384,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Length (ft)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.1"
                       value={jackhammerLength}
-                      onChange={(e) => setJackhammerLength(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setJackhammerLength(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 10"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
 
@@ -4372,14 +4401,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Width (ft)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.1"
                       value={jackhammerWidth}
-                      onChange={(e) => setJackhammerWidth(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setJackhammerWidth(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-yellow-500 focus:ring-2 focus:ring-yellow-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 8"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
                 </div>
@@ -4499,14 +4529,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Length (ft)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.1"
                       value={brokkLength}
-                      onChange={(e) => setBrokkLength(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setBrokkLength(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 10"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
 
@@ -4515,14 +4546,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Width (ft)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       min="0"
                       step="0.1"
                       value={brokkWidth}
-                      onChange={(e) => setBrokkWidth(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setBrokkWidth(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 8"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
 
@@ -4531,14 +4563,15 @@ export default function WorkPerformed() {
                     <label className="block text-sm font-bold text-gray-800 mb-2">
                       Thickness (in)
                     </label>
-                    <input
-                      type="number"
+                    <NumberInput
                       step="0.25"
                       min="0"
                       value={brokkThickness}
-                      onChange={(e) => setBrokkThickness(parseFloat(e.target.value) || 0)}
+                      onValueChange={(nv) => setBrokkThickness(nv)}
                       className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-gray-500 focus:ring-2 focus:ring-gray-200 focus:outline-none bg-white text-gray-900 font-semibold"
                       placeholder="e.g., 6"
+                      emptyValue={0}
+                      blankZero
                     />
                   </div>
                 </div>

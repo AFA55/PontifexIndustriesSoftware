@@ -26,6 +26,7 @@ import { VoiceMicButton } from '@/components/ui/VoiceMicButton';
 import PhotoUploader from '@/components/PhotoUploader';
 import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
 import { useModuleGate } from '@/components/ModuleGuard';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // Dynamic-imported modals — only loaded when their state flag flips true.
 // AISmartFillModal pulls in framer-motion; CustomerForm is a large dialog used for the new-customer flow.
@@ -4531,12 +4532,13 @@ export default function ScheduleFormPage() {
             {/* Estimated hours — office-only; NEVER shown to operators. */}
             <div>
               <Label>Estimated Hours <span className="font-normal text-slate-400">(office only — operators don&apos;t see this)</span></Label>
-              <input
-                type="number" min="0" step="0.25" inputMode="decimal"
+              <NumberInput
                 value={form.estimated_hours ?? ''}
-                onChange={(e) => updateForm({ estimated_hours: e.target.value === '' ? null : Number(e.target.value) })}
+                onValueChange={(nv) => updateForm({ estimated_hours: nv === 0 ? null : nv })}
                 placeholder="e.g. 6"
                 className="mt-1 w-40 px-3 py-3 rounded-xl border-2 border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 text-slate-900 dark:text-white text-base focus:outline-none focus:border-brand"
+                emptyValue={0}
+                blankZero
               />
             </div>
             <div>

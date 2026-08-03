@@ -6,6 +6,7 @@ import {
   DollarSign, Loader2, AlertCircle, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // ─── Types ──────────────────────────────────────────────────────────────────────
 
@@ -256,13 +257,14 @@ function AddChangeOrderModal({
                     </div>
                     <div>
                       <label className="block text-xs text-gray-500 mb-1">Quantity</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={item.quantity}
-                        onChange={e => updateWorkItem(idx, 'quantity', parseFloat(e.target.value) || 0)}
+                        onValueChange={(nv) => updateWorkItem(idx, 'quantity', nv)}
                         min="0"
                         step="0.01"
                         className="w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+                        emptyValue={0}
+                        blankZero
                       />
                     </div>
                   </div>

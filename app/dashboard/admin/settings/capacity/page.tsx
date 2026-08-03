@@ -14,6 +14,7 @@ import {
   XCircle,
   ChevronLeft,
 } from 'lucide-react';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface CapacitySettings {
   skill_wall_saw: number;
@@ -160,13 +161,15 @@ export default function CapacitySettingsPage() {
         >
           −
         </button>
-        <input
-          type="number"
+        <NumberInput
           min={min}
           max={max}
           value={settings[settingKey] as number}
-          onChange={e => updateSetting(settingKey, parseInt(e.target.value, 10) || 0)}
+          onValueChange={(nv) => updateSetting(settingKey, nv)}
           className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-brand"
+          emptyValue={0}
+          integer
+          blankZero
         />
         <button
           onClick={() => updateSetting(settingKey, (settings[settingKey] as number) + 1)}
@@ -257,13 +260,15 @@ export default function CapacitySettingsPage() {
                         >
                           −
                         </button>
-                        <input
-                          type="number"
+                        <NumberInput
                           min={0}
                           max={20}
                           value={settings[skill.key] as number}
-                          onChange={e => updateSetting(skill.key, parseInt(e.target.value, 10) || 0)}
+                          onValueChange={(nv) => updateSetting(skill.key, nv)}
                           className="w-16 text-center bg-white border border-gray-300 rounded text-gray-900 text-sm py-1 focus:outline-none focus:border-brand"
+                          emptyValue={0}
+                          integer
+                          blankZero
                         />
                         <button
                           onClick={() => updateSetting(skill.key, (settings[skill.key] as number) + 1)}

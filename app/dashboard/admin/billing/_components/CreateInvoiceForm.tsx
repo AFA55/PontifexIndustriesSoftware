@@ -13,6 +13,7 @@ import {
   Calculator,
   AlertCircle,
 } from 'lucide-react';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface LineItem {
   description: string;
@@ -635,10 +636,9 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                 <div className="flex items-center justify-between text-sm px-3">
                   <div className="flex items-center gap-2">
                     <span className="text-slate-500 dark:text-white/60">Tax</span>
-                    <input
-                      type="number"
+                    <NumberInput
                       value={taxRate || ''}
-                      onChange={(e) => setTaxRate(Number(e.target.value) || 0)}
+                      onValueChange={(nv) => setTaxRate(nv)}
                       className="
                         w-16 px-2 py-1 rounded text-xs text-right transition-all tabular-nums
                         bg-white border border-slate-200 text-slate-900
@@ -649,6 +649,8 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                       placeholder="0"
                       min="0"
                       step="0.01"
+                      emptyValue={0}
+                      blankZero
                     />
                     <span className="text-slate-400 dark:text-white/40 text-xs">%</span>
                   </div>

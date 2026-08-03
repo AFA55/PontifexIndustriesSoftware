@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Settings, X } from 'lucide-react';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 interface CapacitySettingsModalProps {
   currentMax: number;
@@ -46,13 +47,13 @@ export default function CapacitySettingsModal({
                 Max Crew Slots
               </label>
               <p className="text-xs text-gray-500 dark:text-white/60 mb-2">Total number of crew rows on the schedule board</p>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={50}
                 value={maxSlots}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value) || 1;
+                emptyValue={1}
+                integer
+                onValueChange={(v) => {
                   setMaxSlots(v);
                   if (warningThreshold > v) setWarningThreshold(v);
                 }}
@@ -65,13 +66,14 @@ export default function CapacitySettingsModal({
                 Warning Threshold
               </label>
               <p className="text-xs text-gray-500 dark:text-white/60 mb-2">Show capacity warning when this many slots are filled</p>
-              <input
-                type="number"
+              <NumberInput
                 min={1}
                 max={maxSlots}
                 value={warningThreshold}
-                onChange={(e) => setWarningThreshold(Math.min(parseInt(e.target.value) || 1, maxSlots))}
+                onValueChange={(nv) => setWarningThreshold(Math.min(nv, maxSlots))}
                 className="w-full px-4 py-3 border-2 border-gray-300 dark:border-white/10 dark:bg-slate-700 dark:text-white rounded-xl focus:border-amber-500 focus:ring-2 focus:ring-amber-200 text-lg font-bold text-gray-900 bg-white transition-all"
+                emptyValue={1}
+                integer
               />
             </div>
 

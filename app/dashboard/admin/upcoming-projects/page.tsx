@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // Mock data for upcoming projects - next 7 days
 const mockUpcomingProjects = [
@@ -749,20 +750,24 @@ export default function UpcomingProjectsBoard() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Estimated Hours</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={editingProject.estimatedHours}
-                        onChange={(e) => setEditingProject({...editingProject, estimatedHours: parseInt(e.target.value)})}
+                        onValueChange={(nv) => setEditingProject({...editingProject, estimatedHours: nv})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        emptyValue={0}
+                        integer
+                        blankZero
                       />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Budget</label>
-                      <input
-                        type="number"
+                      <NumberInput
                         value={editingProject.budget}
-                        onChange={(e) => setEditingProject({...editingProject, budget: parseInt(e.target.value)})}
+                        onValueChange={(nv) => setEditingProject({...editingProject, budget: nv})}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        emptyValue={0}
+                        integer
+                        blankZero
                       />
                     </div>
                   </div>
