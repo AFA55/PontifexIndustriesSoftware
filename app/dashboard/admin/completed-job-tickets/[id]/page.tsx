@@ -479,14 +479,14 @@ export default function CompletedJobSummaryPage() {
                 Customer Portal
               </button>
               <Link
-                href={`/dashboard/admin/jobs/${jobId}/completed-print`}
+                href={`/dashboard/admin/jobs/${jobId}/work-ticket?mode=week`}
                 target="_blank"
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors
                   bg-white border border-slate-200 text-slate-700 hover:bg-slate-50
                   dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/10"
               >
                 <Printer className="w-4 h-4" />
-                Print Ticket
+                Print Work Ticket
               </Link>
               <Link
                 href={`/dashboard/admin/billing/create?job=${jobId}`}

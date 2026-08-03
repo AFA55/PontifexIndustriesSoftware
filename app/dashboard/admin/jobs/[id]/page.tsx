@@ -1393,6 +1393,10 @@ export default function AdminJobDetailPage({
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+              {/* Two distinct printouts, so the label says which is which:
+                  "Job Order" = the dispatch sheet (scope + equipment, printed
+                  BEFORE the job), "Work Ticket" = the customer/payroll ticket
+                  of work performed per day per operator (printed DURING/AFTER). */}
               <Link
                 href={`/dashboard/admin/jobs/${job.id}/print`}
                 target="_blank"
@@ -1403,7 +1407,19 @@ export default function AdminJobDetailPage({
                 "
               >
                 <Printer className="w-4 h-4" />
-                Print Ticket
+                Print Job Order
+              </Link>
+              <Link
+                href={`/dashboard/admin/jobs/${job.id}/work-ticket`}
+                target="_blank"
+                className="
+                  inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
+                  text-slate-700 bg-white border border-slate-200 hover:bg-slate-50
+                  dark:text-white/80 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10
+                "
+              >
+                <Printer className="w-4 h-4" />
+                Print Work Ticket
               </Link>
               <button
                 onClick={() => setShowEditSchedule(true)}

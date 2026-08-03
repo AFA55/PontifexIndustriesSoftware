@@ -5,6 +5,9 @@
 
 export const STANDBY_POLICY_VERSION = 'v1.0';
 export const STANDBY_HOURLY_RATE = 189.00;
+/** Minimum billable standby, in hours. Stated in the signed release (§3.2) and
+ *  applied by calculateStandbyCharge — exported so no other surface re-types it. */
+export const STANDBY_MINIMUM_HOURS = 1.0;
 
 export const STANDBY_POLICY_SUMMARY = `
 When work is delayed due to circumstances beyond our control, standby time is billed at $${STANDBY_HOURLY_RATE}/hour.
@@ -234,8 +237,7 @@ export function getStandbyPolicySummaryHTML(): string {
 }
 
 export function calculateStandbyCharge(hours: number): number {
-  const minHours = 1.0; // Minimum 1 hour charge
-  const billableHours = Math.max(hours, minHours);
+  const billableHours = Math.max(hours, STANDBY_MINIMUM_HOURS);
   return Math.round(billableHours * STANDBY_HOURLY_RATE * 100) / 100;
 }
 
