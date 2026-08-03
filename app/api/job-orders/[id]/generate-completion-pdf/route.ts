@@ -20,6 +20,7 @@ import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import React from 'react';
 import CompletionSignOffPDF, { type CompletionPDFData } from '@/components/pdf/CompletionSignOffPDF';
+import { toCompletionPdfWorkItems } from '@/lib/work-items-format';
 import { sendEmail, getTenantEmailBranding, generateCompletionThankYouEmail } from '@/lib/email';
 
 export async function POST(
@@ -163,6 +164,26 @@ export async function POST(
       // Use defaults
     }
 
+    // ── Work items for the PDF ───────────────────────────────────────────────
+    // The client posts its own `workPerformed` array, which carries the
+    // operator's INTERNAL quick note. This document is signed by the customer
+    // and published to the portal, so the note must never reach it — and the
+    // fix belongs here, at the trust boundary, not in the caller.
+    //
+    // Prefer the authoritative DB rows (they also carry details_json, so the
+    // description column shows real measurements instead of prose). Fall back
+    // to the posted array only when the job has no saved rows (the operator's
+    // offline/localStorage path), and sanitize it either way.
+    const { data: savedWorkItems } = await supabaseAdmin
+      .from('work_items')
+      .select('work_type, quantity, core_quantity, core_size, core_depth_inches, linear_feet_cut, cut_depth_inches, details_json')
+      .eq('job_order_id', jobId)
+      .order('created_at', { ascending: true });
+
+    const pdfWorkItems = toCompletionPdfWorkItems(
+      savedWorkItems && savedWorkItems.length > 0 ? savedWorkItems : workPerformed
+    );
+
     // ── Build PDF data ───────────────────────────────────────────────────────
     const signedAt = new Date().toISOString();
 
@@ -176,8 +197,7 @@ export async function POST(
       scope_of_work: job.scope_of_work,
       operator_name: operatorName,
       helper_name: helperName,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      work_performed: workPerformed as any,
+      work_performed: pdfWorkItems,
       signer_name: signerName || undefined,
       signature_data_url: signatureDataUrl || undefined,
       signed_at: signedAt,

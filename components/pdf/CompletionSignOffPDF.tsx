@@ -162,13 +162,17 @@ const s = StyleSheet.create({
 });
 
 // ── Types ────────────────────────────────────────────────────────────────────
+/** This document is signed by the customer and published to their portal.
+ *  There is deliberately NO `notes` field: the operator's quick note is the
+ *  office's internal narrative (prep, access, delays) and must never appear
+ *  here. Callers sanitize via `toCompletionPdfWorkItems()`; the omission below
+ *  is the second layer, so even an `as any` payload cannot render it. */
 export interface WorkItem {
   type?: string;
   description?: string;
   quantity?: string | number;
   unit?: string;
   depth?: string | number;
-  notes?: string;
 }
 
 export interface CompletionPDFData {
@@ -202,7 +206,7 @@ function formatWorkItemRow(item: WorkItem): { qty: string; itemType: string; des
   const depth = item.depth != null ? `${item.depth}" depth` : '';
   const qtyStr = [qty, unit].filter(Boolean).join(' ');
   const itemType = item.type || 'Work Item';
-  const descParts = [item.description, depth, item.notes].filter(Boolean);
+  const descParts = [item.description, depth].filter(Boolean);
   return {
     qty: qtyStr || '—',
     itemType,

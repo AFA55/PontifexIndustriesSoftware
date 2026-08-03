@@ -11,6 +11,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff, resolveTenantScope } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { notifySalesperson } from '@/lib/notify-salesperson';
+import { workItemDetailLine } from '@/lib/work-items-format';
 
 export async function GET(request: NextRequest) {
   try {
@@ -405,6 +406,13 @@ export async function POST(request: NextRequest) {
             qty = Number(item.linear_feet_cut);
             unit = 'LF';
             if (!rate) rate = 10; // Default LF rate if type not found
+          } else {
+            // Neither flat column set — e.g. a demolition/removal item, whose
+            // areas + sq-ft total live only in details_json. Without this the
+            // line read as a bare work type with no dimensions at all.
+            // Description only; qty/unit/rate/amount are untouched.
+            const detail = workItemDetailLine(item);
+            if (detail) desc += ` (${detail})`;
           }
 
           const amount = qty * rate;

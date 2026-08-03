@@ -8,8 +8,11 @@ import {
   buildWorkPerformedSummary,
   difficultyToRating,
   ratingToDifficultyLabel,
+  stripInternalNotes,
   summarizeWorkItem,
+  toCompletionPdfWorkItems,
   workItemDetailLine,
+  workItemQuickNote,
 } from './work-items-format';
 
 describe('difficultyToRating', () => {
@@ -91,6 +94,164 @@ describe('workItemDetailLine', () => {
   it('returns empty string when there is no detail at all', () => {
     expect(workItemDetailLine({ work_type: 'CLEANUP', quantity: 1 })).toBe('');
   });
+
+  // ── Demolition / removal quick entries (break & remove, jack hammering,
+  //    chipping, Brokk) — a TOP-LEVEL areas[] rather than a notes string.
+  it('describes a break & remove area entry with method and equipment', () => {
+    const line = workItemDetailLine({
+      work_type: 'BREAK & REMOVE',
+      details_json: {
+        areas: [
+          { length: 4, width: 6, depth: 8 },
+          { length: 3, width: 8 },
+        ],
+        totalSquareFeet: 48,
+        method: 'rigged',
+        equipment: 'excavator',
+      },
+    });
+    expect(line).toBe(`48 sq ft (4' × 6' @ 8", 3' × 8') — rigged: excavator`);
+  });
+
+  it('uses Brokk thickness and derives the sq-ft total when it is missing', () => {
+    const line = workItemDetailLine({
+      work_type: 'BROKK',
+      details_json: { areas: [{ length: 10, width: 5, thickness: 6 }] },
+    });
+    expect(line).toBe(`50 sq ft (10' × 5' @ 6")`);
+  });
+
+  it('does NOT mistake nested sawing areas for a demolition entry', () => {
+    const line = workItemDetailLine({
+      work_type: 'SLAB SAW',
+      details_json: { cutType: 'dry', cuts: [{ linearFeet: 26, cutDepth: 4, areas: [{ length: 5, width: 8 }] }] },
+    });
+    expect(line).toBe('26 LF @ 4" (dry)');
+  });
+});
+
+// The quick note is INTERNAL (office-only). workItemDetailLine feeds
+// customer-facing surfaces — the signed completion PDF's description column
+// and both invoice line builders — so it must never emit note prose.
+describe('workItemDetailLine — customer-facing safety', () => {
+  const note = 'Waited on the contractor for 45 min, GC was a nightmare';
+
+  it('never leaks the notes column into the detail line', () => {
+    const line = workItemDetailLine({
+      work_type: 'SLAB SAW',
+      notes: note,
+      details_json: { cutType: 'wet', cuts: [{ linearFeet: 120, cutDepth: 6 }] },
+    });
+    expect(line).toBe('120 LF @ 6" (wet)');
+    expect(line).not.toContain('contractor');
+  });
+
+  it('never leaks details_json.notes into the detail line', () => {
+    const line = workItemDetailLine({
+      work_type: 'BREAK & REMOVE',
+      details_json: { areas: [{ length: 4, width: 6 }], totalSquareFeet: 24, notes: note },
+    });
+    expect(line).toBe(`24 sq ft (4' × 6')`);
+    expect(line).not.toContain('contractor');
+  });
+
+  it('still produces a usable description for a demolition item (invoice lines)', () => {
+    // Before details_json was read, these degraded to a bare work type.
+    const line = workItemDetailLine({
+      work_type: 'JACK HAMMERING',
+      quantity: 48,
+      details_json: { areas: [{ length: 8, width: 6 }], totalSquareFeet: 48, equipment: '90lb breaker' },
+    });
+    expect(line).toBe(`48 sq ft (8' × 6') — 90lb breaker`);
+  });
+});
+
+// The completion PDF is signed by the customer AND published to their portal.
+// toCompletionPdfWorkItems is the trust boundary for BOTH the in-person route
+// (which receives a client-posted array) and the remote signing route.
+describe('toCompletionPdfWorkItems', () => {
+  const note = 'Waited on the contractor, GC was a nightmare';
+
+  it('never emits notes from a client-posted payload', () => {
+    // Exactly the shape day-complete/page.tsx POSTs: no details_json, and
+    // `description` undefined — so notes used to BE the whole description.
+    const out = toCompletionPdfWorkItems([
+      { type: 'CORE DRILL', description: undefined, quantity: 3, unit: undefined, depth: 10, notes: note },
+    ]);
+    expect(out).toEqual([{ type: 'CORE DRILL', quantity: 3, description: '10" depth' }]);
+    expect(JSON.stringify(out)).not.toContain('contractor');
+    expect(out[0]).not.toHaveProperty('notes');
+  });
+
+  it('never emits details_json.notes from a DB row, and uses measurements', () => {
+    const out = toCompletionPdfWorkItems([
+      {
+        work_type: 'SLAB SAW',
+        quantity: 120,
+        notes: note,
+        details_json: { cutType: 'wet', cuts: [{ linearFeet: 120, cutDepth: 6 }], notes: note },
+      },
+    ]);
+    expect(out).toEqual([{ type: 'SLAB SAW', quantity: 120, description: '120 LF @ 6" (wet)' }]);
+    expect(JSON.stringify(out)).not.toContain('contractor');
+  });
+
+  it('labels an unknown shape rather than emitting an empty row', () => {
+    expect(toCompletionPdfWorkItems([{}])).toEqual([{ type: 'Work Item', description: '' }]);
+    expect(toCompletionPdfWorkItems(null)).toEqual([]);
+    expect(toCompletionPdfWorkItems(undefined)).toEqual([]);
+  });
+});
+
+// daily_job_logs.work_performed is a jsonb array of the same objects the
+// operator submits, served by two token-only unauthenticated endpoints.
+describe('stripInternalNotes', () => {
+  it('removes notes from every entry, keeping the rest intact', () => {
+    const out = stripInternalNotes([
+      { name: 'CORE DRILL', quantity: 3, notes: 'access was tight' },
+      { name: 'SLAB SAW', quantity: 120 },
+    ]);
+    expect(out).toEqual([
+      { name: 'CORE DRILL', quantity: 3 },
+      { name: 'SLAB SAW', quantity: 120 },
+    ]);
+    expect(JSON.stringify(out)).not.toContain('tight');
+  });
+
+  it('passes through non-array and non-object payloads untouched', () => {
+    expect(stripInternalNotes(null)).toBeNull();
+    expect(stripInternalNotes('Poured and cut')).toBe('Poured and cut');
+    expect(stripInternalNotes(['a string entry'])).toEqual(['a string entry']);
+  });
+});
+
+describe('workItemQuickNote', () => {
+  it('reads the canonical work_items.notes column', () => {
+    expect(workItemQuickNote({ notes: '  Set poly. Access was tight.  ' })).toBe(
+      'Set poly. Access was tight.'
+    );
+  });
+
+  it('falls back to legacy details_json.notes when the column is empty', () => {
+    expect(
+      workItemQuickNote({ notes: '', details_json: { notes: 'Waited on the contractor' } })
+    ).toBe('Waited on the contractor');
+    expect(
+      workItemQuickNote({ details_json: { holes: [], notes: 'old-style note' } })
+    ).toBe('old-style note');
+  });
+
+  it('prefers the column over details_json when both are present', () => {
+    expect(
+      workItemQuickNote({ notes: 'new note', details_json: { notes: 'stale note' } })
+    ).toBe('new note');
+  });
+
+  it('returns empty string when there is no note anywhere', () => {
+    expect(workItemQuickNote({ work_type: 'CLEANUP' })).toBe('');
+    expect(workItemQuickNote({ notes: null, details_json: null })).toBe('');
+    expect(workItemQuickNote({ notes: '   ' })).toBe('');
+  });
 });
 
 describe('summarizeWorkItem', () => {
@@ -104,10 +265,38 @@ describe('summarizeWorkItem', () => {
     expect(s).toBe('CORE DRILL ×3 (3× 4" @ 10") — tight access on the mezzanine');
   });
 
-  it('truncates very long notes', () => {
-    const s = summarizeWorkItem({ work_type: 'REPAIR', quantity: 1, notes: 'x'.repeat(200) });
-    expect(s.length).toBeLessThan(120);
+  // The cap is 160, not 80: the founder's whole point is that the office needs
+  // the CONDITIONS narrative, and one sentence of it doesn't fit in 80 chars.
+  it('keeps a full two-sentence conditions note intact', () => {
+    const note = 'Set poly in the stairwell. Access was tight through the loading dock and we waited on the contractor.';
+    const s = summarizeWorkItem({ work_type: 'SLAB SAW', quantity: 120, notes: note });
+    expect(s).toContain(note);
+    expect(s).not.toContain('…');
+  });
+
+  it('truncates runaway notes', () => {
+    const s = summarizeWorkItem({ work_type: 'REPAIR', quantity: 1, notes: 'x'.repeat(400) });
+    expect(s.length).toBeLessThan(200);
     expect(s).toContain('…');
+  });
+
+  it('collapses dictation line breaks so the summary stays one line', () => {
+    const s = summarizeWorkItem({
+      work_type: 'CORE DRILL',
+      quantity: 2,
+      notes: 'Set poly.\nAccess was tight.\n\nWaited on the contractor.',
+    });
+    expect(s).toBe('CORE DRILL ×2 — Set poly. Access was tight. Waited on the contractor.');
+    expect(s).not.toContain('\n');
+  });
+
+  it('uses the legacy details_json.notes when the notes column is empty', () => {
+    const s = summarizeWorkItem({
+      work_type: 'HAND SAW',
+      quantity: 1,
+      details_json: { cuts: [{ linearFeet: 12, cutDepth: 4 }], notes: 'tight access' },
+    });
+    expect(s).toBe('HAND SAW ×1 (12 LF @ 4") — tight access');
   });
 });
 
@@ -159,5 +348,34 @@ describe('buildWorkPerformedSummary', () => {
     ]);
     expect(s).not.toContain('{');
     expect(s).not.toContain('[');
+  });
+});
+
+// ── The OFFLINE/localStorage shape ────────────────────────────────────────────
+// work-performed persists its own WorkItem[] on a failed POST (basements,
+// parking structures). That shape carries the quick note TWICE — top-level and
+// mirrored into `details.notes` — and stores measurements under `details`,
+// not `details_json`. Both cost us a blocking finding; these pin them.
+describe('offline/localStorage payload shape', () => {
+  const offlineItem = {
+    name: 'SLAB SAW',
+    quantity: 120,
+    notes: 'Set poly. Waited on the contractor.',
+    details: { cutType: 'wet', cuts: [{ linearFeet: 120, cutDepth: 6 }], notes: 'Set poly. Waited on the contractor.' },
+  };
+
+  it('stripInternalNotes removes the MIRRORED note, not just the outer one', () => {
+    const out = stripInternalNotes([offlineItem]);
+    expect(JSON.stringify(out)).not.toContain('Set poly');
+    expect(JSON.stringify(out)).not.toContain('contractor');
+    // measurements survive
+    expect(JSON.stringify(out)).toContain('120');
+  });
+
+  it('toCompletionPdfWorkItems reads `details` and still emits no prose', () => {
+    const [row] = toCompletionPdfWorkItems([offlineItem]);
+    expect(row.description).toBe('120 LF @ 6" (wet)');
+    expect(JSON.stringify(row)).not.toContain('poly');
+    expect(row).not.toHaveProperty('notes');
   });
 });

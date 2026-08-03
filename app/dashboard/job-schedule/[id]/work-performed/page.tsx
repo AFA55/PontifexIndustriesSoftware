@@ -124,8 +124,12 @@ const isBrokk = (itemName: string) => itemName.includes('BROKK');
 interface WorkItem {
   name: string;
   quantity: number;
+  /** QUICK NOTE — the operator's narrative for this item (prep, access,
+   *  delays). CANONICAL HOME: persisted to the `work_items.notes` column by
+   *  /api/job-orders/[id]/work-items. Also mirrored into `details.notes` so
+   *  the legacy details_json.notes readers keep working. */
   notes?: string;
-  details?: CoreDrillingDetails | SawingDetails | GeneralDetails;
+  details?: CoreDrillingDetails | SawingDetails | DemolitionDetails | GeneralDetails;
 }
 
 interface CoreDrillingHole {
@@ -172,6 +176,30 @@ interface SawingCut {
 interface SawingDetails {
   cuts: SawingCut[];
   cutType: 'wet' | 'dry';
+  notes?: string;
+}
+
+/**
+ * Demolition / removal quick entries (break & remove, jack hammering,
+ * chipping, Brokk). These used to be flattened into a generated notes STRING,
+ * which both destroyed the numbers as data AND overwrote whatever the operator
+ * had typed. They now emit real structured detail; `lib/work-items-format.ts`
+ * renders the top-level `areas[]` branch. Sawing areas are nested under
+ * `cuts[i].areas`, so the two shapes never collide.
+ */
+interface DemolitionArea {
+  length: number; // feet
+  width: number; // feet
+  depth?: number; // inches (break & remove)
+  thickness?: number; // inches (Brokk)
+}
+
+interface DemolitionDetails {
+  areas: DemolitionArea[];
+  totalSquareFeet: number;
+  method?: string; // break & remove: how the slab left the site
+  equipment?: string; // rigging / jackhammer equipment
+  avgThicknessInches?: number;
   notes?: string;
 }
 
@@ -235,6 +263,9 @@ export default function WorkPerformed() {
     chainsawAreas: 0,
     chainsawWidthInches: 0
   });
+  // Structured output of the break&remove / jackhammer / chipping / Brokk
+  // quick-entry modals. Null until one of them is applied.
+  const [demolitionData, setDemolitionData] = useState<DemolitionDetails | null>(null);
   const [tempAreas, setTempAreas] = useState<CutArea[]>([]);
   const [selectedBlades, setSelectedBlades] = useState<string[]>([]);
   const [customBladeSize, setCustomBladeSize] = useState('');
@@ -707,7 +738,10 @@ export default function WorkPerformed() {
   const handleSelectItem = (itemName: string) => {
     setCurrentItem(itemName);
     setCurrentQuantity(1);
-    setCurrentNotes('');
+    // Prefill the quick note from the already-added item. handleAddItem treats
+    // an empty box as "clear the note", so re-opening an item to log more work
+    // would otherwise silently wipe what the operator already wrote.
+    setCurrentNotes(selectedItems.find(si => si.name === itemName)?.notes ?? '');
 
     // Reset detailed data forms
     setCoreDrillingData({
@@ -729,6 +763,8 @@ export default function WorkPerformed() {
       cutType: 'wet',
       notes: ''
     });
+
+    setDemolitionData(null);
 
     setCurrentCut({
       inputMode: 'linear',
@@ -753,15 +789,23 @@ export default function WorkPerformed() {
     setShowQuantityModal(true);
   };
 
+  /** The hole still sitting in the input row, or null when it's incomplete.
+   *  Shared by "Add This Hole" and the auto-flush in handleAddItem. */
+  const buildPendingHole = (): CoreDrillingHole | null => {
+    if (!currentHole.bitSize || currentHole.depthInches <= 0) return null;
+    return { ...currentHole };
+  };
+
   const addHole = () => {
-    if (!currentHole.bitSize || currentHole.depthInches <= 0) {
+    const holeToAdd = buildPendingHole();
+    if (!holeToAdd) {
       showNotification('Please specify both bit size and depth for the hole', 'warning');
       return;
     }
 
     setCoreDrillingData(prev => ({
       ...prev,
-      holes: [...prev.holes, { ...currentHole }]
+      holes: [...prev.holes, holeToAdd]
     }));
 
     // Reset current hole for next entry
@@ -786,32 +830,36 @@ export default function WorkPerformed() {
     return coreDrillingData.holes.reduce((total, hole) => total + hole.quantity, 0);
   };
 
-  const addCut = () => {
-    // Validate based on input mode
+  /**
+   * Every area the operator has entered: the ones already added to the list
+   * PLUS one still sitting in the input row. Typing L/W/D and tapping "Add
+   * This Cut" without first tapping "Add Area" used to silently drop it.
+   */
+  const collectAreas = (): CutArea[] => {
+    const pending =
+      currentArea.length > 0 && currentArea.width > 0 && currentArea.depth > 0
+        ? [{ ...currentArea }]
+        : [];
+    return [...tempAreas, ...pending];
+  };
+
+  /**
+   * Builds a cut from the in-progress inputs, or null when nothing usable has
+   * been typed. Shared by the "Add This Cut" button and the auto-flush in
+   * handleAddItem — blades are deliberately NOT required (the founder: the
+   * numbers and the conditions matter, the blade is nice-to-have).
+   */
+  const buildPendingCut = (): SawingCut | null => {
     if (cutInputMode === 'area') {
-      // For area mode, must have at least one area added
-      if (tempAreas.length === 0) {
-        showNotification('Please add at least one cut area', 'warning');
-        return;
-      }
-
-      // Calculate total linear feet from areas
-      const totalLinearFeet = calculateTotalFromAreas(tempAreas);
-
-      // Use the depth from the first area (all areas should have same depth for one cut entry)
-      const cutDepth = tempAreas[0].depth;
-
-      if (selectedBlades.length === 0) {
-        const itemType = isChainsaw(currentItem) ? 'chain size' : 'blade type';
-        showNotification(`Please select at least one ${itemType} used`, 'warning');
-        return;
-      }
-
-      const cutToAdd: SawingCut = {
+      const areas = collectAreas();
+      if (areas.length === 0) return null;
+      return {
         inputMode: 'area',
-        linearFeet: totalLinearFeet,
-        cutDepth: cutDepth,
-        areas: [...tempAreas],
+        // Perimeter math (2L + 2W) × qty — we bill linear feet of cut, not sq ft.
+        linearFeet: calculateTotalFromAreas(areas),
+        // All areas in one cut entry share the depth of the first.
+        cutDepth: areas[0].depth,
+        areas,
         bladesUsed: [...selectedBlades],
         cutSteel: currentCut.cutSteel,
         steelEncountered: currentCut.steelEncountered,
@@ -820,35 +868,28 @@ export default function WorkPerformed() {
         chainsawAreas: currentCut.chainsawAreas,
         chainsawWidthInches: currentCut.chainsawWidthInches
       };
-
-      setSawingData(prev => ({
-        ...prev,
-        cuts: [...prev.cuts, cutToAdd]
-      }));
-    } else {
-      // Linear mode validation
-      if (currentCut.linearFeet <= 0 || currentCut.cutDepth <= 0) {
-        showNotification('Please specify both linear feet and cut depth', 'warning');
-        return;
-      }
-
-      if (selectedBlades.length === 0) {
-        const itemType = isChainsaw(currentItem) ? 'chain size' : 'blade type';
-        showNotification(`Please select at least one ${itemType} used`, 'warning');
-        return;
-      }
-
-      const cutToAdd: SawingCut = {
-        ...currentCut,
-        inputMode: 'linear',
-        bladesUsed: [...selectedBlades]
-      };
-
-      setSawingData(prev => ({
-        ...prev,
-        cuts: [...prev.cuts, cutToAdd]
-      }));
     }
+
+    if (currentCut.linearFeet <= 0 || currentCut.cutDepth <= 0) return null;
+    return { ...currentCut, inputMode: 'linear', bladesUsed: [...selectedBlades] };
+  };
+
+  const addCut = () => {
+    const cutToAdd = buildPendingCut();
+    if (!cutToAdd) {
+      showNotification(
+        cutInputMode === 'area'
+          ? 'Add at least one cut area — length, width and depth'
+          : 'Please specify both linear feet and cut depth',
+        'warning'
+      );
+      return;
+    }
+
+    setSawingData(prev => ({
+      ...prev,
+      cuts: [...prev.cuts, cutToAdd]
+    }));
 
     // Reset current cut for next entry
     setCurrentCut({
@@ -1059,10 +1100,16 @@ export default function WorkPerformed() {
     }
 
     const totalSquareFeet = calculateBreakRemoveTotal();
-    const notes = `Removal Method: ${removalMethod}${removalEquipment ? ` (${removalEquipment})` : ''} | Total: ${totalSquareFeet.toFixed(2)} sq ft`;
 
+    // Structured detail, NOT a generated notes string — the string both threw
+    // the numbers away and clobbered whatever quick note the operator typed.
+    setDemolitionData({
+      areas: breakRemoveAreas.map(a => ({ length: a.length, width: a.width, depth: a.depth })),
+      totalSquareFeet,
+      method: removalMethod,
+      equipment: removalEquipment || undefined,
+    });
     setCurrentQuantity(totalSquareFeet);
-    setCurrentNotes(notes);
 
     // Close modal and reset
     setShowBreakRemoveModal(false);
@@ -1116,10 +1163,13 @@ export default function WorkPerformed() {
 
     const equipment = jackhammerEquipment === 'other' ? jackhammerOther : jackhammerEquipment;
     const totalSquareFeet = calculateJackhammerTotal();
-    const notes = `Equipment: ${equipment} | Total: ${totalSquareFeet.toFixed(2)} sq ft`;
 
+    setDemolitionData({
+      areas: jackhammerAreas.map(a => ({ length: a.length, width: a.width })),
+      totalSquareFeet,
+      equipment: equipment || undefined,
+    });
     setCurrentQuantity(totalSquareFeet);
-    setCurrentNotes(notes);
 
     // Close modal and reset
     setShowJackhammerModal(false);
@@ -1169,10 +1219,13 @@ export default function WorkPerformed() {
 
     const totalSquareFeet = calculateBrokkTotal();
     const avgThickness = brokkAreas.reduce((sum, area) => sum + area.thickness, 0) / brokkAreas.length;
-    const notes = `Total: ${totalSquareFeet.toFixed(2)} sq ft | Avg Thickness: ${avgThickness.toFixed(1)}"`;
 
+    setDemolitionData({
+      areas: brokkAreas.map(a => ({ length: a.length, width: a.width, thickness: a.thickness })),
+      totalSquareFeet,
+      avgThicknessInches: Math.round(avgThickness * 10) / 10,
+    });
     setCurrentQuantity(totalSquareFeet);
-    setCurrentNotes(notes);
 
     // Close modal and reset
     setShowBrokkModal(false);
@@ -1246,38 +1299,75 @@ export default function WorkPerformed() {
 
   const handleAddItem = () => {
     const existingIndex = selectedItems.findIndex(item => item.name === currentItem);
+    // A draft saved BEFORE the per-type "Additional Notes" textareas were
+    // unified into Quick Notes still carries text on coreDrillingData.notes /
+    // sawingData.notes. Fall back to it so a draft left open across the deploy
+    // doesn't silently drop what the operator already wrote.
+    const quickNote =
+      currentNotes.trim() ||
+      (isCoreDrilling(currentItem) ? (coreDrillingData.notes || '').trim() : '') ||
+      (isSawing(currentItem) ? (sawingData.notes || '').trim() : '');
 
     // Prepare detailed data based on item type
-    let details: CoreDrillingDetails | SawingDetails | GeneralDetails | undefined;
+    let details: CoreDrillingDetails | SawingDetails | DemolitionDetails | GeneralDetails | undefined;
+    let itemQuantity = currentQuantity;
 
     if (isCoreDrilling(currentItem)) {
-      if (coreDrillingData.holes.length === 0) {
+      // AUTO-FLUSH: a hole typed into the input row but never committed with
+      // "Add This Hole" used to be silently discarded, and the operator got
+      // "add at least one hole" for data they could see on screen.
+      const pendingHole = buildPendingHole();
+      const holes = pendingHole ? [...coreDrillingData.holes, pendingHole] : coreDrillingData.holes;
+      if (holes.length === 0) {
         showNotification('Please add at least one hole entry with size and depth', 'warning');
         return;
       }
-      details = { ...coreDrillingData };
+      details = { ...coreDrillingData, holes, notes: quickNote || undefined };
+      itemQuantity = holes.reduce((total, hole) => total + (hole.quantity || 1), 0);
+      // Mirror the flush into state so the summary + list match what we saved.
+      if (pendingHole) {
+        setCoreDrillingData(prev => ({ ...prev, holes: [...prev.holes, pendingHole] }));
+        setCurrentHole({ bitSize: '', depthInches: 0, quantity: 1, plasticSetup: false, cutSteel: false, steelEncountered: '' });
+      }
     } else if (isSawing(currentItem)) {
-      if (sawingData.cuts.length === 0) {
+      // AUTO-FLUSH: same for a cut (or an L×W area) left in the input row.
+      const pendingCut = buildPendingCut();
+      const cuts = pendingCut ? [...sawingData.cuts, pendingCut] : sawingData.cuts;
+      if (cuts.length === 0) {
         showNotification('Please add at least one cut entry with linear feet and depth', 'warning');
         return;
       }
-      details = { ...sawingData };
+      details = { ...sawingData, cuts, notes: quickNote || undefined };
+      itemQuantity = cuts.reduce((total, cut) => total + cut.linearFeet, 0);
+      if (pendingCut) {
+        setSawingData(prev => ({ ...prev, cuts: [...prev.cuts, pendingCut] }));
+        setCurrentCut({
+          inputMode: 'linear', linearFeet: 0, cutDepth: 0, areas: [], bladesUsed: [],
+          cutSteel: false, steelEncountered: '', overcut: false, chainsawed: false,
+          chainsawAreas: 0, chainsawWidthInches: 0
+        });
+        setSelectedBlades([]);
+        setTempAreas([]);
+        setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, cutSteel: false, overcut: false, steelEncountered: '', chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+      }
+    } else if (
+      demolitionData &&
+      (isBreakAndRemove(currentItem) || isJackHammering(currentItem) || isChipping(currentItem) || isBrokk(currentItem))
+    ) {
+      // Break & remove / jack hammering / chipping / Brokk quick entries.
+      // Predicate-guarded so a stale demolitionData can never attach an
+      // areas[] payload to an unrelated work type.
+      details = { ...demolitionData, notes: quickNote || undefined };
+      itemQuantity = demolitionData.totalSquareFeet || currentQuantity;
     }
-
-    // For core drilling, use total holes as quantity; for sawing, use total linear feet; otherwise use currentQuantity
-    const itemQuantity = isCoreDrilling(currentItem)
-      ? getTotalHoles()
-      : isSawing(currentItem)
-      ? getTotalLinearFeet()
-      : currentQuantity;
 
     if (existingIndex >= 0) {
       // Update existing item
       const updated = [...selectedItems];
       updated[existingIndex].quantity = itemQuantity; // Replace instead of add for core drilling
-      if (currentNotes) {
-        updated[existingIndex].notes = currentNotes;
-      }
+      // Quick notes are optional — an empty box must be able to CLEAR a note,
+      // not silently keep a stale one.
+      updated[existingIndex].notes = quickNote || undefined;
       if (details) {
         updated[existingIndex].details = details;
       }
@@ -1287,7 +1377,7 @@ export default function WorkPerformed() {
       const newItem: WorkItem = {
         name: currentItem,
         quantity: itemQuantity,
-        notes: currentNotes
+        notes: quickNote || undefined
       };
 
       if (details) {
@@ -1309,6 +1399,7 @@ export default function WorkPerformed() {
     setCurrentNotes('');
     setCoreDrillingData({ holes: [], notes: '' });
     setSawingData({ cuts: [], cutType: 'wet', notes: '' });
+    setDemolitionData(null);
     setCurrentCut({
       inputMode: 'linear',
       linearFeet: 0,
@@ -2028,10 +2119,14 @@ export default function WorkPerformed() {
                           <span className="text-xs font-semibold text-gray-500 dark:text-white/50 bg-gray-200 dark:bg-white/10 px-2 py-0.5 rounded-full">
                             Qty: {item.quantity}
                           </span>
-                          {item.notes && (
-                            <span className="text-xs text-gray-500 dark:text-white/40 truncate max-w-[150px]">{item.notes}</span>
-                          )}
                         </div>
+                        {/* Quick note in full — truncating it to 150px hid the
+                            exact detail the office asked operators to write. */}
+                        {item.notes && (
+                          <p className="mt-1.5 border-l-2 border-brand/40 pl-2 text-xs leading-relaxed whitespace-pre-wrap text-gray-600 dark:text-white/60">
+                            {item.notes}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() => handleRemoveItem(item.name)}
@@ -2092,16 +2187,20 @@ export default function WorkPerformed() {
                                         </div>
                                       </div>
                                     )}
-                                    <div className="flex flex-wrap gap-1 text-xs mt-1">
-                                      <span className="text-gray-500">
-                                        {isChainsaw(item.name) ? 'Chains:' : 'Blades:'}
-                                      </span>
-                                      {cut.bladesUsed.map((blade, bladeIndex) => (
-                                        <span key={bladeIndex} className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">
-                                          {blade}
+                                    {/* Blades are optional — don't render a
+                                        dangling "Blades:" label with nothing after it. */}
+                                    {cut.bladesUsed.length > 0 && (
+                                      <div className="flex flex-wrap gap-1 text-xs mt-1">
+                                        <span className="text-gray-500">
+                                          {isChainsaw(item.name) ? 'Chains:' : 'Blades:'}
                                         </span>
-                                      ))}
-                                    </div>
+                                        {cut.bladesUsed.map((blade, bladeIndex) => (
+                                          <span key={bladeIndex} className="px-1 py-0.5 bg-blue-100 text-blue-700 rounded">
+                                            {blade}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
                                     {cut.cutSteel && cut.steelEncountered && (
                                       <div className="mt-1 text-xs">
                                         <span className="text-gray-500">Steel:</span>
@@ -2376,11 +2475,12 @@ export default function WorkPerformed() {
             <div className="bg-white dark:bg-white/[0.05] rounded-2xl border border-gray-100 dark:border-white/10 p-5 shadow-sm mb-4">
               <div className="flex items-center gap-2 mb-3">
                 <Mic className="w-5 h-5 text-brand" />
-                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Notes</h3>
+                <h3 className="text-sm font-bold text-gray-900 dark:text-white">Job Notes — the whole day</h3>
                 <span className="text-xs text-gray-400 dark:text-white/40">(voice or typed)</span>
               </div>
               <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
-                Describe work performed, conditions encountered, or anything noteworthy. Use the mic button to dictate notes hands-free.
+                Anything about the day overall — site conditions, hold-ups, who you worked with.
+                Notes about a <span className="font-semibold">specific work item</span> go in that item&apos;s Quick notes instead.
               </p>
               <VoiceMemoNotes
                 notes={voiceNotes}
@@ -2707,17 +2807,9 @@ export default function WorkPerformed() {
                     )}
 
 
-                    {/* Core Drilling Notes */}
-                    <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Additional Notes</label>
-                      <textarea
-                        value={coreDrillingData.notes}
-                        onChange={(e) => setCoreDrillingData(prev => ({ ...prev, notes: e.target.value }))}
-                        placeholder="Any additional details about the core drilling work..."
-                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
-                        rows={3}
-                      />
-                    </div>
+                    {/* Notes for this item live in the shared QUICK NOTES block
+                        below — one field for every work type, always after the
+                        numbers. */}
                   </div>
                 )}
 
@@ -2740,36 +2832,42 @@ export default function WorkPerformed() {
                         Add Cut Entry
                       </h5>
 
-                      {/* Input Mode Toggle - Show only for Hand Saw */}
-                      {isHandSaw(currentItem) && (
-                        <div className="mb-4 bg-white rounded-lg p-3">
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Cut Specification Method</label>
-                          <div className="flex gap-3">
-                            <button
-                              type="button"
-                              onClick={() => setCutInputMode('linear')}
-                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                                cutInputMode === 'linear'
-                                  ? 'bg-blue-500 text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              Linear Feet
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setCutInputMode('area')}
-                              className={`flex-1 px-4 py-2 rounded-lg font-medium transition-all ${
-                                cutInputMode === 'area'
-                                  ? 'bg-blue-500 text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              Cut Areas (L × W)
-                            </button>
-                          </div>
+                      {/* Input Mode Toggle — available for EVERY saw type. It
+                          used to be gated to Hand Saw, which left slab/wall/
+                          wire/ring/push crews with no way to report an L × W
+                          area even though the whole area path already worked. */}
+                      <div className="mb-4 bg-gray-50 dark:bg-white/[0.04] rounded-xl p-3 border border-gray-200 dark:border-white/10">
+                        <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">How do you want to enter this cut?</label>
+                        <div className="flex gap-3">
+                          <button
+                            type="button"
+                            onClick={() => setCutInputMode('linear')}
+                            className={`flex-1 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all border-2 ${
+                              cutInputMode === 'linear'
+                                ? 'border-brand bg-brand text-white shadow-md'
+                                : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-700 dark:text-white/70 hover:border-brand'
+                            }`}
+                          >
+                            Linear Feet
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCutInputMode('area')}
+                            className={`flex-1 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all border-2 ${
+                              cutInputMode === 'area'
+                                ? 'border-brand bg-brand text-white shadow-md'
+                                : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-700 dark:text-white/70 hover:border-brand'
+                            }`}
+                          >
+                            Cut Areas (L × W)
+                          </button>
                         </div>
-                      )}
+                        {cutInputMode === 'area' && (
+                          <p className="mt-2 text-xs text-gray-500 dark:text-white/45">
+                            Linear feet are calculated from the perimeter of each area (2 × L + 2 × W).
+                          </p>
+                        )}
+                      </div>
 
                       {/* LINEAR MODE - Traditional linear feet input */}
                       {cutInputMode === 'linear' && (
@@ -3217,7 +3315,8 @@ export default function WorkPerformed() {
                       {/* Blade Selection */}
                       <div className="mb-4">
                         <label className="block text-sm font-bold text-gray-900 dark:text-white mb-3 border-l-4 border-brand pl-3">
-                          {isChainsaw(currentItem) ? 'Chain Size Used' : 'Blades Used'} — select all that apply
+                          {isChainsaw(currentItem) ? 'Chain Size Used' : 'Blades Used'}{' '}
+                          <span className="font-medium text-gray-500 dark:text-white/45">— optional, select any that apply</span>
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                           {getBladesForSawType(currentItem).map((blade) => (
@@ -3369,16 +3468,18 @@ export default function WorkPerformed() {
                                   </div>
                                 </div>
                               )}
-                              <div className="flex flex-wrap gap-1 text-xs">
-                                <span className="text-gray-500 dark:text-white/40">
-                                  {isChainsaw(currentItem) ? 'Chains:' : 'Blades:'}
-                                </span>
-                                {cut.bladesUsed.map((blade, bladeIndex) => (
-                                  <span key={bladeIndex} className="px-2 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-medium">
-                                    {blade}
+                              {cut.bladesUsed.length > 0 && (
+                                <div className="flex flex-wrap gap-1 text-xs">
+                                  <span className="text-gray-500 dark:text-white/40">
+                                    {isChainsaw(currentItem) ? 'Chains:' : 'Blades:'}
                                   </span>
-                                ))}
-                              </div>
+                                  {cut.bladesUsed.map((blade, bladeIndex) => (
+                                    <span key={bladeIndex} className="px-2 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-medium">
+                                      {blade}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
                               {cut.cutSteel && cut.steelEncountered && (
                                 <div className="mt-2 text-xs">
                                   <span className="text-gray-500 dark:text-white/40">Steel type:</span>
@@ -3391,17 +3492,7 @@ export default function WorkPerformed() {
                       </div>
                     )}
 
-                    {/* Sawing Notes */}
-                    <div>
-                      <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">Additional Notes</label>
-                      <textarea
-                        value={sawingData.notes}
-                        onChange={(e) => setSawingData(prev => ({ ...prev, notes: e.target.value }))}
-                        placeholder="Any additional details about the sawing work..."
-                        className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
-                        rows={3}
-                      />
-                    </div>
+                    {/* Notes live in the shared QUICK NOTES block below. */}
                   </div>
                 )}
 
@@ -3466,21 +3557,69 @@ export default function WorkPerformed() {
                   </div>
                 )}
 
-                {/* General Notes for non-specialized items */}
-                {!isCoreDrilling(currentItem) && !isSawing(currentItem) && (
-                  <div>
-                    <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">
-                      {(isBreakAndRemove(currentItem) || isJackHammering(currentItem) || isChipping(currentItem) || isBrokk(currentItem)) ? 'Quantity/Notes (Auto-filled by Quick Entry)' : 'Notes'}
-                    </label>
-                    <textarea
-                      value={currentNotes}
-                      onChange={(e) => setCurrentNotes(e.target.value)}
-                      placeholder="Add any notes about this work item..."
-                      className="w-full px-4 py-3 border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 dark:focus:ring-brand/20 focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] placeholder:text-gray-400 dark:placeholder:text-white/30"
-                      rows={3}
-                    />
+                {/* Demolition quick-entry result — the numbers the modal just
+                    computed. These used to be flattened into a notes string
+                    (which also wiped the operator's own note); they're real
+                    structured detail now, so show them as data. */}
+                {demolitionData && !isCoreDrilling(currentItem) && !isSawing(currentItem) && (
+                  <div className="mb-4 rounded-2xl border-2 border-brand/30 dark:border-brand/25 bg-brand/[0.04] dark:bg-brand/10 p-4">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <span className="text-sm font-bold text-gray-900 dark:text-white">Recorded</span>
+                      <span className="text-xl font-black text-brand">{demolitionData.totalSquareFeet.toFixed(1)} sq ft</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5 text-xs">
+                      {demolitionData.areas.map((a, i) => (
+                        <span key={i} className="px-2 py-1 rounded-lg bg-white dark:bg-white/[0.06] text-gray-700 dark:text-white/70 font-medium border border-gray-200 dark:border-white/10">
+                          {a.length}&apos; × {a.width}&apos;
+                          {(a.thickness || a.depth) ? ` @ ${a.thickness || a.depth}"` : ''}
+                        </span>
+                      ))}
+                      {demolitionData.method && (
+                        <span className="px-2 py-1 rounded-lg bg-rose-100 dark:bg-rose-500/15 text-rose-700 dark:text-rose-300 font-semibold">
+                          {demolitionData.method}
+                        </span>
+                      )}
+                      {demolitionData.equipment && (
+                        <span className="px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-500/15 text-amber-700 dark:text-amber-300 font-semibold">
+                          {demolitionData.equipment}
+                        </span>
+                      )}
+                    </div>
                   </div>
                 )}
+
+                {/* ── QUICK NOTES ─────────────────────────────────────────────
+                    The founder's headline ask: after the numbers, one obvious,
+                    optional box for HOW the job actually went. Same field for
+                    every work type, canonical home = work_items.notes. This is
+                    the PER-ITEM note; the page's "Job Notes" card covers the
+                    whole day. */}
+                <div className="rounded-2xl border-2 border-brand/40 dark:border-brand/30 bg-brand/[0.04] dark:bg-brand/10 p-4">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <MessageSquarePlus className="w-5 h-5 text-brand flex-shrink-0" />
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white">Quick notes</h4>
+                    <span className="text-xs font-medium text-gray-500 dark:text-white/45">(optional)</span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-white/55 mb-3">
+                    Prep, access, delays — anything that affected this{' '}
+                    <span className="font-semibold text-gray-800 dark:text-white/80">{currentItem.toLowerCase()}</span> work.
+                    Tap the mic to talk instead of type.
+                  </p>
+                  <VoiceMemoNotes
+                    compact
+                    notes={currentNotes}
+                    onNotesChange={setCurrentNotes}
+                    placeholder="Set poly. Access was tight. Waited on the contractor."
+                  />
+                  {/* Honesty about the audience: the placeholder coaches candid
+                      prose, so the operator has to know it stays in-house.
+                      Enforced server-side — the customer portal, the signature
+                      page and the signed PDF do not select work_items.notes. */}
+                  <p className="mt-2 text-[11px] leading-relaxed text-gray-500 dark:text-white/45">
+                    Office only — quick notes stay internal. They are not shown to the customer
+                    and never appear on the signed completion sheet.
+                  </p>
+                </div>
               </div>
 
               <div className="flex gap-3 mt-6">

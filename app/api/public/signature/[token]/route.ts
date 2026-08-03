@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendSMS, formatPhoneNumber } from '@/lib/sms';
 import { sendEmail, getTenantEmailBranding, generateCustomerSurveyThankYouEmail } from '@/lib/email';
 import { generateAndUploadCompletionPdf } from '@/lib/generate-completion-pdf';
+import { stripInternalNotes, toCompletionPdfWorkItems } from '@/lib/work-items-format';
 
 export async function GET(
   request: NextRequest,
@@ -69,9 +70,11 @@ export async function GET(
     }
 
     // Fetch work items for this job
+    // NO `notes`: the per-item quick note is the operator's INTERNAL narrative
+    // for the office. The customer-facing sign page shows quantities only.
     const { data: workItems } = await supabaseAdmin
       .from('work_items')
-      .select('work_type, quantity, notes, core_quantity, core_size, linear_feet_cut')
+      .select('work_type, quantity, core_quantity, core_size, linear_feet_cut')
       .eq('job_order_id', sigRequest.job_order_id)
       .order('created_at', { ascending: true });
 
@@ -102,7 +105,12 @@ export async function GET(
         tenant_name: tenantName,
         form_template: sigRequest.form_templates || null,
         work_items: workItems || [],
-        daily_logs: dailyLogs || [],
+        // Same jsonb payload as the portal — strip the internal quick notes
+        // before serving them from this token-only public endpoint.
+        daily_logs: (dailyLogs || []).map((log) => ({
+          ...log,
+          work_performed: stripInternalNotes(log.work_performed),
+        })),
         job: job ? {
           job_number: job.job_number,
           customer_name: job.customer_name,
@@ -230,12 +238,20 @@ export async function POST(
 
           if (!jobForPdf) return;
 
-          // Fetch work items
+          // Fetch work items. NO `notes` — the quick note is the operator's
+          // internal narrative and must never land on the signed customer PDF.
+          // The PDF's description column is built from the MEASUREMENTS
+          // instead (it previously rendered notes, so dropping the column
+          // without this mapping would have blanked every row).
           const { data: workItems } = await supabaseAdmin
             .from('work_items')
-            .select('work_type, quantity, notes, core_quantity, core_size, linear_feet_cut')
+            // Keep this a single string literal — a concatenated select breaks
+            // supabase-js's row-type inference and the rows widen to errors.
+            .select('work_type, quantity, core_quantity, core_size, core_depth_inches, linear_feet_cut, cut_depth_inches, details_json')
             .eq('job_order_id', sigRequest.job_order_id)
             .order('created_at', { ascending: true });
+
+          const pdfWorkItems = toCompletionPdfWorkItems(workItems);
 
           const { pdfUrl } = await generateAndUploadCompletionPdf({
             jobId: sigRequest.job_order_id,
@@ -243,7 +259,7 @@ export async function POST(
             job: jobForPdf,
             signerName: signer_name || null,
             signatureDataUrl: signature_data || null,
-            workPerformed: workItems || [],
+            workPerformed: pdfWorkItems,
           });
 
           // Persist the PDF URL

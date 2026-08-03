@@ -69,6 +69,19 @@ function describeHole(h: any): string {
   return s;
 }
 
+/** Trims float noise off computed totals (48.000000001 → 48). */
+const round2 = (v: number): number => Math.round(v * 100) / 100;
+
+/** `4' × 6' @ 8"` descriptor for one demolition/removal area (break & remove,
+ *  jack hammering, chipping, Brokk). `thickness` and `depth` are the same
+ *  measurement under two names across the three quick-entry modals. */
+function describeDemoArea(a: any): string {
+  let s = `${round2(n(a?.length))}' × ${round2(n(a?.width))}'`;
+  const thick = n(a?.thickness) || n(a?.depth);
+  if (thick > 0) s += ` @ ${round2(thick)}"`;
+  return s;
+}
+
 /** `120 LF @ 6"` style descriptor for one sawing cut spec. */
 function describeCut(c: any): string {
   const lf = n(c?.linearFeet);
@@ -108,6 +121,21 @@ export function workItemDetailLine(item: WorkItemLike): string {
     return d.cutType ? `${cuts} (${d.cutType})` : cuts;
   }
 
+  // Demolition / removal quick entries (break & remove, jack hammering,
+  // chipping, Brokk) — a TOP-LEVEL `areas[]`. Sawing areas live nested under
+  // `cuts[i].areas`, so this branch can't collide with the sawing shape above.
+  if (d && Array.isArray(d.areas) && d.areas.length > 0) {
+    const total =
+      n(d.totalSquareFeet) ||
+      d.areas.reduce((sum: number, a: any) => sum + n(a?.length) * n(a?.width), 0);
+    let s = `${round2(total)} sq ft`;
+    const list = d.areas.map(describeDemoArea).join(', ');
+    if (list) s += ` (${list})`;
+    const meta = [d.method, d.equipment].filter(Boolean).map(String);
+    if (meta.length) s += ` — ${meta.join(': ')}`;
+    return s;
+  }
+
   // Fallback: flat back-compat columns (first-hole flattening, LF totals).
   const parts: string[] = [];
   if (n(item.core_quantity) > 0) {
@@ -129,15 +157,118 @@ export function workItemDetailLine(item: WorkItemLike): string {
 const truncate = (s: string, max: number): string =>
   s.length > max ? `${s.slice(0, max - 1).trimEnd()}…` : s;
 
-/** One work item as a readable summary fragment: label ×qty + detail + note. */
+/**
+ * The operator's per-item QUICK NOTE — prep, access, delays, anything that
+ * affected the job. CANONICAL HOME: the `work_items.notes` column. Older rows
+ * (and the pre-Aug-2026 core/sawing "Additional Notes" textareas) only wrote
+ * `details_json.notes`, so fall back to it when the column is empty.
+ */
+export function workItemQuickNote(item: WorkItemLike): string {
+  const flat = typeof item.notes === 'string' ? item.notes.trim() : '';
+  if (flat) return flat;
+  const nested = item.details_json?.notes;
+  return typeof nested === 'string' ? nested.trim() : '';
+}
+
+/** One work item as a readable summary fragment: label ×qty + detail + note.
+ *  The note cap is deliberately generous (160, not 80): the founder's ask is a
+ *  narrative of conditions, and one sentence of "set poly, access was tight,
+ *  waited on the contractor" is the point of the field. */
 export function summarizeWorkItem(item: WorkItemLike): string {
   const label = item.work_type || 'Work';
   const qty = n(item.quantity) || 1;
   let s = `${label} ×${qty}`;
   const detail = workItemDetailLine(item);
   if (detail) s += ` (${detail})`;
-  if (item.notes) s += ` — ${truncate(String(item.notes), 80)}`;
+  const note = workItemQuickNote(item);
+  // Collapse dictation newlines — this string is prose in one line.
+  if (note) s += ` — ${truncate(note.replace(/\s*\n+\s*/g, ' '), 160)}`;
   return s;
+}
+
+// ── Customer-facing boundary ────────────────────────────────────────────────
+// The quick note is the operator's INTERNAL narrative for the office (prep,
+// access, delays, who held us up). Everything below strips it, so no caller —
+// including one passing a client-supplied array — can put it in front of a
+// customer.
+
+/** The ONLY work-item shape allowed onto a customer-signed completion PDF. */
+export interface CompletionPdfWorkItem {
+  type: string;
+  quantity?: number;
+  description: string;
+}
+
+type LooseWorkItem = WorkItemLike & {
+  type?: string | null;
+  name?: string | null;
+  unit?: string | null;
+  depth?: number | null;
+  /** The offline/localStorage shape stores measurements under `details`, not
+   *  `details_json` — without this the PDF description came out blank. */
+  details?: any;
+};
+
+/**
+ * Normalizes any work-item shape (DB row OR client-posted object) down to
+ * measurements only. `notes` and `details_json.notes` are dropped here, at the
+ * trust boundary — callers cannot opt back in.
+ */
+export function toCompletionPdfWorkItems(
+  items: unknown[] | null | undefined
+): CompletionPdfWorkItem[] {
+  if (!Array.isArray(items)) return [];
+  return items.map((raw) => {
+    const item = (raw || {}) as LooseWorkItem;
+    const type = item.work_type || item.type || item.name || 'Work Item';
+    // Prefer the real measurements; fall back to the depth for legacy client
+    // payloads that carry no details_json. Quantity is deliberately NOT
+    // repeated here — the PDF renders it in its own Qty column.
+    // `details` is the offline/localStorage alias of `details_json`.
+    let description = workItemDetailLine({
+      ...item,
+      details_json: item.details_json ?? item.details,
+    });
+    if (!description) {
+      const depth = n(item.depth);
+      description = depth > 0 ? `${depth}" depth` : '';
+    }
+    const qtyOut = Number(item.quantity);
+    return {
+      type: String(type),
+      ...(isFinite(qtyOut) ? { quantity: qtyOut } : {}),
+      description,
+    };
+  });
+}
+
+/**
+ * Strips internal notes out of a `daily_job_logs.work_performed` jsonb payload
+ * before it crosses a PUBLIC (token-only, unauthenticated) boundary. Applied on
+ * READ, not on write: admin surfaces (WorkHistoryTimeline, job detail) render
+ * these notes on purpose, and read-side stripping also protects rows already
+ * written.
+ */
+export function stripInternalNotes(workPerformed: unknown): unknown {
+  // Recursive: the offline/localStorage payload carries the quick note TWICE —
+  // once at the top level and once mirrored into `details.notes` (the mirror is
+  // deliberate, for legacy readers). Stripping only the outer key left the same
+  // prose on the public endpoint, so every nested object is scrubbed too.
+  const scrub = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(scrub);
+    if (!value || typeof value !== 'object') return value;
+    const out: Record<string, unknown> = {};
+    for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+      // `quickNotes` is forward-looking: no writer uses that key today, but if
+      // one is ever added for the internal note it is scrubbed from day one.
+      if (key === 'notes' || key === 'quickNotes') continue;
+      out[key] = scrub(v);
+    }
+    return out;
+  };
+  // Not just arrays: WorkHistoryTimeline already anticipates object-shaped
+  // legacy rows, and `scrub` returns primitives unchanged, so this is safe.
+  return scrub(workPerformed);
 }
 
 /**

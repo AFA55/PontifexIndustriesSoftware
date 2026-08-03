@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { workItemDetailLine } from '@/lib/work-items-format';
 
 export async function POST(request: NextRequest) {
   try {
@@ -249,25 +250,17 @@ export async function POST(request: NextRequest) {
       const lines: string[] = [];
       for (const item of workItems) {
         const wt = item.work_type || 'Work';
-        let line = '';
-        if (item.core_quantity) {
-          const size = item.core_size ? `${item.core_size}` : '';
-          const depth = item.core_depth_inches ? `${item.core_depth_inches}in` : '';
-          const dims = [size, depth].filter(Boolean).join(' × ');
-          line = `- ${wt} — ${item.core_quantity} cores${dims ? ` @ ${dims}` : ''}`;
-        } else if (item.linear_feet_cut) {
-          const depth = item.cut_depth_inches ? ` @ ${item.cut_depth_inches}in deep` : '';
-          line = `- ${wt} — ${item.linear_feet_cut} LF${depth}`;
-        } else {
-          const qty = item.quantity ? `${item.quantity}` : '';
-          line = `- ${wt}${qty ? ` — ${qty}` : ''}`;
-        }
-        line = truncate(line, 120);
-        if (item.notes && String(item.notes).trim()) {
-          const notesTrim = truncate(String(item.notes).trim().replace(/\s+/g, ' '), 120);
-          line += `\n  ${notesTrim}`;
-        }
-        lines.push(line);
+        // Expand details_json — this used to read the flat columns only, so a
+        // demolition item (which sets neither core_* nor linear_feet_cut)
+        // degraded to a bare "- BREAK & REMOVE — 48" and lost the areas,
+        // removal method and equipment entirely.
+        const detail = workItemDetailLine(item);
+        const fallbackQty = item.quantity ? `${item.quantity}` : '';
+        const suffix = detail || fallbackQty;
+        // NO item.notes: the quick note is the operator's internal narrative.
+        // "Use Operator's Description" copies this summary straight onto a
+        // customer invoice line, so it must stay measurements-only.
+        lines.push(truncate(`- ${wt}${suffix ? ` — ${suffix}` : ''}`, 200));
       }
       workPerformedSummary = lines.join('\n');
     } else {

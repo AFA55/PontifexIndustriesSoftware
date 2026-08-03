@@ -280,11 +280,13 @@ export default function CompletedTicketPrintPage({ params }: { params: Promise<{
                 // Expand details_json (every hole size/depth, LF @ depth,
                 // wet/dry) instead of the bare qty/LF totals.
                 const detail = workItemDetailLine(w);
+                // Measurements only. The operator's quick note is the INTERNAL
+                // conditions narrative for the office — this sheet is printed
+                // for the customer to sign, so it must not carry it.
                 const parts = [
                   w.work_type || w.details_json?.description || 'Work',
                   w.quantity != null && Number(w.quantity) > 0 ? `qty ${w.quantity}` : null,
                   detail || null,
-                  w.notes || null,
                 ].filter(Boolean);
                 return (
                   <li key={w.id}>

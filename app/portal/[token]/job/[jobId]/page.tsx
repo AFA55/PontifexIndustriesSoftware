@@ -29,7 +29,8 @@ import LiveRouteTracker from '@/components/portal/LiveRouteTracker';
 interface WorkItem {
   work_type: string | null;
   quantity: number | null;
-  notes: string | null;
+  // No `notes` — operator quick notes are office-internal and the portal API
+  // does not select them. Don't re-add it here.
   core_quantity: number | null;
   core_size: string | null;
   linear_feet_cut: number | null;
@@ -471,10 +472,9 @@ export default function PortalJobDetailPage() {
             <ul className="space-y-3">
               {work_items.map((item, idx) => (
                 <li key={idx} className="bg-black/20 rounded-xl p-3">
+                  {/* Numbers only — the operator's quick note is internal to
+                      the office and is not selected by the portal API. */}
                   <p className="text-sm font-medium text-white capitalize">{describeWorkItem(item)}</p>
-                  {item.notes && (
-                    <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap break-words">{item.notes}</p>
-                  )}
                 </li>
               ))}
             </ul>

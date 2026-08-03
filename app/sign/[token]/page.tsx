@@ -26,7 +26,8 @@ interface FormField {
 interface WorkItem {
   work_type: string;
   quantity: number;
-  notes?: string;
+  // No `notes` — operator quick notes are office-internal and the signature
+  // API does not select them. Don't re-add it here.
   core_quantity?: number;
   core_size?: string;
   linear_feet_cut?: number;

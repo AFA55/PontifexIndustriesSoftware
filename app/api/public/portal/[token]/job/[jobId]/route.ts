@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { stripInternalNotes } from '@/lib/work-items-format';
 
 export async function GET(
   request: NextRequest,
@@ -97,14 +98,19 @@ export async function GET(
     // Fetch work items
     const { data: workItems } = await supabaseAdmin
       .from('work_items')
-      .select('work_type, quantity, notes, core_quantity, core_size, linear_feet_cut, created_at')
+      // NO `notes`: the per-item quick note is the operator's INTERNAL
+      // narrative for the office (prep, access, delays, who held us up). It is
+      // deliberately never exposed to the customer.
+      .select('work_type, quantity, core_quantity, core_size, linear_feet_cut, created_at')
       .eq('job_order_id', jobId)
       .order('created_at', { ascending: true });
 
     // Fetch daily logs
     const { data: dailyLogs } = await supabaseAdmin
       .from('daily_job_logs')
-      .select('log_date, day_number, hours_worked, work_performed, notes, created_at')
+      // NO `notes`: that's the operator's job-level day note ("hold-ups, who
+      // you worked with") — internal to the office, not for the customer.
+      .select('log_date, day_number, hours_worked, work_performed, created_at')
       .eq('job_order_id', jobId)
       .order('log_date', { ascending: true });
 
@@ -158,7 +164,13 @@ export async function GET(
           operator_name: operatorName,
         },
         work_items: workItems || [],
-        daily_logs: dailyLogs || [],
+        // `work_performed` is a jsonb array built from the same objects the
+        // operator submits, so each entry carries the internal quick note.
+        // Strip it before it crosses this token-only public boundary.
+        daily_logs: (dailyLogs || []).map((log) => ({
+          ...log,
+          work_performed: stripInternalNotes(log.work_performed),
+        })),
         change_orders: changeOrders,
         tenant: {
           name: tenantName,

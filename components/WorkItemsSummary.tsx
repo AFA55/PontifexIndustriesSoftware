@@ -12,7 +12,7 @@
  * expandable, so the two surfaces can't drift apart.
  */
 
-import { ratingToDifficultyLabel, workItemDetailLine } from '@/lib/work-items-format';
+import { ratingToDifficultyLabel, workItemDetailLine, workItemQuickNote } from '@/lib/work-items-format';
 
 export interface WorkItemRow {
   id: string;
@@ -120,6 +120,43 @@ function CutList({ cuts, cutType }: { cuts: any[]; cutType?: string }) {
   );
 }
 
+/** Demolition / removal quick entries (break & remove, jack hammering,
+ *  chipping, Brokk) store a TOP-LEVEL `areas[]` + sq-ft total. */
+function DemoAreaList({ details }: { details: any }) {
+  const areas: any[] = Array.isArray(details?.areas) ? details.areas : [];
+  const total =
+    Number(details?.totalSquareFeet) ||
+    areas.reduce((s, a) => s + (Number(a?.length) || 0) * (Number(a?.width) || 0), 0);
+  return (
+    <div className="mt-1">
+      <span className="flex items-center gap-1.5 flex-wrap text-xs text-slate-600 dark:text-white/60">
+        <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/25 flex-shrink-0" />
+        <span className="font-mono">{Math.round(total * 100) / 100} sq ft</span>
+        {details?.method && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300 font-semibold">
+            {details.method}
+          </span>
+        )}
+        {details?.equipment && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300 font-semibold">
+            {details.equipment}
+          </span>
+        )}
+      </span>
+      {areas.length > 0 && (
+        <span className="block pl-2.5 text-[11px] text-slate-400 dark:text-white/35">
+          {areas
+            .map((a: any) => {
+              const thick = Number(a?.thickness) || Number(a?.depth) || 0;
+              return `${Number(a?.length) || 0}' × ${Number(a?.width) || 0}'${thick > 0 ? ` @ ${thick}"` : ''}`;
+            })
+            .join(' · ')}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function WorkItemsSummary({
   items,
   showOperator = false,
@@ -141,10 +178,13 @@ export default function WorkItemsSummary({
         const d = item.details_json;
         const holes = d && Array.isArray(d.holes) && d.holes.length > 0 ? d.holes : null;
         const cuts = d && Array.isArray(d.cuts) && d.cuts.length > 0 ? d.cuts : null;
+        const demoAreas = !holes && !cuts && d && Array.isArray(d.areas) && d.areas.length > 0 ? d : null;
         // Flat-column fallback line only when there's no structured detail.
-        const flatDetail = !holes && !cuts ? workItemDetailLine(item) : '';
+        const flatDetail = !holes && !cuts && !demoAreas ? workItemDetailLine(item) : '';
         const difficulty = ratingToDifficultyLabel(item.accessibility_rating);
-        const detailNote = d?.notes && d.notes !== item.notes ? String(d.notes) : null;
+        // The operator's quick note — canonical `notes` column, falling back to
+        // the legacy details_json.notes so pre-Aug-2026 rows still show it.
+        const quickNote = workItemQuickNote(item);
 
         return (
           <li key={item.id} className="flex items-start gap-2 text-sm">
@@ -174,15 +214,18 @@ export default function WorkItemsSummary({
 
               {holes && <HoleList holes={holes} />}
               {cuts && <CutList cuts={cuts} cutType={d?.cutType} />}
+              {demoAreas && <DemoAreaList details={demoAreas} />}
               {flatDetail && (
                 <p className="text-xs font-mono text-slate-500 dark:text-white/50 mt-0.5">{flatDetail}</p>
               )}
 
-              {item.notes && (
-                <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5">{item.notes}</p>
-              )}
-              {detailNote && (
-                <p className="text-xs text-slate-400 dark:text-white/40 italic mt-0.5">{detailNote}</p>
+              {/* Quick note — the founder's headline field. Full text on its own
+                  line (never truncated, never a chip), pre-wrapped so voice
+                  dictation's line breaks survive. */}
+              {quickNote && (
+                <p className="mt-1.5 border-l-2 border-brand/40 pl-2 text-xs leading-relaxed whitespace-pre-wrap text-slate-600 dark:text-white/65">
+                  {quickNote}
+                </p>
               )}
               {item.accessibility_description && (
                 <p className="text-xs text-slate-400 dark:text-white/40 mt-0.5">
