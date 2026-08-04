@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { Clock, MapPin, Wrench, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { toLocalYMD } from '@/lib/dates';
 
 export interface JobTicketData {
   id: string;
@@ -71,6 +72,12 @@ export interface JobTicketData {
   day_sequence?: number | null;
   // Visible via the per-day assignment ledger only (e.g. day-2 operator)
   viewer_is_daily?: boolean;
+  /**
+   * Status of THIS DAY's ticket for the viewing operator, for the date being
+   * shown: 'submitted' (green), 'started' (opened, not submitted) or 'todo'.
+   */
+  day_ticket_status?: 'submitted' | 'started' | 'todo';
+  day_ticket_date?: string;
   // Utility waiver
   require_waiver_signature?: boolean;
   utility_waiver_signed?: boolean;
@@ -130,16 +137,37 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
   const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
   const isCompleted = job.status === 'completed';
 
-  // Green highlight logic: completed gets full emerald border+bg, doneToday gets softer variant
+  // ── DAY-TICKET STATUS (the founder's DSM reference) ──────────────────────
+  // A card is BLUE while this DAY's ticket still has to be filled in, and
+  // GREEN once it has been submitted. Crucially this is per DAY, not per job —
+  // on a multi-day job you can page back to a day you missed and it still
+  // reads blue, so you know you owe it. `day_ticket_status` comes from
+  // /api/job-orders for the date being viewed.
+  const dayStatus = job.day_ticket_status;
+  const daySubmitted = dayStatus === 'submitted';
+  const dayStarted = dayStatus === 'started';
+  const dayOwed = dayStatus === 'todo' || dayStarted;
+
   const greenBorder = isCompleted
     ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-    : doneToday
+    : (doneToday || daySubmitted)
     ? 'border-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/20'
+    : dayOwed
+    // Unmistakably "this one still needs you" — matches the blue-to-green
+    // language the crew already knows from their old system.
+    ? 'border-blue-400 bg-blue-50/60 dark:bg-blue-900/20 hover:border-blue-500'
     : 'border-gray-200/50 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/30';
 
   return (
     <Link
-      href={`/dashboard/my-jobs/${job.id}`}
+      // Carry the DAY being viewed through to the ticket, so an operator who
+      // paged back to a day they missed lands on that day's ticket rather than
+      // silently on today's.
+      href={
+        job.day_ticket_date && job.day_ticket_date !== toLocalYMD()
+          ? `/dashboard/my-jobs/${job.id}?date=${job.day_ticket_date}`
+          : `/dashboard/my-jobs/${job.id}`
+      }
       className={`block w-full text-left bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] ${greenBorder} ${isCompleted ? 'opacity-80' : ''}`}
     >
       {/* Special Arrival Time Banner */}
@@ -181,6 +209,19 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
               {isCompleted && (
                 <span className="text-xs px-2 py-0.5 bg-emerald-500 text-white rounded-full font-bold border border-emerald-600 shadow-sm">
                   Completed ✓
+                </span>
+              )}
+              {/* Per-DAY ticket state — the operator must be able to tell, at a
+                  glance and on ANY day they page to, whether they still owe a
+                  ticket for that day. */}
+              {!isCompleted && daySubmitted && (
+                <span className="text-xs px-2 py-0.5 bg-emerald-500 text-white rounded-full font-bold border border-emerald-600 shadow-sm">
+                  Ticket submitted ✓
+                </span>
+              )}
+              {!isCompleted && dayOwed && (
+                <span className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded-full font-bold border border-blue-700 shadow-sm">
+                  {dayStarted ? 'Finish this ticket' : 'Ticket to submit'}
                 </span>
               )}
               {!isCompleted && doneToday && (

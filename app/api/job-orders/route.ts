@@ -336,9 +336,21 @@ export async function GET(request: NextRequest) {
       query = query.or('dispatched_at.not.is.null,status.in.(in_progress,on_hold,on_site,pending_completion)');
     }
 
-    // Filter by scheduled_date if provided
+    // Filter by scheduled_date if provided.
+    //
+    // A MULTI-DAY JOB MUST APPEAR ON EVERY DAY IT SPANS, not just its start
+    // date. `.eq('scheduled_date', D)` matched the START only, so on day 2 the
+    // operator opened My Jobs and saw "No jobs for this day" — the crew was on
+    // site with no ticket. (Devin, Aug 4 2026: he could log yesterday but
+    // nothing for today.)
+    //
+    // Overlap test: starts on/before D, and ends on/after D (end_date is NULL
+    // on single-day jobs). A past single-day job correctly drops out because
+    // its end_date is before D.
     if (scheduledDate) {
-      query = query.eq('scheduled_date', scheduledDate);
+      query = query
+        .lte('scheduled_date', scheduledDate)
+        .or(`end_date.is.null,end_date.gte.${scheduledDate}`);
     }
 
     // Date range filters (used by 7-day lookahead on my-jobs)
@@ -472,6 +484,36 @@ export async function GET(request: NextRequest) {
     }
 
     await attachCrew(filteredOrders);
+
+    // ── Per-DAY ticket status, so the schedule can colour each card ─────────
+    // DSM-style (founder's reference): a day's card is BLUE while the ticket
+    // still needs filling in and GREEN once it's submitted — and a day you
+    // missed stays visible so you can go back and complete it. Without this
+    // the operator has no way to tell which days they still owe.
+    if (scheduledDate && filteredOrders.length > 0 && !isAdmin) {
+      const { data: dayLogs } = await supabaseAdmin
+        .from('daily_job_logs')
+        .select('job_order_id, day_completed_at')
+        .eq('operator_id', user.id)
+        .eq('log_date', scheduledDate)
+        .in('job_order_id', filteredOrders.map((j: any) => j.id));
+
+      const closed = new Set(
+        (dayLogs || []).filter((l) => l.day_completed_at).map((l) => l.job_order_id)
+      );
+      const started = new Set((dayLogs || []).map((l) => l.job_order_id));
+
+      for (const j of filteredOrders as any[]) {
+        // 'submitted' → green. 'started' → they began but owe a submit.
+        // 'todo' → nothing entered for this day yet.
+        j.day_ticket_status = closed.has(j.id)
+          ? 'submitted'
+          : started.has(j.id)
+            ? 'started'
+            : 'todo';
+        j.day_ticket_date = scheduledDate;
+      }
+    }
 
     // Annotate helper-view flag per job so the client shows the light view for
     // crew members (not just the helper_assigned_to slot). viewer_is_daily

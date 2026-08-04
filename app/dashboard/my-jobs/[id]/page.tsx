@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import nextDynamic from 'next/dynamic';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
@@ -57,7 +57,14 @@ function getStatusStyle(status: string) {
 export default function JobDetailPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const jobId = params.id as string;
+
+  // The DAY this ticket is being opened for. Set when the operator paged back
+  // to a day they missed on a multi-day job; carried through to work-performed
+  // so their entry lands on that day rather than silently on today.
+  const backfillDate = searchParams?.get('date') || '';
+  const backfillQuery = /^\d{4}-\d{2}-\d{2}$/.test(backfillDate) ? `?date=${backfillDate}` : '';
 
   const [job, setJob] = useState<JobTicketData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -130,7 +137,7 @@ export default function JobDetailPage() {
             const isHelperJob = helperView;
             const lastPage = localStorage.getItem(`job_last_page_${jobId}`);
             if (!isHelperJob && lastPage === 'work-performed' && ['in_route', 'on_site', 'in_progress', 'working', 'pending_completion'].includes(found.status)) {
-              router.replace(`/dashboard/job-schedule/${jobId}/work-performed`);
+              router.replace(`/dashboard/job-schedule/${jobId}/work-performed${backfillQuery}`);
               return;
             }
           } else {
@@ -344,7 +351,9 @@ export default function JobDetailPage() {
     if (job.status === 'in_route') {
       router.push(`/dashboard/my-jobs/${job.id}/jobsite`);
     } else if (job.status === 'in_progress' || job.status === 'pending_completion') {
-      router.push(`/dashboard/job-schedule/${job.id}/work-performed`);
+      // Preserve the day being worked (set when the operator paged back to a
+      // day they missed) so their entry lands on THAT day.
+      router.push(`/dashboard/job-schedule/${job.id}/work-performed${backfillQuery}`);
     }
   };
 

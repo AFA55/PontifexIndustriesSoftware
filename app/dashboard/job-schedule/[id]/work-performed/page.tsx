@@ -4,10 +4,10 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import dynamicImport from 'next/dynamic';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { toLocalYMD } from '@/lib/dates';
+import { toLocalYMD, formatDayLong } from '@/lib/dates';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import { Camera, Mic, Save, Zap, Home, CheckCircle2, ChevronDown, ChevronUp, Send, Loader2, MessageSquarePlus, Clock } from 'lucide-react';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
@@ -213,6 +213,21 @@ interface GeneralDetails {
 export default function WorkPerformed() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
+
+  // ── WHICH DAY IS THIS TICKET FOR? ────────────────────────────────────────
+  // Multi-day jobs: an operator who didn't get their ticket in yesterday has to
+  // be able to page back and submit it for THAT day (the founder's DSM
+  // reference — a day you missed stays on the schedule until you fill it in).
+  // `?date=YYYY-MM-DD` carries the day being viewed; anything malformed or in
+  // the FUTURE falls back to today, so nobody can pre-log work that hasn't
+  // happened.
+  const requestedDate = searchParams?.get('date') || '';
+  const workDate = (() => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) return toLocalYMD();
+    return requestedDate > toLocalYMD() ? toLocalYMD() : requestedDate;
+  })();
+  const isBackfill = workDate !== toLocalYMD();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<WorkItem[]>([]);
   const [showQuantityModal, setShowQuantityModal] = useState(false);
@@ -370,16 +385,15 @@ export default function WorkPerformed() {
     fetchJobInfo();
   }, [params.id]);
 
-  // Check if today's daily log is already submitted (lock the page if so)
+  // Is the ticket for THE DAY BEING VIEWED already submitted? (lock if so)
   useEffect(() => {
     const checkDaySubmitted = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        // LOCAL calendar date — toISOString() is UTC, so after ~5pm PT it
-        // returns TOMORROW and this lookup misses the log the operator just
-        // filed (see CLAUDE.md, lib/dates.ts).
-        const today = toLocalYMD();
+        // The day being logged — NOT necessarily today. Paging back to a day
+        // you missed must show that day's state, not today's.
+        const today = workDate;
         const res = await fetch(`/api/job-orders/${params.id}/daily-log`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
@@ -404,7 +418,8 @@ export default function WorkPerformed() {
       } catch { /* non-critical — default to editable */ }
     };
     checkDaySubmitted();
-  }, [params.id]);
+    // Re-check when the operator pages to a different day.
+  }, [params.id, workDate]);
 
   // Fetch amendment notes already submitted for this job
   const fetchAmendmentNotes = async (accessToken: string) => {
@@ -1571,7 +1586,7 @@ export default function WorkPerformed() {
             difficultyNotes: difficultyNotes.trim() || undefined,
             // Operator-local calendar date — anchors the day-note row
             // (never toISOString; UTC shifts the day).
-            workDate: toLocalYMD(new Date()),
+            workDate,
           })
         });
 
@@ -1876,6 +1891,23 @@ export default function WorkPerformed() {
 
         {!dayAlreadySubmitted && view === 'search' ? (
           <>
+            {/* Filling in a PREVIOUS day — say so loudly. An operator catching
+                up on yesterday must never be in doubt about which day their
+                numbers are landing on. */}
+            {isBackfill && (
+              <div className="mb-4 rounded-2xl border-2 border-amber-300 bg-amber-50 dark:bg-amber-500/10 dark:border-amber-500/40 p-4 flex items-start gap-3">
+                <Clock className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                    You&apos;re filling in {formatDayLong(workDate)}
+                  </p>
+                  <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-0.5">
+                    This work will be recorded against that day, not today.
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Autocomplete Search Bar */}
             <div className="bg-white dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 mb-4">
               {/* Smart Recommendations based on job type */}
