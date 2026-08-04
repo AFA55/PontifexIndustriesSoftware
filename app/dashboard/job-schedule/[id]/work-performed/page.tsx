@@ -282,6 +282,9 @@ export default function WorkPerformed() {
   // Structured output of the break&remove / jackhammer / chipping / Brokk
   // quick-entry modals. Null until one of them is applied.
   const [demolitionData, setDemolitionData] = useState<DemolitionDetails | null>(null);
+  /** Inline error INSIDE the Break & Remove calculator — a toast renders behind
+   *  the overlay, which is how an operator's footage went missing silently. */
+  const [breakRemoveError, setBreakRemoveError] = useState<string | null>(null);
   const [tempAreas, setTempAreas] = useState<CutArea[]>([]);
   const [selectedBlades, setSelectedBlades] = useState<string[]>([]);
   const [customBladeSize, setCustomBladeSize] = useState('');
@@ -1119,20 +1122,22 @@ export default function WorkPerformed() {
   };
 
   const applyBreakRemoveEntry = () => {
+    // THE MEASUREMENT MUST NEVER BE THROWN AWAY (founder, Aug 2026 — an
+    // operator measured 20 x 10 x 6, saw the calculator total 200 sq ft, hit
+    // Apply, and the work item saved as quantity 1 with no dimensions at all).
+    //
+    // The cause was NOT a save bug: Apply bailed out because a REMOVAL METHOD
+    // hadn't been picked, and the warning toast rendered BEHIND the calculator
+    // overlay — so the operator saw nothing happen, the modal stayed open, and
+    // the footage was lost. Removal method is useful context, not a
+    // prerequisite for recording square footage, so it no longer blocks. The
+    // one genuine requirement — that some area exists — is surfaced INLINE,
+    // inside the modal, where it cannot be hidden.
     if (breakRemoveAreas.length === 0) {
-      showNotification('Please add at least one area', 'warning');
+      setBreakRemoveError('Add at least one area first — enter length and width, then "Add Area to List".');
       return;
     }
-
-    if (!removalMethod) {
-      showNotification('Please select a removal method', 'warning');
-      return;
-    }
-
-    if (removalMethod === 'rigged' && !removalEquipment) {
-      showNotification('Please specify equipment used for rigging', 'warning');
-      return;
-    }
+    setBreakRemoveError(null);
 
     const totalSquareFeet = calculateBreakRemoveTotal();
 
@@ -4331,6 +4336,12 @@ export default function WorkPerformed() {
                 Apply to Work Item
               </button>
             </div>
+            {/* Inline, INSIDE the overlay — a toast here renders behind it. */}
+            {breakRemoveError && (
+              <p className="mt-3 text-sm font-semibold text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded-xl px-3 py-2">
+                {breakRemoveError}
+              </p>
+            )}
           </div>
         </div>
       )}
