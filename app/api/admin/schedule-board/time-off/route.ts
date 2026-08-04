@@ -111,18 +111,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Invalid type. Must be one of: ${validTypes.join(', ')}` }, { status: 400 });
     }
 
+    // PAID vs UNPAID must be derived from the TYPE, not left to the column
+    // default. `is_paid` defaults to false and `pto_days_used` to 0, so booking
+    // PTO from the schedule board recorded a day that paid the operator nothing
+    // and burned none of their balance — silently wrong in the operator's
+    // favour on the books and against them on their balance.
+    const PAID_TYPES = ['pto', 'vacation', 'personal_day', 'sick'];
+    const isPaid = PAID_TYPES.includes(type);
+    // Only true PTO/vacation draws down the accrued balance; paid sick and
+    // personal days are tracked separately by the office.
+    const drawsFromPtoBalance = ['pto', 'vacation'].includes(type);
+
     const { data, error } = await supabaseAdmin
       .from('operator_time_off')
       .insert({
         operator_id,
         date,
         type,
+        request_type: type,
+        is_paid: isPaid,
+        pto_days_used: drawsFromPtoBalance ? 1 : 0,
         notes: notes || null,
         approved_by: auth.userId,
+        approved_at: new Date().toISOString(),
         created_by: auth.userId,
         tenant_id: tenantId || null,
       })
-      .select('id, operator_id, date, type, notes, created_at')
+      .select('id, operator_id, date, type, notes, is_paid, pto_days_used, created_at')
       .single();
 
     if (error) {

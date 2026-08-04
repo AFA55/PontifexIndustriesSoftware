@@ -18,11 +18,21 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { tenantToday } from '@/lib/tenant-timezone';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
-function todayISO(): string {
-  return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+/**
+ * "Today" for the OFFICE, not for UTC.
+ *
+ * THE BUG: Vercel runs the API in UTC, so `toISOString()` rolls over to
+ * TOMORROW at 8pm ET. The founder loaded the dashboard at 9:26pm with 4 jobs
+ * scheduled for today and saw "Jobs Today: 0". Server-side this was wrong
+ * EVERY evening. `tenantToday()` reads tenants.timezone (Patriot:
+ * America/New_York) and falls back to Eastern.
+ */
+async function todayISO(tenantId: string | null): Promise<string> {
+  return tenantToday(tenantId);
 }
 
 function monthStartISO(offset = 0): string {
@@ -42,7 +52,7 @@ async function getJobsToday(
   opts: { isPersonal: boolean; targetUserId: string }
 ) {
   try {
-    const today = todayISO();
+    const today = await todayISO(tenantId);
 
     // Use schedule_board_view so we get operator_name, helper_name, and all rich fields
     let query = supabaseAdmin
@@ -188,7 +198,7 @@ async function getOpenItems(
   opts: { isPersonal: boolean; targetUserId: string }
 ) {
   try {
-    const today = todayISO();
+    const today = await todayISO(tenantId);
 
     if (opts.isPersonal) {
       // For personal scope: show jobs created by or assigned to this user that are
@@ -294,7 +304,7 @@ async function getCrewUtilization(
       .from('timecards')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
-      .eq('date', todayISO())
+      .eq('date', await todayISO(tenantId))
       .is('clock_out_time', null);
 
     // Also check any jobs in_progress today as a cross-reference floor
@@ -303,7 +313,7 @@ async function getCrewUtilization(
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
       .eq('status', 'in_progress')
-      .eq('scheduled_date', todayISO())
+      .eq('scheduled_date', await todayISO(tenantId))
       .is('deleted_at', null);
 
     const totalCount = total ?? 0;
@@ -323,7 +333,7 @@ async function getTeamStatus(
   opts: { isPersonal: boolean; targetUserId: string }
 ) {
   try {
-    const today = todayISO();
+    const today = await todayISO(tenantId);
 
     // Personal scope: return only the requesting/target user's own status
     if (opts.isPersonal) {
@@ -454,7 +464,7 @@ async function getTeamStatus(
 
 async function getOperationalAlerts(tenantId: string) {
   try {
-    const today = todayISO();
+    const today = await todayISO(tenantId);
 
     const [lateClockins, openMaintenance, pendingTimeOff] = await Promise.all([
       // Late clock-ins today

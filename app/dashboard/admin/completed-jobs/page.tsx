@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
-import { parseYMDLocal } from '@/lib/dates';
+import { parseYMDLocal, formatDay, formatMaybeDateTime } from '@/lib/dates';
 import {
   FileText,
   Clock,
@@ -69,6 +69,8 @@ interface CompletedJob {
   total_days_worked: number | null;
   total_hours_worked: number | null;
   work_completed_at: string | null;
+  /** Jobs finished via the current flow only have THIS one. */
+  completion_submitted_at: string | null;
   // Sign-off PDF + photos + helper
   completion_pdf_url: string | null;
   photo_urls: string[] | null;
@@ -641,7 +643,11 @@ export default function CompletedJobsArchivePage() {
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-slate-500 dark:text-white/50">
-                              {new Date(job.work_completed_at || job.completion_signed_at).toLocaleDateString()}
+                              {formatMaybeDateTime(
+                                job.work_completed_at || job.completion_signed_at || job.completion_submitted_at,
+                                '—',
+                                { dateStyle: 'medium' }
+                              )}
                             </span>
                             {job.customer_overall_rating && (
                               <span className="px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30">
@@ -719,16 +725,21 @@ export default function CompletedJobsArchivePage() {
                           ],
                           [
                             'Scheduled Date',
-                            new Date(
-                              selectedJobDetails.job.scheduled_date
-                            ).toLocaleDateString(),
+                            // Bare date column — parse LOCAL or it prints the day before.
+                            selectedJobDetails.job.scheduled_date
+                              ? formatDay(selectedJobDetails.job.scheduled_date)
+                              : '—',
                           ],
                           [
                             'Completion Date',
-                            new Date(
+                            // `new Date(null)` is the epoch — that is where
+                            // "12/31/1969" came from. Jobs finished through the
+                            // current flow only have completion_submitted_at.
+                            formatMaybeDateTime(
                               selectedJobDetails.job.work_completed_at ||
-                              selectedJobDetails.job.completion_signed_at
-                            ).toLocaleString(),
+                              selectedJobDetails.job.completion_signed_at ||
+                              selectedJobDetails.job.completion_submitted_at
+                            ),
                           ],
                         ].map(([label, value]) => (
                           <div key={label as string}>

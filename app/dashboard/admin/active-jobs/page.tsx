@@ -6,7 +6,7 @@ import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
-import { formatDay } from '@/lib/dates';
+import { formatDay, toLocalYMD } from '@/lib/dates';
 import {
   Briefcase,
   Calendar,
@@ -365,18 +365,20 @@ export default function ActiveJobsPage() {
   }, [jobs]);
 
   const filtered = jobs.filter(j => {
-    const today = new Date().toISOString().split('T')[0];
-    const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+    // LOCAL day. toISOString() is UTC, so after ~8pm ET "today" became TOMORROW
+    // and this filter went empty while jobs were plainly listed under All.
+    const today = toLocalYMD();
+    const tomorrow = toLocalYMD(new Date(Date.now() + 86400000));
     if (filter === 'today') return j.scheduled_date === today;
     if (filter === 'coming_up') return j.scheduled_date === tomorrow;
     if (filter === 'attention') return (j.pending_change_requests ?? 0) > 0 || j.pending_completion_approval;
     return true;
   });
 
-  const tomorrow = new Date(Date.now() + 86400000).toISOString().split('T')[0];
+  const tomorrow = toLocalYMD(new Date(Date.now() + 86400000));
   const stats = {
     total: jobs.length,
-    today: jobs.filter(j => j.scheduled_date === new Date().toISOString().split('T')[0]).length,
+    today: jobs.filter(j => j.scheduled_date === toLocalYMD()).length,
     comingUp: jobs.filter(j => j.scheduled_date === tomorrow).length,
     needsAttention: jobs.filter(
       j => (j.pending_change_requests ?? 0) > 0 || j.pending_completion_approval

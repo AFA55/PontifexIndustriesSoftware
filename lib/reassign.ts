@@ -506,8 +506,13 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
     if (u) updatedJob = u;
 
     // 5. Outgoing-operator preservation: if the replaced lead already submitted
-    //    work on this job, crew them as 'helper' so their access + submitted
+    //    work on this job, keep them on the crew so their access + submitted
     //    work stays reachable (job_crew is honored by the my-jobs API).
+    //
+    //    ROLE MUST BE 'operator', NOT 'helper'. They ran the job as the lead —
+    //    demoting them flips their ticket to the light helper form (one text
+    //    box) instead of the full work-performed input, so the work they still
+    //    owe for that day can no longer be entered the way it was started.
     if (operatorId && prevOperatorId && prevOperatorId !== operatorId) {
       try {
         const [{ data: logRow }, { data: itemRow }] = await Promise.all([
@@ -532,7 +537,7 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
               tenant_id: tenantId,
               job_order_id: jobOrderId,
               user_id: prevOperatorId,
-              role: 'helper',
+              role: 'operator',
               added_by: actor.userId,
             },
             { onConflict: 'job_order_id,user_id', ignoreDuplicates: true }
