@@ -1239,14 +1239,22 @@ export default function DayCompletePage() {
         {!showSignature ? (
           <div className="space-y-4">
             <h2 className="text-center text-lg font-semibold text-gray-800 dark:text-gray-100">
-              {isLastScheduledDay === true
-                ? 'This is the final scheduled day'
-                : 'How would you like to wrap up?'}
+              Is the job finished, or are you coming back?
             </h2>
+            {isLastScheduledDay === true && (
+              <p className="-mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
+                This was the last day on the schedule — but if there&apos;s still work
+                left, choose &ldquo;Done for Today&rdquo; and pick it back up tomorrow.
+              </p>
+            )}
 
-            {/* Option 1 — Done for Today */}
-            {isLastScheduledDay !== true && (
-              <button
+            {/* Option 1 — Done for Today.
+                ALWAYS AVAILABLE (founder, Aug 2026). This used to be hidden on
+                the final scheduled day, which forced an operator whose job ran
+                long to either complete a job that wasn't finished or get stuck.
+                Jobs run long; the schedule is a plan, not a fact. Choosing this
+                keeps the job open and lets them submit more work tomorrow. */}
+            <button
                 onClick={handleDoneForToday}
                 disabled={submitting || subsistenceUnanswered}
                 className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 text-left shadow-lg shadow-amber-500/30 ring-1 ring-amber-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-amber-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
@@ -1259,8 +1267,7 @@ export default function DayCompletePage() {
                   <p className="text-sm text-white/85 mt-0.5">Job continues tomorrow. Progress saved.</p>
                 </div>
                 {submitting && <Loader2 className="w-5 h-5 animate-spin text-white" />}
-              </button>
-            )}
+            </button>
 
             {/* Option 2 — Complete Job (on-site signature) */}
             <button
