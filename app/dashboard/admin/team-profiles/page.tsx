@@ -18,6 +18,7 @@ import { supabase } from '@/lib/supabase';
 import FeatureFlagsPanel, { type UserFeatureFlags } from '@/components/FeatureFlagsPanel';
 import InviteMemberModal from '@/components/InviteMemberModal';
 import UserAvatar from '@/components/UserAvatar';
+import { toLocalYMD } from '@/lib/dates';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -263,14 +264,21 @@ function EditableDateRow({
 
   const startEditing = () => {
     // Convert display date to YYYY-MM-DD for the input
+    // A bare 'YYYY-MM-DD' from the DB must pass through UNTOUCHED. The old code
+    // ran it through new Date() (UTC) then toISOString() (UTC) — which walked
+    // hire dates and badge expiries back ONE DAY every time an admin opened and
+    // saved the field, compounding on each edit.
     let iso = '';
     if (value) {
-      try {
-        const d = new Date(value);
-        if (!isNaN(d.getTime())) {
-          iso = d.toISOString().split('T')[0];
-        }
-      } catch { /* ignore */ }
+      const raw = String(value).trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        iso = raw;
+      } else {
+        try {
+          const d = new Date(raw);
+          if (!isNaN(d.getTime())) iso = toLocalYMD(d);
+        } catch { /* ignore */ }
+      }
     }
     setInputVal(iso);
     setEditing(true);

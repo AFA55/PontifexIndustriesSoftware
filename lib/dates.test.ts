@@ -14,6 +14,7 @@ import {
   weekDatesMonSun,
   isWeekend,
   enumerateYMDRange,
+  formatMaybeDateTime,
 } from './dates';
 
 describe('parseYMDLocal', () => {
@@ -110,5 +111,48 @@ describe('enumerateYMDRange', () => {
   });
   it('returns just the start day when start === end', () => {
     expect(enumerateYMDRange('2026-06-03', '2026-06-03')).toEqual(['2026-06-03']);
+  });
+});
+
+/**
+ * The "1995" bug (founder, Aug 3 2026): "some jobs say the right date but that
+ * they started in 1995, or other dates besides the real date."
+ *
+ * JavaScript's Date constructor accepts far more than it should. These pin the
+ * guard that stops junk reaching the screen.
+ */
+describe('formatMaybeDateTime — untrusted date values', () => {
+  it('refuses a bare number instead of inventing 1995', () => {
+    // new Date('95') is literally Jan 1 1995. This is the reported bug.
+    expect(formatMaybeDateTime('95')).toBe('—');
+    expect(formatMaybeDateTime('7')).toBe('—');
+    expect(formatMaybeDateTime('2026')).toBe('—');
+  });
+
+  it('refuses a half-typed datetime (a cleared time field)', () => {
+    // The orientation field stored `${date}T` when the time was cleared.
+    expect(formatMaybeDateTime('2026-08-05T')).toBe('—');
+  });
+
+  it('never renders the string "Invalid Date"', () => {
+    for (const junk of ['', '   ', 'not a date', 'abc', '95', '2026-08-05T', null, undefined]) {
+      expect(formatMaybeDateTime(junk)).not.toMatch(/Invalid Date/);
+    }
+  });
+
+  it('renders a real timestamp', () => {
+    expect(formatMaybeDateTime('2026-08-05T14:30:00Z')).not.toBe('—');
+  });
+
+  it('renders a bare date on the RIGHT day, not the day before', () => {
+    // new Date('2026-08-05') is UTC midnight -> Aug 4 in every US timezone.
+    const out = formatMaybeDateTime('2026-08-05');
+    expect(out).not.toBe('—');
+    expect(out).toContain('5');
+    expect(out).not.toContain('4');
+  });
+
+  it('honours a custom fallback', () => {
+    expect(formatMaybeDateTime('95', 'Not set')).toBe('Not set');
   });
 });

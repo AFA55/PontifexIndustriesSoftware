@@ -16,6 +16,7 @@ import {
   ExternalLink,
   PenTool,
 } from 'lucide-react';
+import { parseYMDLocal } from '@/lib/dates';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,7 +56,12 @@ type PageState = 'loading' | 'ready' | 'expired' | 'not_found' | 'error';
 
 function formatDate(dateStr: string | null): string {
   if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('en-US', {
+  // A bare 'YYYY-MM-DD' is parsed as UTC midnight by new Date(), which renders
+  // as the PREVIOUS day in every US timezone. The customer was being shown the
+  // wrong work date. Parse local instead.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? parseYMDLocal(dateStr) : new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

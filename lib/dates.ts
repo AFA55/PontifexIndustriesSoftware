@@ -132,3 +132,38 @@ export function enumerateYMDRange(startYMD: string, endYMD?: string | null): str
   }
   return days.length > 0 ? days : [startYMD];
 }
+
+/**
+ * Format an UNTRUSTED date-ish value for display. Returns `fallback` instead of
+ * the string "Invalid Date" (or a nonsense year) when the value can't be parsed.
+ *
+ * WHY THIS EXISTS (founder, Aug 3 2026): "some jobs say the right date but that
+ * they started in 1995, or other dates besides the real date." The culprit is
+ * JavaScript's Date constructor being far too willing:
+ *
+ *     new Date('95')          -> Jan 1 1995      <-- the reported 1995
+ *     new Date('7')           -> Jul 1 2001
+ *     new Date('2026-08-05T') -> Invalid Date    <-- a cleared time field
+ *     new Date(undefined)     -> Invalid Date
+ *
+ * Any value that reached the screen from free text or a JSONB blob must come
+ * through here rather than straight into `new Date(...)`.
+ */
+export function formatMaybeDateTime(
+  value: unknown,
+  fallback = '—',
+  opts: Intl.DateTimeFormatOptions = { dateStyle: 'medium', timeStyle: 'short' }
+): string {
+  if (value == null || value === '') return fallback;
+  const raw = String(value).trim();
+  // A bare 'YYYY-MM-DD' must be parsed LOCAL, or it renders a day early.
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return parseYMDLocal(raw).toLocaleDateString(undefined, { dateStyle: opts.dateStyle ?? 'medium' });
+  }
+  // Refuse anything that isn't a plausible full date/timestamp. This is what
+  // stops '95' from becoming 1995 and '2026-08-05T' from becoming Invalid Date.
+  if (!/^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(raw)) return fallback;
+  const d = new Date(raw);
+  if (Number.isNaN(d.getTime())) return fallback;
+  return d.toLocaleString(undefined, opts);
+}

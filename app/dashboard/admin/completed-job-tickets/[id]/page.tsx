@@ -16,6 +16,7 @@ import {
   Loader2, Bell, Receipt, TrendingUp, BarChart3, Target,
   Image as ImageIcon, Milestone, ChevronRight, Send, PenTool, RefreshCw, Globe, Printer,
 } from 'lucide-react';
+import { formatDay } from '@/lib/dates';
 
 interface CompletionSummary {
   id: string; job_number: string; title: string | null; project_name: string | null;
@@ -416,7 +417,8 @@ export default function CompletedJobSummaryPage() {
   const jobName = summary.project_name || summary.title || summary.job_number;
   const customerName = summary.customer_name;
   const location = summary.address || summary.location || summary.job_location || '--';
-  const scheduledDate = summary.scheduled_date ? new Date(summary.scheduled_date).toLocaleDateString() : '--';
+  // Bare date column — parse local or it prints a day early.
+  const scheduledDate = summary.scheduled_date ? formatDay(summary.scheduled_date) : '--';
   const completedDate = (summary.completion_signed_at || summary.work_completed_at) ? new Date((summary.completion_signed_at || summary.work_completed_at)!).toLocaleDateString() : '--';
   const signatureCaptured = !summary.contact_not_on_site && !!summary.completion_signer_name;
   const isCycleBilling = (summary.billing_type || '').toLowerCase() === 'cycle';

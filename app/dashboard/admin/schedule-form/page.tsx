@@ -27,6 +27,7 @@ import PhotoUploader from '@/components/PhotoUploader';
 import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { NumberInput } from '@/components/ui/NumberInput';
+import { toLocalYMD } from '@/lib/dates';
 
 // Dynamic-imported modals — only loaded when their state flag flips true.
 // AISmartFillModal pulls in framer-motion; CustomerForm is a large dialog used for the new-customer flow.
@@ -4204,10 +4205,18 @@ export default function ScheduleFormPage() {
                     type="date"
                     value={form.orientation_datetime ? form.orientation_datetime.split('T')[0] : ''}
                     onChange={e => {
-                      const timepart = form.orientation_datetime?.includes('T')
+                      // Never store a half-formed value. `${date}T` with an
+                      // empty time part parses as Invalid Date everywhere it's
+                      // read, and this JSONB field is the one place in the app
+                      // where free text reaches new Date() — clearing the date
+                      // must clear the whole field, not leave "T08:00" behind.
+                      const existing = form.orientation_datetime?.includes('T')
                         ? form.orientation_datetime.split('T')[1]
-                        : '08:00';
-                      updateForm({ orientation_datetime: `${e.target.value}T${timepart}` });
+                        : '';
+                      const timepart = /^\d{2}:\d{2}/.test(existing) ? existing : '08:00';
+                      updateForm({
+                        orientation_datetime: e.target.value ? `${e.target.value}T${timepart}` : '',
+                      });
                     }}
                   />
                   <Label>Orientation Time</Label>
@@ -4216,10 +4225,15 @@ export default function ScheduleFormPage() {
                     type="time"
                     value={form.orientation_datetime?.includes('T') ? form.orientation_datetime.split('T')[1] : ''}
                     onChange={e => {
+                      // Same rule the date half follows: clearing the time must
+                      // not leave a dangling "2026-08-05T" behind. toLocalYMD,
+                      // not toISOString — the latter is tomorrow after ~8pm ET.
                       const datepart = form.orientation_datetime?.includes('T')
                         ? form.orientation_datetime.split('T')[0]
-                        : form.start_date || new Date().toISOString().split('T')[0];
-                      updateForm({ orientation_datetime: `${datepart}T${e.target.value}` });
+                        : form.start_date || toLocalYMD();
+                      updateForm({
+                        orientation_datetime: e.target.value ? `${datepart}T${e.target.value}` : '',
+                      });
                     }}
                   />
                   {form.start_date && (

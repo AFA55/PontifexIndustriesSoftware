@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { parseYMDLocal } from '@/lib/dates';
 
 // ── Styles ──────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -215,9 +216,13 @@ function formatWorkItemRow(item: WorkItem): { qty: string; itemType: string; des
 }
 
 function formatDate(dateStr?: string): string {
-  if (!dateStr) return new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const OPTS: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long', day: 'numeric' };
+  if (!dateStr) return new Date().toLocaleDateString('en-US', OPTS);
   try {
-    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    // "Date of Work" on a document the CUSTOMER SIGNS. A bare 'YYYY-MM-DD' run
+    // through new Date() is UTC midnight and prints the day before.
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(dateStr) ? parseYMDLocal(dateStr) : new Date(dateStr);
+    return Number.isNaN(d.getTime()) ? dateStr : d.toLocaleDateString('en-US', OPTS);
   } catch {
     return dateStr;
   }

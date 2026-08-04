@@ -13,6 +13,7 @@ import { EQUIPMENT_PRESETS } from '@/lib/equipment-map';
 import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 import JobCrewPanel from '@/components/JobCrewPanel';
+import { formatMaybeDateTime } from '@/lib/dates';
 
 const WorkHistoryTimeline = lazy(() => import('./WorkHistoryTimeline'));
 const OfficeDocumentsPanel = lazy(() => import('@/components/admin/OfficeDocumentsPanel'));
@@ -1475,7 +1476,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                               <div>
                                 <div className="text-xs font-bold text-blue-900 dark:text-blue-200">Orientation Required</div>
                                 {compliance.orientation_datetime ? (
-                                  <div className="text-[10px] text-blue-600 dark:text-blue-300">{new Date(String(compliance.orientation_datetime)).toLocaleString()}</div>
+                                  <div className="text-[10px] text-blue-600 dark:text-blue-300">{formatMaybeDateTime(compliance.orientation_datetime)}</div>
                                 ) : null}
                               </div>
                             </div>

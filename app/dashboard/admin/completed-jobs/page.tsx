@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
+import { parseYMDLocal } from '@/lib/dates';
 import {
   FileText,
   Clock,
@@ -43,8 +44,12 @@ interface CompletedJob {
   scope_of_work: string;
   assigned_to: string;
   scheduled_date: string;
+  /** TEXT clock time like "08:00" — NOT a date. Never pass this to new Date(). */
   arrival_time: string;
   shop_arrival_time: string;
+  /** Real timestamps — these are what job duration should be measured from. */
+  work_started_at: string | null;
+  route_started_at: string | null;
   completion_signed_at: string;
   completion_signer_name: string;
   contact_not_on_site: boolean;
@@ -307,9 +312,22 @@ export default function CompletedJobsArchivePage() {
       if (totalHoursWorked > 0) {
         totalJobHours = totalHoursWorked;
       } else {
-        const startTime = new Date(job.arrival_time || job.scheduled_date);
-        const endTime = new Date(job.completion_signed_at || job.work_completed_at || new Date());
-        totalJobHours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+        // `arrival_time` is a bare TEXT clock time ("08:00"), NOT a date.
+        // `new Date('08:00')` is Invalid Date, so this whole subtraction was
+        // NaN and the job's hours were garbage. Anchor to the real work
+        // timestamp, then the scheduled DAY parsed locally (never
+        // `new Date('YYYY-MM-DD')`, which is UTC and lands a day early).
+        const startIso = job.work_started_at || job.route_started_at || null;
+        const startTime = startIso
+          ? new Date(startIso)
+          : job.scheduled_date
+            ? parseYMDLocal(job.scheduled_date)
+            : null;
+        const endTime = new Date(job.completion_signed_at || job.work_completed_at || Date.now());
+        totalJobHours =
+          startTime && !Number.isNaN(startTime.getTime()) && !Number.isNaN(endTime.getTime())
+            ? Math.max(0, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60))
+            : 0;
       }
 
       // TRUE labor cost from the job P&L API (bounded hours × real wages ×

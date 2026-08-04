@@ -11,6 +11,7 @@ import {
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
 import { getDisplayName } from '@/lib/equipment-map';
 import type { PendingJob } from './PendingQueueSidebar';
+import { formatMaybeDateTime } from '@/lib/dates';
 
 interface CapacityInfo {
   jobCount: number;
@@ -430,7 +431,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                       Orientation Required
                       {job.site_compliance.orientation_datetime && (
                         <span className="font-normal ml-0.5 text-orange-600">
-                          · {new Date(job.site_compliance.orientation_datetime).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                          · {formatMaybeDateTime(job.site_compliance.orientation_datetime, '—', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}
                         </span>
                       )}
                     </span>
@@ -642,7 +643,7 @@ export default function ApprovalModal({ job, onConfirm, onClose }: ApprovalModal
                         <div>
                           <div className="text-xs font-bold text-blue-900">Orientation Required</div>
                           {compliance.orientation_datetime && (
-                            <div className="text-[10px] text-blue-600">{new Date(compliance.orientation_datetime).toLocaleString()}</div>
+                            <div className="text-[10px] text-blue-600">{formatMaybeDateTime(compliance.orientation_datetime)}</div>
                           )}
                         </div>
                       </div>

@@ -1,9 +1,12 @@
+
 /**
  * Voice Parser Utilities for PontiBot
  *
  * Handles fuzzy matching, date/time/number extraction from natural speech.
  * All functions are pure — no side effects, easy to test.
  */
+
+import { toLocalYMD } from '@/lib/dates';
 
 // ============================================================
 // FUZZY MATCHING
@@ -381,7 +384,11 @@ export function parseDate(spoken: string): string | null {
 }
 
 function formatDate(d: Date): string {
-  return d.toISOString().split('T')[0]; // YYYY-MM-DD
+  // LOCAL calendar date. `toISOString()` is UTC, so a job spoken in after ~8pm
+  // ET was being scheduled for the FOLLOWING day (see CLAUDE.md — this is the
+  // recurring date bug, and this is its highest-impact instance: it writes
+  // job_orders.scheduled_date).
+  return toLocalYMD(d);
 }
 
 /**
