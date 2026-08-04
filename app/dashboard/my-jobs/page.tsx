@@ -12,6 +12,7 @@ import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
 import NotificationBanner from './_components/NotificationBanner';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import SubmitRatingModal from './_components/SubmitRatingModal';
+import { formatMaybeDateTime } from '@/lib/dates';
 
 interface PendingRating {
   ratee: { id: string; name: string; role: string };
@@ -568,13 +569,13 @@ export default function MyJobsPage() {
                     <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">
                       Multi-Day
                     </span>
-                    <a
+                    <Link
                       href={`/dashboard/my-jobs/${job.id}`}
                       className="text-xs text-amber-700 font-semibold flex items-center gap-1 hover:text-amber-900 px-2 py-1.5 min-h-[32px]"
                     >
                       <PlayCircle className="w-3.5 h-3.5" />
                       View
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ))}
@@ -615,13 +616,13 @@ export default function MyJobsPage() {
                        job.status === 'pending_completion' ? 'Awaiting' :
                        'In Progress'}
                     </span>
-                    <a
+                    <Link
                       href={`/dashboard/my-jobs/${job.id}`}
                       className="text-xs text-brand font-semibold flex items-center gap-1 hover:text-brand/80 px-2 py-1.5 min-h-[32px]"
                     >
                       <PlayCircle className="w-3.5 h-3.5" />
                       Resume
-                    </a>
+                    </Link>
                   </div>
                 </div>
               ))}
@@ -785,9 +786,15 @@ export default function MyJobsPage() {
               ) : (
                 <div className="divide-y divide-gray-100 dark:divide-white/10">
                   {pastJobs.map((job: any) => (
-                    <a
+                    // MUST be next/link, NOT a raw <a>. A bare anchor is a FULL
+                    // page navigation, and inside the iOS/Android webview that
+                    // can hop the operator out into Safari — which is exactly
+                    // what happened to Lucas when he opened a past job. Link
+                    // keeps it in the app's own router. (CLAUDE.md documents
+                    // this: navigate IN the webview, never window-level.)
+                    <Link
                       key={job.id}
-                      href={`/dashboard/my-jobs/${job.id}`}
+                      href={`/dashboard/my-jobs/${job.id}?view=history`}
                       className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                     >
                       <div className="w-2 h-2 rounded-full flex-shrink-0 bg-emerald-400" />
@@ -798,7 +805,11 @@ export default function MyJobsPage() {
                         <p className="text-xs text-gray-500 dark:text-white/50 truncate">
                           {job.job_number}
                           {(job.work_completed_at || job.scheduled_date) && (
-                            <> &bull; {new Date(job.work_completed_at || job.scheduled_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</>
+                            <> &bull; {formatMaybeDateTime(
+                              job.work_completed_at || job.scheduled_date,
+                              '—',
+                              { month: 'short', day: 'numeric', year: 'numeric' }
+                            )}</>
                           )}
                         </p>
                       </div>
@@ -810,7 +821,7 @@ export default function MyJobsPage() {
                         {job.status === 'completed' ? 'Completed' : 'Pending'}
                       </span>
                       <ChevronRight className="w-4 h-4 text-gray-300 dark:text-white/30 flex-shrink-0" />
-                    </a>
+                    </Link>
                   ))}
                 </div>
               )}

@@ -148,15 +148,26 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
   const dayStarted = dayStatus === 'started';
   const dayOwed = dayStatus === 'todo' || dayStarted;
 
-  const greenBorder = isCompleted
-    ? 'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
-    : (doneToday || daySubmitted)
-    ? 'border-emerald-400 bg-emerald-50/60 dark:bg-emerald-900/20'
-    : dayOwed
-    // Unmistakably "this one still needs you" — matches the blue-to-green
-    // language the crew already knows from their old system.
-    ? 'border-blue-400 bg-blue-50/60 dark:bg-blue-900/20 hover:border-blue-500'
-    : 'border-gray-200/50 dark:border-white/10 hover:border-blue-300 dark:hover:border-white/30';
+  // ── WHOLE-CARD COLOUR: WHITE -> BLUE -> GREEN ────────────────────────────
+  // Founder's rule, and it maps to what the crew actually does:
+  //   WHITE  = not started. They haven't tapped In Route yet.
+  //   BLUE   = in progress. On the road or on site, ticket still owed.
+  //   GREEN  = finished. Day's ticket submitted, or the job is complete.
+  // The whole card changes, not a small badge — it has to be readable at a
+  // glance in sunlight, one-handed, from a truck.
+  const hasStarted =
+    !!job.route_started_at ||
+    !!job.work_started_at ||
+    ['in_route', 'on_site', 'in_progress', 'working', 'pending_completion'].includes(job.status);
+
+  const cardTone = (isCompleted || doneToday || daySubmitted)
+    ? // GREEN — done
+      'border-emerald-400 bg-emerald-50 dark:bg-emerald-900/25'
+    : hasStarted
+    ? // BLUE — under way
+      'border-blue-500 bg-blue-50 dark:bg-blue-900/25'
+    : // WHITE — not started
+      'border-gray-300 bg-white dark:bg-white/5 dark:border-white/15 hover:border-blue-300';
 
   return (
     <Link
@@ -168,7 +179,7 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
           ? `/dashboard/my-jobs/${job.id}?date=${job.day_ticket_date}`
           : `/dashboard/my-jobs/${job.id}`
       }
-      className={`block w-full text-left bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] ${greenBorder} ${isCompleted ? 'opacity-80' : ''}`}
+      className={`block w-full text-left backdrop-blur-lg rounded-2xl shadow-xl border-2 transition-all duration-200 hover:shadow-2xl hover:scale-[1.01] ${cardTone} ${isCompleted ? 'opacity-90' : ''}`}
     >
       {/* Special Arrival Time Banner */}
       {(arrivalDisplay || shopArrival) && !isCompleted && (
@@ -216,12 +227,17 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
                   ticket for that day. */}
               {!isCompleted && daySubmitted && (
                 <span className="text-xs px-2 py-0.5 bg-emerald-500 text-white rounded-full font-bold border border-emerald-600 shadow-sm">
-                  Ticket submitted ✓
+                  Done ✓
                 </span>
               )}
-              {!isCompleted && dayOwed && (
+              {!isCompleted && !daySubmitted && hasStarted && (
                 <span className="text-xs px-2 py-0.5 bg-blue-600 text-white rounded-full font-bold border border-blue-700 shadow-sm">
-                  {dayStarted ? 'Finish this ticket' : 'Ticket to submit'}
+                  In progress
+                </span>
+              )}
+              {!isCompleted && !daySubmitted && !hasStarted && (
+                <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded-full font-bold border border-gray-300">
+                  Not started
                 </span>
               )}
               {!isCompleted && doneToday && (

@@ -122,6 +122,37 @@ const isJackHammering = (itemName: string) =>
 const isChipping = (itemName: string) => itemName.includes('CHIPPING');
 const isBrokk = (itemName: string) => itemName.includes('BROKK');
 
+/**
+ * True for work types with NO specialised measurement form of their own —
+ * GRINDING, EXCAVATE DIRT, POURED/FINISH CONCRETE, REPAIR, SPOT/CAUGHT CORES,
+ * INSTALL BOLLARD(S), HAULING, MATERIAL(S) and friends.
+ *
+ * These previously offered the operator NOTHING but a notes box, so the
+ * quantity they actually produced never reached the ticket — which is how a
+ * customer-signed sheet ends up reading "SLAB SAW — 1" for 120 linear feet.
+ * They now get a plain How much? + unit pair.
+ */
+const hasNoSpecialisedForm = (itemName: string) =>
+  !isCoreDrilling(itemName) &&
+  !isSawing(itemName) &&
+  !isBreakAndRemove(itemName) &&
+  !isJackHammering(itemName) &&
+  !isChipping(itemName) &&
+  !isBrokk(itemName);
+
+/** Sensible default unit per work type, so the operator rarely changes it. */
+const defaultUnitFor = (itemName: string): string => {
+  const n = itemName.toUpperCase();
+  if (n.includes('CORE')) return 'holes';
+  if (n.includes('GRINDING') || n.includes('CONCRETE') || n.includes('REPAIR')) return 'sq ft';
+  if (n.includes('EXCAVATE') || n.includes('HAUL') || n.includes('DUMPSTER')) return 'loads';
+  if (n.includes('INSTALL') || n.includes('BOLLARD') || n.includes('LINTEL') || n.includes('BOOT')) return 'each';
+  if (n.includes('SEALING')) return 'linear ft';
+  if (n.includes('STANDBY') || n.includes('TRAVEL') || n.includes('MEETING') || n.includes('WASH') || n.includes('VACUUM')) return 'hours';
+  if (n.includes('SCAN')) return 'sq ft';
+  return 'each';
+};
+
 interface WorkItem {
   name: string;
   quantity: number;
@@ -208,6 +239,8 @@ interface GeneralDetails {
   duration?: number;
   equipment?: string[];
   notes?: string;
+  /** sq ft / linear ft / holes / loads / hours ... — printed next to the qty. */
+  unit?: string;
 }
 
 export default function WorkPerformed() {
@@ -234,6 +267,8 @@ export default function WorkPerformed() {
   const [showAddMoreDialog, setShowAddMoreDialog] = useState(false);
   const [currentItem, setCurrentItem] = useState<string>('');
   const [currentQuantity, setCurrentQuantity] = useState(1);
+  /** Unit for work types with no specialised form (sq ft, holes, loads, ...). */
+  const [currentUnit, setCurrentUnit] = useState('each');
   const [currentNotes, setCurrentNotes] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [coreDrillingData, setCoreDrillingData] = useState<CoreDrillingDetails>({
@@ -776,6 +811,8 @@ export default function WorkPerformed() {
   const handleSelectItem = (itemName: string) => {
     setCurrentItem(itemName);
     setCurrentQuantity(1);
+    // Sensible default unit so the operator rarely has to touch the picker.
+    setCurrentUnit(defaultUnitFor(itemName));
     // Prefill the quick note from the already-added item. handleAddItem treats
     // an empty box as "clear the note", so re-opening an item to log more work
     // would otherwise silently wipe what the operator already wrote.
@@ -1399,6 +1436,11 @@ export default function WorkPerformed() {
       // areas[] payload to an unrelated work type.
       details = { ...demolitionData, notes: quickNote || undefined };
       itemQuantity = demolitionData.totalSquareFeet || currentQuantity;
+    } else if (hasNoSpecialisedForm(currentItem)) {
+      // Generic types: the unit is the only thing that makes the number mean
+      // anything on the customer's ticket ("120" vs "120 sq ft").
+      details = { unit: currentUnit, notes: quickNote || undefined };
+      itemQuantity = currentQuantity;
     }
 
     if (existingIndex >= 0) {
@@ -3649,6 +3691,51 @@ export default function WorkPerformed() {
                           {demolitionData.equipment}
                         </span>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── HOW MUCH? (work types with no specialised form) ─────────
+                    Without this, GRINDING / EXCAVATE DIRT / POURED CONCRETE /
+                    REPAIR / SPOT CORES / INSTALL / HAULING offered only a notes
+                    box, so the produced quantity never reached the ticket or
+                    the invoice. */}
+                {hasNoSpecialisedForm(currentItem) && (
+                  <div className="mb-4 rounded-2xl border-2 border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-4">
+                    <h4 className="text-base font-bold text-gray-900 dark:text-white mb-1">How much did you do?</h4>
+                    <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
+                      This is what goes on the customer&apos;s ticket.
+                    </p>
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1.5">
+                          Amount
+                        </label>
+                        <NumberInput
+                          value={currentQuantity}
+                          onValueChange={setCurrentQuantity}
+                          emptyValue={0}
+                          blankZero
+                          min="0"
+                          step="0.1"
+                          placeholder="e.g. 120"
+                          className="w-full px-4 py-3 text-lg font-bold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:ring-2 focus:ring-brand/30 focus:outline-none"
+                        />
+                      </div>
+                      <div className="w-36">
+                        <label className="block text-xs font-bold text-gray-600 dark:text-white/60 mb-1.5">
+                          Unit
+                        </label>
+                        <select
+                          value={currentUnit}
+                          onChange={(e) => setCurrentUnit(e.target.value)}
+                          className="w-full px-3 py-3 text-base font-semibold text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] border-2 border-gray-200 dark:border-white/10 rounded-xl focus:border-brand focus:outline-none min-h-[44px]"
+                        >
+                          {['each', 'sq ft', 'linear ft', 'holes', 'loads', 'hours', 'lbs', 'yards'].map((u) => (
+                            <option key={u} value={u}>{u}</option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 )}
