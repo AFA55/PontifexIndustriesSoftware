@@ -15,6 +15,7 @@ import {
   isWeekend,
   enumerateYMDRange,
   formatMaybeDateTime,
+  endOfDayUTC,
 } from './dates';
 
 describe('parseYMDLocal', () => {
@@ -154,5 +155,35 @@ describe('formatMaybeDateTime — untrusted date values', () => {
 
   it('honours a custom fallback', () => {
     expect(formatMaybeDateTime('95', 'Not set')).toBe('Not set');
+  });
+});
+
+/**
+ * Auto-closing a forgotten shift used the bare string `${date}T23:59:59`, which
+ * Postgres reads as 23:59:59 UTC = 7:59:59 PM Eastern. Paired with a UTC-date
+ * read that closed a shift on the day it STARTED, this wrote timecards with
+ * NEGATIVE hours (clock-in 9:29 PM, clock-out 7:59 PM, gross -1.49) on a live
+ * payroll table.
+ */
+describe('endOfDayUTC — end of the OPERATOR day, not of UTC', () => {
+  it('is 03:59:59Z the NEXT day for Eastern daylight time', () => {
+    // 2026-08-03 23:59:59 EDT (UTC-4) === 2026-08-04T03:59:59Z
+    expect(endOfDayUTC('2026-08-03', 'America/New_York')).toBe('2026-08-04T03:59:59.000Z');
+  });
+
+  it('shifts correctly for Eastern standard time', () => {
+    // 2026-01-15 23:59:59 EST (UTC-5) === 2026-01-16T04:59:59Z
+    expect(endOfDayUTC('2026-01-15', 'America/New_York')).toBe('2026-01-16T04:59:59.000Z');
+  });
+
+  it('is never EARLIER than a clock-in made that evening', () => {
+    // The exact shape of the corrupted rows: clocked in 9:29 PM ET.
+    const clockIn = new Date('2026-08-04T01:29:10Z'); // 9:29 PM EDT on Aug 3
+    const close = new Date(endOfDayUTC('2026-08-03', 'America/New_York'));
+    expect(close.getTime()).toBeGreaterThan(clockIn.getTime());
+  });
+
+  it('handles UTC itself without shifting', () => {
+    expect(endOfDayUTC('2026-08-03', 'UTC')).toBe('2026-08-03T23:59:59.000Z');
   });
 });

@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { tenantToday } from '@/lib/tenant-timezone';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -157,7 +158,13 @@ export async function PUT(request: NextRequest, context: RouteContext) {
       );
     }
 
-    const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    // THE LOST-DAY BUG: this was `toISOString()` (UTC) while the day-complete
+    // path uses the LOCAL date. After 8pm ET the two disagreed, so the draft
+    // filed the operator's work under TOMORROW's daily_job_logs row while
+    // "Done for Today" published YESTERDAY's — the operator saw a green
+    // confirmation and an entire day of measurements was discarded.
+    // Both sides must agree on what day it is.
+    const today = await tenantToday(tenantId ?? null);
     const now = new Date().toISOString();
 
     // Look for an existing log row for this operator on this job today.

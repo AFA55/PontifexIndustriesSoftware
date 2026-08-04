@@ -10,13 +10,34 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantShopContext, DEFAULT_TENANT_TIMEZONE } from '@/lib/geolocation-server';
 import { findUnfinishedTickets, type UnfinishedTicketJob, type ClockOutWarningType } from '@/lib/unfinished-tickets';
+import { endOfDayUTC } from '@/lib/dates';
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    // THE 8PM BUG (founder-reported, Aug 2026): this was
+    // `new Date().toISOString().split('T')[0]` — a UTC date used as a LOCAL
+    // calendar date, the exact anti-pattern CLAUDE.md forbids.
+    //
+    // Clock-in WRITES `timecards.date` in the TENANT's timezone. After 8pm ET
+    // the UTC date is already tomorrow, so this read missed the row the
+    // operator had just created and the app said "Not Clocked In" — they'd
+    // clock in again, and the stale-shift sweep then closed a shift that had
+    // just started, producing NEGATIVE hours on a real payroll row.
+    // Read and write must use the same clock.
+    // ONE tenants read serves both the date below and the shop geofence later
+    // (this endpoint is polled every couple of minutes on native).
+    let shop: { lat: number; lng: number } | null = null;
+    let tenantTz = DEFAULT_TENANT_TIMEZONE;
+    try {
+      const ctx = await getTenantShopContext(supabaseAdmin, auth.tenantId ?? null);
+      shop = { lat: ctx.coords.latitude, lng: ctx.coords.longitude };
+      tenantTz = ctx.timezone;
+    } catch { /* non-critical — fall back to the default timezone */ }
+
+    const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
 
     // Find active timecard for TODAY only (clocked in but not clocked out)
     const { data: activeTimecard, error: fetchError } = await supabaseAdmin
@@ -54,8 +75,8 @@ export async function GET(request: NextRequest) {
         .lt('date', todayStr);
 
       for (const stale of staleTimecards ?? []) {
-        // Close at end of that day (23:59:59)
-        const eod = `${stale.date}T23:59:59`;
+        // End of the OPERATOR's day, not 23:59:59 UTC (= 7:59 PM ET).
+        const eod = endOfDayUTC(stale.date, tenantTz);
         await supabaseAdmin
           .from('timecards')
           .update({ clock_out_time: eod, notes: 'Auto-closed: no clock-out recorded' })
@@ -90,17 +111,6 @@ export async function GET(request: NextRequest) {
         jobInfo = { job_number: job.job_number, customer_name: job.customer_name };
       }
     }
-
-    // Tenant shop coords for the native "back at shop → clock out?" geofence
-    // reminder — plus the tenant timezone, from the SAME single `tenants` read
-    // (this endpoint is polled every couple of minutes on native).
-    let shop: { lat: number; lng: number } | null = null;
-    let tenantTz = DEFAULT_TENANT_TIMEZONE;
-    try {
-      const ctx = await getTenantShopContext(supabaseAdmin, auth.tenantId ?? null);
-      shop = { lat: ctx.coords.latitude, lng: ctx.coords.longitude };
-      tenantTz = ctx.timezone;
-    } catch { /* non-critical */ }
 
     // PRE-EMPTIVE nudge (founder Aug 2026: "before an operator clocks out,
     // remind them to fill out the ticket"). The clock-out 409 stays the

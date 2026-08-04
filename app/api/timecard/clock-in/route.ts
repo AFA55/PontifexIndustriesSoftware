@@ -24,6 +24,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS, ShopOverride } from '@/lib/geolocation';
 import { resolveEffectiveStart, computeLate } from '@/lib/timecard-start';
+import { endOfDayUTC } from '@/lib/dates';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
@@ -288,7 +289,8 @@ export async function POST(request: NextRequest) {
       .lt('date', todayDate);
 
     for (const stale of staleTimecards ?? []) {
-      const eod = `${stale.date}T23:59:59`;
+      // End of the OPERATOR's day, not 23:59:59 UTC (= 7:59 PM ET).
+      const eod = endOfDayUTC(stale.date, tenantTz);
       await supabaseAdmin
         .from('timecards')
         .update({ clock_out_time: eod, notes: 'Auto-closed: no clock-out recorded' })

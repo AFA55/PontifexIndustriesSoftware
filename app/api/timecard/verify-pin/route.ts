@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { tenantToday } from '@/lib/tenant-timezone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +29,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Tenant-local day: timecards.date is written in the tenant's timezone.
+    const today = await tenantToday(auth.tenantId ?? null);
 
     // Look up today's PIN for this tenant
     let query = supabaseAdmin

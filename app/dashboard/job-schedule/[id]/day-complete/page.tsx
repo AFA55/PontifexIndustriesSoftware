@@ -34,6 +34,7 @@ import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey';
 import JobProgressLogger from '@/components/JobProgressLogger';
+import { toLocalYMD } from '@/lib/dates';
 
 // Shop location for "Directions back to shop". Hardcoded for now — Patriot's
 // verified shop coordinates. TODO: make tenant-configurable (e.g. read from
@@ -232,7 +233,8 @@ export default function DayCompletePage() {
       });
       if (res.ok) {
         const json = await res.json();
-        const today = new Date().toISOString().split('T')[0];
+        // LOCAL day — toISOString() is UTC and flips at ~8pm ET.
+        const today = toLocalYMD();
         const endDate = json.data?.scheduled_end_date;
         const scheduledDate = json.data?.scheduled_date;
         const isLast = endDate ? endDate === today : scheduledDate === today;

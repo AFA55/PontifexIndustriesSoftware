@@ -167,3 +167,20 @@ export function formatMaybeDateTime(
   if (Number.isNaN(d.getTime())) return fallback;
   return d.toLocaleString(undefined, opts);
 }
+
+/**
+ * The UTC instant for 23:59:59 LOCAL on `ymd` in IANA zone `tz`.
+ *
+ * WHY: auto-closing a forgotten shift wrote the bare string
+ * `${date}T23:59:59` — no timezone — which Postgres stores as 23:59:59 UTC,
+ * i.e. 7:59:59 PM Eastern. Combined with the UTC-date read bug that closed a
+ * shift on the day it STARTED, this produced timecards with NEGATIVE hours
+ * (clock-in 9:29 PM, clock-out 7:59 PM, gross −1.49). End of day has to mean
+ * end of the operator's day.
+ */
+export function endOfDayUTC(ymd: string, tz: string): string {
+  const guess = new Date(`${ymd}T23:59:59Z`);
+  const asLocal = new Date(guess.toLocaleString('en-US', { timeZone: tz }));
+  const asUtc = new Date(guess.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(guess.getTime() + (asUtc.getTime() - asLocal.getTime())).toISOString();
+}
