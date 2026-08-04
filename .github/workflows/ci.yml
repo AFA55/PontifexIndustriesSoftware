@@ -26,7 +26,11 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      # --legacy-peer-deps is REQUIRED for this project (vercel.json uses it
+      # too). Without it `npm ci` aborts on a peer-dependency conflict, which
+      # is why every CI run failed at step one and the 577 tests below have
+      # never actually executed in CI.
+      run: npm ci --legacy-peer-deps
 
     - name: Run linter
       # Use ESLint CLI directly — `next lint` is deprecated in Next.js 15 and
@@ -65,7 +69,11 @@ jobs:
         cache: 'npm'
 
     - name: Install dependencies
-      run: npm ci
+      # --legacy-peer-deps is REQUIRED for this project (vercel.json uses it
+      # too). Without it `npm ci` aborts on a peer-dependency conflict, which
+      # is why every CI run failed at step one and the 577 tests below have
+      # never actually executed in CI.
+      run: npm ci --legacy-peer-deps
 
     - name: Build application
       run: npm run build

@@ -94,20 +94,26 @@ export async function POST(request: NextRequest) {
       activeTimecard = timecardData;
     }
 
-    // Create status history entry — gracefully handle missing table
+    // Create status history entry — gracefully handle missing table.
+    // ONLY these columns exist on operator_status_history: operator_id,
+    // job_order_id, status, route_started_at, work_started_at,
+    // work_completed_at, tenant_id (+ id/created_at/updated_at). The previous
+    // payload named user_id, timecard_id, timestamp, latitude, longitude,
+    // accuracy, notes and job_id — eight columns that do not exist — so every
+    // insert failed. The failure was then swallowed as "table missing", which
+    // is why no operator status has ever been recorded.
     let statusEntry = null;
+    const nowIso = new Date().toISOString();
     const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .insert([{
-        user_id: user.id,
-        timecard_id: activeTimecard?.id || null,
-        status: status,
-        timestamp: new Date().toISOString(),
-        latitude: latitude || null,
-        longitude: longitude || null,
-        accuracy: accuracy || null,
-        notes: notes || null,
-        job_id: jobId || null,
+        operator_id: user.id,
+        job_order_id: jobId || null,
+        status,
+        tenant_id: tenantId,
+        ...(status === 'in_route' ? { route_started_at: nowIso } : {}),
+        ...(status === 'in_progress' ? { work_started_at: nowIso } : {}),
+        ...(status === 'completed' ? { work_completed_at: nowIso } : {}),
       }])
       .select()
       .single();
@@ -191,13 +197,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get latest status — gracefully handle missing table
+    // Get latest status — gracefully handle missing table.
+    // THE COLUMNS ARE `operator_id` and `created_at`. They were `user_id` and
+    // `timestamp` here, neither of which exists, so this threw Postgres 42703
+    // on EVERY operator dashboard load — 81 errors across 30 users over 48 days
+    // before anyone noticed, because 42703 is not a missing-table error and
+    // nothing was alerting.
     let latestStatus = null;
     const { data: statusData, error: statusError } = await supabaseAdmin
       .from('operator_status_history')
       .select('*')
-      .eq('user_id', user.id)
-      .order('timestamp', { ascending: false })
+      .eq('operator_id', user.id)
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
