@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Clock, MapPin, Wrench, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Clock, MapPin, Wrench, ChevronRight, CheckCircle2, Users } from 'lucide-react';
 import { toLocalYMD } from '@/lib/dates';
 
 export interface JobTicketData {
@@ -261,6 +261,28 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
                 <span className="font-semibold">{job.job_type}</span>
               </div>
             </div>
+            {/* WHO ELSE IS ON THIS JOB — on the CARD, not buried in the
+                ticket. Founder: adding a second operator showed nothing next
+                to the lead's name, so the crew couldn't tell who they were
+                working with without opening the job. */}
+            {(() => {
+              const people = [
+                job.operator_name ? { name: job.operator_name, role: 'lead' as const } : null,
+                job.helper_name ? { name: job.helper_name, role: 'helper' as const } : null,
+                ...(job.crew || []).map((c) => ({ name: c.name, role: c.role })),
+              ].filter(Boolean) as Array<{ name: string; role: string }>;
+              if (people.length === 0) return null;
+              return (
+                <div className="flex items-center gap-1.5 mt-2 min-w-0">
+                  <Users className="w-3.5 h-3.5 flex-shrink-0 text-gray-400 dark:text-white/40" />
+                  <span className="text-xs text-gray-600 dark:text-white/60 truncate">
+                    {people
+                      .map((p) => (p.role === 'helper' ? `${p.name} (helper)` : p.name))
+                      .join(' · ')}
+                  </span>
+                </div>
+              );
+            })()}
             {/* Estimated hours intentionally NOT shown to operators (admin-only). */}
           </div>
 

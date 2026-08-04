@@ -47,6 +47,19 @@ export default function MyJobsPage() {
   const [continuingProjects, setContinuingProjects] = useState<any[]>([]);
   const [multiDayScheduled, setMultiDayScheduled] = useState<any[]>([]);
   const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
+
+  // ── ONE JOB, ONE CARD ────────────────────────────────────────────────────
+  // This screen builds THREE lists — today's schedule, multi-day carryover and
+  // continuing projects — and each only deduped against ITSELF. So a job could
+  // legitimately qualify for two of them and the operator saw the SAME job
+  // twice (Aiden, Aug 2026: two tickets for one job). Now the day's schedule
+  // wins and the secondary lists only ever show what it does NOT already
+  // contain.
+  const shownJobIds = new Set(jobs.map((j) => j.id));
+  const visibleMultiDay = multiDayScheduled.filter((j: any) => !shownJobIds.has(j.id));
+  const visibleContinuing = continuingProjects.filter(
+    (j: any) => !shownJobIds.has(j.id) && !visibleMultiDay.some((m: any) => m.id === j.id)
+  );
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
   const [scheduleUpdatedBanner, setScheduleUpdatedBanner] = useState(false);
@@ -546,16 +559,16 @@ export default function MyJobsPage() {
             wording on purpose: the same card is seen the evening after "Done
             for Today" AND the next morning — "tomorrow"/"today" would each be
             wrong half the time, "in progress / up next" is always true. */}
-        {multiDayScheduled.length > 0 && (
+        {visibleMultiDay.length > 0 && (
           <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden shadow-md">
             <div className="flex items-center gap-3 px-4 py-3 bg-amber-500">
               <Clock className="w-5 h-5 text-white" />
               <h3 className="text-sm font-bold text-white">
-                Multi-Day In Progress ({multiDayScheduled.length})
+                Multi-Day In Progress ({visibleMultiDay.length})
               </h3>
             </div>
             <div className="divide-y divide-amber-100">
-              {multiDayScheduled.map((job: any) => (
+              {visibleMultiDay.map((job: any) => (
                 <div key={job.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-400" />
                   <div className="flex-1 min-w-0">
@@ -584,7 +597,7 @@ export default function MyJobsPage() {
         )}
 
         {/* Continuing Projects (on_hold / in_progress from past dates) */}
-        {continuingProjects.length > 0 && (
+        {visibleContinuing.length > 0 && (
           <div className="mb-5 bg-brand/5 border-2 border-brand/30 rounded-2xl overflow-hidden shadow-md">
             <div className="flex items-center gap-3 px-4 py-3 bg-brand">
               <PauseCircle className="w-5 h-5 text-white" />
@@ -593,7 +606,7 @@ export default function MyJobsPage() {
               </h3>
             </div>
             <div className="divide-y divide-brand/10">
-              {continuingProjects.map((job: any) => (
+              {visibleContinuing.map((job: any) => (
                 <div key={job.id} className="flex items-center gap-3 px-4 py-3">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-brand' : 'bg-orange-400'}`} />
                   <div className="flex-1 min-w-0">
