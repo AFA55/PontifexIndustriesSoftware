@@ -340,13 +340,13 @@ export default function DayCompletePage() {
 
   // ─── DONE FOR TODAY (Continue Tomorrow) ───────────────────────────────────
   const handleDoneForToday = async () => {
-    // Required: today's work + photos (unless prohibited on this site).
+    // Required: today's work. PHOTOS ARE NOT REQUIRED TO CLOSE OUT A DAY on a
+    // multi-day job (founder, Aug 3 2026) — the crew is coming back tomorrow,
+    // nothing is being handed to the customer, and nobody is signing anything.
+    // Photos become mandatory only on the FINAL step, when the job is actually
+    // completed and the customer signs (handleSubmitCompletion below).
     if (workPerformedItems.length === 0) {
       setNotification({ message: 'Log what you did today before finishing for the day.', type: 'error' });
-      return;
-    }
-    if (completionPhotos.length === 0 && !photosProhibited) {
-      setNotification({ message: 'Add at least one photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
       return;
     }
     setSubmitting(true);
@@ -1140,11 +1140,20 @@ export default function DayCompletePage() {
               <Camera className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
             </div>
             <div>
+              {/* Photos are required only to COMPLETE the job. On a multi-day
+                  job, "Done for today" needs none — the crew is coming back and
+                  nothing is being signed. `isLastScheduledDay !== true` is the
+                  same condition that shows the Done-for-today button below. */}
               <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                Completion Photos {!photosProhibited && <span className="text-red-500">*</span>}
+                Completion Photos{' '}
+                {!photosProhibited && isLastScheduledDay === true && <span className="text-red-500">*</span>}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {photosProhibited ? 'Not allowed at this jobsite' : 'Required — before/after photos, site conditions'}
+                {photosProhibited
+                  ? 'Not allowed at this jobsite'
+                  : isLastScheduledDay === true
+                    ? 'Required to complete the job — before/after photos, site conditions'
+                    : 'Optional today — required only when you complete the job'}
               </p>
             </div>
           </div>
