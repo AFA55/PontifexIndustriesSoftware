@@ -22,6 +22,12 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { isNativeApp } from './is-native';
+import {
+  requestSpeechPermission,
+  startListening as nativeStartListening,
+  stopListening as nativeStopListening,
+} from './native-speech';
 
 type SpeechRecognitionLike = {
   lang: string;
@@ -75,6 +81,11 @@ export function useArtifexVoice() {
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
+  // Native (in-app) listening state — the phone recogniser has no "turn ended"
+  // event, so the hook owns the timer and the finish handler.
+  const nativeActiveRef = useRef(false);
+  const nativeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nativeFinishRef = useRef<(() => Promise<void>) | null>(null);
 
   // Live speech loudness 0..1 — mutable ref by design (see header comment).
   const amplitudeRef = useRef(0);
@@ -83,7 +94,10 @@ export function useArtifexVoice() {
   const ampRafRef = useRef(0);
 
   useEffect(() => {
-    setMicSupported(!!getRecognition());
+    // Inside the app the browser API is unavailable BY DESIGN — the phone's
+    // own recogniser is used instead, so the mic must still show as supported
+    // or the crew never sees the button.
+    setMicSupported(isNativeApp() || !!getRecognition());
     return () => {
       audioRef.current?.pause();
       recRef.current?.abort();
@@ -249,6 +263,52 @@ export function useArtifexVoice() {
 
   const startListening = useCallback(
     (onTranscript: (text: string) => void) => {
+      // ── INSIDE THE APP, USE THE PHONE'S OWN MICROPHONE ──────────────────
+      // The browser Web Speech API does NOT work in the iOS WKWebView — it
+      // returns 'service-not-allowed', which surfaced to the crew as
+      // "browser not permitted" when they tried to talk to Artifex. The app
+      // already ships a native speech plugin (lib/native-speech.ts, used by
+      // voice equipment checkout); Artifex just wasn't using it. Native path
+      // asks for permission properly and streams the same live transcript.
+      if (isNativeApp()) {
+        void (async () => {
+          setMicError(null);
+          setLiveTranscript('');
+          const granted = await requestSpeechPermission();
+          if (!granted) {
+            setMicError(
+              'Microphone access is off for this app. Open your phone Settings → Pontifex → Microphone (and Speech Recognition) to turn it on — or just type below.'
+            );
+            return;
+          }
+          setListening(true);
+          nativeActiveRef.current = true;
+          const ok = await nativeStartListening({
+            onPartialResult: (text) => setLiveTranscript(text),
+          });
+          if (!ok) {
+            nativeActiveRef.current = false;
+            setListening(false);
+            setMicError('Voice isn\'t available on this device right now — type below instead.');
+            return;
+          }
+          // Native recogniser doesn't emit an "end of turn" event, so mirror
+          // the web behaviour: a silence window closes the turn.
+          nativeFinishRef.current = async () => {
+            if (!nativeActiveRef.current) return;
+            nativeActiveRef.current = false;
+            const finalText = await nativeStopListening();
+            setListening(false);
+            const text = (finalText || '').trim();
+            if (text) onTranscript(text);
+          };
+          nativeTimerRef.current = setTimeout(() => {
+            void nativeFinishRef.current?.();
+          }, MAX_LISTEN_MS);
+        })();
+        return;
+      }
+
       const rec = getRecognition();
       if (!rec) return;
       recRef.current?.abort();
@@ -325,6 +385,11 @@ export function useArtifexVoice() {
   );
 
   const stopListening = useCallback(() => {
+    if (nativeActiveRef.current) {
+      if (nativeTimerRef.current) clearTimeout(nativeTimerRef.current);
+      void nativeFinishRef.current?.();
+      return;
+    }
     recRef.current?.stop();
     setListening(false);
   }, []);
