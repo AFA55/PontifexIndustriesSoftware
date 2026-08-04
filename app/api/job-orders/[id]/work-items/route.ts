@@ -71,6 +71,20 @@ export async function POST(
       return NextResponse.json({ error: 'Not authorized for this job' }, { status: 403 });
     }
 
+    // A FINISHED JOB IS A CLOSED RECORD. Hiding the buttons in the UI is not a
+    // control — this is. Once a job is completed or cancelled, the work log
+    // behind a customer's signature must not be rewritten from an operator's
+    // phone. The office can still correct it (isAdmin passes).
+    if (!isAdmin && ['completed', 'cancelled', 'archived'].includes(String(job.status))) {
+      return NextResponse.json(
+        {
+          error:
+            'This job is already closed out. Ask the office to make a change — the signed record can\'t be edited from here.',
+        },
+        { status: 409 }
+      );
+    }
+
     // Delete existing work items for this job + day (replace pattern) — ONLY
     // this submitter's rows. Without the operator filter, one crew member's
     // resubmit wiped every other crew member's items for the day.

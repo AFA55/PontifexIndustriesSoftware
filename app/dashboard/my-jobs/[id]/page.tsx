@@ -281,6 +281,15 @@ export default function JobDetailPage() {
       : equipmentAllChecked && inRouteReached;
 
   const isCompleted = job?.status === 'completed';
+
+  // ── HISTORY MODE: LOOK, DON'T TOUCH ──────────────────────────────────────
+  // Founder: "they should only be able to see previous and current job and not
+  // affect the tickets." Opening a finished job out of the past-jobs list must
+  // never let an operator restart a route, re-log work, or otherwise rewrite a
+  // record the customer already signed. Two ways in: the ?view=history link
+  // from the past-jobs list, or simply that the job is already completed.
+  const isHistoryView = searchParams?.get('view') === 'history';
+  const readOnlyTicket = isHistoryView || job?.status === 'completed';
   const isOnHold = job?.status === 'on_hold';
   // pending_completion = operator submitted for approval; treat same as in_progress so they can still navigate freely
   const isPendingCompletion = job?.status === 'pending_completion';
@@ -1073,6 +1082,21 @@ export default function JobDetailPage() {
           </div>
         )}
 
+        {/* Looking at a finished job — say so, and make clear nothing here
+            can be changed. Prevents an operator "fixing" a signed record. */}
+        {readOnlyTicket && (
+          <div className="mb-4 rounded-2xl border-2 border-slate-300 dark:border-white/20 bg-slate-50 dark:bg-white/5 p-4 flex items-start gap-3">
+            <FileText className="w-5 h-5 text-slate-500 dark:text-white/50 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-bold text-slate-800 dark:text-white">Viewing a past job</p>
+              <p className="text-xs text-slate-600 dark:text-white/60 mt-0.5">
+                This is a record of work already submitted. It can&apos;t be changed from here —
+                if something is wrong, tell the office.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Crew Info - collapsible */}
         <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 overflow-hidden">
           <button
@@ -1426,7 +1450,8 @@ export default function JobDetailPage() {
             </div>
             <button
               onClick={() => router.push(`/dashboard/my-jobs/${job.id}/jobsite`)}
-              className="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
+              disabled={readOnlyTicket}
+              className="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <PlayCircle className="w-6 h-6" />
               {isPendingCompletion ? 'View Jobsite & My Work Log' : 'Jobsite & Log My Work'}
@@ -1434,8 +1459,8 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Action Buttons */}
-        {!isCompleted && !isOnHold && !jobIsHelper && !isCoOperator && (
+        {/* Action Buttons — hidden entirely when reviewing history. */}
+        {!readOnlyTicket && !isCompleted && !isOnHold && !jobIsHelper && !isCoOperator && (
           <div className="pt-2">
             {isInProgress ? (
               <button
