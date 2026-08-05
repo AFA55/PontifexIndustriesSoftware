@@ -12,18 +12,18 @@ outrank polish; anything an operator hits on a live jobsite outranks the office.
 ### 🚧 BLOCKED ON FOUNDER (2 minutes each, but they gate real features)
 | # | What | Why it blocks |
 |---|---|---|
-| B1 | **Set the shop location** (`tenants.shop_latitude/longitude` are NULL for Patriot) | EVERY ETA calculation measures from the shop. Without it the whole "estimated arrival" feature has no origin point. Clock-in currently leans on a default fallback, which is why nobody noticed. |
+| ~~B1~~ | ~~**Set the shop location**~~ ✅ DONE Aug 5 — founder gave 269 S Old Piedmont Hwy; the field-verified clock-in pin is now stored on the tenant. | EVERY ETA calculation measures from the shop. Without it the whole "estimated arrival" feature has no origin point. Clock-in currently leans on a default fallback, which is why nobody noticed. |
 | B2 | **Enter operator wages** (`profiles.hourly_rate` — 0 of 35 set) | Labor cost honestly reads "rates not set" everywhere until then. |
 | B3 | Change-order paperwork / the ticket's 10 numbered questions vs a real pad | Needed to finish the printed ticket. |
 
 ### P0 — the ticket must be trustworthy
-- [ ] **Job Scope & Progress reads 0%** while a draft shows WALL SAW ×132. Submitted work never moves the office-set targets. *Founder screenshot Aug 4.*
-- [ ] **Timecard PDF is missing the times.**
-- [ ] **Liability waiver flow** — checked on the schedule form → sent to the site contact when the operator first taps In Route → reminder based on ETA if unsigned → operator sees "Waiver signed ✓" or "Resend waiver" BEFORE starting work.
+- [x] ~~**Job Scope & Progress reads 0%**~~ FIXED Aug 5 (`da770dcc`) — two stacked faults: nothing ever wrote `job_progress_entries`, AND the office/operator vocabularies never matched. Progress now DERIVED from `work_items` via `lib/job-progress.ts`. Founder's job: 0% → 132/3280 wall saw + 7/80 cores.
+- [x] ~~**Timecard PDF is missing the times.**~~ FIXED Aug 5 (`685a7d13`) — the times were there but rendered in the SERVER's zone. On Vercel (UTC) a 7:07 AM clock-in printed as 11:07 AM. Fixed in the operator PDF, admin PDF and the payroll CSV.
+- [x] ~~**Liability waiver flow**~~ BUILT Aug 5 (`b3549ff2`) — auto-sends on first In Route, reminder cron, operator banner with resend. **Also fixed: every customer signing link was dead** (missing FK → PGRST200 → "Invalid or expired link" for every token ever issued). ⚠️ FOUNDER: the waiver body is still placeholder text — send me the legal wording.
 
 ### P1 — the crew's day
 - [ ] **Work-performed redesign** — pick the work type first, then enter every measurement + notes below in one pass, instead of one modal at a time. Founder's biggest UX ask.
-- [ ] **ETA instead of In Route after day 1.** In Route is only tapped on day 1; after that show an estimated arrival from the jobsite↔shop distance. Founder's buffer rule: **< 1 hr → drive + 20 min · > 1 hr → drive + 30 min · > 3 hrs → drive + 45 min (45 is the cap)**. Must work for quick-add AND schedule-form jobs. NEEDS B1.
+- [x] ~~**ETA instead of In Route after day 1.**~~ BUILT Aug 5 (`d1f4f07f`, `ca030af5`) — `lib/eta.ts` + shop location now stored on the tenant. Live on the customer portal. Still to do: show it on the OPERATOR ticket too.
 - [ ] **Quick Add: address autofill + drive time** — still not integrated; feeds the ETA above.
 - [ ] **Helper history view** — DSM-style day toggle: who they worked with, what they did, hours. Stored so both the helper and the office can look back.
 - [ ] Equipment checklist can lock at 0/3 while reading "Ready", and records gear the operator never confirmed.
