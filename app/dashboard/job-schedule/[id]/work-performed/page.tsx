@@ -263,7 +263,19 @@ export default function WorkPerformed() {
   const isBackfill = workDate !== toLocalYMD();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedItems, setSelectedItems] = useState<WorkItem[]>([]);
+  /**
+   * Controls the WORK DETAIL PANEL. Named "modal" historically — it is now an
+   * INLINE panel that opens below the work-type picker rather than a pop-up.
+   *
+   * WHY (founder, Aug 2026): tapping a work type used to throw a full-screen
+   * overlay over the operator immediately. On a phone, in the field, that hides
+   * what you just picked and everything you already added. The flow is now:
+   * pick the type, then scroll down and enter every measurement and note in one
+   * pass — which is how the crew actually works.
+   */
   const [showQuantityModal, setShowQuantityModal] = useState(false);
+  /** The inline detail panel, so picking a type can scroll it into view. */
+  const detailPanelRef = useRef<HTMLDivElement | null>(null);
   const [showAddMoreDialog, setShowAddMoreDialog] = useState(false);
   const [currentItem, setCurrentItem] = useState<string>('');
   const [currentQuantity, setCurrentQuantity] = useState(1);
@@ -863,6 +875,24 @@ export default function WorkPerformed() {
 
     setShowQuantityModal(true);
   };
+
+  /**
+   * Bring the detail panel into view once it has rendered.
+   *
+   * The panel is inline now, so picking a work type near the top of a long
+   * picker would otherwise leave the operator staring at the list with no sign
+   * anything happened. Runs after paint so the panel exists to scroll to.
+   */
+  useEffect(() => {
+    if (!showQuantityModal) return;
+    // A short delay, not requestAnimationFrame: the panel is inserted into the
+    // DOM in this same commit and rAF fires before the browser has laid it out,
+    // so scrollIntoView computes a position of 0 and nothing moves (measured).
+    const id = setTimeout(() => {
+      detailPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+    return () => clearTimeout(id);
+  }, [showQuantityModal, currentItem]);
 
   /** The hole still sitting in the input row, or null when it's incomplete.
    *  Shared by "Add This Hole" and the auto-flush in handleAddItem. */
@@ -1997,6 +2027,12 @@ export default function WorkPerformed() {
               </div>
             )}
 
+            {/* Search + picker are hidden while a work item is being entered,
+                so the detail panel is the next thing on screen instead of a
+                thousand pixels below the list you just picked from. "Cancel"
+                brings them straight back. */}
+            {!showQuantityModal && (
+              <>
             {/* Autocomplete Search Bar */}
             <div className="bg-white dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-sm border border-gray-100 dark:border-white/10 p-4 mb-4">
               {/* Smart Recommendations based on job type */}
@@ -2054,6 +2090,10 @@ export default function WorkPerformed() {
                 Start typing to see suggestions. Click to add multiple items.
               </p>
             </div>
+              </>
+            )}
+            {!showQuantityModal && (
+              <>
 
             {/* Selected Items Display */}
             {selectedItems.length > 0 && (
@@ -2136,6 +2176,8 @@ export default function WorkPerformed() {
               })}
               </div>
             </div>
+              </>
+            )}
           </>
         ) : (
           /* Selected Items View */
@@ -2533,7 +2575,15 @@ export default function WorkPerformed() {
           </div>
         )}
 
-        {!dayAlreadySubmitted && (
+        {/* The day-level sections — photos, the whole-day note, difficulty —
+            are hidden while a work item is being entered.
+            They belong to the DAY, not to the item in hand, and leaving them
+            between the work-type picker and the detail panel meant the operator
+            picked a type and then had to scroll past three unrelated cards to
+            reach the measurements. With them out of the way the panel opens
+            directly under the picker, which is what "pick the type, then enter
+            everything below" actually means on a phone. */}
+        {!dayAlreadySubmitted && !showQuantityModal && (
           <>
             {/* Job Photos — OPTIONAL on this screen. The requirement lives at
                 job completion, before the customer signature. */}
@@ -2694,12 +2744,16 @@ export default function WorkPerformed() {
         )}
       </div>
 
-      {/* Work Item Detail Modal */}
+      {/* ── Work detail panel — INLINE, not an overlay ────────────────────────
+          Sits in the page flow directly under the work-type picker so the
+          operator picks a type and then scrolls down into the measurements.
+          It used to be a fixed full-screen modal that covered everything the
+          moment a type was tapped. */}
       {showQuantityModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 sm:p-4">
-          <div className="bg-white dark:bg-gray-900 rounded-t-2xl sm:rounded-2xl max-w-2xl w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl border border-gray-100 dark:border-white/10">
-            {/* Modal Header */}
-            <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/10 p-4 sm:p-6 rounded-t-2xl">
+        <div ref={detailPanelRef} className="max-w-2xl mx-auto w-full px-4 pb-6 scroll-mt-4">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl w-full shadow-lg border-2 border-brand/30 dark:border-brand/40 overflow-hidden">
+            {/* Panel header — stays visible while scrolling the measurements */}
+            <div className="sticky top-0 z-10 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-white/10 p-4 sm:p-6">
               <h3 className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
                 <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg ${
                   isCoreDrilling(currentItem)
@@ -3818,8 +3872,12 @@ export default function WorkPerformed() {
 
               <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowQuantityModal(false)}
-                  className="flex-shrink-0 px-6 py-3 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold border border-gray-200 dark:border-white/10"
+                  onClick={() => {
+                    setShowQuantityModal(false);
+                    // Put them back on the picker they came from.
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }}
+                  className="flex-shrink-0 min-h-[44px] px-6 py-3 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white rounded-xl hover:bg-gray-200 dark:hover:bg-white/20 transition-all font-semibold border border-gray-200 dark:border-white/10"
                 >
                   Cancel
                 </button>
