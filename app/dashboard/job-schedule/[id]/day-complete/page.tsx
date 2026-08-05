@@ -505,9 +505,32 @@ export default function DayCompletePage() {
           // so onsite-signed jobs are queryable by the same columns.
           customer_signature: signatureUrl || undefined,
           customer_signed_at: new Date().toISOString(),
-          customer_signature_method: 'onsite',
+          // 'on_site' with the underscore — the column's CHECK constraint
+          // allows ('on_site','remote','none'). 'onsite' would be rejected and
+          // the status route's silent fallback would drop the whole payload
+          // again, which is how zero signatures ever saved.
+          customer_signature_method: 'on_site',
         })
       });
+
+      const statusJson = await statusRes.json().catch(() => null);
+
+      // NEVER report a clean completion when the database refused part of the
+      // payload. This is the exact failure that lost every signature: the
+      // request came back 200, the operator saw "Job Complete", and the
+      // signature was silently gone. If the signature specifically didn't
+      // land, say so and keep the local copy — do NOT clear it.
+      const droppedSignature = (statusJson?.partial_save?.dropped_fields || []).some(
+        (f: string) => f.includes('signature') || f.includes('signed')
+      );
+      if (statusRes.ok && droppedSignature) {
+        showNotif(
+          'The job was marked complete but the SIGNATURE did not save. Tell the office before you leave — do not re-sign.',
+          'error'
+        );
+        setSubmitting(false);
+        return;
+      }
 
       if (statusRes.ok) {
         localStorage.removeItem(`work-performed-${jobId}`);
@@ -520,8 +543,7 @@ export default function DayCompletePage() {
         void sendReviewToContact(session.access_token);
         setSuccessMode('complete');
       } else {
-        const data = await statusRes.json();
-        showNotif(data.error || 'Failed to complete job', 'error');
+        showNotif(statusJson?.error || 'Failed to complete job', 'error');
       }
     } catch (err) {
       console.error('Error completing job:', err);

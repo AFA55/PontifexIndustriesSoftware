@@ -448,6 +448,8 @@ async function updateJobStatus(
 
     // Update job order (scoped to tenant)
     let updatedJob: any = null;
+    /** Set when the DB refused some columns — surfaced so nothing claims a clean save. */
+    let partialSaveWarning: { dropped_fields: string[]; reason: string } | null = null;
     let fullUpdateQuery = supabaseAdmin
       .from('job_orders')
       .update(updateData)
@@ -456,10 +458,26 @@ async function updateJobStatus(
     const { data: fullUpdateResult, error: updateError } = await fullUpdateQuery.select().single();
 
     if (updateError) {
-      // If the error is about unknown columns, retry with just the status field
+      // ── THE SILENT FALLBACK THAT ATE EVERY SIGNATURE ────────────────────
+      // This used to catch an unknown-column error, quietly retry with
+      // `{status}` ALONE, and return HTTP 200. The operator saw "Job Complete"
+      // while the customer's signature, the signer's name, customer_signed_at
+      // and total_hours_worked were all thrown away — which is why NOT ONE
+      // signature existed in production across every completed job.
+      //
+      // An unknown column is a BUG (a migration that never ran), not a
+      // condition to paper over. The fallback still runs so the job isn't left
+      // in a wrong STATUS mid-flow, but it now names the columns it dropped,
+      // reports them to the caller, and — critically — is loud enough to
+      // notice. Silence on the path that carries a signed record is a defect.
       const errMsg = (updateError.message || '').toLowerCase();
       if (errMsg.includes('column') || errMsg.includes('does not exist') || errMsg.includes('undefined')) {
-        console.log('Full update failed (likely missing columns), retrying with status only:', updateError.message);
+        const droppedFields = Object.keys(updateData).filter((k) => k !== 'status');
+        console.error(
+          '[status] SCHEMA DRIFT — the job_orders update was rejected and these fields were DROPPED:',
+          droppedFields.join(', '),
+          '| postgres said:', updateError.message
+        );
         let fallbackQuery = supabaseAdmin
           .from('job_orders')
           .update({ status })
@@ -475,6 +493,11 @@ async function updateJobStatus(
           );
         }
         updatedJob = fallbackResult;
+        // Tell the caller the truth so a UI can stop claiming success.
+        partialSaveWarning = {
+          dropped_fields: droppedFields,
+          reason: updateError.message,
+        };
       } else {
         console.error('Error updating job order status:', updateError);
         return NextResponse.json(
@@ -607,6 +630,10 @@ async function updateJobStatus(
         success: true,
         message: `Job status updated to: ${status}`,
         data: updatedJob,
+        // Non-null when the database refused part of the payload. Callers that
+        // record something legally meaningful (a signature) must NOT report a
+        // clean save when this is present.
+        partial_save: partialSaveWarning,
       },
       { status: 200 }
     );
