@@ -12,6 +12,7 @@ import { notifySalesperson } from '@/lib/notify-salesperson';
 import { notifyCustomer } from '@/lib/notify-customer';
 import { isValidTransition, validateTransitionTimestamp } from '@/lib/job-status';
 import { sequenceBlocks } from '@/lib/reassign';
+import { tenantToday as resolveTenantToday } from '@/lib/tenant-timezone';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -132,6 +133,33 @@ async function updateJobStatus(
         { status: 400 }
       );
     }
+    // ── A MULTI-DAY JOB DOESN'T CLOSE BY ACCIDENT ────────────────────────
+    // Founder's rule: on a multi-day job the crew can submit a DAY's work
+    // ticket as often as they like, but the JOB stays open until they say
+    // they're finished and a signature is taken. Finishing on day 1 of a
+    // 5-day job is almost always a mis-tap — and it's expensive, because a
+    // completed job stops appearing as work to do and can't be edited from the
+    // field. The UI asks; this makes it impossible to do silently, including
+    // through the API.
+    if (status === 'completed' && currentStatus !== 'completed') {
+      const spanEnd = existingJob.end_date || existingJob.scheduled_end_date || null;
+      const todayLocal = await resolveTenantToday(tenantId ?? null);
+      const finishingEarly = !!spanEnd && spanEnd > todayLocal;
+      if (finishingEarly && body.confirm_finish_early !== true) {
+        return NextResponse.json(
+          {
+            error: 'finish_early_confirmation_required',
+            message:
+              `This job is scheduled through ${spanEnd}. Completing it now closes it for good — ` +
+              `nobody can log more work against it. If the work really is finished, confirm; ` +
+              `otherwise choose "Done for Today" and pick it back up tomorrow.`,
+            scheduled_through: spanEnd,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     if ((status === 'cancelled' || status === 'archived') && !isAdmin) {
       return NextResponse.json(
         { error: `Only admins may set status='${status}'` },

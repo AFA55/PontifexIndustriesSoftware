@@ -415,14 +415,26 @@ export default function CustomerPortalPage() {
                         </div>
                       )}
 
-                      {job.total_cost != null && (
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
-                          <span className="text-xs text-slate-500">Total</span>
-                          <span className="text-sm font-semibold text-white">
-                            {formatCost(job.total_cost)}
-                          </span>
-                        </div>
-                      )}
+                      {/* NO PRICE HERE (founder, Aug 2026). The portal is the
+                          customer's record of WHAT WAS DONE, not an invoice —
+                          and a "Total $0.00" on a finished job reads as either
+                          free work or a broken system. Money goes on the
+                          invoice, which the office controls. What belongs here
+                          is the state of the work. */}
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-white/10">
+                        <span className="text-xs text-slate-500">
+                          {job.status === 'completed' ? 'Work' : 'Status'}
+                        </span>
+                        <span className="text-sm font-semibold text-white">
+                          {job.status === 'completed'
+                            ? 'Scope complete'
+                            : job.status === 'in_progress' || job.status === 'on_site'
+                              ? 'Crew on site'
+                              : job.status === 'in_route'
+                                ? 'Crew on the way'
+                                : 'Scheduled'}
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 );

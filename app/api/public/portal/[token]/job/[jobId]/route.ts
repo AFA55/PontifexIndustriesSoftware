@@ -46,9 +46,13 @@ export async function GET(
       .from('job_orders')
       .select(
         'id, job_number, project_name, customer_name, customer_email, job_type, address, location, ' +
-        'description, scope_of_work, scheduled_date, status, assigned_to, helper_assigned_to, ' +
+        // NOTE: `scope_of_work` and `completed_at` DO NOT EXIST on job_orders.
+        // Naming them made PostgREST reject the WHOLE select, so every customer
+        // who tapped a job in their portal got "Job Not Found". The real
+        // columns are `scope_details` (jsonb) and `work_completed_at`.
+        'description, scope_details, scheduled_date, end_date, status, assigned_to, helper_assigned_to, ' +
         'tenant_id, total_cost, customer_signature, customer_signed_at, customer_signature_method, ' +
-        'completed_at, work_completed_at, completion_pdf_url, completion_signer_name, ' +
+        'work_completed_at, completion_pdf_url, completion_signer_name, completion_signed_at, ' +
         'in_route_at, arrived_at_jobsite_at, work_started_at, total_hours_worked, total_days_worked'
       )
       .eq('id', jobId)

@@ -515,6 +515,44 @@ export default function DayCompletePage() {
 
       const statusJson = await statusRes.json().catch(() => null);
 
+      // The job is scheduled past today and the server wants an explicit
+      // confirmation before closing it for good. Ask plainly, in the crew's
+      // terms, then retry with the confirmation.
+      if (statusRes.status === 409 && statusJson?.error === 'finish_early_confirmation_required') {
+        const ok = window.confirm(
+          `${statusJson.message}\n\nOK = the work really is finished, close the job.\nCancel = go back.`
+        );
+        if (!ok) { setSubmitting(false); return; }
+        const retry = await fetch(`/api/job-orders/${jobId}/status`, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            status: 'completed',
+            work_completed_at: new Date().toISOString(),
+            completion_signer_name: signerName || undefined,
+            completion_signature: signatureUrl || undefined,
+            customer_signature: signatureUrl || undefined,
+            customer_signed_at: new Date().toISOString(),
+            customer_signature_method: 'on_site',
+            confirm_finish_early: true,
+          }),
+        });
+        if (!retry.ok) {
+          const rj = await retry.json().catch(() => null);
+          showNotif(rj?.error || 'Failed to complete job', 'error');
+          setSubmitting(false);
+          return;
+        }
+        localStorage.removeItem(`work-performed-${jobId}`);
+        localStorage.removeItem(`work-draft-${jobId}`);
+        void sendReviewToContact(session.access_token);
+        setSuccessMode('complete');
+        return;
+      }
+
       // NEVER report a clean completion when the database refused part of the
       // payload. This is the exact failure that lost every signature: the
       // request came back 200, the operator saw "Job Complete", and the
