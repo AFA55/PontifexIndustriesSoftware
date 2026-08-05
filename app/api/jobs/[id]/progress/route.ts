@@ -43,20 +43,38 @@ export async function GET(request: NextRequest, context: RouteContext) {
       for (const p of opProfiles ?? []) operatorNames[p.id] = p.full_name ?? 'Unknown';
     }
 
+    // The raw work item behind each entry, for the measurement fields the
+    // activity log prints (linear feet vs cores vs a bare count).
+    const rawById = new Map(loaded.work_items.map((w) => [w.id, w]));
+
     // Newest first, matching the previous ordering.
     const flatEntries = [...entries]
       .sort((a, b) => String(b.date ?? '').localeCompare(String(a.date ?? '')))
-      .map((e) => ({
-        id: e.id,
-        scope_item_id: e.scope_item_id,
-        scope_item_description: e.description,
-        work_type: e.work_type,
-        unit: e.unit,
-        quantity_completed: e.quantity_completed,
-        date: e.date,
-        operator_name: e.operator_id ? operatorNames[e.operator_id] ?? 'Unknown' : 'Unknown',
-        notes: e.notes,
-      }));
+      .map((e) => {
+        const raw = rawById.get(e.id);
+        const num = (v: unknown) => {
+          const n = Number(v);
+          return Number.isFinite(n) && n > 0 ? n : 0;
+        };
+        return {
+          id: e.id,
+          scope_item_id: e.scope_item_id,
+          scope_item_description: e.description,
+          work_type: e.work_type,
+          unit: e.unit,
+          quantity_completed: e.quantity_completed,
+          date: e.date,
+          operator_name: e.operator_id ? operatorNames[e.operator_id] ?? 'Unknown' : 'Unknown',
+          notes: e.notes,
+          day_number: e.day_number,
+          // Fields the admin activity log reads by name. Without these it
+          // printed "undefined units" for every entry.
+          timestamp: raw?.created_at ?? null,
+          quantity: num(raw?.quantity),
+          linear_feet: num(raw?.linear_feet_cut),
+          cores: num(raw?.core_quantity),
+        };
+      });
 
     // Per-target summary, with each day's contribution kept for the chart.
     const dailyByScope: Record<string, Array<{ date: string; quantity: number }>> = {};

@@ -13,16 +13,29 @@ import {
   CartesianGrid,
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
+import { buildProgressChartData } from '@/lib/progress-chart-data';
 import type { ScopeItem } from './JobScopePanel';
 
+/**
+ * One row as /api/jobs/[id]/progress actually returns it: a FLAT list of work
+ * entries, one per thing the operator logged.
+ *
+ * This component previously expected `{ date, items: [...] }` — a grouped shape
+ * that route has never returned. It survived only because the endpoint read
+ * `job_progress_entries`, a table nothing ever wrote, so `entries` was always
+ * `[]` and `e.items.map(...)` was never reached. The moment progress started
+ * being derived from real work items (Aug 2026), `entries` became non-empty for
+ * the first time and this crashed every admin job page with
+ * "cannot read properties of undefined (reading 'map')".
+ *
+ * The grouping now happens here, from the shape the API really sends.
+ */
 interface ProgressEntry {
-  date: string;
-  items: {
-    work_type: string;
-    quantity: number;
-    linear_feet: number;
-    cores: number;
-  }[];
+  date: string | null;
+  work_type: string | null;
+  unit: string | null;
+  quantity_completed: number | null;
+  operator_name?: string | null;
 }
 
 interface JobProgressChartProps {
@@ -85,23 +98,9 @@ export default function JobProgressChart({ jobId, scopeItems }: JobProgressChart
     fetchProgress();
   }, [fetchProgress]);
 
-  // Build chart data: one row per date, keys per work type
-  const workTypes = [
-    ...new Set(
-      entries.flatMap((e) => e.items.map((i) => i.work_type))
-    ),
-  ];
-
-  const chartData = entries.map((entry) => {
-    const row: Record<string, string | number> = {
-      date: formatDate(entry.date),
-    };
-    for (const wt of workTypes) {
-      const items = entry.items.filter((i) => i.work_type === wt);
-      row[wt] = items.reduce((s, i) => s + (i.linear_feet || i.quantity || 0), 0);
-    }
-    return row;
-  });
+  // Grouping lives in lib/progress-chart-data.ts so it can be unit-tested
+  // against the real API payload — see that file for why.
+  const { workTypes, rows: chartData } = buildProgressChartData(entries, formatDate);
 
   const WORK_TYPE_LABELS: Record<string, string> = {
     wall_sawing: 'Wall Sawing',
