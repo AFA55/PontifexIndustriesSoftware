@@ -183,15 +183,40 @@ export async function GET(request: NextRequest, context: RouteContext) {
         },
         todayTz
       );
-      if (span && memberIds.size > 0) {
+      if (span) {
+        // WHO WORKED THIS JOB = the roster PLUS anyone who actually clocked
+        // into it. The old query only looked at roster members, so a person who
+        // clocked in against the job but was never added to the crew had their
+        // hours vanish from the job entirely (founder: "Aiden was at that job,
+        // it should show his clock-in to clock-out"). A timecard pointing at
+        // this job is ground truth — they were there; the roster is just a plan.
+        const memberList = Array.from(memberIds);
         let tcQuery = supabaseAdmin
           .from('timecards')
           .select('user_id, date, clock_in_time, clock_out_time, total_hours, job_order_id')
-          .in('user_id', Array.from(memberIds))
           .gte('date', span.from)
           .lte('date', span.to);
+        tcQuery = memberList.length > 0
+          ? tcQuery.or(`user_id.in.(${memberList.join(',')}),job_order_id.eq.${jobId}`)
+          : tcQuery.eq('job_order_id', jobId);
         if (tenantId) tcQuery = tcQuery.eq('tenant_id', tenantId);
         const { data: tcRows } = await tcQuery.order('date', { ascending: true });
+
+        // Resolve names for anyone who showed up via a timecard but isn't on
+        // the roster — otherwise they'd render as a blank row.
+        const unknownIds = Array.from(
+          new Set((tcRows || []).map((r) => r.user_id).filter((id) => id && !nameByUserId.has(id)))
+        );
+        if (unknownIds.length > 0) {
+          const { data: extraProfiles } = await supabaseAdmin
+            .from('profiles')
+            .select('id, full_name')
+            .in('id', unknownIds);
+          for (const pr of extraProfiles || []) {
+            nameByUserId.set(pr.id, pr.full_name ?? null);
+          }
+        }
+
         crewTimecards = groupCrewTimecards(tcRows || [], nameByUserId, jobId);
       }
     } catch (e) {

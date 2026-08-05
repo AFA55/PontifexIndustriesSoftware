@@ -870,7 +870,7 @@ export default function AdminJobDetailPage({
   const renderLiveStatusPanel = () => {
     if (!liveStatus) return null;
     const standbySegments = liveStatus.standby_segments_today ?? [];
-    const workPerformedCount = liveStatus.work_performed_count_today ?? liveStatus.work_performed_today.length;
+    const workPerformedCount = liveStatus.work_performed_count_today ?? (liveStatus.work_performed_today || []).length;
     const standbyElapsedMs = liveStatus.standby_active && liveStatus.standby_started_at
       ? nowTick - new Date(liveStatus.standby_started_at).getTime()
       : 0;
@@ -952,7 +952,7 @@ export default function AdminJobDetailPage({
               {standbySegmentsOpen && (
                 <ul className="divide-y divide-slate-100 dark:divide-white/5">
                   {/* TODO: inline-edit standby segments in a future iteration */}
-                  {standbySegments.map((seg) => (
+                  {(standbySegments || []).map((seg) => (
                     <li key={seg.id} className="px-3 py-2 text-xs flex items-start gap-2">
                       <span className={`w-1.5 h-1.5 mt-1.5 rounded-full flex-shrink-0 ${seg.ended_at ? 'bg-slate-400' : 'bg-rose-500 animate-pulse'}`} />
                       <div className="flex-1 min-w-0">
@@ -999,7 +999,7 @@ export default function AdminJobDetailPage({
           </div>
 
           {/* Live draft pill — operator is currently typing */}
-          {liveStatus.draft_work_performed && liveStatus.draft_work_performed.items.length > 0 && (
+          {liveStatus.draft_work_performed && (liveStatus.draft_work_performed.items || []).length > 0 && (
             <div
               className="
                 mb-3 w-full px-3 py-2 rounded-xl text-xs
@@ -1014,8 +1014,8 @@ export default function AdminJobDetailPage({
                 </span>
                 <span className="font-semibold">Draft in progress</span>
                 <span className="text-brand/80 dark:text-brand/80">
-                  · {liveStatus.draft_work_performed.items.length}{' '}
-                  {liveStatus.draft_work_performed.items.length === 1 ? 'item' : 'items'} typed
+                  · {(liveStatus.draft_work_performed.items || []).length}{' '}
+                  {(liveStatus.draft_work_performed.items || []).length === 1 ? 'item' : 'items'} typed
                 </span>
                 {liveStatus.draft_work_performed.updated_at && (
                   <span className="ml-auto text-[10px] text-brand/70 dark:text-brand/60">
@@ -1024,7 +1024,7 @@ export default function AdminJobDetailPage({
                 )}
               </div>
               <div className="mt-1.5 flex flex-wrap gap-1">
-                {liveStatus.draft_work_performed.items.slice(0, 8).map((it, i) => {
+                {(liveStatus.draft_work_performed?.items || []).slice(0, 8).map((it, i) => {
                   const item = it as { name?: string; quantity?: number };
                   return (
                     <span
@@ -1173,14 +1173,14 @@ export default function AdminJobDetailPage({
           </div>
 
           {/* Work performed today */}
-          {liveStatus.work_performed_today.length > 0 && (
+          {(liveStatus.work_performed_today || []).length > 0 && (
             <div>
               <p className="text-[10px] font-semibold text-slate-400 dark:text-white/40 uppercase tracking-wide mb-2 flex items-center gap-1">
                 <Activity className="w-3 h-3" />
                 Work Today
               </p>
               <ul className="space-y-1.5">
-                {liveStatus.work_performed_today.map((item) => (
+                {(liveStatus.work_performed_today || []).map((item) => (
                   <li key={item.id} className="flex items-start gap-2 text-xs">
                     <span className="w-1.5 h-1.5 mt-1.5 rounded-full bg-brand-accent flex-shrink-0" />
                     <div className="min-w-0">
@@ -1558,7 +1558,7 @@ export default function AdminJobDetailPage({
                         <span className="text-slate-500 dark:text-white/50">total</span>
                       </div>
                       <div className="flex gap-1">
-                        {dailyLogs.map((_, i) => (
+                        {(dailyLogs || []).map((_, i) => (
                           <div
                             key={i}
                             className="w-6 h-2 rounded-full bg-gradient-to-r from-brand to-brand-accent"
@@ -1570,7 +1570,7 @@ export default function AdminJobDetailPage({
                   )}
 
                   {/* Day cards */}
-                  {dailyLogs.map((log, idx) => {
+                  {(dailyLogs || []).map((log, idx) => {
                     const dayNum = log.day_number ?? idx + 1;
                     const logDate = log.log_date
                       ? new Date(log.log_date + 'T00:00:00').toLocaleDateString('en-US', {
@@ -1663,7 +1663,7 @@ export default function AdminJobDetailPage({
                                   // rows predating the work_items pipeline. Never
                                   // render the details object raw.
                                   <ul className="space-y-1.5">
-                                    {workItems.map((item, itemIdx) => {
+                                    {(workItems || []).map((item, itemIdx) => {
                                       const label = item.name || item.work_type || item.type || 'Work Item';
                                       const qty = item.quantity
                                         ? `× ${item.quantity}`
@@ -1795,7 +1795,7 @@ export default function AdminJobDetailPage({
                 </div>
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {photos.map((url, idx) => (
+                  {(photos || []).map((url, idx) => (
                     <a
                       key={`${url}-${idx}`}
                       href={url}
@@ -1833,7 +1833,7 @@ export default function AdminJobDetailPage({
                   Work Performed (submitted with completion request)
                 </p>
                 <div className="space-y-2">
-                  {activityLog.slice(0, 5).map((entry) => (
+                  {(activityLog || []).slice(0, 5).map((entry) => (
                     <div key={entry.id} className="flex items-start gap-2 text-sm">
                       <span className="w-1.5 h-1.5 mt-2 rounded-full bg-amber-400 flex-shrink-0" />
                       <div>
@@ -1927,7 +1927,7 @@ export default function AdminJobDetailPage({
                     </div>
                   )}
 
-                  {activityLog.map((entry) => (
+                  {(activityLog || []).map((entry) => (
                     <div key={entry.id} className="flex items-start gap-3 text-sm">
                       <div className="w-2 h-2 mt-1.5 rounded-full bg-brand flex-shrink-0" />
                       <div className="flex-1 min-w-0">
@@ -2338,7 +2338,7 @@ export default function AdminJobDetailPage({
                       <Crown className="w-3 h-3" /> {job.operator_name} · Lead
                     </span>
                   )}
-                  {crew.filter((c) => c.role === 'operator').map((c) => (
+                  {(crew || []).filter((c) => c.role === 'operator').map((c) => (
                     <span key={c.user_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200 dark:bg-indigo-500/15 dark:text-indigo-200 dark:border-indigo-400/30">
                       <Wrench className="w-3 h-3" /> {c.full_name || 'Operator'} · Operator
                     </span>
@@ -2348,7 +2348,7 @@ export default function AdminJobDetailPage({
                       <HardHat className="w-3 h-3" /> {job.helper_name} · Helper
                     </span>
                   )}
-                  {crew.filter((c) => c.role !== 'operator').map((c) => (
+                  {(crew || []).filter((c) => c.role !== 'operator').map((c) => (
                     <span key={c.user_id} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-500/15 dark:text-emerald-200 dark:border-emerald-400/30">
                       <HardHat className="w-3 h-3" /> {c.full_name || 'Helper'} · Helper
                     </span>
@@ -2378,13 +2378,13 @@ export default function AdminJobDetailPage({
                 {/* Per-member clock-in / clock-out by day */}
                 {crewTimecards.length > 0 ? (
                   <div className="space-y-3">
-                    {crewTimecards.map((day) => (
+                    {(crewTimecards || []).map((day) => (
                       <div key={day.date}>
                         <p className="text-xs font-bold text-slate-400 dark:text-white/45 uppercase tracking-wide mb-1.5">
                           {formatDate(day.date)}
                         </p>
                         <div className="space-y-1">
-                          {day.entries.map((e, i) => (
+                          {(day.entries || []).map((e, i) => (
                             <div
                               key={`${e.user_id}-${i}`}
                               className="flex items-center justify-between gap-2 px-3 py-2 rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/10 text-sm"
@@ -2458,7 +2458,7 @@ export default function AdminJobDetailPage({
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {siteVisits.map((v) => {
+                  {(siteVisits || []).map((v) => {
                     const grades = [v.performance_rating, v.safety_rating, v.cleanliness_rating]
                       .filter((n): n is number => typeof n === 'number');
                     const avg = grades.length
@@ -2560,7 +2560,7 @@ export default function AdminJobDetailPage({
                               Photos ({photos.length})
                             </p>
                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                              {photos.map((url, i) => (
+                              {(photos || []).map((url, i) => (
                                 <button
                                   key={`${v.id}-p-${i}`}
                                   type="button"
@@ -2583,7 +2583,7 @@ export default function AdminJobDetailPage({
                               Equipment flagged ({issues.length})
                             </p>
                             <div className="space-y-1.5">
-                              {issues.map((issue, i) => {
+                              {(issues || []).map((issue, i) => {
                                 // Match the shop's request back to the issue by equipment name;
                                 // fall back to the single request when there's only one.
                                 const mr =
@@ -2674,7 +2674,7 @@ export default function AdminJobDetailPage({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {changeRequests.map((cr) => (
+                  {(changeRequests || []).map((cr) => (
                     <div
                       key={cr.id}
                       className={`rounded-xl border p-3 text-sm ${
@@ -2786,7 +2786,7 @@ export default function AdminJobDetailPage({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {operatorNotes.map((note) => {
+                  {(operatorNotes || []).map((note) => {
                     const noteTypeColors: Record<string, string> = {
                       done_for_day: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
                       completion: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
@@ -2853,7 +2853,7 @@ export default function AdminJobDetailPage({
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {helperLogs.map((log) => {
+                  {(helperLogs || []).map((log) => {
                     const initials = (log.helper_name || 'H').split(' ').map((w) => w[0]).join('').substring(0, 2).toUpperCase();
                     return (
                       <div key={log.id} className="rounded-xl border p-3 text-sm border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-white/5">

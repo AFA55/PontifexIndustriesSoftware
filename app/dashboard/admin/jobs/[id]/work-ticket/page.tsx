@@ -236,9 +236,9 @@ function PersonBlock({
         )}
       </div>
 
-      {work.length > 0 ? (
+      {(work || []).length > 0 ? (
         <ul style={{ margin: '2px 0 0 14px', listStyle: 'disc' }}>
-          {work.map((item, i) => (
+          {(work || []).map((item, i) => (
             <WorkLine key={(item as { id?: string }).id || `w${i}`} item={item} showNote={showNotes} />
           ))}
         </ul>
@@ -355,7 +355,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
       : '';
 
   // Flatten to the paper's day blocks: one row per person per day.
-  const hourRows = days.flatMap((d) => d.people.map((p) => ({ date: d.date, p })));
+  const hourRows = (days || []).flatMap((d) => (d.people || []).map((p) => ({ date: d.date, p })));
   // The paper form has FOUR day blocks — always print at least four so the crew
   // can add days by hand on a light week.
   const padRows = Math.max(0, 4 - hourRows.length);
@@ -463,10 +463,10 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
         </div>
 
         {/* Quick picks — the days this crew was actually on the job */}
-        {data && data.dates_worked.length > 0 && (
+        {data && (data.dates_worked || []).length > 0 && (
           <div style={{ maxWidth: 1100, margin: '8px auto 0', display: 'flex', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
             <span style={{ fontSize: 11, color: '#71717a' }}>Days worked:</span>
-            {data.dates_worked.map((d) => {
+            {(data.dates_worked || []).map((d) => {
               const active = d >= data.range.from && d <= data.range.to;
               return (
                 <button
@@ -549,7 +549,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               One ticket PER JOB ID on purpose: the office duplicates a job to
               send a SECOND crew, and each crew signs their own ticket. We never
               merge the sibling job's work in — we point at it instead. */}
-          {(data.job.parent_job || data.job.sibling_jobs.length > 0) && (
+          {(data.job.parent_job || (data.job.sibling_jobs || []).length > 0) && (
             <div
               style={{
                 border: `2px solid ${accent}`,
@@ -565,10 +565,10 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                   {data.job.job_number} (continuation of {data.job.parent_job.job_number}).
                 </span>
               )}
-              {data.job.sibling_jobs.length > 0 && (
+              {(data.job.sibling_jobs || []).length > 0 && (
                 <span style={{ display: 'block' }}>
-                  Other crew ticket{data.job.sibling_jobs.length > 1 ? 's' : ''} on this job — print
-                  separately: {data.job.sibling_jobs.map((s) => s.job_number).join(', ')}
+                  Other crew ticket{(data.job.sibling_jobs || []).length > 1 ? 's' : ''} on this job — print
+                  separately: {(data.job.sibling_jobs || []).map((s) => s.job_number).join(', ')}
                 </span>
               )}
             </div>
@@ -616,7 +616,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             </p>
           )}
 
-          {days.length === 0 ? (
+          {(days || []).length === 0 ? (
             // Nothing digital in this range — hand the crew a clean write-in area.
             <div style={{ border: '1px solid #000', padding: 8 }}>
               {[0, 1, 2, 3, 4, 5].map((i) => (
@@ -626,7 +626,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
           ) : (
-            days.map((day) => (
+            (days || []).map((day) => (
               <div key={day.date} style={{ breakInside: 'avoid', marginBottom: 9 }}>
                 <div
                   style={{
@@ -642,7 +642,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                   </span>
                   <span style={{ fontSize: 11, fontWeight: 800 }}>{day.total_hours.toFixed(2)} hrs</span>
                 </div>
-                {day.people.map((p) => (
+                {(day.people || []).map((p) => (
                   <PersonBlock key={`${day.date}-${p.user_id}`} person={p} showNotes={showNotes} accent={accent} />
                 ))}
               </div>
@@ -672,7 +672,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               </tr>
             </thead>
             <tbody>
-              {hourRows.map(({ date, p }) => (
+              {(hourRows || []).map(({ date, p }) => (
                 <tr key={`${date}-${p.user_id}-row`}>
                   <td style={cell}>{formatDay(date, { month: 'numeric', day: 'numeric', year: '2-digit' })}</td>
                   <td style={cell}>
