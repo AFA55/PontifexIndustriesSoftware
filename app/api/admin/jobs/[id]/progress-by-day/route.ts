@@ -40,6 +40,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -51,31 +52,28 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
 
-    // 1. Scope items (the source-of-truth targets)
-    const { data: scopeItems } = await supabaseAdmin
-      .from('job_scope_items')
-      .select('id, work_type, description, unit, target_quantity, sort_order')
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('sort_order', { ascending: true });
+    // 1+2. Scope targets and the operator work logged against them, derived
+    // from work_items. This replaced a read of `job_progress_entries`, a table
+    // nothing in the codebase writes — see lib/job-progress.ts.
+    const loaded = await loadJobProgress(jobId, tenantId);
+    const scopeItems = loaded.scope_items;
 
-    // 2. Progress entries
-    const { data: progressEntries } = await supabaseAdmin
-      .from('job_progress_entries')
-      .select(`
-        id,
-        scope_item_id,
-        quantity_completed,
-        date,
-        notes,
-        work_type,
-        operator_id,
-        profiles!job_progress_entries_operator_id_fkey(full_name),
-        job_scope_items!job_progress_entries_scope_item_id_fkey(description, work_type, unit, target_quantity)
-      `)
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('date', { ascending: true });
+    // Operator names for the entries below.
+    const entryOperatorIds = Array.from(
+      new Set(loaded.work_items.map((w) => w.operator_id).filter((v): v is string => !!v))
+    );
+    const operatorNames: Record<string, string> = {};
+    if (entryOperatorIds.length > 0) {
+      const { data: opProfiles } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', entryOperatorIds);
+      for (const p of opProfiles ?? []) operatorNames[p.id] = p.full_name ?? 'Unknown';
+    }
+
+    const progressEntries = explodeProgressEntries(loaded).sort((a, b) =>
+      String(a.date ?? '').localeCompare(String(b.date ?? ''))
+    );
 
     // 3. Daily job logs (in_route, work_started, day_completed)
     const { data: dailyLogs } = await supabaseAdmin
@@ -103,51 +101,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .eq('job_order_id', jobId)
       .order('clock_in_time', { ascending: true });
 
-    // ── Build scope_progress summary (cumulative totals) ─────────────────────
-    const scopeMap: Record<string, {
-      scope_item_id: string;
-      description: string | null;
-      work_type: string;
-      unit: string;
-      target_quantity: number;
-      completed_quantity: number;
-      pct_complete: number;
-    }> = {};
-    for (const s of scopeItems || []) {
-      scopeMap[s.id] = {
-        scope_item_id: s.id,
-        description: s.description,
-        work_type: s.work_type,
-        unit: s.unit,
-        target_quantity: Number(s.target_quantity || 0),
-        completed_quantity: 0,
-        pct_complete: 0,
-      };
-    }
-    for (const e of progressEntries || []) {
-      if (e.scope_item_id && scopeMap[e.scope_item_id]) {
-        scopeMap[e.scope_item_id].completed_quantity += Number(e.quantity_completed || 0);
-      }
-    }
-    for (const k of Object.keys(scopeMap)) {
-      const s = scopeMap[k];
-      s.pct_complete = s.target_quantity > 0
-        ? parseFloat(Math.min(100, (s.completed_quantity / s.target_quantity) * 100).toFixed(1))
-        : 0;
-    }
-    const scopeProgress = Object.values(scopeMap);
+    // ── scope_progress summary (cumulative totals) ───────────────────────────
+    const scopeProgress = loaded.scope_progress;
+    const targetById: Record<string, number> = {};
+    for (const s of scopeItems) targetById[s.id] = Number(s.target_quantity || 0);
 
     // ── Group entries by date ────────────────────────────────────────────────
     const entriesByDate: Record<string, any[]> = {};
-    // Track cumulative per scope item through time (sorted by date asc)
+    // Track cumulative per scope item through time (entries are date-sorted).
     const cumByScope: Record<string, number> = {};
 
-    for (const e of progressEntries || []) {
+    for (const e of progressEntries) {
+      // An entry with no resolvable date can't sit on a day row. It still
+      // counts toward the scope totals above; it just has no column here.
+      if (!e.date) continue;
       const dateKey = e.date;
-      const scopeRef = (e.job_scope_items as any) || {};
-      const sid = e.scope_item_id as string | null;
+      const sid = e.scope_item_id;
       const qty = Number(e.quantity_completed || 0);
-      const target = Number(scopeRef.target_quantity || (sid ? scopeMap[sid]?.target_quantity : 0) || 0);
+      const target = sid ? targetById[sid] ?? 0 : 0;
       if (sid) {
         cumByScope[sid] = (cumByScope[sid] || 0) + qty;
       }
@@ -158,16 +129,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       entriesByDate[dateKey].push({
         id: e.id,
         scope_item_id: sid,
-        description: scopeRef.description ?? null,
-        work_type: scopeRef.work_type ?? e.work_type ?? null,
-        unit: scopeRef.unit ?? null,
+        description: e.description,
+        // Show the operator's own words for the work; fall back to the target's.
+        work_type: e.work_type,
+        unit: e.unit,
         quantity_completed: qty,
         target_quantity: target,
         cumulative_quantity: cumulative,
         cumulative_pct: cumPct,
         operator_id: e.operator_id,
-        operator_name: (e.profiles as any)?.full_name ?? 'Unknown',
-        notes: e.notes ?? null,
+        operator_name: e.operator_id ? operatorNames[e.operator_id] ?? 'Unknown' : 'Unknown',
+        notes: e.notes,
       });
     }
 
@@ -297,6 +269,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
       data: {
         days,
         scope_progress: scopeProgress,
+        overall_pct: loaded.overall_pct,
+        unmatched_work: loaded.unmatched_work,
         change_orders: {
           count: (changeOrders || []).length,
           ...coTotals,

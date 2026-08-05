@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff, requireAuth } from '@/lib/api-auth';
+import { loadJobProgress } from '@/lib/job-progress-server';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -25,20 +26,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
-    // Fetch scope items
-    const { data: scopeItems, error: scopeError } = await supabaseAdmin
-      .from('job_scope_items')
-      .select('id, work_type, description, unit, target_quantity, sort_order')
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId)
-      .order('sort_order', { ascending: true });
 
-    if (scopeError) {
-      console.error('Error fetching scope items:', scopeError);
-      return NextResponse.json({ error: 'Failed to fetch scope items' }, { status: 500 });
-    }
+    // Progress is DERIVED from the operator's work items — the actual record.
+    // This used to read `job_progress_entries`, which nothing in the codebase
+    // ever writes, so every job reported 0% no matter how much work was logged.
+    const loaded = await loadJobProgress(jobId, tenantId);
 
-    if (!scopeItems || scopeItems.length === 0) {
+    if (loaded.scope_items.length === 0) {
       return NextResponse.json({
         success: true,
         data: [],
@@ -47,49 +41,35 @@ export async function GET(request: NextRequest, context: RouteContext) {
           overall_pct: 0,
           total_target: 0,
           total_completed: 0,
+          unmatched_work: loaded.unmatched_work,
         },
       });
     }
 
-    // Fetch progress sums grouped by scope_item_id for this job
-    const { data: progressSums, error: progressError } = await supabaseAdmin
-      .from('job_progress_entries')
-      .select('scope_item_id, quantity_completed')
-      .eq('job_order_id', jobId)
-      .eq('tenant_id', tenantId);
-
-    if (progressError) {
-      console.error('Error fetching progress sums:', progressError);
-      return NextResponse.json({ error: 'Failed to fetch progress data' }, { status: 500 });
-    }
-
-    // Aggregate completed quantities per scope item
-    const completedByScopeItem: Record<string, number> = {};
-    for (const entry of progressSums || []) {
-      if (entry.scope_item_id) {
-        completedByScopeItem[entry.scope_item_id] =
-          (completedByScopeItem[entry.scope_item_id] || 0) + Number(entry.quantity_completed);
-      }
-    }
+    const sortOrderById = new Map(loaded.scope_items.map((s) => [s.id, s.sort_order ?? 0]));
 
     let totalTarget = 0;
     let totalCompleted = 0;
 
-    const enrichedItems = scopeItems.map((item) => {
-      const completed = completedByScopeItem[item.id] || 0;
-      const target = Number(item.target_quantity);
-      const pctComplete = target > 0 ? Math.min(100, (completed / target) * 100) : 0;
-      totalTarget += target;
-      totalCompleted += completed;
+    const enrichedItems = loaded.scope_progress.map((row) => {
+      // Percent-unit targets are excluded from the totals — there is no
+      // quantity behind them, so folding them in would skew the overall figure.
+      if (row.derivable) {
+        totalTarget += row.target_quantity;
+        totalCompleted += row.completed_quantity;
+      }
       return {
-        id: item.id,
-        work_type: item.work_type,
-        description: item.description,
-        unit: item.unit,
-        target_quantity: target,
-        completed_quantity: completed,
-        pct_complete: parseFloat(pctComplete.toFixed(1)),
-        sort_order: item.sort_order,
+        id: row.scope_item_id,
+        work_type: row.work_type,
+        description: row.description,
+        unit: row.unit,
+        target_quantity: row.target_quantity,
+        completed_quantity: row.completed_quantity,
+        pct_complete: row.pct_complete,
+        derivable: row.derivable,
+        entry_count: row.entry_count,
+        ambiguous: row.ambiguous,
+        sort_order: sortOrderById.get(row.scope_item_id) ?? 0,
       };
     });
 
@@ -107,6 +87,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         overall_pct: overallPct,
         total_target: totalTarget,
         total_completed: totalCompleted,
+        // Work the crew logged that no scope item accounts for — the office
+        // should see this rather than wonder why the bar didn't move.
+        unmatched_work: loaded.unmatched_work,
       },
     });
   } catch (error: unknown) {

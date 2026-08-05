@@ -11,6 +11,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { crewTimecardSpan, groupCrewTimecards } from '@/lib/crew-timecards';
+import { computeJobProgress, matchWorkItemToScope, quantityInUnit, type ScopeItemLike, type WorkItemLike } from '@/lib/job-progress';
+import { getTenantTimezone } from '@/lib/tenant-timezone';
+import { dateInTz } from '@/lib/reminder-timing';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -298,6 +301,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (tenantId) workItemsQuery = workItemsQuery.eq('tenant_id', tenantId);
     const { data: workItems } = await workItemsQuery.order('created_at', { ascending: false });
 
+    // Dates an operator would recognise, not UTC dates.
+    const tenantTz = await getTenantTimezone(tenantId);
+
     // Resolve operator names for any work_items.operator_id values not already
     // present in the progressEntries operator profile join.
     const workItemOperatorIds = Array.from(
@@ -348,32 +354,37 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // ── 5. Build scope summary ──────────────────────────────────────────────
-    const completedByScopeItem: Record<string, number> = {};
-    for (const entry of progressEntries || []) {
-      if (entry.scope_item_id) {
-        completedByScopeItem[entry.scope_item_id] =
-          (completedByScopeItem[entry.scope_item_id] || 0) + Number(entry.quantity_completed);
-      }
-    }
+    // The rollup used to sum `job_progress_entries`, which nothing writes — so
+    // every job reported 0% while its work_items sat right here in this same
+    // route, merged into by_date for DISPLAY only. Both now come from the same
+    // place. See lib/job-progress.ts for the vocabulary bridge.
+    const derived = computeJobProgress(
+      (scopeItems ?? []) as ScopeItemLike[],
+      (workItems ?? []) as WorkItemLike[]
+    );
+    const sortOrderById = new Map((scopeItems ?? []).map((s) => [s.id, s.sort_order]));
 
     let totalTarget = 0;
     let totalCompleted = 0;
 
-    const enrichedScopeItems = (scopeItems || []).map((item) => {
-      const completed = completedByScopeItem[item.id] || 0;
-      const target = Number(item.target_quantity);
-      const pct = target > 0 ? parseFloat(Math.min(100, (completed / target) * 100).toFixed(1)) : 0;
-      totalTarget += target;
-      totalCompleted += completed;
+    const enrichedScopeItems = derived.scope_progress.map((row) => {
+      // Percent-unit targets have no reportable quantity — excluded from the
+      // totals so they can't drag the overall figure toward zero.
+      if (row.derivable) {
+        totalTarget += row.target_quantity;
+        totalCompleted += row.completed_quantity;
+      }
       return {
-        id: item.id,
-        work_type: item.work_type,
-        description: item.description,
-        unit: item.unit,
-        target_quantity: target,
-        completed_quantity: completed,
-        pct_complete: pct,
-        sort_order: item.sort_order,
+        id: row.scope_item_id,
+        work_type: row.work_type,
+        description: row.description,
+        unit: row.unit,
+        target_quantity: row.target_quantity,
+        completed_quantity: row.completed_quantity,
+        pct_complete: row.pct_complete,
+        derivable: row.derivable,
+        entry_count: row.entry_count,
+        sort_order: sortOrderById.get(row.scope_item_id) ?? 0,
       };
     });
 
@@ -407,10 +418,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     for (const wi of workItems || []) {
       const created = (wi as any).created_at;
       if (!created) continue;
-      const dateKey =
-        typeof created === 'string'
-          ? created.slice(0, 10)
-          : new Date(created).toISOString().slice(0, 10);
+      // Read the timestamp in the TENANT'S timezone — the server runs UTC, so
+      // slicing the string files an 8pm submission under tomorrow's date.
+      const dateKey = dateInTz(created, tenantTz);
+      if (!dateKey) continue;
       if (!byDate[dateKey]) byDate[dateKey] = [];
 
       const workType = (wi as any).work_type ?? null;
@@ -456,26 +467,28 @@ export async function GET(request: NextRequest, context: RouteContext) {
       daily_entries: Array<{ date: string; quantity: number }>;
     }> = {};
 
-    for (const item of scopeItems || []) {
-      byScopeItemMap[item.id] = {
-        scope_item_id: item.id,
-        description: item.description ?? '',
-        work_type: item.work_type,
-        unit: item.unit,
-        target_quantity: Number(item.target_quantity),
-        total_completed: completedByScopeItem[item.id] || 0,
-        pct_complete:
-          Number(item.target_quantity) > 0
-            ? parseFloat(
-                Math.min(
-                  100,
-                  ((completedByScopeItem[item.id] || 0) / Number(item.target_quantity)) * 100
-                ).toFixed(1)
-              )
-            : 0,
-        daily_entries: (progressEntries || [])
-          .filter((e) => e.scope_item_id === item.id)
-          .map((e) => ({ date: e.date, quantity: Number(e.quantity_completed) })),
+    // Each target's per-day contribution, from the same derived numbers as the
+    // summary above so the chart and the headline can never disagree.
+    const dailyByScope: Record<string, Array<{ date: string; quantity: number }>> = {};
+    for (const wi of workItems || []) {
+      const { scopeItem } = matchWorkItemToScope(wi as WorkItemLike, (scopeItems ?? []) as ScopeItemLike[]);
+      if (!scopeItem) continue;
+      const qty = quantityInUnit(wi as WorkItemLike, scopeItem.unit);
+      const date = dateInTz((wi as any).created_at, tenantTz);
+      if (qty === null || !date) continue;
+      (dailyByScope[scopeItem.id] ||= []).push({ date, quantity: qty });
+    }
+
+    for (const row of derived.scope_progress) {
+      byScopeItemMap[row.scope_item_id] = {
+        scope_item_id: row.scope_item_id,
+        description: row.description ?? '',
+        work_type: row.work_type,
+        unit: row.unit,
+        target_quantity: row.target_quantity,
+        total_completed: row.completed_quantity,
+        pct_complete: row.pct_complete ?? 0,
+        daily_entries: dailyByScope[row.scope_item_id] ?? [],
       };
     }
 

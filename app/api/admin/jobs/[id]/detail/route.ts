@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { loadJobProgress } from '@/lib/job-progress-server';
 
 export async function GET(
   request: NextRequest,
@@ -63,8 +64,7 @@ export async function GET(
     const [
       operatorResult,
       helperResult,
-      scopeItemsResult,
-      progressEntriesResult,
+      jobProgress,
       timecardsResult,
       notesResult,
       dailyLogsResult,
@@ -87,25 +87,10 @@ export async function GET(
             .maybeSingle()
         : Promise.resolve({ data: null, error: null }),
 
-      // 3. Scope items
-      (() => {
-        let q = supabaseAdmin
-          .from('job_scope_items')
-          .select('id, work_type, description, unit, target_quantity, sort_order')
-          .eq('job_order_id', id);
-        if (tenantId) q = q.eq('tenant_id', tenantId);
-        return q.order('sort_order', { ascending: true });
-      })(),
-
-      // 4. Progress entries (grouped manually after fetch)
-      (() => {
-        let q = supabaseAdmin
-          .from('job_progress_entries')
-          .select('scope_item_id, quantity_completed')
-          .eq('job_order_id', id);
-        if (tenantId) q = q.eq('tenant_id', tenantId);
-        return q;
-      })(),
+      // 3+4. Scope targets and the operator work logged against them.
+      // Derived from work_items — see lib/job-progress.ts for why the old
+      // job_progress_entries read path always reported 0%.
+      loadJobProgress(id, tenantId),
 
       // 5. Timecards
       (() => {
@@ -140,37 +125,31 @@ export async function GET(
     ]);
 
     // ── 3. Merge scope items with progress ───────────────────────────────────
-    const progressEntries = progressEntriesResult.data ?? [];
-
-    // Sum quantity_completed per scope_item_id
-    const completedByScopeItem: Record<string, number> = {};
-    for (const entry of progressEntries) {
-      if (entry.scope_item_id) {
-        completedByScopeItem[entry.scope_item_id] =
-          (completedByScopeItem[entry.scope_item_id] || 0) +
-          Number(entry.quantity_completed ?? 0);
-      }
-    }
+    const sortOrderById = new Map(
+      jobProgress.scope_items.map((s) => [s.id, s.sort_order ?? 0])
+    );
 
     let totalTargetQty = 0;
     let totalCompletedQty = 0;
 
-    const scopeItems = (scopeItemsResult.data ?? []).map((item) => {
-      const completed = completedByScopeItem[item.id] || 0;
-      const target = Number(item.target_quantity ?? 0);
-      const pct =
-        target > 0 ? Math.min(100, Math.round((completed / target) * 100)) : 0;
-      totalTargetQty += target;
-      totalCompletedQty += completed;
+    const scopeItems = jobProgress.scope_progress.map((row) => {
+      // `percent`-unit targets carry no reportable quantity, so they stay out
+      // of the totals instead of dragging the overall figure toward zero.
+      if (row.derivable) {
+        totalTargetQty += row.target_quantity;
+        totalCompletedQty += row.completed_quantity;
+      }
       return {
-        id: item.id,
-        work_type: item.work_type ?? null,
-        description: item.description ?? null,
-        unit: item.unit ?? null,
-        target_quantity: target,
-        completed_qty: completed,
-        pct_complete: pct,
-        sort_order: item.sort_order ?? 0,
+        id: row.scope_item_id,
+        work_type: row.work_type ?? null,
+        description: row.description ?? null,
+        unit: row.unit ?? null,
+        target_quantity: row.target_quantity,
+        completed_qty: row.completed_quantity,
+        pct_complete: row.pct_complete === null ? null : Math.round(row.pct_complete),
+        derivable: row.derivable,
+        entry_count: row.entry_count,
+        sort_order: sortOrderById.get(row.scope_item_id) ?? 0,
       };
     });
 
@@ -179,7 +158,9 @@ export async function GET(
         ? Math.min(100, Math.round((totalCompletedQty / totalTargetQty) * 100))
         : 0;
 
-    const completedScopeCount = scopeItems.filter((s) => s.pct_complete >= 100).length;
+    const completedScopeCount = scopeItems.filter(
+      (s) => s.pct_complete !== null && s.pct_complete >= 100
+    ).length;
 
     // ── 5. Enrich timecards with operator names ──────────────────────────────
     const rawTimecards = timecardsResult.data ?? [];
@@ -230,6 +211,8 @@ export async function GET(
           ? { id: helperResult.data.id, full_name: helperResult.data.full_name }
           : null,
         scope_items: scopeItems,
+        // Work the crew logged that no scope item accounts for.
+        unmatched_work: jobProgress.unmatched_work,
         timecards,
         notes: (notesResult.data ?? []).map((n) => ({
           id: n.id,

@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -226,56 +227,40 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // ── 5. Work performed today ──────────────────────────────────────────────
-    const { data: progressRows } = await supabaseAdmin
-      .from('job_progress_entries')
-      .select(`
-        id,
-        work_type,
-        quantity_completed,
-        notes,
-        job_scope_items!job_progress_entries_scope_item_id_fkey(description)
-      `)
-      .eq('job_order_id', jobId)
-      .eq('date', todayStr)
-      .order('created_at', { ascending: true });
-
-    const workPerformedToday = (progressRows ?? []).map((r) => ({
-      id: r.id,
-      work_type: (r as any).work_type ?? null,
-      quantity_completed: Number(r.quantity_completed),
-      notes: (r as any).notes ?? null,
-      scope_item_description:
-        (r.job_scope_items as { description?: string } | null)?.description ?? null,
-    }));
-
-    // ── 5b. Work performed count + last entry timestamp (today) ─────────────
+    // Derived from work_items (what the operator actually recorded). This used
+    // to read `job_progress_entries`, which nothing writes — so the live board
+    // reported "no work performed" on every job all day. See lib/job-progress.ts.
+    let workPerformedToday: Array<{
+      id: string;
+      work_type: string | null;
+      quantity_completed: number;
+      notes: string | null;
+      scope_item_description: string | null;
+    }> = [];
     let workPerformedCountToday = 0;
     let lastWorkPerformedAt: string | null = null;
+
     try {
-      const { data: latestRows } = await supabaseAdmin
-        .from('job_progress_entries')
-        .select('created_at, date')
-        .eq('job_order_id', jobId)
-        .eq('date', todayStr)
-        .order('created_at', { ascending: false })
-        .limit(1);
+      const loaded = await loadJobProgress(jobId, tenantId);
+      const todaysEntries = explodeProgressEntries(loaded).filter((e) => e.date === todayStr);
+      const createdById = new Map(loaded.work_items.map((w) => [w.id, w.created_at]));
 
-      if (latestRows && latestRows.length > 0) {
-        const r = latestRows[0] as Record<string, string | null>;
-        lastWorkPerformedAt = r['created_at'] ?? r['date'] ?? null;
-      }
-
-      const { count: progressCount } = await supabaseAdmin
-        .from('job_progress_entries')
-        .select('id', { count: 'exact', head: true })
-        .eq('job_order_id', jobId)
-        .eq('date', todayStr);
-
-      workPerformedCountToday = progressCount ?? 0;
+      workPerformedToday = todaysEntries.map((e) => ({
+        id: e.id,
+        work_type: e.work_type ?? null,
+        quantity_completed: Number(e.quantity_completed ?? 0),
+        notes: e.notes,
+        scope_item_description: e.description,
+      }));
+      workPerformedCountToday = todaysEntries.length;
+      lastWorkPerformedAt =
+        todaysEntries
+          .map((e) => createdById.get(e.id) ?? null)
+          .filter((v): v is string => !!v)
+          .sort()
+          .reverse()[0] ?? null;
     } catch (e) {
-      console.error('live-status: work_performed count/last fetch failed', e);
-      workPerformedCountToday = 0;
-      lastWorkPerformedAt = null;
+      console.error('live-status: work performed today fetch failed', e);
     }
 
     // ── 6. Status history (gracefully skip if table absent) ──────────────────

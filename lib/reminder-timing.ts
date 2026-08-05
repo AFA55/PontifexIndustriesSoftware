@@ -21,6 +21,20 @@ export function todayInTz(tz: string): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(new Date());
 }
 
+/**
+ * The calendar date a UTC timestamp falls on in a given timezone.
+ *
+ * The server runs UTC, so `String(ts).slice(0, 10)` puts anything an operator
+ * submitted after 8pm ET on TOMORROW's date. Use this whenever a stored
+ * timestamp has to become a day an operator would recognise.
+ */
+export function dateInTz(ts: string | Date | null | undefined, tz: string): string | null {
+  if (!ts) return null;
+  const d = ts instanceof Date ? ts : new Date(ts);
+  if (Number.isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz }).format(d);
+}
+
 /** Current minutes-since-midnight in a given IANA timezone. */
 export function nowMinutesInTz(tz: string, now: Date = new Date()): number {
   const parts = new Intl.DateTimeFormat('en-US', {

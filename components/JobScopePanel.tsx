@@ -27,7 +27,14 @@ export interface ScopeItem {
   unit: string;
   target_quantity: number;
   completed_quantity: number;
-  pct_complete: number;
+  /**
+   * null when the target is measured in `percent` — the office set "100%" and
+   * there is no quantity an operator reports against it, so we show the entry
+   * count instead of inventing a figure.
+   */
+  pct_complete: number | null;
+  derivable?: boolean;
+  entry_count?: number;
 }
 
 export interface JobScopePanelProps {
@@ -218,15 +225,18 @@ export default function JobScopePanel({
     fetchScope();
   }, [fetchScope]);
 
-  // Compute overall progress
-  const totalTarget = items.reduce((s, i) => s + i.target_quantity, 0);
-  const totalCompleted = items.reduce((s, i) => s + i.completed_quantity, 0);
+  // Compute overall progress across measurable targets only — a "% complete"
+  // item has a target of 100 with no quantity behind it, so including it would
+  // pull the headline figure down for work nobody can report against.
+  const measurable = items.filter((i) => i.pct_complete !== null);
+  const totalTarget = measurable.reduce((s, i) => s + i.target_quantity, 0);
+  const totalCompleted = measurable.reduce((s, i) => s + i.completed_quantity, 0);
   const overallPct =
     totalTarget > 0 ? Math.min(100, Math.round((totalCompleted / totalTarget) * 100)) : 0;
 
   // Find a dominant unit for overall display
   const dominantUnit =
-    items.length > 0 ? UNIT_LABELS[items[0].unit] || items[0].unit : '';
+    measurable.length > 0 ? UNIT_LABELS[measurable[0].unit] || measurable[0].unit : '';
 
   const resetAddModal = () => {
     setAddForm(DEFAULT_FORM);
@@ -457,15 +467,28 @@ export default function JobScopePanel({
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-xs text-gray-500">
-                      {item.completed_quantity} / {item.target_quantity}{' '}
-                      {UNIT_LABELS[item.unit] || item.unit}
-                    </span>
-                    <span
-                      className={`text-sm font-bold tabular-nums ${pctColor(item.pct_complete)}`}
-                    >
-                      {item.pct_complete}%
-                    </span>
+                    {item.pct_complete === null ? (
+                      // A "% complete" target has no quantity behind it. Say what
+                      // we DO know — that the crew logged work against it —
+                      // rather than printing a number nobody reported.
+                      <span className="text-xs text-gray-500">
+                        {item.entry_count
+                          ? `${item.entry_count} ${item.entry_count === 1 ? 'entry' : 'entries'} logged`
+                          : 'Not started'}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="text-xs text-gray-500">
+                          {item.completed_quantity} / {item.target_quantity}{' '}
+                          {UNIT_LABELS[item.unit] || item.unit}
+                        </span>
+                        <span
+                          className={`text-sm font-bold tabular-nums ${pctColor(item.pct_complete)}`}
+                        >
+                          {item.pct_complete}%
+                        </span>
+                      </>
+                    )}
 
                     {/* Admin actions */}
                     {!readOnly && (
@@ -494,13 +517,16 @@ export default function JobScopePanel({
                   </div>
                 </div>
 
-                {/* Per-item progress bar */}
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500 ${pctBarColor(item.pct_complete)}`}
-                    style={{ width: `${item.pct_complete}%` }}
-                  />
-                </div>
+                {/* Per-item progress bar — hidden when there is no percentage
+                    to draw, so an underivable target doesn't read as 0% done. */}
+                {item.pct_complete !== null && (
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-500 ${pctBarColor(item.pct_complete)}`}
+                      style={{ width: `${item.pct_complete}%` }}
+                    />
+                  </div>
+                )}
               </div>
             ))}
           </div>
