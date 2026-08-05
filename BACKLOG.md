@@ -4,6 +4,46 @@
 > Priorities: **P0** = broken in prod / blocking · **P1** = this week · **P2** = soon · **P3** = someday.
 > When work completes: check it off, move to "Recently shipped" (keep ~2 sessions), then delete.
 
+## 🗺️ AUG 5 PLAN — ticket system to "solid enough to run 8 jobs/day"
+
+Sequenced by **risk removed per hour**, not by request order. Money and records
+outrank polish; anything an operator hits on a live jobsite outranks the office.
+
+### 🚧 BLOCKED ON FOUNDER (2 minutes each, but they gate real features)
+| # | What | Why it blocks |
+|---|---|---|
+| B1 | **Set the shop location** (`tenants.shop_latitude/longitude` are NULL for Patriot) | EVERY ETA calculation measures from the shop. Without it the whole "estimated arrival" feature has no origin point. Clock-in currently leans on a default fallback, which is why nobody noticed. |
+| B2 | **Enter operator wages** (`profiles.hourly_rate` — 0 of 35 set) | Labor cost honestly reads "rates not set" everywhere until then. |
+| B3 | Change-order paperwork / the ticket's 10 numbered questions vs a real pad | Needed to finish the printed ticket. |
+
+### P0 — the ticket must be trustworthy
+- [ ] **Job Scope & Progress reads 0%** while a draft shows WALL SAW ×132. Submitted work never moves the office-set targets. *Founder screenshot Aug 4.*
+- [ ] **Timecard PDF is missing the times.**
+- [ ] **Liability waiver flow** — checked on the schedule form → sent to the site contact when the operator first taps In Route → reminder based on ETA if unsigned → operator sees "Waiver signed ✓" or "Resend waiver" BEFORE starting work.
+
+### P1 — the crew's day
+- [ ] **Work-performed redesign** — pick the work type first, then enter every measurement + notes below in one pass, instead of one modal at a time. Founder's biggest UX ask.
+- [ ] **ETA instead of In Route after day 1.** In Route is only tapped on day 1; after that show an estimated arrival from the jobsite↔shop distance. Founder's buffer rule: **< 1 hr → drive + 20 min · > 1 hr → drive + 30 min · > 3 hrs → drive + 45 min (45 is the cap)**. Must work for quick-add AND schedule-form jobs. NEEDS B1.
+- [ ] **Quick Add: address autofill + drive time** — still not integrated; feeds the ETA above.
+- [ ] **Helper history view** — DSM-style day toggle: who they worked with, what they did, hours. Stored so both the helper and the office can look back.
+- [ ] Equipment checklist can lock at 0/3 while reading "Ready", and records gear the operator never confirmed.
+
+### P2 — the customer's view
+- [ ] **Portal branding + light/dark toggle** — the customer's landing page doesn't reflect the tenant's colours.
+- [ ] **Replace the portal's job timeline** with start date + projected end date.
+- [ ] **Customer messages visible** — the office must see what a customer typed.
+- [ ] **Change-order request from the portal** — customer describes the extra work + photos → the job's project manager is notified → job ticket updates → PM sends a cost → customer accepts/declines → routed to the site contact or another named person for signature **before the work is done**, so it gets paid.
+
+### P2 — the office
+- [ ] **Team Profiles**: surface the date of birth + emergency contact ALREADY BEING CAPTURED (5 and 3 people have them; the screen just never shows them), add wage entry, project-manager job-visibility toggles, and make peer ratings work.
+- [ ] ~60 remaining dates that render one day early (catalogued; none invent 1995).
+- [ ] Invoicing: recording a payment fails 100%; a fixed-price job invoices at $0.00 and discards the logged footage.
+
+### Practices (would have caught most of this week's bugs before an operator did)
+- [ ] **Schema/code drift check in CI** — three bugs this week were code naming a column the database doesn't have (`scope_of_work`, `completed_at`, `salesman_id`, `notes`, `directions`). A generated types file + a CI diff makes that a build failure instead of a customer dead end.
+- [ ] **Write-verification smoke test** — after each deploy, write a record and READ IT BACK. Would have caught the signature, standby, helper-log and work-performed failures.
+- [ ] **Sentry → Pontifex Hub** — errors as cards (company · screen · users hit · since when), with a "Send to Claude" button that packages the trace for diagnosis. *Founder's idea, Aug 5. Deliberately NOT auto-fixing: this week's bugs were 3-deep and an auto-fixer would have patched symptoms on a system carrying payroll and signed records.*
+
 ## 📊 STATUS (update every session — this is the at-a-glance progress dashboard)
 
 | | |
