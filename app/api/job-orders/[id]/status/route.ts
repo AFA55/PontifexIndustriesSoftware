@@ -13,6 +13,7 @@ import { notifyCustomer } from '@/lib/notify-customer';
 import { isValidTransition, validateTransitionTimestamp } from '@/lib/job-status';
 import { sequenceBlocks } from '@/lib/reassign';
 import { tenantToday as resolveTenantToday } from '@/lib/tenant-timezone';
+import { sendWaiver } from '@/lib/waiver-dispatch';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -651,6 +652,35 @@ async function updateJobStatus(
       }
     } catch {
       // never block on customer-notification dispatch
+    }
+
+    // Fire-and-forget WAIVER dispatch on the crew's first In Route tap.
+    //
+    // The schedule form's "requires waiver signature" checkbox previously
+    // recorded an intention nothing acted on — production had 4 jobs requiring
+    // a waiver, 11 jobs that went In Route, and zero waivers ever signed. This
+    // is the link: the site contact gets the signing request while the crew is
+    // still driving, not after someone is standing on the slab.
+    //
+    // Keyed off the SAME atomic claim as the customer notification, so exactly
+    // one request sends it. sendWaiver is itself idempotent and never throws.
+    try {
+      if (claimedInRoute && existingJob.require_waiver_signature && !existingJob.utility_waiver_signed) {
+        sendWaiver({
+          jobId,
+          tenantId: existingJob.tenant_id ?? tenantId,
+          triggeredBy: user.id,
+          reason: 'in_route',
+        })
+          .then((r) => {
+            if (r.outcome !== 'sent') {
+              console.warn(`[job-status] waiver not sent for job ${jobId}: ${r.outcome}`);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch {
+      // never block going In Route on a waiver send
     }
 
     return NextResponse.json(

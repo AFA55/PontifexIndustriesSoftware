@@ -21,14 +21,31 @@ export async function GET(
   try {
     const { token } = await params;
 
-    // Find the signature request by token
+    // Find the signature request by token.
+    //
+    // The optional form template is fetched SEPARATELY on purpose. This used to
+    // be an embed (`'*, form_templates(*)'`), and because the FK was missing,
+    // PostgREST failed the entire query — every customer signing link returned
+    // "Invalid or expired link". The FK now exists, but the signing page must
+    // never again be brought down by an optional decoration: the token lookup
+    // stands alone, and a template problem can only cost you the template.
     const { data: sigRequest, error } = await supabaseAdmin
       .from('signature_requests')
-      .select('*, form_templates(*)')
+      .select('*')
       .eq('token', token)
-      .single();
+      .maybeSingle();
 
     if (error || !sigRequest) {
+      // Log the REAL reason. This lookup previously reported every failure as
+      // "Invalid or expired link", so a broken query and a genuinely bad token
+      // were indistinguishable — and a query fault could sit in production
+      // silently telling every customer their signing link was invalid.
+      console.error('[signature] token lookup failed', {
+        tokenPrefix: token.slice(0, 8),
+        code: error?.code,
+        message: error?.message,
+        details: error?.details,
+      });
       return NextResponse.json({ error: 'Invalid or expired link' }, { status: 404 });
     }
 
@@ -96,6 +113,21 @@ export async function GET(
       ).catch(() => {});
     }
 
+    // Optional custom form template. Fetched on its own so a failure here can
+    // never take the signing page down with it (see the lookup note above).
+    let formTemplate: Record<string, unknown> | null = null;
+    if (sigRequest.form_template_id) {
+      const { data: tpl, error: tplError } = await supabaseAdmin
+        .from('form_templates')
+        .select('*')
+        .eq('id', sigRequest.form_template_id)
+        .maybeSingle();
+      if (tplError) {
+        console.error('[signature] form template fetch failed (continuing):', tplError);
+      }
+      formTemplate = tpl ?? null;
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -103,7 +135,7 @@ export async function GET(
         contact_name: sigRequest.contact_name,
         status: sigRequest.status,
         tenant_name: tenantName,
-        form_template: sigRequest.form_templates || null,
+        form_template: formTemplate,
         work_items: workItems || [],
         // Same jsonb payload as the portal — strip the internal quick notes
         // before serving them from this token-only public endpoint.

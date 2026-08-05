@@ -10,10 +10,11 @@ import {
   ArrowLeft, Briefcase, Loader2, Clock, Wrench, FileText,
   ChevronDown, User, Users, Inbox, PlayCircle, Star, CheckCircle2, Printer,
   Paperclip, Upload, Trash2, PauseCircle, X, Image, File, MapPin, Phone, Eye,
-  AlertTriangle, Shield, Lock, Home, FileSignature
+  AlertTriangle, Shield, Lock, Home
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import UnifiedEquipmentPanel from '../_components/UnifiedEquipmentPanel';
+import WaiverBanner from '../_components/WaiverBanner';
 import type { JobTicketData } from '../_components/JobTicketCard';
 import { isMandatoryComplete, getDisplayName } from '@/lib/equipment-map';
 import { viewPdfBlob } from '@/lib/open-pdf';
@@ -1421,22 +1422,11 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Utility Waiver Banner */}
-        {job.require_waiver_signature && !job.utility_waiver_signed && !isCompleted && (
-          <Link
-            href={`/dashboard/job-schedule/${job.id}/utility-waiver`}
-            className="flex items-center justify-center gap-2 w-full px-4 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-2xl shadow-md transition-all"
-          >
-            <FileSignature size={20} />
-            Sign Utility Waiver
-          </Link>
-        )}
-        {job.require_waiver_signature && job.utility_waiver_signed && (
-          <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-500/30 rounded-xl">
-            <CheckCircle2 size={16} className="text-emerald-500" />
-            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Utility Waiver Signed</span>
-          </div>
-        )}
+        {/* Waiver status — signed / sent-but-unsigned / not sent, with a
+            resend button. Replaces the old pair of static banners, which could
+            only offer in-person signing and never told the crew whether the
+            site contact had been asked at all. */}
+        <WaiverBanner jobId={job.id} readOnly={isCompleted} />
 
         {/* Co-operator action — full input, but the LEAD drives status. No
             Start Route / Job Not Ready; go straight to jobsite + work log. */}
