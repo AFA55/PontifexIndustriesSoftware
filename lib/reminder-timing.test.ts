@@ -10,6 +10,7 @@ import {
   middayReminderDue,
   minutesToLabel,
   nowMinutesInTz,
+  dateInTz,
   LUNCH_HOURS,
   OVERDUE_HOURS,
 } from './reminder-timing';
@@ -119,5 +120,33 @@ describe('nowMinutesInTz', () => {
     const fixed = new Date('2026-05-23T12:00:00Z');
     // 05:00 in America/Los_Angeles (PDT, UTC-7) → 300 min
     expect(nowMinutesInTz('America/Los_Angeles', fixed)).toBe(300);
+  });
+});
+
+describe('dateInTz — the calendar day a stored timestamp belongs to', () => {
+  it("uses the tenant's day, not the server's UTC day", () => {
+    // A real clock-in: 11:07 UTC is 7:07 AM Eastern on the SAME day.
+    expect(dateInTz('2026-08-04T11:07:08.286Z', 'America/New_York')).toBe('2026-08-04');
+  });
+
+  it('keeps an evening submission on the day the crew actually worked', () => {
+    // 00:30 UTC on Aug 5 is 8:30 PM Eastern on Aug 4 — the bug this prevents.
+    expect(dateInTz('2026-08-05T00:30:00Z', 'America/New_York')).toBe('2026-08-04');
+    // Proof the naive approach gets it wrong:
+    expect('2026-08-05T00:30:00Z'.slice(0, 10)).toBe('2026-08-05');
+  });
+
+  it('handles a west-coast tenant too', () => {
+    expect(dateInTz('2026-08-05T05:30:00Z', 'America/Los_Angeles')).toBe('2026-08-04');
+  });
+
+  it('accepts a Date as well as a string', () => {
+    expect(dateInTz(new Date('2026-08-04T16:00:00Z'), 'America/New_York')).toBe('2026-08-04');
+  });
+
+  it('returns null for nothing rather than inventing a day', () => {
+    expect(dateInTz(null, 'America/New_York')).toBeNull();
+    expect(dateInTz('', 'America/New_York')).toBeNull();
+    expect(dateInTz('not a date', 'America/New_York')).toBeNull();
   });
 });

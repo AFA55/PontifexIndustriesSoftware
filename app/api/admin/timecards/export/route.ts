@@ -15,6 +15,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { renderToBuffer, Document } from '@react-pdf/renderer';
 import { TimecardPage } from '@/components/pdf/TimecardPDF';
+import { getTenantTimezone } from '@/lib/tenant-timezone';
 import { getTenantPdfBranding, fetchLogoDataUri } from '@/lib/pdf-branding';
 import {
   calculateWeekSummary,
@@ -52,6 +53,10 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
     'Approved',
   ];
 
+  // Payroll reads this file. The server runs UTC, so without the tenant's zone
+  // every clock time in the export is shifted by the UTC offset.
+  const tz = await getTenantTimezone(tenantId);
+
   const rows = (timecards || []).map((tc: Record<string, unknown>) => {
     const date = new Date((tc.date as string) + 'T00:00:00');
     const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
@@ -66,6 +71,7 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
           hour: 'numeric',
           minute: '2-digit',
           hour12: true,
+          timeZone: tz,
         })
       : '';
     const clockOut = tc.clock_out_time
@@ -73,6 +79,7 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
           hour: 'numeric',
           minute: '2-digit',
           hour12: true,
+          timeZone: tz,
         })
       : '';
 
@@ -164,6 +171,9 @@ async function generateBatchPDF(
   const branding = await getTenantPdfBranding(tenantId);
   branding.logoDataUri = await fetchLogoDataUri(branding.logo_url);
 
+  // The server runs UTC — without this every printed clock time is off.
+  const timeZone = await getTenantTimezone(tenantId);
+
   // One Document, one TimecardPage per operator
   const doc = React.createElement(
     Document,
@@ -185,6 +195,7 @@ async function generateBatchPDF(
         entries: buildWeekDayEntries(tcArray, weekDates),
         summary: calculateWeekSummary(tcArray),
         branding,
+        timeZone,
       });
     })
   );

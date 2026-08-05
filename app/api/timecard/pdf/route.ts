@@ -23,6 +23,7 @@ import {
   buildWeekDayEntries,
 } from '@/lib/timecard-utils';
 import type { TimecardEntry } from '@/lib/timecard-utils';
+import { getTenantTimezone } from '@/lib/tenant-timezone';
 
 export async function GET(request: NextRequest) {
   try {
@@ -92,6 +93,8 @@ export async function GET(request: NextRequest) {
       entries,
       summary,
       branding,
+      // The server runs UTC — without this every printed clock time is off.
+      timeZone: await getTenantTimezone(auth.tenantId),
     });
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

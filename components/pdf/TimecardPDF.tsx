@@ -18,6 +18,14 @@ export interface TimecardPageProps {
   entries: TimecardPDFEntry[];
   summary: WeekSummary;
   branding?: PDFBranding;
+  /**
+   * The tenant's IANA timezone, used to print clock-in/out times.
+   *
+   * REQUIRED for correctness in production: this PDF renders on Vercel, which
+   * runs UTC. Without it, a 7:07 AM clock-in printed as 11:07 AM and the crew's
+   * timecard showed hours nobody worked.
+   */
+  timeZone?: string;
 }
 
 export type TimecardPDFProps = TimecardPageProps;
@@ -300,7 +308,15 @@ function getDayOfWeek(dateStr: string): string {
   }
 }
 
-function formatTimeDisplay(isoString: string | null): string {
+/**
+ * A stored clock time, printed as the crew's wall clock.
+ *
+ * `timeZone` is not optional in spirit — the server renders this in UTC, so
+ * omitting it shifts every time on the timecard. It defaults to Eastern (the
+ * platform's first tenant) rather than to the server's zone, so a missing
+ * prop degrades to "probably right" instead of "certainly wrong".
+ */
+function formatTimeDisplay(isoString: string | null, timeZone?: string): string {
   if (!isoString) return '—';
   try {
     const d = new Date(isoString);
@@ -308,6 +324,7 @@ function formatTimeDisplay(isoString: string | null): string {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
+      timeZone: timeZone || 'America/New_York',
     });
   } catch {
     return '—';
@@ -342,6 +359,7 @@ export function TimecardPage({
   entries,
   summary,
   branding,
+  timeZone,
 }: TimecardPageProps) {
   const primaryColor = branding?.primary_color || '#1E40AF';
   const secondaryColor = branding?.secondary_color || primaryColor;
@@ -475,7 +493,7 @@ export function TimecardPage({
                   ...s.colClockIn,
                 }}
               >
-                {formatTimeDisplay(entry.clockIn)}
+                {formatTimeDisplay(entry.clockIn, timeZone)}
               </Text>
               <Text
                 style={{
@@ -483,7 +501,7 @@ export function TimecardPage({
                   ...s.colClockOut,
                 }}
               >
-                {formatTimeDisplay(entry.clockOut)}
+                {formatTimeDisplay(entry.clockOut, timeZone)}
               </Text>
               <Text
                 style={{
