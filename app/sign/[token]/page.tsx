@@ -10,6 +10,11 @@ import {
   ClipboardCheck,
 } from 'lucide-react';
 import CustomerSatisfactionSurvey, { type SurveyData } from '@/components/CustomerSatisfactionSurvey';
+import {
+  utilityWaiverSections,
+  waiverAcknowledgments,
+  waiverIntro,
+} from '@/lib/legal/utility-waiver';
 
 type RequestType = 'utility_waiver' | 'completion' | 'custom';
 type PageState = 'loading' | 'form' | 'survey' | 'success' | 'error';
@@ -404,6 +409,13 @@ export default function PublicSignPage() {
 
   // ─── FORM ─────────────────────────────────
   const isWaiver = data?.request_type === 'utility_waiver';
+  // White-label: the company name comes from the tenant, never hardcoded.
+  const waiverSections = utilityWaiverSections({
+    companyName: data?.tenant_name || '',
+    jobNumber: data?.job?.job_number ?? null,
+    jobAddress: data?.job?.address ?? null,
+  });
+  const acknowledgments = waiverAcknowledgments(data?.tenant_name || '');
   const isCompletion = data?.request_type === 'completion';
   const isCustom = data?.request_type === 'custom';
 
@@ -483,55 +495,51 @@ export default function PublicSignPage() {
                 <h2 className="text-lg font-bold text-slate-900">Utility Waiver</h2>
               </div>
 
-              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
-                <p className="text-sm text-amber-800 leading-relaxed">
-                  This is where the utility waiver legal content will go. [Editable via Form Builder]
-                </p>
-                <p className="text-xs text-amber-600 mt-2">
-                  By signing below, you acknowledge that cutting operations may encounter subsurface utilities,
-                  and you authorize the work to proceed under the stated conditions.
-                </p>
+              <p className="text-sm text-slate-600 leading-relaxed mb-4">
+                {waiverIntro(data?.tenant_name || '')}
+              </p>
+
+              {/* The waiver itself. South Carolina construes releases strictly
+                  against whoever drafted them, so the signer is shown the full
+                  terms rather than a summary — see lib/legal/utility-waiver.ts
+                  for the authorities behind each section. */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4 max-h-80 overflow-y-auto space-y-4">
+                {waiverSections.map((section) => (
+                  <div key={section.heading}>
+                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide mb-1.5">
+                      {section.heading}
+                    </h3>
+                    {section.body.map((para, i) => (
+                      <p key={i} className="text-xs text-slate-700 leading-relaxed mb-2">
+                        {para}
+                      </p>
+                    ))}
+                  </div>
+                ))}
               </div>
 
+              {/* Discrete affirmations rather than one blanket "I agree" —
+                  SC wants specific, explicit assent, not a wall of text with a
+                  single tick at the bottom. */}
               <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={safetyAck}
-                    onChange={e => setSafetyAck(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-slate-700">
-                    I acknowledge the safety protocols and potential hazards involved in this work.
-                    <span className="text-red-500 ml-1">*</span>
-                  </span>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={liabilityAccepted}
-                    onChange={e => setLiabilityAccepted(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-slate-700">
-                    I understand and accept the liability terms described above.
-                    <span className="text-red-500 ml-1">*</span>
-                  </span>
-                </label>
-
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={cutThroughAuth}
-                    onChange={e => setCutThroughAuth(e.target.checked)}
-                    className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-slate-700">
-                    I authorize the concrete cutting operations to proceed, including potential cut-throughs.
-                    <span className="text-red-500 ml-1">*</span>
-                  </span>
-                </label>
+                {([
+                  [safetyAck, setSafetyAck] as const,
+                  [liabilityAccepted, setLiabilityAccepted] as const,
+                  [cutThroughAuth, setCutThroughAuth] as const,
+                ]).map(([checked, setChecked], i) => (
+                  <label key={i} className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) => setChecked(e.target.checked)}
+                      className="w-5 h-5 mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500 flex-shrink-0"
+                    />
+                    <span className="text-sm text-slate-700">
+                      {acknowledgments[i]}
+                      <span className="text-red-500 ml-1">*</span>
+                    </span>
+                  </label>
+                ))}
               </div>
             </div>
           </>
