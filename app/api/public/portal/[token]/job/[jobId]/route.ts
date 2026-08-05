@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { stripInternalNotes } from '@/lib/work-items-format';
+import { computeEta } from '@/lib/eta';
 
 export async function GET(
   request: NextRequest,
@@ -53,7 +54,9 @@ export async function GET(
         'description, scope_details, scheduled_date, end_date, status, assigned_to, helper_assigned_to, ' +
         'tenant_id, total_cost, customer_signature, customer_signed_at, customer_signature_method, ' +
         'work_completed_at, completion_pdf_url, completion_signer_name, completion_signed_at, ' +
-        'in_route_at, arrived_at_jobsite_at, work_started_at, total_hours_worked, total_days_worked'
+        'in_route_at, arrived_at_jobsite_at, work_started_at, total_hours_worked, total_days_worked, ' +
+        // Feeds the arrival estimate below.
+        'jobsite_latitude, jobsite_longitude, drive_distance_miles, arrival_time'
       )
       .eq('id', jobId)
       .eq('tenant_id', portalToken.tenant_id)
@@ -159,6 +162,41 @@ export async function GET(
     const { signStoredUrl } = await import('@/lib/storage-url-server');
     const signedCompletionPdf = await signStoredUrl((jobRow as any).completion_pdf_url);
 
+    // ── Estimated arrival ────────────────────────────────────────────────────
+    // The crew taps In Route on day one only. After that the customer should
+    // still see when to expect them, worked out from the jobsite's distance to
+    // the shop. Only shown while the job is still coming — never on a job
+    // that's finished, and never once the crew has actually arrived today.
+    let eta: (ReturnType<typeof computeEta> & { arrives_at: string | null }) | null = null;
+    try {
+      const stillComing = !['completed', 'cancelled', 'archived'].includes(
+        String(jobRow.status || '')
+      );
+      if (stillComing && !jobRow.arrived_at_jobsite_at) {
+        const { data: shopRow } = await supabaseAdmin
+          .from('tenants')
+          .select('shop_latitude, shop_longitude, timezone')
+          .eq('id', portalToken.tenant_id)
+          .maybeSingle();
+
+        const result = computeEta({
+          shop: { latitude: shopRow?.shop_latitude, longitude: shopRow?.shop_longitude },
+          jobsite: { latitude: jobRow.jobsite_latitude, longitude: jobRow.jobsite_longitude },
+          driveDistanceMiles: jobRow.drive_distance_miles,
+          // If the crew is already rolling, count from when they left;
+          // otherwise this is a duration, not a clock time.
+          departAt: jobRow.in_route_at ? new Date(jobRow.in_route_at) : undefined,
+        });
+
+        if (result.basis !== 'unavailable') {
+          eta = { ...result, arrives_at: result.arrivesAt ? result.arrivesAt.toISOString() : null };
+        }
+      }
+    } catch (e) {
+      // An arrival estimate is a nicety — never fail the customer's job view.
+      console.error('[portal] ETA calculation failed (continuing):', e);
+    }
+
     return NextResponse.json({
       success: true,
       data: {
@@ -176,6 +214,10 @@ export async function GET(
           work_performed: stripInternalNotes(log.work_performed),
         })),
         change_orders: changeOrders,
+        // Estimated arrival, for the days after the crew stops tapping In Route.
+        // Null when there is nothing to measure from — the customer is shown
+        // nothing rather than a made-up time.
+        eta,
         tenant: {
           name: tenantName,
           logo_url: tenantLogoUrl,

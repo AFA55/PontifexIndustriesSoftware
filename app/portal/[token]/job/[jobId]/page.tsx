@@ -23,6 +23,7 @@ import {
 import { parseYMDLocal, formatTime } from '@/lib/dates';
 import CommentThread from '@/components/portal/CommentThread';
 import LiveRouteTracker from '@/components/portal/LiveRouteTracker';
+import { formatEtaDuration } from '@/lib/eta';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,28 @@ interface JobDetail {
   operator_name: string | null;
 }
 
+/**
+ * Estimated arrival. Present only while the crew is still on the way — the API
+ * omits it entirely once they've arrived or the job is closed, so there is no
+ * "stale ETA" state to guard against here.
+ */
+interface JobEta {
+  basis: 'road_distance' | 'straight_line';
+  miles: number | null;
+  driveMinutes: number | null;
+  totalMinutes: number | null;
+  /** True when derived from coordinates — the wording hedges accordingly. */
+  approximate: boolean;
+  /** ISO arrival time, only once the crew is actually rolling. */
+  arrives_at: string | null;
+}
+
 interface JobResponse {
   job: JobDetail;
   work_items: WorkItem[];
   daily_logs: unknown[];
   change_orders: unknown[];
+  eta?: JobEta | null;
   tenant: {
     name: string;
     logo_url: string | null;
@@ -289,7 +307,7 @@ export default function PortalJobDetailPage() {
   }
 
   // ── Ready ─────────────────────────────────────────────────────────────────
-  const { job, work_items, tenant } = data!;
+  const { job, work_items, tenant, eta } = data!;
   const { label, classes } = statusConfig(job.status);
   const timeline = buildTimeline(job);
   const displayName = job.project_name || job.customer_name || job.job_number;
@@ -405,6 +423,37 @@ export default function PortalJobDetailPage() {
               "Total $0.00" reads as free work or broken software. Money goes
               on the invoice, which the office controls and sends deliberately. */}
         </div>
+
+        {/* ── Estimated arrival ─────────────────────────────────────────────
+            The crew taps "In Route" on day one only. On every later day the
+            customer still deserves to know when to expect them, so this is
+            worked out from the jobsite's distance to the shop. The API omits it
+            once the crew has arrived, so this card disappears on its own.
+
+            Worded as an estimate, because it is one — never as a promise. */}
+        {eta && eta.totalMinutes ? (
+          <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <h2 className="text-base font-semibold text-slate-200">Estimated arrival</h2>
+            </div>
+            <p className="text-2xl font-bold text-white">
+              {eta.arrives_at
+                ? new Date(eta.arrives_at).toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })
+                : formatEtaDuration(eta.totalMinutes)}
+            </p>
+            <p className="text-xs text-slate-400 mt-1.5">
+              {eta.arrives_at
+                ? 'The crew is on the way.'
+                : `About ${formatEtaDuration(eta.totalMinutes)} from our shop once the crew sets off.`}
+              {eta.approximate ? ' This is an estimate and traffic can change it.' : ''}
+            </p>
+          </div>
+        ) : null}
 
         {/* ── Timeline card ─────────────────────────────────────────────────── */}
         <div className="bg-white/5 border border-white/10 rounded-2xl p-5">
