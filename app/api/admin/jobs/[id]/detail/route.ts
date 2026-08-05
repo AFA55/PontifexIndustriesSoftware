@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { loadJobProgress } from '@/lib/job-progress-server';
+import { normalizeJobArrays } from '@/lib/job-arrays';
 
 export async function GET(
   request: NextRequest,
@@ -203,7 +204,7 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
-        job,
+        job: normalizeJobArrays(job as Record<string, unknown>),
         operator: operatorResult.data
           ? { id: operatorResult.data.id, full_name: operatorResult.data.full_name }
           : null,

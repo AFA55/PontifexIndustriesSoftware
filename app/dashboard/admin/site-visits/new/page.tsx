@@ -14,6 +14,7 @@ import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { CalendarPicker } from '@/components/ui/CalendarPicker';
+import { asArray } from '@/lib/job-arrays';
 
 interface OperatorOpt {
   id: string;
@@ -794,7 +795,7 @@ export default function NewSiteVisitPage() {
                       </p>
                       {it.photo_urls.length > 0 && (
                         <div className="grid grid-cols-3 gap-2 mb-2">
-                          {it.photo_urls.map((url, pi) => (
+                          {asArray<string>(it.photo_urls).map((url, pi) => (
                             <div key={pi} className="relative group aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-slate-600">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img src={sitePhotoPreviews[url] || url} alt={`Issue ${idx + 1} photo`} className="w-full h-full object-cover" />

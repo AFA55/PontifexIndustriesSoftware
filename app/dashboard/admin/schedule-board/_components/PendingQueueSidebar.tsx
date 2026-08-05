@@ -2,6 +2,7 @@
 
 import { X, Clock, MapPin, Wrench, CheckCircle, Phone, AlertCircle, User, DollarSign, CalendarDays } from 'lucide-react';
 import { getDisplayName } from '@/lib/equipment-map';
+import { asArray } from '@/lib/job-arrays';
 
 export interface JobsiteConditions {
   water_available?: boolean;
@@ -193,7 +194,7 @@ export default function PendingQueueSidebar({
                   {/* Equipment chips */}
                   {job.equipment_needed && job.equipment_needed.length > 0 && (
                     <div className="flex flex-wrap gap-1 mb-2">
-                      {job.equipment_needed.map((eq) => (
+                      {asArray<string>(job.equipment_needed).map((eq) => (
                         <span key={eq} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 dark:bg-indigo-500/15 rounded-md text-xs text-indigo-600 dark:text-indigo-400">
                           <Wrench className="w-3 h-3" />
                           {getDisplayName(eq)}

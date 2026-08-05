@@ -1,5 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { asArray } from '@/lib/job-arrays';
 
 // ── Styles ──────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -315,7 +316,7 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
           <View style={s.permitBanner}>
             <Text style={s.permitLabel}>PERMITS REQUIRED:</Text>
             <Text style={s.permitText}>
-              {job.permits.map(p => {
+              {asArray<any>(job.permits).map(p => {
                 const label = p.type === 'work_permit' ? 'Work Permit' :
                   p.type === 'hot_work' ? 'Hot Work Permit' :
                   p.type === 'excavation' ? 'Excavation Permit' :
@@ -484,7 +485,7 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                 {job.equipment_needed && job.equipment_needed.length > 0 && (
                   <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
                     <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#64748B', marginBottom: 2 }}>SPECIFIED:</Text>
-                    {job.equipment_needed.map((eq, i) => {
+                    {asArray<any>(job.equipment_needed).map((eq, i) => {
                       const isRental = !!(job.equipment_rental_flags?.[eq]);
                       return (
                         <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
@@ -532,7 +533,7 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
               <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#92400E', textTransform: 'uppercase', letterSpacing: 0.5 }}>PPE REQUIRED</Text>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 5 }}>
-              {job.ppe_required.map((item, i) => {
+              {asArray<string>(job.ppe_required).map((item, i) => {
                 const gloveMatch = item.match(/^gloves_cut_(\d)$/);
                 const label = gloveMatch
                   ? `Gloves Cut Level ${gloveMatch[1]}`

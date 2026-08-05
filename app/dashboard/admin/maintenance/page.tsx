@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 import { useModuleGate } from '@/components/ModuleGuard';
+import { asArray } from '@/lib/job-arrays';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,7 +167,7 @@ function RequestCard({
         {/* Photos */}
         {expanded && req.photo_urls && req.photo_urls.length > 0 && (
           <div className="flex flex-wrap gap-2 mt-3">
-            {req.photo_urls.map((url, i) => (
+            {asArray<string>(req.photo_urls).map((url, i) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                 <img src={url} alt={`Photo ${i + 1}`} className="w-16 h-16 rounded-lg object-cover border border-gray-200 dark:border-slate-600 hover:opacity-80 transition-opacity" />
               </a>

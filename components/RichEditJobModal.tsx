@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Calendar, Users } from 'lucide-react';
 import { commonEquipment } from '@/types/equipment-constants';
 import type { JobOrder } from '@/types/job';
+import { asArray } from '@/lib/job-arrays';
 
 interface OperatorInfo {
   id: string;
@@ -358,7 +359,7 @@ export default function RichEditJobModal({
               {/* Selected Equipment Tags */}
               {job.equipment_needed && job.equipment_needed.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3 p-3 bg-gray-50 dark:bg-white/[0.03] rounded-xl border border-gray-200 dark:border-slate-700">
-                  {job.equipment_needed.map((item, idx) => (
+                  {asArray<string>(job.equipment_needed).map((item, idx) => (
                     <span
                       key={idx}
                       className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-lg text-sm font-medium"

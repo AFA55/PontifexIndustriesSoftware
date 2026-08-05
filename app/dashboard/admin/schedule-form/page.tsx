@@ -28,6 +28,7 @@ import SmartCombobox, { ContactCombobox } from '@/components/SmartCombobox';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { NumberInput } from '@/components/ui/NumberInput';
 import { toLocalYMD } from '@/lib/dates';
+import { asArray } from '@/lib/job-arrays';
 
 // Dynamic-imported modals — only loaded when their state flag flips true.
 // AISmartFillModal pulls in framer-motion; CustomerForm is a large dialog used for the new-customer flow.
@@ -3748,7 +3749,7 @@ export default function ScheduleFormPage() {
                 </div>
                 {form.equipment_needed.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
-                    {form.equipment_needed.map(eq => (
+                    {asArray<string>(form.equipment_needed).map(eq => (
                       <div key={eq} className="flex items-center gap-1 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2 py-1.5 rounded-xl text-sm shadow-sm">
                         <span className="text-slate-700 dark:text-white/80 font-semibold text-xs">{eq}</span>
                         <button
@@ -3923,7 +3924,7 @@ export default function ScheduleFormPage() {
               {/* Summary chip strip */}
               {form.ppe_required.length > 0 && (
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  {form.ppe_required.map(key => {
+                  {asArray<string>(form.ppe_required).map(key => {
                     const item = PPE_ITEMS.find(p => p.key === key);
                     const gloveMatch = key.match(/^gloves_cut_(\d)$/);
                     const label = item ? `${item.icon} ${item.label}` : gloveMatch ? `🧤 Gloves Cut ${gloveMatch[1]}` : key;
@@ -4391,7 +4392,7 @@ export default function ScheduleFormPage() {
                           placeholder={`${p.type.replace(/_/g, ' ')} details (permit #, expiry, etc.)`}
                           value={p.details}
                           onChange={e => {
-                            const updated = form.permits.map(fp =>
+                            const updated = asArray<any>(form.permits).map(fp =>
                               fp.type === p.type ? { ...fp, details: e.target.value } : fp
                             );
                             updateForm({ permits: updated });

@@ -14,6 +14,7 @@ import { crewTimecardSpan, groupCrewTimecards } from '@/lib/crew-timecards';
 import { computeJobProgress, matchWorkItemToScope, quantityInUnit, type ScopeItemLike, type WorkItemLike } from '@/lib/job-progress';
 import { getTenantTimezone } from '@/lib/tenant-timezone';
 import { dateInTz } from '@/lib/reminder-timing';
+import { normalizeJobArrays } from '@/lib/job-arrays';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -121,6 +122,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       operatorProfile = opProf;
     }
     (job as any).profiles = operatorProfile;
+
+    // A NULL list column must never reach the UI — it crashed two live tickets
+    // on 5 Aug 2026 (see lib/job-arrays.ts).
+    Object.assign(job as object, normalizeJobArrays(job as Record<string, unknown>));
 
     // Fetch helper profile separately (same pattern as operator above).
     // Without this the schedule-form edit-load can't repopulate the helper and a

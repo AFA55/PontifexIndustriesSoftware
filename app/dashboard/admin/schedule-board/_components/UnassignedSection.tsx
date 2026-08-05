@@ -2,6 +2,7 @@
 
 import { AlertCircle, MapPin, Users } from 'lucide-react';
 import type { JobCardData } from './JobCard';
+import { asArray } from '@/lib/job-arrays';
 
 interface UnassignedSectionProps {
   jobs: JobCardData[];
@@ -51,7 +52,7 @@ export default function UnassignedSection({
               <p className="text-xs text-gray-500 flex items-center gap-1 mb-2"><MapPin className="w-3 h-3 text-gray-400" /> {job.location}</p>
               {job.equipment_needed.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {job.equipment_needed.map(eq => (
+                  {asArray<string>(job.equipment_needed).map(eq => (
                     <span key={eq} className="px-2 py-0.5 bg-indigo-50 rounded text-xs text-indigo-600 font-medium">{eq}</span>
                   ))}
                 </div>

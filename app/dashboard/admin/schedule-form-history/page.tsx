@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { asArray } from '@/lib/job-arrays';
 
 // ─── Types ────────────────────────────────────────────────────────────────
 
@@ -451,7 +452,7 @@ export default function ScheduleFormHistoryPage() {
                         <div className="px-5 pb-3">
                           <h4 className="text-xs font-semibold text-gray-400 uppercase mb-2">Equipment</h4>
                           <div className="flex flex-wrap gap-1.5">
-                            {form.equipment_needed.map((eq, idx) => (
+                            {asArray<any>(form.equipment_needed).map((eq, idx) => (
                               <span key={idx} className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-50 rounded-lg text-xs text-indigo-600 font-medium">
                                 <Wrench className="w-3 h-3" />
                                 {eq}

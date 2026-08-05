@@ -14,6 +14,7 @@ import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 import JobCrewPanel from '@/components/JobCrewPanel';
 import { formatMaybeDateTime } from '@/lib/dates';
+import { asArray } from '@/lib/job-arrays';
 
 const WorkHistoryTimeline = lazy(() => import('./WorkHistoryTimeline'));
 const OfficeDocumentsPanel = lazy(() => import('@/components/admin/OfficeDocumentsPanel'));
@@ -1540,7 +1541,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                       onToggle={() => toggleSection('permits')}
                     >
                       <div className="flex flex-wrap gap-2">
-                        {d.permits.map((p: { type: string; details?: string }, i: number) => {
+                        {asArray<{ type: string; details?: string }>(d.permits).map((p, i: number) => {
                           const label = p.type === 'work_permit' ? 'Work Permit' :
                             p.type === 'hot_work' ? 'Hot Work Permit' :
                             p.type === 'excavation' ? 'Excavation Permit' :

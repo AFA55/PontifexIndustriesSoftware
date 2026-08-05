@@ -4,6 +4,7 @@ import { X, MapPin, Wrench, FileText, Clock, User, Phone, ExternalLink } from 'l
 import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
+import { asArray } from '@/lib/job-arrays';
 
 interface JobPreviewPanelProps {
   job: JobCardData;
@@ -132,7 +133,7 @@ export default function JobPreviewPanel({ job, operatorName, helperName, onClose
             <div>
               <h3 className="text-sm font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider mb-2">Equipment</h3>
               <div className="flex flex-wrap gap-1.5">
-                {job.equipment_needed.map((item, i) => (
+                {asArray<string>(job.equipment_needed).map((item, i) => (
                   <span key={i} className="px-2 py-1 bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 rounded-lg text-xs font-medium">
                     {getDisplayName(item)}
                   </span>
