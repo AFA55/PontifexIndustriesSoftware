@@ -1856,6 +1856,48 @@ export default function WorkPerformed() {
                   Need to add something? Leave a note below.
                 </p>
 
+                {/* START THIS DAY OVER. Founder, Aug 2026: an operator who typed
+                    the wrong footage or picked the wrong work type had no way
+                    back — their only options were to leave a wrong number on
+                    the customer's ticket or ring the office. This clears THEIR
+                    OWN work for THIS DAY only; it can't touch a crewmate's
+                    entry and it refuses once the job is completed and signed. */}
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const ok = window.confirm(
+                      `Start this day's ticket over?\n\nEverything you entered for ${formatDayLong(workDate)} will be deleted and you'll type it in again. Your crewmates' entries are not affected.`
+                    );
+                    if (!ok) return;
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      if (!session) { showNotification('Please sign in again.', 'error'); return; }
+                      const res = await fetch(`/api/job-orders/${params.id}/reset-day`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          Authorization: `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({ date: workDate }),
+                      });
+                      const json = await res.json().catch(() => null);
+                      if (!res.ok) {
+                        showNotification(json?.error || 'Could not reset the ticket.', 'error');
+                        return;
+                      }
+                      // Clear the local mirror too, or the old numbers come back.
+                      localStorage.removeItem(`work-performed-${params.id}`);
+                      localStorage.removeItem(`work-draft-${params.id}`);
+                      window.location.reload();
+                    } catch {
+                      showNotification('Could not reset the ticket. Check your signal and try again.', 'error');
+                    }
+                  }}
+                  className="w-full min-h-[44px] px-4 py-3 rounded-xl border-2 border-amber-300 dark:border-amber-500/40 bg-amber-50 dark:bg-amber-500/10 text-amber-800 dark:text-amber-200 font-bold text-sm hover:bg-amber-100 dark:hover:bg-amber-500/20 transition-colors"
+                >
+                  Entered something wrong? Start this day over
+                </button>
+
                 {/* Success flash */}
                 {noteSubmitted && (
                   <div className="flex items-center gap-2 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40 rounded-xl px-4 py-3 mb-4">

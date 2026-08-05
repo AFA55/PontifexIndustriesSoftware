@@ -86,10 +86,6 @@ function formatDate(dateStr: string | null): string {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-function formatCost(amount: number): string {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-}
-
 function statusConfig(status: string): { label: string; classes: string } {
   switch (status) {
     case 'completed':
@@ -404,12 +400,10 @@ export default function PortalJobDetailPage() {
             </div>
           )}
 
-          {job.total_cost != null && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t border-white/10">
-              <span className="text-sm text-slate-400">Total</span>
-              <span className="text-lg font-bold text-white">{formatCost(job.total_cost)}</span>
-            </div>
-          )}
+          {/* NO PRICE IN THE CUSTOMER PORTAL (founder, Aug 2026). This is the
+              customer's record of WHAT WAS DONE, not an invoice — and a
+              "Total $0.00" reads as free work or broken software. Money goes
+              on the invoice, which the office controls and sends deliberately. */}
         </div>
 
         {/* ── Timeline card ─────────────────────────────────────────────────── */}
