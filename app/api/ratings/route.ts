@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
     }
 
-    const { form_id, ratee_id, job_order_id, responses } = body || {};
+    const { form_id, ratee_id, job_order_id, responses, photo_urls } = body || {};
 
     if (!form_id || typeof form_id !== 'string') {
       return NextResponse.json({ error: 'form_id is required' }, { status: 400 });
@@ -44,6 +44,22 @@ export async function POST(request: NextRequest) {
     }
     if (!responses || typeof responses !== 'object' || Array.isArray(responses)) {
       return NextResponse.json({ error: 'responses must be an object' }, { status: 400 });
+    }
+
+    // Photos attached to the review. Storage paths only — a review photo lives
+    // in a PRIVATE bucket and is served through a signed URL, so anything that
+    // looks like an external link is rejected rather than stored and rendered.
+    const photos: string[] = Array.isArray(photo_urls)
+      ? photo_urls
+          .filter((u: unknown): u is string => typeof u === 'string' && u.trim().length > 0)
+          .map((u: string) => u.trim())
+          .slice(0, 10)
+      : [];
+    if (photos.some((u) => /^https?:\/\//i.test(u) && !u.includes('/review-photos/'))) {
+      return NextResponse.json(
+        { error: 'Review photos must be uploaded through the review form.' },
+        { status: 400 }
+      );
     }
 
     // Cannot rate yourself
@@ -151,6 +167,7 @@ export async function POST(request: NextRequest) {
         ratee_id,
         responses,
         overall_score: overallScore,
+        photo_urls: photos,
       })
       .select()
       .single();

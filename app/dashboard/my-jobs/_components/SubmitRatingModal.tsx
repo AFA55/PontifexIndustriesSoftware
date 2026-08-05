@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import PhotoUploader from '@/components/PhotoUploader';
 import { X, Star, Loader2, CheckCircle2, BarChart2, CheckSquare, AlignLeft, Send } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
@@ -88,6 +89,16 @@ function NumericRating({ value, onChange }: { value: number; onChange: (v: numbe
 
 export default function SubmitRatingModal({ pending, questions, onClose, onSubmitted }: Props) {
   const [responses, setResponses] = useState<Record<string, any>>({});
+  /**
+   * Photos attached to the review.
+   *
+   * WHY (founder, Aug 2026): David wrote Patriot's first peer review and tried
+   * to attach pictures of the work he was describing. The form had no way to
+   * take them, so nothing uploaded and the founder saw a review with no
+   * evidence. "The cut edge was rough" is worth far more with the cut edge
+   * attached. Private bucket — PhotoUploader signs the URLs on read.
+   */
+  const [photoUrls, setPhotoUrls] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +144,7 @@ export default function SubmitRatingModal({ pending, questions, onClose, onSubmi
           ratee_id: pending.ratee.id,
           job_order_id: pending.job.id,
           responses,
+          photo_urls: photoUrls,
         }),
       });
 
@@ -153,7 +165,7 @@ export default function SubmitRatingModal({ pending, questions, onClose, onSubmi
       setSubmitting(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [responses, pending]);
+  }, [responses, photoUrls, pending]);
 
   const handleDone = () => {
     onSubmitted(pending.form_id, pending.ratee.id, pending.job.id);
@@ -272,6 +284,24 @@ export default function SubmitRatingModal({ pending, questions, onClose, onSubmi
                   )}
                 </div>
               ))}
+
+              {/* Photos — optional, but the reason this feature exists. */}
+              <div className="pt-1">
+                <PhotoUploader
+                  bucket="review-photos"
+                  pathPrefix={`${pending.ratee.id}/${pending.job.id}`}
+                  photos={photoUrls}
+                  onPhotosChange={setPhotoUrls}
+                  maxPhotos={6}
+                  label="Add photos (optional)"
+                  lightMode
+                  compact
+                />
+                <p className="mt-1.5 text-[11px] leading-relaxed text-gray-500">
+                  Pictures of the work you're describing. Only management and the
+                  person being reviewed can see them.
+                </p>
+              </div>
             </div>
           )}
         </div>

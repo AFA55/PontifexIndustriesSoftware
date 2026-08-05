@@ -5,6 +5,7 @@ import { X, Star, Loader2, MessageSquare, Calendar, CheckCircle2, XCircle, BarCh
 import { supabase } from '@/lib/supabase';
 import UserAvatar from '@/components/UserAvatar';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import { PhotoViewer } from '@/components/PhotoUploader';
 
 interface TeamMemberRating {
   id: string;
@@ -21,6 +22,8 @@ interface ReceivedRating {
   form_title: string;
   overall_score: number | null;
   submitted_at: string;
+  /** Photos the reviewer attached. Private bucket — PhotoViewer signs them. */
+  photo_urls?: string[] | null;
   rater_display_name: string;
   responses: Record<string, any>;
   questions: Array<{ id: string; text: string; type: string; required: boolean }>;
@@ -245,6 +248,10 @@ export default function TeamRatingsSlideOver({ member, onClose }: Props) {
                           </div>
                         );
                       })}
+
+                      {/* Photos the reviewer attached. PhotoViewer signs the
+                          private-bucket URLs and renders nothing when empty. */}
+                      <PhotoViewer photos={rating.photo_urls ?? []} label="Photos from this review" />
                     </div>
                   )}
                 </div>

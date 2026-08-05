@@ -11,6 +11,7 @@ import {
   ImageIcon, ChevronRight, Loader2, ExternalLink, Flag,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { needsSigning, toDisplayUrls } from '@/lib/storage-url';
 import { getCurrentUser, type User } from '@/lib/auth';
 
 interface EquipmentIssue {
@@ -86,6 +87,8 @@ export default function SiteVisitDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  /** original stored URL -> signed display URL, for private buckets. */
+  const [signedByOriginal, setSignedByOriginal] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const cu = getCurrentUser();
@@ -118,6 +121,41 @@ export default function SiteVisitDetailPage() {
       }
     })();
   }, [user, id]);
+
+  /**
+   * Sign every photo on the page in one pass.
+   *
+   * maintenance-photos is a PRIVATE bucket but the rows store
+   * `/object/public/...` URLs, which 403 when rendered directly — silently, as
+   * a broken image with nothing in the console. That is why David's supervisor
+   * visit photos looked lost on 5 Aug 2026; the files were fine all along.
+   *
+   * Signed here rather than at each <img> because the per-issue photos render
+   * inside a .map() where a hook can't go.
+   */
+  useEffect(() => {
+    if (!visit) return;
+    const all = [
+      ...(Array.isArray(visit.photo_urls) ? visit.photo_urls : []),
+      ...(Array.isArray(visit.equipment_issues) ? visit.equipment_issues : []).flatMap(
+        (iss: EquipmentIssue) => (Array.isArray(iss?.photo_urls) ? iss.photo_urls : [])
+      ),
+    ].filter((u): u is string => typeof u === 'string' && !!u);
+
+    const needing = [...new Set(all)].filter(needsSigning);
+    if (needing.length === 0) return;
+
+    let alive = true;
+    toDisplayUrls(needing)
+      .then((signed) => {
+        if (!alive) return;
+        const map: Record<string, string> = {};
+        needing.forEach((orig, i) => { map[orig] = signed[i]; });
+        setSignedByOriginal(map);
+      })
+      .catch(() => { /* a broken thumbnail beats a crashed page */ });
+    return () => { alive = false; };
+  }, [visit]);
 
   if (loading) {
     return (
@@ -153,6 +191,16 @@ export default function SiteVisitDetailPage() {
 
   const sitePhotos: string[] = Array.isArray(visit.photo_urls) ? visit.photo_urls : [];
   const issues: EquipmentIssue[] = Array.isArray(visit.equipment_issues) ? visit.equipment_issues : [];
+
+  // maintenance-photos is a PRIVATE bucket, but the rows store
+  // `/object/public/...` URLs. Rendering those raw gives a 403 and a broken
+  // image with no error anywhere — which is why David's site photos appeared to
+  // vanish. Sign them for display; the stored value is left untouched.
+  //
+  // Every photo on the page is signed in ONE pass (a hook can't run inside the
+  // per-issue map), then looked up by its original URL at each render site.
+  const displayUrl = (u: string) => signedByOriginal[u] ?? u;
+  const displaySitePhotos = sitePhotos;
 
   return (
     <>
@@ -347,16 +395,16 @@ export default function SiteVisitDetailPage() {
                 </span>
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {sitePhotos.map((url, i) => (
+                {displaySitePhotos.map((url, i) => (
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setLightboxUrl(url)}
+                    onClick={() => setLightboxUrl(displayUrl(url))}
                     className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 hover:opacity-95 hover:ring-2 hover:ring-brand transition group"
                     aria-label={`View jobsite photo ${i + 1}`}
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={url} alt={`Site photo ${i + 1}`} className="w-full h-full object-cover" />
+                    <img src={displayUrl(url)} alt={`Site photo ${i + 1}`} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition flex items-center justify-center">
                       <ExternalLink className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition drop-shadow" />
                     </div>
@@ -426,12 +474,12 @@ export default function SiteVisitDetailPage() {
                           <button
                             key={pi}
                             type="button"
-                            onClick={() => setLightboxUrl(url)}
+                            onClick={() => setLightboxUrl(displayUrl(url))}
                             className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-white/10 hover:ring-2 hover:ring-brand transition group"
                             aria-label={`View issue photo ${pi + 1}`}
                           >
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={url} alt={`Issue ${i + 1} photo`} className="w-full h-full object-cover" />
+                            <img src={displayUrl(url)} alt={`Issue ${i + 1} photo`} className="w-full h-full object-cover" />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition" />
                           </button>
                         ))}

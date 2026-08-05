@@ -16,11 +16,32 @@
  */
 import { supabase } from '@/lib/supabase';
 
-/** Buckets that have been flipped to private and need display-time signing. */
+/**
+ * Buckets that are PRIVATE and therefore need display-time signing.
+ *
+ * ⚠️ THIS LIST MUST MATCH storage.buckets WHERE public = false.
+ * A private bucket missing from here is invisible in the worst way: the upload
+ * succeeds, the row stores a `/object/public/...` URL, and every <img> pointing
+ * at it 403s. Nothing errors — the picture is simply never there.
+ *
+ * That is exactly what happened to David's supervisor visit photos on 5 Aug
+ * 2026. `maintenance-photos` had been made private but was never added here, so
+ * his site photos uploaded fine and then rendered as broken images. The files
+ * were safe the whole time; only the URL was unusable.
+ *
+ * Verified against the live bucket list Aug 2026. Buckets holding documents
+ * rather than displayed images (completion-pdfs, contracts, hiring-resumes,
+ * office-documents, takeoff-documents, JobDocuments, voice-checkouts) are
+ * signed server-side via lib/storage-url-server.ts instead.
+ */
 export const PRIVATE_DISPLAY_BUCKETS = new Set<string>([
   'scope-photos',
   'jobsite-area-docs',
   'job-photos',
+  'maintenance-photos',    // supervisor site-visit photos + maintenance requests
+  'timecard-photos',
+  'blade-checkout-photos',
+  'review-photos',
 ]);
 
 const PUBLIC_URL_RE = /\/storage\/v1\/object\/public\/([^/]+)\/(.+)$/;

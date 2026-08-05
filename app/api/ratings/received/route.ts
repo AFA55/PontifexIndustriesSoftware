@@ -64,6 +64,7 @@ export async function GET(request: NextRequest) {
         rater_id,
         responses,
         overall_score,
+        photo_urls,
         submitted_at
       `)
       .eq('ratee_id', targetUserId)
