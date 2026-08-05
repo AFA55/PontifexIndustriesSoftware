@@ -651,7 +651,6 @@ export default function NewSiteVisitPage() {
                 ref={siteFileRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
                 onChange={handleSitePhotoSelect}
               />
@@ -817,8 +816,7 @@ export default function NewSiteVisitPage() {
                         ref={(el) => { issueFileRefs.current[idx] = el; }}
                         type="file"
                         accept="image/*"
-                        capture="environment"
-                        className="hidden"
+                                className="hidden"
                         onChange={(e) => handleIssuePhotoSelect(idx, e)}
                       />
                       <button

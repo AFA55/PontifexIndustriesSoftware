@@ -87,6 +87,8 @@ export default function SiteVisitDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+  /** Desktop tap-to-zoom (phones pinch instead). Reset whenever the box opens. */
+  const [zoomed, setZoomed] = useState(false);
   /** original stored URL -> signed display URL, for private buckets. */
   const [signedByOriginal, setSignedByOriginal] = useState<Record<string, string>>({});
 
@@ -207,16 +209,29 @@ export default function SiteVisitDetailPage() {
       {/* Lightbox */}
       {lightboxUrl && (
         <div
-          className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4"
+          className="fixed inset-0 z-50 bg-black/90"
           onClick={() => setLightboxUrl(null)}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={lightboxUrl}
-            alt="Visit photo"
-            className="max-w-full max-h-full rounded-xl object-contain"
+          {/* ZOOMABLE. The founder needs to inspect detail in a supervisor's
+              photo — a rough cut edge, a missing hardhat — and a fixed-size
+              image can't show it. The image sits in its own scrollable,
+              pinch-zoomable surface: `touch-action: pinch-zoom` lets iOS and
+              Android scale it natively, and overflow-auto lets you pan around
+              once zoomed. Tapping the backdrop still closes. */}
+          <div
+            className="absolute inset-0 overflow-auto flex items-center justify-center p-4"
+            style={{ touchAction: 'pinch-zoom' }}
             onClick={(e) => e.stopPropagation()}
-          />
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={lightboxUrl}
+              alt="Visit photo"
+              className="rounded-xl object-contain cursor-zoom-in"
+              style={{ maxWidth: zoomed ? 'none' : '100%', maxHeight: zoomed ? 'none' : '100%', width: zoomed ? '200%' : undefined }}
+              onClick={() => setZoomed((z) => !z)}
+            />
+          </div>
           <button
             onClick={() => setLightboxUrl(null)}
             className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/10 text-white flex items-center justify-center hover:bg-white/20 transition"
@@ -399,7 +414,7 @@ export default function SiteVisitDetailPage() {
                   <button
                     key={i}
                     type="button"
-                    onClick={() => setLightboxUrl(displayUrl(url))}
+                    onClick={() => { setZoomed(false); setLightboxUrl(displayUrl(url)); }}
                     className="relative aspect-square rounded-xl overflow-hidden border border-gray-200 dark:border-white/10 hover:opacity-95 hover:ring-2 hover:ring-brand transition group"
                     aria-label={`View jobsite photo ${i + 1}`}
                   >
@@ -474,7 +489,7 @@ export default function SiteVisitDetailPage() {
                           <button
                             key={pi}
                             type="button"
-                            onClick={() => setLightboxUrl(displayUrl(url))}
+                            onClick={() => { setZoomed(false); setLightboxUrl(displayUrl(url)); }}
                             className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 dark:border-white/10 hover:ring-2 hover:ring-brand transition group"
                             aria-label={`View issue photo ${pi + 1}`}
                           >

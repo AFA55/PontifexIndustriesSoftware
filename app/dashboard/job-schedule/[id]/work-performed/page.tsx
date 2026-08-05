@@ -1796,20 +1796,39 @@ export default function WorkPerformed() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
+            {/* THE HEADER MUST NEVER CHANGE HEIGHT.
+                It used to mount/unmount the "Saving…" / "Saved ✓" indicator
+                inline next to a subtitle that wraps on a phone. Every click on
+                this page triggers the autosave, so the header reflowed
+                constantly and shoved the content below it — the operator would
+                tap a field and find the page had "slid back up", losing the
+                spot they were typing in (founder, Aug 2026).
+
+                Now: one row, both lines truncate, and the status sits in a
+                fixed-width slot that is always present and only changes what it
+                shows. No mount, no reflow, no jump. */}
             <div className="flex-1 min-w-0">
               <h1 className="text-lg font-bold text-gray-900 dark:text-white truncate">Work Performed</h1>
-              <div className="flex items-center gap-2">
-                <p className="text-gray-500 dark:text-white/50 text-xs">Select completed work items</p>
-                {saveStatus === 'saving' && (
-                  <span className="text-xs text-gray-400 dark:text-white/30 flex items-center gap-1">
-                    <Save className="w-3 h-3 animate-pulse" />Saving...
-                  </span>
-                )}
-                {saveStatus === 'saved' && (
-                  <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
-                    <Save className="w-3 h-3" />Saved ✓
-                  </span>
-                )}
+              <div className="flex items-center gap-2 h-4">
+                <p className="text-gray-500 dark:text-white/50 text-xs truncate">Select completed work items</p>
+                <span
+                  aria-live="polite"
+                  className="w-[62px] flex-shrink-0 text-xs flex items-center gap-1 justify-end"
+                >
+                  {saveStatus === 'saving' && (
+                    <span className="text-gray-400 dark:text-white/30 flex items-center gap-1">
+                      <Save className="w-3 h-3 animate-pulse" />
+                      <span className="hidden xs:inline">Saving…</span>
+                    </span>
+                  )}
+                  {saveStatus === 'saved' && (
+                    <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                      <Save className="w-3 h-3" />
+                      <span className="hidden xs:inline">Saved</span>
+                      <span className="xs:hidden">✓</span>
+                    </span>
+                  )}
+                </span>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

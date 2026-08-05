@@ -348,13 +348,20 @@ export default function PhotoUploader({
       {/* Upload button */}
       {photos.length < maxPhotos && (
         <div>
+          {/* NO `capture` attribute — deliberately. It used to be set whenever
+              captureLocation was on, which forces the device camera and removes
+              "Photo Library" from the iOS/Android sheet entirely. The founder
+              asked (Aug 2026) that operators and supervisors be able to EITHER
+              take a photo OR pick an existing one — e.g. to replace a bad shot
+              taken minutes earlier. The GPS stamp is unaffected: getPosition()
+              already runs best-effort and never blocks the upload, so a picked
+              photo still records where it was submitted from. */}
           <input
             ref={fileInputRef}
             type="file"
             // GPS-stamp mode: images only + force the CAMERA on mobile so
             // photos are taken on the spot (no gallery uploads).
             accept={captureLocation ? 'image/*' : 'image/*,application/pdf'}
-            {...(captureLocation ? { capture: 'environment' as const } : {})}
             multiple
             onChange={handleFileSelect}
             className="hidden"
