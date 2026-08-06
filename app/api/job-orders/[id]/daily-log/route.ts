@@ -392,6 +392,13 @@ export async function POST(
         // reads silently drop these rows.
         tenant_id: job.tenant_id ?? tenantId ?? null,
         day_number: dayNum,
+        // The log row this work belongs to. THE identity of "this operator's
+        // work on this job on this date" — stable across resubmits because the
+        // log is upserted on (job_order_id, operator_id, log_date). day_number
+        // is NOT stable: it comes from a trigger and was observed changing
+        // between two submits 53 seconds apart, which is how the same footage
+        // ended up counted twice.
+        daily_log_id: dailyLog?.id ?? null,
         work_type: resolvedWorkType || 'unspecified',
         quantity: Number(item.quantity) || 1,
         core_quantity: item.core_quantity ? Number(item.core_quantity) : null,
@@ -407,13 +414,33 @@ export async function POST(
         };
       });
 
-      // Replace any prior rows for this job/operator/day (idempotent resubmit, no double-billing).
-      await supabaseAdmin
+      // Replace any prior rows for this job/operator/day (idempotent resubmit,
+      // no double-billing).
+      //
+      // Keyed on daily_log_id, NOT day_number. Scoping by day_number let a
+      // resubmit land under a different number and ADD a second set of rows
+      // instead of replacing the first — verified live on JOB-2026-364026,
+      // where 2 ft of hand sawing was reported as 4 and 6 ft of push sawing
+      // as 12. Both the delete and the insert now use the log row's id, so a
+      // resubmit can only ever replace itself.
+      //
+      // day_number is still cleared alongside it to sweep up rows written
+      // before daily_log_id was stamped.
+      const replaceQuery = supabaseAdmin
         .from('work_items')
         .delete()
         .eq('job_order_id', jobId)
-        .eq('operator_id', user.id)
-        .eq('day_number', dayNum);
+        .eq('operator_id', user.id);
+      const { error: replaceError } = dailyLog?.id
+        ? await replaceQuery.or(`daily_log_id.eq.${dailyLog.id},day_number.eq.${dayNum}`)
+        : await replaceQuery.eq('day_number', dayNum);
+      if (replaceError) {
+        console.error('Error clearing prior work items:', replaceError);
+        return NextResponse.json(
+          { error: 'Could not save your work — nothing was changed. Try again.' },
+          { status: 500 }
+        );
+      }
 
       const { error: wiError } = await supabaseAdmin.from('work_items').insert(workItemRows);
       if (wiError) {
