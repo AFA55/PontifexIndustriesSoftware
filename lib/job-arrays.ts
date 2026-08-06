@@ -23,14 +23,23 @@
 /** The job_orders columns that are list-shaped and nullable. */
 export const JOB_LIST_COLUMNS = [
   'equipment_needed',
-  'equipment_selections',
   'permits',
   'ppe_required',
   'photo_urls',
   'scope_photo_urls',
   'takeoff_page_ids',
-  'attachments',
 ] as const;
+
+/**
+ * ⚠️ DO NOT ADD `equipment_selections` HERE. It LOOKS list-shaped and is not:
+ * it is a JSONB OBJECT keyed by service code —
+ *   { "ECD": { "backup_saw": "yes" }, "HHS/PS": { "push_saw": "yes" } }
+ * Running it through asArray() wraps it as `[theObject]`, after which the
+ * schedule form's edit view reads `selections['ECD']` off an array, gets
+ * undefined, renders every equipment choice blank — and then SAVES the array
+ * back, permanently corrupting the row and the operator's equipment list.
+ * `attachments` is likewise absent: no such column exists on job_orders.
+ */
 
 /**
  * Anything → an array you can safely `.map()`.
