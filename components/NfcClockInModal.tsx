@@ -257,7 +257,7 @@ export default function NfcClockInModal({
       setRequiresApproval(false);
       setFlow('success');
     } catch (err: unknown) {
-      setGlobalError(err instanceof Error ? err.message : 'Clock-in failed');
+      setGlobalError(err instanceof Error ? err.message : isClockOut ? 'Clock-out failed' : 'Clock-in failed');
       setFlow('shop_gps');
     }
   };
@@ -308,7 +308,7 @@ export default function NfcClockInModal({
       setRequiresApproval(true);
       setFlow('success');
     } catch (err: unknown) {
-      setGlobalError(err instanceof Error ? err.message : 'Clock-in failed');
+      setGlobalError(err instanceof Error ? err.message : isClockOut ? 'Clock-out failed' : 'Clock-in failed');
       setFlow('jobsite_camera');
     }
   };
@@ -541,13 +541,13 @@ export default function NfcClockInModal({
                     </div>
                     <div>
                       <p className="font-bold text-slate-900 dark:text-white">Location confirmed</p>
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">You&apos;re at the shop — good to go!</p>
+                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">{isClockOut ? "You're at the shop — ready to clock out." : "You're at the shop — good to go!"}</p>
                     </div>
                     <button
                       onClick={() => confirmShopClockIn(gpsCoords)}
                       className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-bold text-sm hover:from-emerald-600 hover:to-teal-700 active:scale-[0.98] transition-all"
                     >
-                      Clock In Now
+                      {isClockOut ? 'Clock Out Now' : 'Clock In Now'}
                     </button>
                   </div>
                 )}
