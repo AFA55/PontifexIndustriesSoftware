@@ -76,6 +76,20 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose, initialValu
 
   const isValid = salesmanName.trim() && start_date && end_date && contractorName.trim() && jobTypes.length > 0 && !dateError;
 
+  /**
+   * What is still missing, in words. The button used to just grey out on six
+   * separate conditions with nothing on screen saying which — and it sits below
+   * a scrolling modal body, so the required fields are off-screen at the moment
+   * you try to click it.
+   */
+  const missingFields = [
+    !contractorName.trim() && 'Customer',
+    !salesmanName.trim() && 'Salesman',
+    !start_date && 'Start date',
+    !end_date && 'End date',
+    jobTypes.length === 0 && 'Job type',
+  ].filter(Boolean) as string[];
+
   const handleSalesmanChange = (name: string) => {
     setSalesmanName(name);
     const match = salesmanOptions.find(s => s.full_name === name);
@@ -291,6 +305,11 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose, initialValu
             </div>
 
             {/* Actions */}
+            {(missingFields.length > 0 || dateError) && (
+              <p className="px-1 pb-2 text-xs font-medium text-amber-600 dark:text-amber-400">
+                {dateError ? dateError : `Still needed: ${missingFields.join(', ')}`}
+              </p>
+            )}
             <div className="flex items-center gap-3 pt-1">
               <button onClick={onClose}
                 className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 dark:bg-white/10 dark:hover:bg-white/20 text-gray-700 dark:text-white rounded-lg font-semibold text-sm transition-all">
@@ -299,6 +318,7 @@ export default function QuickAddModal({ salesmen, onSubmit, onClose, initialValu
               <button
                 onClick={() => isValid && onSubmit({ salesmanName, salesmanId, start_date, end_date, contractorName, scope, jobTypes, address, contactName, contactPhone, priority, estimatedCost })}
                 disabled={!isValid}
+                title={missingFields.length ? `Still needed: ${missingFields.join(', ')}` : undefined}
                 className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-brand-accent hover:from-blue-700 hover:to-brand-dark text-white rounded-lg font-semibold text-sm transition-all shadow-md flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed">
                 <Send className="w-3.5 h-3.5" /> Create & Notify
               </button>

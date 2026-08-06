@@ -165,7 +165,10 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
     if (field === 'description') {
       item.description = value as string;
     } else {
-      const numVal = Number(value) || 0;
+      // A number arrives already parsed from NumberInput; only a string needs
+      // coercing. `Number(value) || 0` also turned a legitimate 0 into 0 via
+      // the falsy branch, which is how "0.75" lost its leading zero.
+      const numVal = typeof value === 'number' ? value : (Number(value) || 0);
       if (field === 'quantity') {
         item.quantity = numVal;
         item.amount = numVal * item.rate;
@@ -572,10 +575,14 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                     />
                   </div>
                   <div className="col-span-2 px-2 py-1.5">
-                    <input
-                      type="number"
-                      value={item.quantity || ''}
-                      onChange={(e) => updateLineItem(idx, 'quantity', e.target.value)}
+                    {/* NumberInput, not a raw field. `value={item.quantity || ''}`
+                        rendered 0 as empty, so any entry beginning with 0 erased
+                        itself — a rate of 0.75 or a quantity of 0.5 was
+                        physically unenterable on an INVOICE. */}
+                    <NumberInput
+                      value={item.quantity}
+                      onValueChange={(nv) => updateLineItem(idx, 'quantity', nv)}
+                      blankZero
                       className="
                         w-full px-2 py-1.5 rounded-lg text-sm text-right transition-all tabular-nums
                         bg-white border border-slate-200 text-slate-900
@@ -588,10 +595,10 @@ export default function CreateInvoiceForm({ onClose, onCreated }: CreateInvoiceF
                     />
                   </div>
                   <div className="col-span-2 px-2 py-1.5">
-                    <input
-                      type="number"
-                      value={item.rate || ''}
-                      onChange={(e) => updateLineItem(idx, 'rate', e.target.value)}
+                    <NumberInput
+                      value={item.rate}
+                      onValueChange={(nv) => updateLineItem(idx, 'rate', nv)}
+                      blankZero
                       className="
                         w-full px-2 py-1.5 rounded-lg text-sm text-right transition-all tabular-nums
                         bg-white border border-slate-200 text-slate-900

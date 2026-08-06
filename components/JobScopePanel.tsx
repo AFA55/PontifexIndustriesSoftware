@@ -17,6 +17,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { NumberInput } from '@/components/ui/NumberInput';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -184,6 +185,8 @@ export default function JobScopePanel({
   const [items, setItems] = useState<ScopeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** What is stopping the Add-item save, shown next to the button. */
+  const [addError, setAddError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [addForm, setAddForm] = useState<AddItemForm>(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
@@ -284,7 +287,18 @@ export default function JobScopePanel({
   };
 
   const handleAddSave = async () => {
-    if (!addForm.work_type || !addForm.unit || !addForm.target_quantity) return;
+    // NAME what is missing. This used to `return` silently while the Save
+    // button sat disabled on three separate conditions with nothing on screen
+    // saying which — the founder's exact complaint, "it wouldn't say what was
+    // missing to be able to continue". Target Quantity isn't even marked
+    // required in the label.
+    if (!addForm.work_type) return setAddError('Pick the type of work.');
+    if (!addForm.unit) return setAddError('Pick a unit.');
+    if (!addForm.target_quantity) return setAddError('Enter a target quantity.');
+    if (pushForward && !pushDate) {
+      return setAddError('Pick the new end date, or untick "Push job forward".');
+    }
+    setAddError(null);
     setSaving(true);
     try {
       const res = await apiFetch(`/api/admin/jobs/${jobId}/scope`, {
@@ -746,10 +760,15 @@ export default function JobScopePanel({
             </div>
 
             {/* Footer */}
-            <div className="flex items-center gap-2 px-5 sm:px-6 py-4 border-t border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-white/[0.02] rounded-b-none sm:rounded-b-3xl">
+            <div className="px-5 sm:px-6 pt-3 border-t border-slate-200 dark:border-white/10 bg-slate-50/60 dark:bg-white/[0.02]">
+              {addError && (
+                <p className="text-sm font-medium text-red-600 dark:text-red-400">{addError}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 px-5 sm:px-6 py-4 border-t-0 bg-slate-50/60 dark:bg-white/[0.02] rounded-b-none sm:rounded-b-3xl">
               <button
                 onClick={handleAddSave}
-                disabled={saving || !addForm.target_quantity || (pushForward && !pushDate)}
+                disabled={saving}
                 className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
@@ -852,15 +871,17 @@ export default function JobScopePanel({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Target Qty</label>
-                  <input
-                    type="number"
-                    min="0"
+                  {/* NumberInput: `Number(e.target.value)` turned an emptied box
+                      into 0 and wrote it straight back, and Number('0.') is 0 —
+                      so the decimal point was wiped mid-keystroke and "0.5" was
+                      unenterable. The Add modal above already did this right. */}
+                  <NumberInput
                     value={editingItem.target_quantity}
-                    onChange={(e) =>
-                      setEditingItem((prev) =>
-                        prev ? { ...prev, target_quantity: Number(e.target.value) } : prev
-                      )
+                    onValueChange={(nv) =>
+                      setEditingItem((prev) => (prev ? { ...prev, target_quantity: nv } : prev))
                     }
+                    blankZero
+                    min="0"
                     className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
