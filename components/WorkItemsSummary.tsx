@@ -12,7 +12,7 @@
  * expandable, so the two surfaces can't drift apart.
  */
 
-import { ratingToDifficultyLabel, workItemDetailLine, workItemQuickNote } from '@/lib/work-items-format';
+import { rebarLabel, ratingToDifficultyLabel, workItemDetailLine, workItemQuickNote } from '@/lib/work-items-format';
 
 export interface WorkItemRow {
   id: string;
@@ -48,9 +48,9 @@ function HoleList({ holes }: { holes: any[] }) {
             {(Number(h?.quantity) || 1)}× {h?.bitSize ? `${String(h.bitSize).replace(/"$/, '')}"` : '?'}
             {Number(h?.depthInches) > 0 ? ` @ ${Number(h.depthInches)}" deep` : ''}
           </span>
-          {h?.cutSteel && (
+          {rebarLabel(h) && (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300 font-semibold">
-              steel{h?.steelEncountered ? `: ${h.steelEncountered}` : ''}
+              {rebarLabel(h)}
             </span>
           )}
           {h?.plasticSetup && (
@@ -82,9 +82,9 @@ function CutList({ cuts, cutType }: { cuts: any[]; cutType?: string }) {
                   {cutType}
                 </span>
               )}
-              {c?.cutSteel && (
+              {rebarLabel(c) && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300 font-semibold">
-                  steel{c?.steelEncountered ? `: ${c.steelEncountered}` : ''}
+                  {rebarLabel(c)}
                 </span>
               )}
               {c?.overcut && (

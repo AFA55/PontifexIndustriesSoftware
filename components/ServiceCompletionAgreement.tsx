@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { rebarLabel } from '@/lib/work-items-format';
 
 interface ServiceCompletionAgreementProps {
   jobData: {
@@ -249,7 +250,9 @@ export default function ServiceCompletionAgreement({
                                       <div><span className="font-semibold">Depth:</span> {hole.depthInches} inches</div>
                                       <div><span className="font-semibold">Holes:</span> {hole.quantity}</div>
                                       {hole.plasticSetup && <div className="col-span-2"><span className="font-semibold">Setup:</span> Plastic/Handheld</div>}
-                                      {hole.cutSteel && <div className="col-span-2"><span className="font-semibold">Steel Cut:</span> Yes{hole.steelEncountered ? ` (${hole.steelEncountered})` : ''}</div>}
+                                      {/* "Reinforcement" covers both: new rows carry a rebar size,
+                                          pre-Aug-2026 rows only recorded "steel was cut". */}
+                                      {rebarLabel(hole) && <div className="col-span-2"><span className="font-semibold">Reinforcement:</span> {rebarLabel(hole)}</div>}
                                     </div>
                                   </div>
                                 ))}
@@ -268,7 +271,7 @@ export default function ServiceCompletionAgreement({
                                       {cut.bladesUsed && cut.bladesUsed.length > 0 && (
                                         <div className="col-span-2"><span className="font-semibold">Blades Used:</span> {cut.bladesUsed.join(', ')}</div>
                                       )}
-                                      {cut.cutSteel && <div className="col-span-2"><span className="font-semibold">Steel Cut:</span> Yes{cut.steelEncountered ? ` (${cut.steelEncountered})` : ''}</div>}
+                                      {rebarLabel(cut) && <div className="col-span-2"><span className="font-semibold">Reinforcement:</span> {rebarLabel(cut)}</div>}
                                       {cut.overcut && <div className="col-span-2"><span className="font-semibold">Overcut:</span> Yes</div>}
                                       {cut.chainsawed && (
                                         <div className="col-span-2">

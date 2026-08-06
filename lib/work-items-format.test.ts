@@ -6,8 +6,12 @@
 
 import {
   buildWorkPerformedSummary,
+  cutRebar,
   difficultyToRating,
   ratingToDifficultyLabel,
+  rebarLabel,
+  rebarSizeOf,
+  REBAR_SIZES,
   stripInternalNotes,
   summarizeWorkItem,
   toCompletionPdfWorkItems,
@@ -64,11 +68,52 @@ describe('workItemDetailLine', () => {
     expect(line).toBe('2× 4" @ 10", 1× 6" @ 12"');
   });
 
-  it('flags steel on a hole', () => {
+  // OLD SHAPE — rows written before the Aug 2026 "what size rebar?" change.
+  // Their wording must not drift; the office reads these every day.
+  it('flags steel on a legacy hole (cutSteel boolean, no size)', () => {
     const line = workItemDetailLine({
       details_json: { holes: [{ bitSize: '4', depthInches: 8, quantity: 1, cutSteel: true }] },
     });
-    expect(line).toContain('steel');
+    expect(line).toBe('1× 4" @ 8" steel');
+  });
+
+  it('flags steel on a legacy cut (cutSteel boolean, no size)', () => {
+    const line = workItemDetailLine({
+      details_json: { cuts: [{ linearFeet: 120, cutDepth: 6, cutSteel: true }] },
+    });
+    expect(line).toBe('120 LF @ 6" (steel)');
+  });
+
+  // NEW SHAPE — the operator answers a bar size. `cutSteel` is still written
+  // (derived) so nothing downstream had to change at once.
+  it('prints the rebar SIZE on a new hole', () => {
+    const line = workItemDetailLine({
+      details_json: {
+        holes: [
+          { bitSize: '4', depthInches: 8, quantity: 1, rebarSize: '#5', cutSteel: true, steelEncountered: '#5 rebar' },
+        ],
+      },
+    });
+    expect(line).toBe('1× 4" @ 8" rebar #5');
+  });
+
+  it('prints the rebar SIZE on a new cut, alongside the other flags', () => {
+    const line = workItemDetailLine({
+      details_json: {
+        cutType: 'wet',
+        cuts: [
+          { linearFeet: 80, cutDepth: 6, rebarSize: '#4', cutSteel: true, overcut: true },
+        ],
+      },
+    });
+    expect(line).toBe('80 LF @ 6" (rebar #4, overcut) (wet)');
+  });
+
+  it('prints free-text rebar answers ("unknown") without a stray #', () => {
+    const line = workItemDetailLine({
+      details_json: { holes: [{ bitSize: '6', depthInches: 12, quantity: 2, rebarSize: 'unknown', cutSteel: true }] },
+    });
+    expect(line).toBe('2× 6" @ 12" rebar: unknown');
   });
 
   it('describes sawing cuts with LF, depth and wet/dry', () => {
@@ -377,5 +422,95 @@ describe('offline/localStorage payload shape', () => {
     expect(row.description).toBe('120 LF @ 6" (wet)');
     expect(JSON.stringify(row)).not.toContain('poly');
     expect(row).not.toHaveProperty('notes');
+  });
+});
+
+// ── The rebar answer (was the yes/no "Cut Steel") ────────────────────────────
+// Aug 2026 the founder replaced the boolean with "what SIZE rebar did you cut?".
+// Nothing stored was renamed or migrated, so BOTH shapes are live in the table
+// at the same time and every helper has to read both.
+describe('rebar helpers', () => {
+  it('offers the real US bar sizes, #3 through #18', () => {
+    expect(REBAR_SIZES).toEqual(['#3', '#4', '#5', '#6', '#7', '#8', '#9', '#10', '#11', '#14', '#18']);
+  });
+
+  describe('NEW shape — a size was recorded', () => {
+    const entry = { rebarSize: '#4', cutSteel: true, steelEncountered: '#4 rebar' };
+
+    it('reads the size back', () => {
+      expect(rebarSizeOf(entry)).toBe('#4');
+      expect(cutRebar(entry)).toBe(true);
+      expect(rebarLabel(entry)).toBe('Rebar #4');
+    });
+
+    it('labels free-text answers without pretending they are a bar number', () => {
+      expect(rebarLabel({ rebarSize: 'unknown', cutSteel: true })).toBe('Rebar: unknown');
+      expect(rebarLabel({ rebarSize: 'angle iron', cutSteel: true })).toBe('Rebar: angle iron');
+    });
+
+    it('trims operator whitespace', () => {
+      expect(rebarSizeOf({ rebarSize: '  #9  ' })).toBe('#9');
+      expect(rebarLabel({ rebarSize: '  #9  ' })).toBe('Rebar #9');
+    });
+
+    it('treats an empty size as "no rebar", even next to a stale boolean', () => {
+      expect(rebarSizeOf({ rebarSize: '   ' })).toBe('');
+      expect(rebarLabel({ rebarSize: '', cutSteel: false, steelEncountered: '' })).toBeNull();
+    });
+  });
+
+  describe('OLD shape — rows saved before the change (live production data)', () => {
+    // Verbatim from work_items.details_json in production.
+    const legacyBooleanOnly = { bitSize: '6', cutSteel: true, quantity: 4, depthInches: 10, plasticSetup: false, steelEncountered: '' };
+    const legacyWithText = { depth: 6, width: 13, length: 40, overcut: true, cutSteel: true, quantity: 1, steelEncountered: 'Number 4' };
+
+    it('still reports that steel was cut when only the boolean exists', () => {
+      expect(cutRebar(legacyBooleanOnly)).toBe(true);
+      expect(rebarSizeOf(legacyBooleanOnly)).toBe('');
+      // Says "Steel", NOT "Rebar" — the operator answered a broader question
+      // and we must not put words in their mouth after the fact.
+      expect(rebarLabel(legacyBooleanOnly)).toBe('Steel Cut');
+    });
+
+    it('keeps the legacy free-text description visible', () => {
+      expect(cutRebar(legacyWithText)).toBe(true);
+      expect(rebarLabel(legacyWithText)).toBe('Steel: Number 4');
+    });
+
+    it('reports no steel for a legacy entry that answered "no"', () => {
+      expect(cutRebar({ cutSteel: false, steelEncountered: '' })).toBe(false);
+      expect(rebarLabel({ cutSteel: false, steelEncountered: '' })).toBeNull();
+    });
+  });
+
+  it('is null-safe on garbage', () => {
+    expect(rebarLabel(null)).toBeNull();
+    expect(rebarLabel(undefined)).toBeNull();
+    expect(rebarLabel({})).toBeNull();
+    expect(cutRebar(null)).toBe(false);
+    expect(rebarSizeOf(null)).toBe('');
+    // A non-string size (bad client payload) must not crash or leak "[object Object]".
+    expect(rebarSizeOf({ rebarSize: 4 as unknown as string })).toBe('');
+  });
+
+  it('renders a real legacy production row end-to-end, unchanged', () => {
+    // Nested sawing areas: the cut says cutSteel:false, the AREA says true.
+    const line = workItemDetailLine({
+      work_type: 'SLAB SAW',
+      details_json: {
+        cutType: 'wet',
+        cuts: [
+          {
+            areas: [{ depth: 6, width: 13, length: 40, overcut: true, cutSteel: true, quantity: 1, steelEncountered: 'Number 4' }],
+            cutDepth: 6,
+            cutSteel: false,
+            inputMode: 'area',
+            linearFeet: 106,
+            steelEncountered: '',
+          },
+        ],
+      },
+    });
+    expect(line).toBe('106 LF @ 6" (wet)');
   });
 });

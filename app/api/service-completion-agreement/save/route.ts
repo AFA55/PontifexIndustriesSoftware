@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import jsPDF from 'jspdf';
+import { rebarLabel } from '@/lib/work-items-format';
 
 export async function POST(request: NextRequest) {
   try {
@@ -114,8 +115,11 @@ export async function POST(request: NextRequest) {
           item.details.holes.forEach((hole: any) => {
             pdf.text(`   • Bit Size: ${hole.bitSize}", Depth: ${hole.depthInches}", Holes: ${hole.quantity}`, margin, yPos);
             yPos += 6;
-            if (hole.cutSteel) {
-              pdf.text(`     Steel Cut: Yes`, margin, yPos);
+            // New rows carry the rebar SIZE; pre-Aug-2026 rows only ever had
+            // the "steel was cut" boolean, and still print as they always did.
+            const holeRebar = rebarLabel(hole);
+            if (holeRebar) {
+              pdf.text(`     Reinforcement: ${holeRebar}`, margin, yPos);
               yPos += 6;
             }
           });
@@ -128,6 +132,13 @@ export async function POST(request: NextRequest) {
             yPos += 6;
             if (cut.bladesUsed && cut.bladesUsed.length > 0) {
               pdf.text(`     Blades: ${cut.bladesUsed.join(', ')}`, margin, yPos);
+              yPos += 6;
+            }
+            // The on-screen agreement has always shown this for cuts; the PDF
+            // was silently dropping it.
+            const cutRebarLabel = rebarLabel(cut);
+            if (cutRebarLabel) {
+              pdf.text(`     Reinforcement: ${cutRebarLabel}`, margin, yPos);
               yPos += 6;
             }
           });

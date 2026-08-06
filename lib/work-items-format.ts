@@ -57,6 +57,72 @@ const n = (v: unknown): number => {
   return isFinite(x) ? x : 0;
 };
 
+// ── Rebar (was "Cut Steel") ─────────────────────────────────────────────────
+// The operator used to answer a yes/no "Cut Steel" per hole / cut / area, with
+// an optional free-text "steel type". Aug 2026 the founder replaced that with
+// the question that actually matters for billing and blade wear: WHAT SIZE
+// rebar did you cut?
+//
+// STORAGE (do not "clean this up" — it is deliberate):
+//   rebarSize        NEW canonical answer, e.g. '#4' or free text ('unknown').
+//   cutSteel         still WRITTEN, derived as `!!rebarSize` — every reader
+//                    built before this change keys off it.
+//   steelEncountered still WRITTEN as a human mirror of the size, and is the
+//                    ONLY thing older rows have besides the boolean.
+// Nothing stored is renamed or migrated, so a row saved yesterday
+// (`cutSteel: true`) keeps rendering exactly as it did.
+
+/** US rebar bar-size designations. #3 = 3/8", #8 = 1", then #14 / #18. */
+export const REBAR_SIZES = ['#3', '#4', '#5', '#6', '#7', '#8', '#9', '#10', '#11', '#14', '#18'] as const;
+
+export interface RebarLike {
+  /** New (Aug 2026+): the size the operator picked, or their free text. */
+  rebarSize?: string | null;
+  /** Legacy + derived: "something reinforcing was cut". */
+  cutSteel?: boolean | null;
+  /** Legacy free text ("#4 rebar", "angle iron"); also written as a mirror. */
+  steelEncountered?: string | null;
+}
+
+const trimmed = (v: unknown): string => (typeof v === 'string' ? v.trim() : '');
+
+/** The size the operator recorded, or '' when they didn't (or it's an old row). */
+export function rebarSizeOf(entry: RebarLike | null | undefined): string {
+  return trimmed(entry?.rebarSize);
+}
+
+/** Did this hole / cut / area go through rebar or other steel?
+ *  True for BOTH the new size answer and the legacy boolean. */
+export function cutRebar(entry: RebarLike | null | undefined): boolean {
+  return Boolean(rebarSizeOf(entry) || trimmed(entry?.steelEncountered) || entry?.cutSteel);
+}
+
+/**
+ * Badge text for one entry, or null when no rebar/steel was recorded.
+ *   new row, size picked   → `Rebar #4`
+ *   new row, free text     → `Rebar: unknown`
+ *   OLD row w/ description → `Steel: angle iron`   (unchanged wording)
+ *   OLD row, boolean only  → `Steel Cut`           (unchanged wording)
+ * Legacy rows keep the word "steel" on purpose: they answered a different,
+ * broader question and relabelling them "rebar" would assert something the
+ * operator never said.
+ */
+export function rebarLabel(entry: RebarLike | null | undefined): string | null {
+  const size = rebarSizeOf(entry);
+  if (size) return size.startsWith('#') ? `Rebar ${size}` : `Rebar: ${size}`;
+  const legacy = trimmed(entry?.steelEncountered);
+  if (legacy) return `Steel: ${legacy}`;
+  return entry?.cutSteel ? 'Steel Cut' : null;
+}
+
+/** Lowercase fragment for the compact one-line summaries (`rebar #4` / `steel`). */
+function rebarTag(entry: RebarLike | null | undefined): string | null {
+  const size = rebarSizeOf(entry);
+  if (size) return size.startsWith('#') ? `rebar ${size}` : `rebar: ${size}`;
+  // Legacy rows stay exactly as they read before this change.
+  return cutRebar(entry) ? 'steel' : null;
+}
+
 /** `2× 4" @ 10"` style descriptor for one core-drilling hole spec. */
 function describeHole(h: any): string {
   const qty = n(h?.quantity) || 1;
@@ -65,7 +131,8 @@ function describeHole(h: any): string {
   let s = `${qty}×`;
   if (size) s += ` ${size}"`;
   if (depth > 0) s += ` @ ${depth}"`;
-  if (h?.cutSteel) s += ' steel';
+  const rebar = rebarTag(h);
+  if (rebar) s += ` ${rebar}`;
   return s;
 }
 
@@ -89,7 +156,8 @@ function describeCut(c: any): string {
   let s = lf > 0 ? `${lf} LF` : 'cut';
   if (depth > 0) s += ` @ ${depth}"`;
   const flags: string[] = [];
-  if (c?.cutSteel) flags.push('steel');
+  const rebar = rebarTag(c);
+  if (rebar) flags.push(rebar);
   if (c?.overcut) flags.push('overcut');
   if (c?.chainsawed) flags.push('chainsawed');
   if (flags.length) s += ` (${flags.join(', ')})`;

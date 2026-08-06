@@ -12,6 +12,8 @@ import QuickAccessButtons from '@/components/QuickAccessButtons';
 import { Camera, Mic, Save, Zap, Home, CheckCircle2, ChevronDown, ChevronUp, Send, Loader2, MessageSquarePlus, Clock } from 'lucide-react';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import { NumberInput } from '@/components/ui/NumberInput';
+import { RebarSizePicker } from '@/components/ui/RebarSizePicker';
+import { rebarLabel } from '@/lib/work-items-format';
 
 const EquipmentUsageForm = dynamicImport(() => import('@/components/EquipmentUsageForm'), {
   ssr: false,
@@ -164,13 +166,27 @@ interface WorkItem {
   details?: CoreDrillingDetails | SawingDetails | DemolitionDetails | GeneralDetails;
 }
 
-interface CoreDrillingHole {
+/**
+ * The rebar answer, shared by holes / cuts / areas.
+ *
+ * `rebarSize` is what the operator now answers ("what size rebar did you cut?",
+ * replacing the old yes/no "Cut Steel"). `cutSteel` and `steelEncountered` are
+ * NOT removed: they are still written, derived from the size by
+ * `withRebarCompat()`, because every reader and every already-saved row keys
+ * off them. See the storage note in lib/work-items-format.ts.
+ */
+interface RebarFields {
+  /** '#4', or free text ('unknown'), or '' for none. */
+  rebarSize?: string;
+  cutSteel: boolean;
+  steelEncountered?: string;
+}
+
+interface CoreDrillingHole extends RebarFields {
   bitSize: string;
   depthInches: number;
   quantity: number;
   plasticSetup: boolean;
-  cutSteel: boolean;
-  steelEncountered?: string;
 }
 
 interface CoreDrillingDetails {
@@ -178,32 +194,47 @@ interface CoreDrillingDetails {
   notes?: string;
 }
 
-interface CutArea {
+interface CutArea extends RebarFields {
   length: number; // in feet
   width: number; // in feet
   depth: number; // in inches
   quantity: number; // number of areas
-  cutSteel: boolean;
   overcut: boolean;
-  steelEncountered?: string;
   chainsawed: boolean;
   chainsawAreas?: number;
   chainsawWidthInches?: number;
 }
 
-interface SawingCut {
+interface SawingCut extends RebarFields {
   inputMode: 'linear' | 'area'; // How the cut was specified
   linearFeet: number; // Total linear feet (calculated from areas or direct input)
   cutDepth: number;
   areas?: CutArea[]; // If using area mode
   bladesUsed: string[];
-  cutSteel: boolean;
-  steelEncountered?: string;
   overcut: boolean;
   chainsawed: boolean;
   chainsawAreas?: number;
   chainsawWidthInches?: number;
 }
+
+/**
+ * Stamps the legacy fields from the new rebar-size answer, right before an
+ * entry is captured. Writing all three keeps EVERY existing reader (the
+ * completion-agreement PDF, WorkItemsSummary, the admin renders, the offline
+ * localStorage payload) working unchanged, and never rewrites a stored row.
+ */
+const withRebarCompat = <T extends RebarFields>(entry: T): T => {
+  const size = (entry.rebarSize || '').trim();
+  return {
+    ...entry,
+    rebarSize: size,
+    cutSteel: size.length > 0,
+    steelEncountered: size ? (size.startsWith('#') ? `${size} rebar` : size) : '',
+  };
+};
+
+/** A fresh, empty rebar answer — spread into every form reset. */
+const EMPTY_REBAR: RebarFields = { rebarSize: '', cutSteel: false, steelEncountered: '' };
 
 interface SawingDetails {
   cuts: SawingCut[];
@@ -292,8 +323,7 @@ export default function WorkPerformed() {
     depthInches: 0,
     quantity: 1,
     plasticSetup: false,
-    cutSteel: false,
-    steelEncountered: ''
+    ...EMPTY_REBAR
   });
   const [sawingData, setSawingData] = useState<SawingDetails>({
     cuts: [],
@@ -306,8 +336,7 @@ export default function WorkPerformed() {
     cutDepth: 0,
     areas: [],
     bladesUsed: [],
-    cutSteel: false,
-    steelEncountered: '',
+    ...EMPTY_REBAR,
     overcut: false,
     chainsawed: false,
     chainsawAreas: 0,
@@ -319,9 +348,8 @@ export default function WorkPerformed() {
     width: 0,
     depth: 0,
     quantity: 1,
-    cutSteel: false,
+    ...EMPTY_REBAR,
     overcut: false,
-    steelEncountered: '',
     chainsawed: false,
     chainsawAreas: 0,
     chainsawWidthInches: 0
@@ -841,8 +869,7 @@ export default function WorkPerformed() {
       depthInches: 0,
       quantity: 1,
       plasticSetup: false,
-      cutSteel: false,
-      steelEncountered: ''
+      ...EMPTY_REBAR
     });
 
     setSawingData({
@@ -859,8 +886,7 @@ export default function WorkPerformed() {
       cutDepth: 0,
       areas: [],
       bladesUsed: [],
-      cutSteel: false,
-      steelEncountered: '',
+      ...EMPTY_REBAR,
       overcut: false,
       chainsawed: false,
       chainsawAreas: 0,
@@ -871,7 +897,7 @@ export default function WorkPerformed() {
     setCustomBladeSize('');
     setCutInputMode('linear');
     setTempAreas([]);
-    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, cutSteel: false, overcut: false, steelEncountered: '', chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, ...EMPTY_REBAR, overcut: false, chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
 
     setShowQuantityModal(true);
   };
@@ -898,7 +924,7 @@ export default function WorkPerformed() {
    *  Shared by "Add This Hole" and the auto-flush in handleAddItem. */
   const buildPendingHole = (): CoreDrillingHole | null => {
     if (!currentHole.bitSize || currentHole.depthInches <= 0) return null;
-    return { ...currentHole };
+    return withRebarCompat({ ...currentHole });
   };
 
   const addHole = () => {
@@ -919,8 +945,7 @@ export default function WorkPerformed() {
       depthInches: 0,
       quantity: 1,
       plasticSetup: false,
-      cutSteel: false,
-      steelEncountered: ''
+      ...EMPTY_REBAR
     });
   };
 
@@ -943,7 +968,7 @@ export default function WorkPerformed() {
   const collectAreas = (): CutArea[] => {
     const pending =
       currentArea.length > 0 && currentArea.width > 0 && currentArea.depth > 0
-        ? [{ ...currentArea }]
+        ? [withRebarCompat({ ...currentArea })]
         : [];
     return [...tempAreas, ...pending];
   };
@@ -958,25 +983,28 @@ export default function WorkPerformed() {
     if (cutInputMode === 'area') {
       const areas = collectAreas();
       if (areas.length === 0) return null;
-      return {
-        inputMode: 'area',
+      return withRebarCompat({
+        inputMode: 'area' as const,
         // Perimeter math (2L + 2W) × qty — we bill linear feet of cut, not sq ft.
         linearFeet: calculateTotalFromAreas(areas),
         // All areas in one cut entry share the depth of the first.
         cutDepth: areas[0].depth,
         areas,
         bladesUsed: [...selectedBlades],
+        // The rebar answer in AREA mode is recorded per area, so the cut itself
+        // carries the size only if one was somehow set on the cut-level form.
+        rebarSize: currentCut.rebarSize,
         cutSteel: currentCut.cutSteel,
         steelEncountered: currentCut.steelEncountered,
         overcut: currentCut.overcut,
         chainsawed: currentCut.chainsawed,
         chainsawAreas: currentCut.chainsawAreas,
         chainsawWidthInches: currentCut.chainsawWidthInches
-      };
+      });
     }
 
     if (currentCut.linearFeet <= 0 || currentCut.cutDepth <= 0) return null;
-    return { ...currentCut, inputMode: 'linear', bladesUsed: [...selectedBlades] };
+    return withRebarCompat({ ...currentCut, inputMode: 'linear' as const, bladesUsed: [...selectedBlades] });
   };
 
   const addCut = () => {
@@ -1003,8 +1031,7 @@ export default function WorkPerformed() {
       cutDepth: 0,
       areas: [],
       bladesUsed: [],
-      cutSteel: false,
-      steelEncountered: '',
+      ...EMPTY_REBAR,
       overcut: false,
       chainsawed: false,
       chainsawAreas: 0,
@@ -1014,7 +1041,7 @@ export default function WorkPerformed() {
     setCustomBladeSize('');
     setCutInputMode('linear');
     setTempAreas([]);
-    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, cutSteel: false, overcut: false, steelEncountered: '', chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, ...EMPTY_REBAR, overcut: false, chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
   };
 
   const removeCut = (index: number) => {
@@ -1046,8 +1073,8 @@ export default function WorkPerformed() {
       return;
     }
 
-    setTempAreas(prev => [...prev, { ...currentArea }]);
-    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, cutSteel: false, overcut: false, steelEncountered: '', chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+    setTempAreas(prev => [...prev, withRebarCompat({ ...currentArea })]);
+    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, ...EMPTY_REBAR, overcut: false, chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
   };
 
   // Remove an area from temporary areas list
@@ -1434,7 +1461,7 @@ export default function WorkPerformed() {
       // Mirror the flush into state so the summary + list match what we saved.
       if (pendingHole) {
         setCoreDrillingData(prev => ({ ...prev, holes: [...prev.holes, pendingHole] }));
-        setCurrentHole({ bitSize: '', depthInches: 0, quantity: 1, plasticSetup: false, cutSteel: false, steelEncountered: '' });
+        setCurrentHole({ bitSize: '', depthInches: 0, quantity: 1, plasticSetup: false, ...EMPTY_REBAR });
       }
     } else if (isSawing(currentItem)) {
       // AUTO-FLUSH: same for a cut (or an L×W area) left in the input row.
@@ -1450,12 +1477,12 @@ export default function WorkPerformed() {
         setSawingData(prev => ({ ...prev, cuts: [...prev.cuts, pendingCut] }));
         setCurrentCut({
           inputMode: 'linear', linearFeet: 0, cutDepth: 0, areas: [], bladesUsed: [],
-          cutSteel: false, steelEncountered: '', overcut: false, chainsawed: false,
+          ...EMPTY_REBAR, overcut: false, chainsawed: false,
           chainsawAreas: 0, chainsawWidthInches: 0
         });
         setSelectedBlades([]);
         setTempAreas([]);
-        setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, cutSteel: false, overcut: false, steelEncountered: '', chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+        setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, ...EMPTY_REBAR, overcut: false, chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
       }
     } else if (
       demolitionData &&
@@ -1518,8 +1545,7 @@ export default function WorkPerformed() {
       cutDepth: 0,
       areas: [],
       bladesUsed: [],
-      cutSteel: false,
-      steelEncountered: '',
+      ...EMPTY_REBAR,
       overcut: false,
       chainsawed: false,
       chainsawAreas: 0,
@@ -1529,14 +1555,13 @@ export default function WorkPerformed() {
     setCustomBladeSize('');
     setCutInputMode('linear');
     setTempAreas([]);
-    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, cutSteel: false, overcut: false, steelEncountered: '', chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+    setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, ...EMPTY_REBAR, overcut: false, chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
     setCurrentHole({
       bitSize: '',
       depthInches: 0,
       quantity: 1,
       plasticSetup: false,
-      cutSteel: false,
-      steelEncountered: ''
+      ...EMPTY_REBAR
     });
     // Show dropdown to select another work item
     setShowDropdown(true);
@@ -2356,9 +2381,9 @@ export default function WorkPerformed() {
                                           Area Mode
                                         </span>
                                       )}
-                                      {cut.cutSteel && (
+                                      {rebarLabel(cut) && (
                                         <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">
-                                          Steel Cut
+                                          {rebarLabel(cut)}
                                         </span>
                                       )}
                                       {cut.overcut && (
@@ -2394,7 +2419,10 @@ export default function WorkPerformed() {
                                         ))}
                                       </div>
                                     )}
-                                    {cut.cutSteel && cut.steelEncountered && (
+                                    {/* The badge above already carries the size;
+                                        this line only adds the legacy free-text
+                                        description an OLD row may have. */}
+                                    {!cut.rebarSize && cut.cutSteel && cut.steelEncountered && (
                                       <div className="mt-1 text-xs">
                                         <span className="text-gray-500">Steel:</span>
                                         <span className="ml-1 text-red-600 font-medium">{cut.steelEncountered}</span>
@@ -2451,14 +2479,14 @@ export default function WorkPerformed() {
                                       <span className="font-medium">{hole.depthInches}&quot;</span>
                                       <span className="text-gray-500">deep</span>
                                     </div>
-                                    {(hole.plasticSetup || hole.cutSteel) && (
+                                    {(hole.plasticSetup || rebarLabel(hole)) && (
                                       <div className="flex gap-1 text-xs mt-1">
                                         {hole.plasticSetup && (
                                           <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full">Plastic</span>
                                         )}
-                                        {hole.cutSteel && (
+                                        {rebarLabel(hole) && (
                                           <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full">
-                                            Steel{hole.steelEncountered ? `: ${hole.steelEncountered}` : ''}
+                                            {rebarLabel(hole)}
                                           </span>
                                         )}
                                       </div>
@@ -2927,25 +2955,13 @@ export default function WorkPerformed() {
                         />
                       </div>
 
-                      {/* Cut Through Steel for this hole */}
-                      <div className={`mt-3 rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
-                        currentHole.cutSteel
-                          ? 'border-red-400 bg-red-50 dark:bg-red-900/20'
-                          : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
-                      }`}
-                        onClick={() => setCurrentHole(prev => ({ ...prev, cutSteel: !prev.cutSteel }))}>
-                        <div>
-                          <span className="text-sm font-semibold text-gray-900 dark:text-white">Cut Through Steel</span>
-                          <p className="text-xs text-gray-500 dark:text-white/50 mt-0.5">Cut through steel/rebar?</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={currentHole.cutSteel}
-                          onChange={(e) => setCurrentHole(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                          className="w-5 h-5 text-red-600 bg-white dark:bg-white/10 border-2 border-gray-300 dark:border-white/20 rounded focus:ring-2 focus:ring-red-500"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      </div>
+                      {/* Cut Rebar (what SIZE) for this hole */}
+                      <RebarSizePicker
+                        className="mt-3"
+                        title="Cut Rebar?"
+                        value={currentHole.rebarSize || ''}
+                        onChange={(size) => setCurrentHole(prev => ({ ...prev, rebarSize: size }))}
+                      />
 
                       <button
                         onClick={addHole}
@@ -2994,14 +3010,14 @@ export default function WorkPerformed() {
                                   </svg>
                                 </button>
                               </div>
-                              {(hole.plasticSetup || hole.cutSteel) && (
+                              {(hole.plasticSetup || rebarLabel(hole)) && (
                                 <div className="flex gap-2 text-xs">
                                   {hole.plasticSetup && (
                                     <span className="px-2 py-1 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-medium">Plastic Setup</span>
                                   )}
-                                  {hole.cutSteel && (
+                                  {rebarLabel(hole) && (
                                     <span className="px-2 py-1 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full font-medium">
-                                      Steel Cut{hole.steelEncountered ? `: ${hole.steelEncountered}` : ''}
+                                      {rebarLabel(hole)}
                                     </span>
                                   )}
                                 </div>
@@ -3257,21 +3273,13 @@ export default function WorkPerformed() {
                             )}
                           </div>
 
-                          {/* Cut Through Steel and Overcut - Linear Mode */}
+                          {/* Cut Rebar (what SIZE) and Overcut - Linear Mode */}
                           <div className="mb-4 space-y-2">
-                            <div className={`rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
-                              currentCut.cutSteel ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
-                            }`}
-                              onClick={() => setCurrentCut(prev => ({ ...prev, cutSteel: !prev.cutSteel }))}>
-                              <span className="text-sm font-semibold text-gray-900 dark:text-white">Cut Through Steel</span>
-                              <input
-                                type="checkbox"
-                                checked={currentCut.cutSteel}
-                                onChange={(e) => setCurrentCut(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                                className="w-4 h-4 text-red-600 rounded"
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                            </div>
+                            <RebarSizePicker
+                              title="Cut Rebar?"
+                              value={currentCut.rebarSize || ''}
+                              onChange={(size) => setCurrentCut(prev => ({ ...prev, rebarSize: size }))}
+                            />
                             {(isHandSaw(currentItem) || isChainsaw(currentItem)) && (
                               <div className={`rounded-xl border-2 px-4 py-3 flex items-center justify-between cursor-pointer transition-all ${
                                 currentCut.overcut ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
@@ -3353,22 +3361,9 @@ export default function WorkPerformed() {
                               </div>
                             </div>
 
-                            {/* Cut Steel and Overcut options for this area */}
-                            <div className="grid grid-cols-2 gap-2 mt-3">
-                              <div className={`rounded-xl border-2 px-3 py-2.5 flex items-center justify-between cursor-pointer transition-all ${
-                                currentArea.cutSteel ? 'border-red-400 bg-red-50 dark:bg-red-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
-                              }`}
-                                onClick={() => setCurrentArea(prev => ({ ...prev, cutSteel: !prev.cutSteel }))}>
-                                <span className="text-sm font-semibold text-gray-900 dark:text-white">Cut Steel</span>
-                                <input
-                                  type="checkbox"
-                                  checked={currentArea.cutSteel}
-                                  onChange={(e) => setCurrentArea(prev => ({ ...prev, cutSteel: e.target.checked }))}
-                                  className="w-4 h-4 text-red-600 rounded"
-                                  onClick={(e) => e.stopPropagation()}
-                                />
-                              </div>
-                              <div className={`rounded-xl border-2 px-3 py-2.5 flex items-center justify-between cursor-pointer transition-all ${
+                            {/* Overcut for this area (the rebar SIZE follows) */}
+                            <div className="mt-3">
+                              <div className={`rounded-xl border-2 px-3 py-2.5 flex items-center justify-between cursor-pointer transition-all min-h-[44px] ${
                                 currentArea.overcut ? 'border-amber-400 bg-amber-50 dark:bg-amber-900/20' : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03]'
                               }`}
                                 onClick={() => setCurrentArea(prev => ({ ...prev, overcut: !prev.overcut }))}>
@@ -3383,19 +3378,13 @@ export default function WorkPerformed() {
                               </div>
                             </div>
 
-                            {/* Steel Info field - appears when Cut Through Steel is checked */}
-                            {currentArea.cutSteel && (
-                              <div className="mt-3">
-                                <label className="block text-xs font-bold text-gray-700 dark:text-white/70 mb-1">Steel Type/Description</label>
-                                <textarea
-                                  value={currentArea.steelEncountered || ''}
-                                  onChange={(e) => setCurrentArea(prev => ({ ...prev, steelEncountered: e.target.value }))}
-                                  placeholder="e.g., #4 rebar, angle iron, etc..."
-                                  className="w-full px-3 py-2 text-base sm:text-sm border-2 border-red-300 dark:border-red-500/30 rounded-xl focus:border-red-500 focus:outline-none bg-white dark:bg-white/[0.05] text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-white/30"
-                                  rows={2}
-                                />
-                              </div>
-                            )}
+                            {/* Cut Rebar (what SIZE) for this area */}
+                            <RebarSizePicker
+                              className="mt-3"
+                              title="Cut Rebar in this area?"
+                              value={currentArea.rebarSize || ''}
+                              onChange={(size) => setCurrentArea(prev => ({ ...prev, rebarSize: size }))}
+                            />
 
                             {/* Chainsaw Question */}
                             <div className={`mt-3 rounded-xl border-2 px-4 py-3 cursor-pointer transition-all ${
@@ -3482,9 +3471,9 @@ export default function WorkPerformed() {
                                         <span className="text-xs text-gray-400">
                                           ({calculateLinearFeetFromArea(area).toFixed(1)}&apos; total)
                                         </span>
-                                        {area.cutSteel && (
+                                        {rebarLabel(area) && (
                                           <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-medium">
-                                            Steel Cut
+                                            {rebarLabel(area)}
                                           </span>
                                         )}
                                         {area.overcut && (
@@ -3508,7 +3497,9 @@ export default function WorkPerformed() {
                                         </svg>
                                       </button>
                                     </div>
-                                    {area.steelEncountered && (
+                                    {/* Legacy-only: with a size picked, the badge
+                                        above already says it. */}
+                                    {!area.rebarSize && area.steelEncountered && (
                                       <div className="mt-1 text-xs text-red-700 bg-red-50 px-2 py-1 rounded">
                                         Steel: {area.steelEncountered}
                                       </div>
@@ -3645,9 +3636,9 @@ export default function WorkPerformed() {
                                       Area Mode
                                     </span>
                                   )}
-                                  {cut.cutSteel && (
+                                  {rebarLabel(cut) && (
                                     <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded-full text-xs font-medium">
-                                      Steel Cut
+                                      {rebarLabel(cut)}
                                     </span>
                                   )}
                                   {cut.overcut && (
@@ -3702,7 +3693,8 @@ export default function WorkPerformed() {
                                   ))}
                                 </div>
                               )}
-                              {cut.cutSteel && cut.steelEncountered && (
+                              {/* Legacy free text only — a picked size is on the badge. */}
+                              {!cut.rebarSize && cut.cutSteel && cut.steelEncountered && (
                                 <div className="mt-2 text-xs">
                                   <span className="text-gray-500 dark:text-white/40">Steel type:</span>
                                   <span className="ml-1 text-red-600 dark:text-red-400 font-medium">{cut.steelEncountered}</span>
