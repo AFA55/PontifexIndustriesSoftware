@@ -55,16 +55,39 @@ export async function POST(
       );
     }
 
-    // Fetch the job order
-    let jobQuery = supabaseAdmin
-      .from('job_orders')
-      .select('*, profiles:created_by(id, full_name, email)')
-      .eq('id', id);
+    // Fetch the job order.
+    //
+    // NO EMBED HERE — deliberately. This used to select
+    // `'*, profiles:created_by(id, full_name, email)'`, but job_orders.created_by
+    // is a foreign key to auth.users, NOT to public.profiles. PostgREST cannot
+    // resolve that relationship, so it failed the WHOLE query with PGRST200 and
+    // this route answered "Job order not found" for every single rejection.
+    // Rejecting a project manager's ticket was impossible, and the error message
+    // pointed at the wrong thing entirely.
+    let jobQuery = supabaseAdmin.from('job_orders').select('*').eq('id', id);
     jobQuery = jobQuery.eq('tenant_id', tenantId);
-    const { data: jobOrder, error: fetchError } = await jobQuery.single();
+    const { data: jobOrder, error: fetchError } = await jobQuery.maybeSingle();
 
-    if (fetchError || !jobOrder) {
+    if (fetchError) {
+      console.error('[reject] job fetch failed', { id, fetchError });
+      return NextResponse.json(
+        { error: 'Could not load that job order.', details: fetchError.message },
+        { status: 500 }
+      );
+    }
+    if (!jobOrder) {
       return NextResponse.json({ error: 'Job order not found' }, { status: 404 });
+    }
+
+    // The submitter's profile, fetched separately (see above).
+    let submitterName: string | null = null;
+    if (jobOrder.created_by) {
+      const { data: submitterProfile } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', jobOrder.created_by)
+        .maybeSingle();
+      submitterName = submitterProfile?.full_name ?? null;
     }
 
     if (jobOrder.status !== 'pending_approval') {
@@ -127,26 +150,61 @@ export async function POST(
         other: 'Other',
       };
 
-      Promise.resolve(
-        supabaseAdmin.from('schedule_notifications').insert({
+      const label = reasonLabels[rejection_reason] || rejection_reason;
+      const whatWasWrong = `${label}: ${rejection_notes.trim()}`;
+      // Reopens the SAME submission with everything they entered still in it —
+      // the schedule form already supports ?editJobId. They fix what was
+      // flagged and resubmit; they never retype the ticket.
+      const reopenUrl = `/dashboard/admin/schedule-form?editJobId=${id}`;
+
+      // AWAITED. This notification IS the hand-back — if it silently fails the
+      // project manager never learns their ticket was rejected and the job just
+      // stops. It is not a side effect.
+      const { error: schedNotifError } = await supabaseAdmin
+        .from('schedule_notifications')
+        .insert({
           recipient_id: submitterId,
-          recipient_name: jobOrder.profiles?.full_name || null,
+          recipient_name: submitterName,
           job_order_id: id,
+          tenant_id: tenantId,
           type: 'rejected',
-          title: `Rejected: ${jobOrder.job_number} — ${jobOrder.customer_name}`,
-          message: `Rejected by ${rejectorName}. Reason: ${reasonLabels[rejection_reason] || rejection_reason}. Notes: ${rejection_notes.trim()}`,
+          title: `Sent back: ${jobOrder.job_number} — ${jobOrder.customer_name}`,
+          message: `${rejectorName} sent this back. ${whatWasWrong}`,
           metadata: {
             rejection_reason,
             rejection_notes: rejection_notes.trim(),
             rejected_by_name: rejectorName,
+            reopen_url: reopenUrl,
           },
-        })
-      ).catch(() => {});
+        });
+      if (schedNotifError) {
+        console.error('[reject] schedule notification failed', schedNotifError);
+      }
+
+      // ALSO into `notifications` — that is what the bell reads. Writing only
+      // to schedule_notifications is why hand-backs went unseen before.
+      const { error: bellError } = await supabaseAdmin.from('notifications').insert({
+        user_id: submitterId,
+        tenant_id: tenantId,
+        job_id: id,
+        type: 'warning',
+        priority: 'high',
+        title: `Ticket sent back: ${jobOrder.job_number}`,
+        message: `${rejectorName} sent your ticket back. ${whatWasWrong} Tap to reopen your form and fix it.`,
+        action_url: reopenUrl,
+        action_type: 'reopen_schedule_form',
+      });
+      if (bellError) {
+        console.error('[reject] bell notification failed', bellError);
+      }
     }
 
-    // Audit log (fire-and-forget)
-    Promise.resolve(
-      supabaseAdmin.from('job_orders_history').insert({
+    // Audit — awaited and checked. This was fire-and-forget AND used a
+    // change_type the CHECK constraint rejected, so every rejection went
+    // unrecorded: there was no way to see who sent a ticket back, or why.
+    const { error: rejectAuditError } = await supabaseAdmin
+      .from('job_orders_history')
+      .insert({
         job_order_id: id,
         job_number: jobOrder.job_number,
         changed_by: auth.userId,
@@ -159,12 +217,14 @@ export async function POST(
           rejection_notes: { old: null, new: rejection_notes.trim() },
         },
         snapshot: updatedJob,
-      })
-    ).catch(() => {});
+      });
+    if (rejectAuditError) {
+      console.error('[reject] AUDIT WRITE FAILED', { id, rejectAuditError });
+    }
 
     return NextResponse.json({
       success: true,
-      message: `Job ${jobOrder.job_number} rejected`,
+      message: `Sent back to ${submitterName || 'the submitter'}. They can reopen their form and fix it.`,
       data: updatedJob,
     });
   } catch (error: any) {
