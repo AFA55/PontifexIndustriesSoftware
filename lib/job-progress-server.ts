@@ -54,16 +54,73 @@ const EMPTY: LoadedJobProgress = {
  * tenant-unique, and by tenant_id where the row carries one (older rows predate
  * that column).
  */
+
+/**
+ * The whole ticket family for a job: the root plus every duplicate of it.
+ *
+ * A duplicate points at its root via parent_job_id (the duplicate route already
+ * re-parents copies-of-copies to the root, so the tree is only ever one deep).
+ * Given ANY member, this returns the root and every sibling — so asking a child
+ * for progress gives the same answer as asking the parent.
+ */
+async function resolveJobFamily(
+  jobId: string,
+  tenantId: string | null | undefined
+): Promise<{ rootId: string; allIds: string[] }> {
+  try {
+    let selfQuery = supabaseAdmin
+      .from('job_orders')
+      .select('id, parent_job_id')
+      .eq('id', jobId);
+    if (tenantId) selfQuery = selfQuery.eq('tenant_id', tenantId);
+    const { data: self } = await selfQuery.maybeSingle();
+
+    const rootId = (self?.parent_job_id as string | null) || jobId;
+
+    let childQuery = supabaseAdmin
+      .from('job_orders')
+      .select('id')
+      .eq('parent_job_id', rootId);
+    if (tenantId) childQuery = childQuery.eq('tenant_id', tenantId);
+    const { data: children } = await childQuery;
+
+    const allIds = Array.from(
+      new Set([rootId, jobId, ...(children ?? []).map((c) => c.id as string)])
+    );
+    return { rootId, allIds };
+  } catch {
+    // A family lookup must never break a progress read — fall back to this job.
+    return { rootId: jobId, allIds: [jobId] };
+  }
+}
+
 export async function loadJobProgress(
   jobId: string,
   tenantId: string | null | undefined
 ): Promise<LoadedJobProgress> {
   if (!jobId) return EMPTY;
 
+  // ── One job location = one scope, however many operators are on it ────────
+  //
+  // Duplicating a ticket is how a second crew gets sent to the SAME job at the
+  // SAME address. Each of them gets their own ticket to record what THEY did —
+  // but the scope of work is the customer's, not the operator's, and there is
+  // only ever one of it.
+  //
+  // Duplicates are already linked by parent_job_id, but they are created with
+  // ZERO scope items of their own. So Aiden's 2 work items on the Logistics
+  // Drive copy had nothing to count against, and Zack's parent ticket only ever
+  // showed Zack's footage. That is the "not in sync with total scope" the
+  // founder hit (Aug 2026).
+  //
+  // Progress is therefore computed for the whole FAMILY: scope comes from the
+  // root ticket, and the work counted against it is everyone's.
+  const family = await resolveJobFamily(jobId, tenantId);
+
   let scopeQuery = supabaseAdmin
     .from('job_scope_items')
     .select('id, work_type, description, unit, target_quantity, sort_order')
-    .eq('job_order_id', jobId)
+    .eq('job_order_id', family.rootId)
     .order('sort_order', { ascending: true });
   if (tenantId) scopeQuery = scopeQuery.eq('tenant_id', tenantId);
 
@@ -75,7 +132,7 @@ export async function loadJobProgress(
     .select(
       'id, work_type, quantity, linear_feet_cut, core_quantity, cut_depth_inches, core_size, notes, operator_id, day_number, daily_log_id, created_at'
     )
-    .eq('job_order_id', jobId);
+    .in('job_order_id', family.allIds);
   if (tenantId) workQuery = workQuery.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
 
   const [{ data: scopeRows }, { data: workRows }] = await Promise.all([
