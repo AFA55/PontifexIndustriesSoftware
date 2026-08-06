@@ -1,5 +1,53 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
+**Last updated:** Aug 6, 2026 (Opus 5) | **Branch:** `main` | **Prod:** ✅ LIVE — everything pushed through `45850db8`. Working tree clean.
+
+> ## 📌 Aug 5–6 (Opus 5) — bug-hunting on a live system. 12 pushes, all verified against production data.
+>
+> **THE THEME:** almost every bug was *software reporting success without checking*. Four audit
+> writes had been silently rejected by a CHECK constraint for weeks. Customer signing links had
+> been dead for EVERY token since launch (a PostgREST embed with no FK). Rejecting a PM ticket
+> answered "Job order not found" for the same reason. Progress read a table nothing ever wrote.
+> None of it errored anywhere. If a write matters, **await it and check it**.
+>
+> ### Shipped and verified live
+> - **Job Scope & Progress** off 0% — progress now DERIVED from `work_items` via `lib/job-progress.ts`
+>   (a vocabulary bridge: office says "Wall/Track Sawing", operators say "WALL SAW").
+> - **Timecard PDF times** — rendered in the SERVER's zone; 7:07 AM printed as 11:07 AM on Vercel.
+> - **Liability waiver** flow end-to-end + the SC waiver text (`lib/legal/utility-waiver.ts`,
+>   researched against § 32-2-10, Title 58 Ch. 36. ⚠️ STILL NEEDS ATTORNEY REVIEW).
+> - **Shop location + ETA engine** (`lib/eta.ts`) — Patriot's field-verified pin is now tenant data.
+> - **Admin job pages crashed** the moment progress data became real (my own regression).
+> - **David's supervisor photos** — private bucket served via `/object/public/` URLs → 403, invisible.
+> - **Rejecting a PM ticket** — now works, notifies, and reopens THEIR form with everything intact.
+> - **Work-item double-counting** — replace keyed on unstable `day_number`; now on `daily_log_id`.
+> - **Input sweep** — invoice rate couldn't take `0.75`; Job Scope Save was dead with no reason.
+> - **`equipment_selections` corruption** — my normalizer treated a JSONB object as a list. Caught
+>   before any row was saved through the edit form. **Never add it to `JOB_LIST_COLUMNS`.**
+>
+> ### Founder decisions recorded
+> - Duplicates = **linked children**; scope + progress roll up to the parent, only hours/work are per-person.
+> - Office force-complete: operator goes **read-only AFTER he submits his current day**. Admin,
+>   ops manager AND supervisor may do it. Reason mandatory.
+> - Ratings stay **three separate tracks** — peer, customer, supervisor. Never blended.
+> - Auto-clockout moved **18:00 → 19:00** (was clipping real 10-hour days).
+> - On duplicate work rows: **"what's real is what the operator inputs"** — do not delete their entries.
+>
+> ### ⚠️ Open, and the founder knows
+> - **Force-complete has NO UI.** API + `lib/office-completion.ts` are built and tested; no button,
+>   no read-only banner. It does not exist for him yet.
+> - **Continuation ("new scope") jobs** also set `parent_job_id`, so the family rollup shows them the
+>   parent's scope and inflates the parent's %.
+> - **Portal ETA never appears** — suppressed once the crew first arrives, and nothing resets that
+>   on a new day, i.e. exactly the day-2-onward case it was built for.
+> - **Customer creation "not authenticated"** — DIAGNOSED not fixed: `getSession()` returns null on an
+>   expired token and the code treats stale as logged-out. Same pattern in 4 other files.
+> - **Existing duplicate work rows** left in place per the founder's rule. Watch JOB-2026-124747
+>   (Dante SLAB SAW 4× 106) before invoicing.
+> - **Sentry captures nothing** — no DSN set in Vercel. Founder action.
+> - **38 profiles still have no `hourly_rate`** — blocks labor cost everywhere.
+
+
 **Last updated:** Aug 3, 2026 (Fable 5) | **Branch:** `main` | **Prod:** ✅ LIVE — batches 1–3 pushed; **2 commits UNPUSHED, awaiting the founder's go** (`0e5db5c5`, `40d77aa4`).
 
 > ## 📌 Aug 3 session (Fable 5) — duplicate, helper tickets, takeoff rotation. UNPUSHED.
