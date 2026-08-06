@@ -3643,8 +3643,12 @@ export default function ScheduleFormPage() {
                               <button
                                 type="button"
                                 onClick={() => {
+                                  // 'yes' = selected with NO quantity yet, so the
+                                  // box opens EMPTY and they type the real
+                                  // footage. It used to pre-fill '1', which the
+                                  // office then had to delete — and couldn't.
                                   if (isActive) { setEquipVal(code, item.id, ''); }
-                                  else { setEquipVal(code, item.id, '1'); }
+                                  else { setEquipVal(code, item.id, 'yes'); }
                                 }}
                                 className={`text-sm font-semibold transition-colors ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500 dark:text-white/50 hover:text-slate-700 dark:hover:text-white/80'}`}
                               >
@@ -3657,7 +3661,16 @@ export default function ScheduleFormPage() {
                                     min="1"
                                     value={val === 'yes' ? '' : val}
                                     placeholder="Qty"
-                                    onChange={e => setEquipVal(code, item.id, e.target.value || '1')}
+                                    /* An empty box must STAY empty. This was
+                                       `e.target.value || '1'`, so deleting the
+                                       digit instantly wrote 1 back and the
+                                       field could never be cleared (founder,
+                                       Aug 2026 — "qty of 48, cord won't let me
+                                       delete 1"). Clearing falls back to 'yes',
+                                       which keeps the item SELECTED with no
+                                       quantity rather than silently
+                                       de-selecting it. */
+                                    onChange={e => setEquipVal(code, item.id, e.target.value === '' ? 'yes' : e.target.value)}
                                     className="w-16 px-2 py-1.5 bg-white dark:bg-white/5 border border-blue-300 dark:border-blue-400/40 rounded-lg text-sm font-bold text-slate-800 dark:text-white text-center focus:ring-1 focus:ring-blue-400 focus:border-blue-400"
                                   />
                                   {item.qtyUnit && <span className="text-xs font-bold text-slate-400">{item.qtyUnit}</span>}
