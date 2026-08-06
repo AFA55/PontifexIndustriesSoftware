@@ -135,18 +135,23 @@ export async function POST(request: NextRequest, context: RouteContext) {
       );
     }
 
-    // Audit — a reset is a real event and the office should be able to see it.
-    Promise.resolve(
-      supabaseAdmin.from('job_orders_history').insert({
-        job_order_id: jobId,
-        job_number: job.job_number,
-        changed_by: auth.userId,
-        changed_by_name: auth.userEmail,
-        changed_by_role: auth.role,
-        change_type: 'day_ticket_reset',
-        changes: { date, work_items_removed: itemsDeleted ?? null },
-      })
-    ).catch(() => {});
+    // Audit — a reset wipes a day of somebody's recorded work, so the office
+    // must be able to see that it happened. AWAITED and checked: this insert
+    // was fire-and-forget and had been silently REJECTED since it shipped (the
+    // change_type CHECK constraint didn't allow 'day_ticket_reset'), so every
+    // reset went unrecorded and nobody could have known.
+    const { error: auditError } = await supabaseAdmin.from('job_orders_history').insert({
+      job_order_id: jobId,
+      job_number: job.job_number,
+      changed_by: auth.userId,
+      changed_by_name: auth.userEmail,
+      changed_by_role: auth.role,
+      change_type: 'day_ticket_reset',
+      changes: { date, work_items_removed: itemsDeleted ?? null },
+    });
+    if (auditError) {
+      console.error('[reset-day] AUDIT WRITE FAILED', { jobId, date, auditError });
+    }
 
     return NextResponse.json({
       success: true,
