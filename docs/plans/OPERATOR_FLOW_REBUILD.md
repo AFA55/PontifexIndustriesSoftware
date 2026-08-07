@@ -5,9 +5,12 @@ worked in small batches. **Two or three items at a time, then an agent reviews
 behind it, then continue** — his instruction, and the right one given how many
 regressions this codebase has produced when several things move at once.
 
-The demo ticket for watching all three points of view is **DEMO-2026-000001**
-(`1b9b5010-d553-49d8-9210-3c3809f57daa`) — 2 days, wall sawing + core drilling +
-slab sawing, Demo Operator as lead, Demo Helper as team member.
+The demo ticket for watching all three points of view is **DEMO-2026-000002**
+(`b50c0f3a-b96c-457b-9e76-7129ff7d321b`) — 2 days, wall sawing + core drilling +
+slab sawing, Demo Operator as lead, Demo Helper as team member, sitting at the
+very start with In Route untapped.
+Logins: `zztest.operator@pontifexqa.com` / `zztest.helper@pontifexqa.com`,
+password `DemoTest2026!`, company code `PATRIOT`.
 
 ---
 
@@ -116,7 +119,7 @@ arrival time, scope) at dispatch time and compare against it.
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
-- **Nothing ships without the founder seeing it** on DEMO-2026-000001.
+- **Nothing ships without the founder seeing it** on DEMO-2026-000002.
 - **Never break what operators already recorded.** Add fields, derive old ones;
   do not rename or migrate stored JSON. (The `equipment_selections` near-miss on
   Aug 6 is why.)
