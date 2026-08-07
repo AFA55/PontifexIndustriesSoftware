@@ -281,6 +281,42 @@ grouping work (batch 5 / task #56)** rather than becoming another top-level tab.
 
 ---
 
+## BATCH 11 — after they sign (added Aug 7)
+
+The founder tested a live waiver send end to end. **The send works.** The tail
+end doesn't exist yet.
+
+**11a. SMS wording — ✅ DONE Aug 7.** It used to open "Our crew is heading to
+{address}…", duplicating the en-route notification the contact already receives
+when the operator taps In Route, and burying the one thing the message is for.
+Now: *"{Company}: before we start cutting we need the utility & liability waiver
+signed for {site}. Sign here: {link}"*.
+
+**11b. On signature → PDF, stored, attached to the job.** Render the signed
+waiver exactly as they saw it, with signature, name, date and job, and attach it
+to that job so the office can pull it up later. Private bucket + signed URLs —
+see the maintenance-photos lesson, where a private bucket served through
+`/object/public/` 403s silently and the photos looked lost. Surface it on the
+job ticket and in the documents area (batch 5 / task #55).
+*Reuse `lib/generate-completion-pdf.ts` and the `completion-pdfs` machinery
+rather than inventing a second PDF path, and reuse tenant branding.*
+
+**11c. Offer the copy, don't demand the address.** Keep the thank-you, then ask
+whether they'd like it emailed: a field for their email, or "No thanks". Never
+block on an email address.
+
+**11d. Return them to their dashboard**, not a dead end — the customer portal,
+where they can view the project and its details, **Add work / Add notes** (ties
+into the queued change-order flow) and **Leave operator review** (feeds the
+CUSTOMER rating track, batch 9b).
+
+**11e. A contact on several live jobs** must be able to move between the jobs
+currently running for them rather than being stuck on the one they just signed.
+Portal tokens are per-customer with an optional job pin — check how a contact
+with multiple live jobs resolves today before building.
+
+---
+
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.

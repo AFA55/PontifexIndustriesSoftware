@@ -243,6 +243,11 @@ export async function sendWaiver(args: SendWaiverArgs): Promise<WaiverDispatchRe
     const url = `${resolveAppOrigin()}/sign/${token}`;
     const delivered: { email?: string; sms?: string } = {};
 
+    // Who the message is from, in plain text — the SMS has no branding to lean
+    // on, so the company name has to be in the words or it reads like spam.
+    const branding = await getTenantEmailBranding(job.tenant_id);
+    const company = branding.companyName || 'Your contractor';
+
     // ── Deliver ───────────────────────────────────────────────────────────
     const jobLabel = job.job_number ? `job ${job.job_number}` : 'your job';
     const site = firstNonEmpty(job.address, job.location);
@@ -250,7 +255,7 @@ export async function sendWaiver(args: SendWaiverArgs): Promise<WaiverDispatchRe
     if (email) {
       try {
         const b = await getTenantEmailBranding(job.tenant_id);
-        const company = escapeHtml(b.companyName);
+        const companyHtml = escapeHtml(b.companyName);
         const html = `
 <!DOCTYPE html><html><body style="margin:0;padding:0;background:#f1f5f9;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 0;">
@@ -279,7 +284,7 @@ ${emailHeader(b, 'Signature needed before work begins')}
   </p>
 </td></tr>
 <tr><td style="padding:16px 40px 32px;border-top:1px solid #e2e8f0;">
-  <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;">Sent by ${company}.</p>
+  <p style="margin:12px 0 0;font-size:12px;color:#94a3b8;">Sent by ${companyHtml}.</p>
 </td></tr>
 </table></td></tr></table></body></html>`;
 
@@ -298,9 +303,14 @@ ${emailHeader(b, 'Signature needed before work begins')}
       try {
         const res = await sendSMSAny({
           to: phone,
+          // NO "our crew is heading to ..." — the site contact already gets an
+          // en-route notification the moment the operator taps In Route.
+          // Repeating it here made the waiver text read like a duplicate of a
+          // message they'd just received, burying the one thing this SMS is
+          // actually for (founder, Aug 2026, after testing a live send).
           message:
-            `Our crew is heading to ${site || jobLabel}. ` +
-            `Before we start cutting we need the utility & liability waiver signed: ${url}`,
+            `${company}: before we start cutting we need the utility & liability ` +
+            `waiver signed${site ? ` for ${site}` : ''}. Sign here: ${url}`,
         });
         if (res.success) delivered.sms = phone;
       } catch (e) {
