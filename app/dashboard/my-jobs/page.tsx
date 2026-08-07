@@ -19,10 +19,9 @@ interface PendingRating {
   job: { id: string; job_number: string; scheduled_date: string; customer_name: string };
   form_id: string;
   form_title: string;
-}
-
-interface RatingForm {
-  id: string;
+  /** Comes back WITH the prompt. Fetching these separately from the admin
+   *  rating-forms route 403'd for every operator and silently disabled the
+   *  Rate button — see the comment in app/api/ratings/pending/route.ts. */
   questions: any[];
 }
 
@@ -74,7 +73,6 @@ export default function MyJobsPage() {
   // Peer ratings
   const [pendingRatings, setPendingRatings] = useState<PendingRating[]>([]);
   const [ratingsOpen, setRatingsOpen] = useState(false);
-  const [ratingForms, setRatingForms] = useState<Record<string, RatingForm>>({});
   const [ratingModalItem, setRatingModalItem] = useState<PendingRating | null>(null);
   const [dismissedRatings, setDismissedRatings] = useState<Set<string>>(new Set());
 
@@ -339,27 +337,9 @@ export default function MyJobsPage() {
       if (!res.ok) return;
       const json = await res.json();
       const pending: PendingRating[] = json.data ?? [];
-      setPendingRatings(pending);
-
-      // Pre-fetch form questions for each unique form_id
-      const formIds = [...new Set(pending.map((p) => p.form_id))];
-      const formData: Record<string, RatingForm> = {};
-      await Promise.all(
-        formIds.map(async (fid) => {
-          try {
-            const fRes = await fetch(`/api/admin/rating-forms/${fid}`, {
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-            if (fRes.ok) {
-              const fJson = await fRes.json();
-              if (fJson.data) formData[fid] = fJson.data;
-            }
-          } catch {
-            // silent — form may not be accessible
-          }
-        })
-      );
-      setRatingForms(formData);
+      // A prompt with no questions is a button that does nothing. Drop it
+      // rather than showing the crew a Rate button that opens an empty form.
+      setPendingRatings(pending.filter((p) => Array.isArray(p.questions) && p.questions.length > 0));
     } catch {
       // silent — ratings are optional feature
     }
@@ -902,10 +882,10 @@ export default function MyJobsPage() {
       </div>
 
       {/* Submit Rating Modal */}
-      {ratingModalItem && ratingForms[ratingModalItem.form_id] && (
+      {ratingModalItem && (
         <SubmitRatingModal
           pending={ratingModalItem}
-          questions={ratingForms[ratingModalItem.form_id].questions || []}
+          questions={ratingModalItem.questions}
           onClose={() => setRatingModalItem(null)}
           onSubmitted={(formId, rateeId, jobId) => {
             // Hide it immediately, then re-ask the server. The local set only

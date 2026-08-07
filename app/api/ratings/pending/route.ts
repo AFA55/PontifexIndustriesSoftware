@@ -32,9 +32,19 @@ export async function GET(request: NextRequest) {
     const userRole = auth.role;
 
     // 1. Find active rating forms where caller's role can rate others
+    // `questions` ships WITH the pending row on purpose.
+    //
+    // WHY (Aug 7): the client used to fetch them from
+    // GET /api/admin/rating-forms/[id], which is requireAdmin. Every eligible
+    // rater is an operator, apprentice or supervisor — none of whom pass that
+    // check. The 403 was swallowed client-side, the questions map stayed empty,
+    // and the "Rate" button rendered nothing at all. `rating_submissions` had
+    // ZERO rows in production as a result: no rating has ever been submitted.
+    // The caller is already authorised to rate through this form, so the
+    // questions come back with the prompt rather than via an admin route.
     const { data: forms, error: formsError } = await supabaseAdmin
       .from('rating_forms')
-      .select('id, title, rater_roles, target_roles')
+      .select('id, title, rater_roles, target_roles, questions')
       .eq('tenant_id', tenantId)
       .eq('is_active', true);
 
@@ -162,6 +172,7 @@ export async function GET(request: NextRequest) {
           },
           form_id: form.id,
           form_title: form.title,
+          questions: Array.isArray(form.questions) ? form.questions : [],
         });
         break; // one prompt per person per job — never one per duplicate form
       }

@@ -33,6 +33,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
 import { getTenantShopLocationOrDefault } from '@/lib/geolocation-server';
+import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
 import {
   ESCALATION_AFTER_MINUTES,
   driveMinutesForJob,
@@ -150,11 +151,11 @@ export async function GET(request: NextRequest) {
       const userIds = Array.from(new Set(openCards.map((t) => t.user_id)));
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('id, phone, phone_number, role, full_name')
+        .select(`id, ${PROFILE_PHONE_SELECT}, role, full_name`)
         .in('id', userIds);
       type ProfileRow = { id: string; phone: string | null; phone_number: string | null; role: string | null; full_name: string | null };
       const phoneMap = new Map<string, string | null>(
-        (profiles || []).map((p: ProfileRow) => [p.id, p.phone || p.phone_number || null])
+        (profiles || []).map((p: ProfileRow) => [p.id, readProfilePhone(p)])
       );
       const roleMap = new Map<string, string | null>(
         (profiles || []).map((p: ProfileRow) => [p.id, p.role])

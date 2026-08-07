@@ -14,6 +14,7 @@
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { todayInTz } from '@/lib/reminder-timing';
+import { startOfDayUTC } from '@/lib/dates';
 
 export const DEFAULT_TENANT_TZ = 'America/New_York';
 
@@ -30,4 +31,16 @@ export async function getTenantTimezone(tenantId: string | null | undefined): Pr
 /** Today's YYYY-MM-DD in the tenant's timezone. */
 export async function tenantToday(tenantId: string | null | undefined): Promise<string> {
   return todayInTz(await getTenantTimezone(tenantId));
+}
+
+/**
+ * The UTC instant of midnight at the START of the tenant's today.
+ *
+ * For `timestamptz` comparisons like "anything written since the day began".
+ * `new Date().setUTCHours(0,0,0,0)` is the trap this exists to avoid — it puts
+ * the boundary at 8pm ET, so evening work lands in tomorrow's bucket.
+ */
+export async function tenantDayStartUTC(tenantId: string | null | undefined): Promise<string> {
+  const tz = await getTenantTimezone(tenantId);
+  return startOfDayUTC(todayInTz(tz), tz);
 }

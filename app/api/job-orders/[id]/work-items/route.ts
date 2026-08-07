@@ -13,6 +13,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { buildWorkPerformedSummary, difficultyToRating } from '@/lib/work-items-format';
+import { tenantDayStartUTC } from '@/lib/tenant-timezone';
 
 export async function POST(
   request: NextRequest,
@@ -258,22 +259,105 @@ export async function POST(
 
         if (!admins || admins.length === 0) return;
 
-        const notifications = admins.map((a: { id: string }) => ({
-          user_id: a.id,
-          type: 'work_performed',
-          title: 'Work performed update',
-          message,
-          job_id: jobId,
-          tenant_id: tenantId,
-          sender_id: auth.userId,
-          related_entity_type: 'job_order',
-          related_entity_id: jobId,
-          action_url: `/dashboard/admin/jobs/${jobId}`,
-          read: false,
-          is_read: false,
-        }));
+        // ONE live notification per (admin, job, operator, day) — not one per save.
+        //
+        // THE BUG (founder, Aug 7 — "notifications won't stay dismissed"):
+        // this inserted a fresh row on EVERY save of the work-performed form,
+        // and operators save repeatedly through the day. His bell showed 46
+        // unread personal items, of which 30 were `work_performed` and most
+        // were literal duplicates — "Conrade Richardson logged 8 CORE DRILL
+        // (+1 more) on JOB-2026-631148" five times, two of them 27 seconds
+        // apart. Mark-all-read was working correctly; the count simply refilled
+        // faster than he could clear it.
+        //
+        // A later save on the same job carries NEW information, so it still
+        // surfaces — by refreshing the existing row and marking it unread
+        // again, rather than stacking another one beside it.
+        // "Today" is the TENANT's day, not UTC's.
+        //
+        // setUTCHours(0,0,0,0) would put the boundary at 8pm ET. An operator
+        // saving at 2pm and again at 8:30pm would land either side of it and
+        // get two rows anyway — reintroducing the duplicate at exactly the hour
+        // crews wrap up. Same UTC-rollover trap that made the dashboard read
+        // "Jobs Today: 0" every evening.
+        const dayStartISO = await tenantDayStartUTC(tenantId);
+        const nowISO = new Date().toISOString();
+        const adminIds = (admins as { id: string }[]).map((a) => a.id);
 
-        await supabaseAdmin.from('notifications').insert(notifications);
+        // Three round-trips flat, not two per admin. This runs AFTER the
+        // response has been returned, where Vercel may freeze the instance at
+        // any moment — a per-admin loop could notify some admins and silently
+        // skip the rest.
+        const { data: existingRows } = await supabaseAdmin
+          .from('notifications')
+          .select('id, user_id')
+          .in('user_id', adminIds)
+          .eq('type', 'work_performed')
+          .eq('job_id', jobId)
+          .eq('sender_id', auth.userId)
+          .gte('created_at', dayStartISO)
+          .order('created_at', { ascending: false });
+
+        // Keep the newest row per recipient; anything else matching the exact
+        // same (recipient, job, operator, day) is a duplicate of the same event
+        // and gets deleted. This also DRAINS the backlog the old insert-per-save
+        // behaviour left behind — the founder had 30 work_performed items, most
+        // of them repeats, and they collapse as each job is next saved rather
+        // than needing a one-off purge of his bell.
+        const refreshIds: string[] = [];
+        const staleIds: string[] = [];
+        const alreadyNotified = new Set<string>();
+        for (const row of (existingRows ?? []) as { id: string; user_id: string }[]) {
+          if (alreadyNotified.has(row.user_id)) staleIds.push(row.id);
+          else {
+            alreadyNotified.add(row.user_id);
+            refreshIds.push(row.id);
+          }
+        }
+
+        if (staleIds.length > 0) {
+          const { error: delErr } = await supabaseAdmin
+            .from('notifications')
+            .delete()
+            .in('id', staleIds);
+          if (delErr) console.error('Error collapsing duplicate work_performed notifications:', delErr);
+        }
+
+        if (refreshIds.length > 0) {
+          const { error: updErr } = await supabaseAdmin
+            .from('notifications')
+            .update({
+              message,
+              created_at: nowISO,
+              updated_at: nowISO,
+              read: false,
+              is_read: false,
+            })
+            .in('id', refreshIds);
+          if (updErr) console.error('Error refreshing work_performed notifications:', updErr);
+        }
+
+        const newRows = adminIds
+          .filter((adminId) => !alreadyNotified.has(adminId))
+          .map((adminId) => ({
+            user_id: adminId,
+            type: 'work_performed',
+            title: 'Work performed update',
+            message,
+            job_id: jobId,
+            tenant_id: tenantId,
+            sender_id: auth.userId,
+            related_entity_type: 'job_order',
+            related_entity_id: jobId,
+            action_url: `/dashboard/admin/jobs/${jobId}`,
+            read: false,
+            is_read: false,
+          }));
+
+        if (newRows.length > 0) {
+          const { error: insErr } = await supabaseAdmin.from('notifications').insert(newRows);
+          if (insErr) console.error('Error inserting work_performed notifications:', insErr);
+        }
       } catch {
         // Non-critical — never block the operator's submit response.
       }

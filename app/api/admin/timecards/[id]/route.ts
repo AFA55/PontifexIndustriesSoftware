@@ -16,6 +16,7 @@ import { boundedJobHours } from '@/lib/labor-cost';
 import { logAuditEvent } from '@/lib/audit';
 import { sendNotification } from '@/lib/send-reminder';
 import { formatDay } from '@/lib/dates';
+import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
 
 export async function GET(
   request: NextRequest,
@@ -51,7 +52,7 @@ export async function GET(
     // Get user profile
     const { data: profile } = await supabaseAdmin
       .from('profiles')
-      .select('full_name, email, role, phone')
+      .select(`full_name, email, role, ${PROFILE_PHONE_SELECT}`)
       .eq('id', timecard.user_id)
       .single();
 
@@ -98,7 +99,8 @@ export async function GET(
           fullName: profile?.full_name || null,
           email: profile?.email || null,
           role: profile?.role || null,
-          phone: profile?.phone || null,
+          // profiles has two phone columns and this read the empty one.
+          phone: readProfilePhone(profile),
         },
         approverName,
         editorName,

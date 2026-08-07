@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
 import { todayInTz, workReminderPhase, parseHHMM, nowMinutesInTz, middayReminderDue } from '@/lib/reminder-timing';
+import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
 
 const ACTIVE_STATUSES = ['scheduled', 'assigned', 'dispatched', 'in_route', 'in_progress', 'on_site'];
 
@@ -85,10 +86,10 @@ export async function GET(request: NextRequest) {
       // Phone numbers for SMS fallback
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select('id, phone, phone_number')
+        .select(`id, ${PROFILE_PHONE_SELECT}`)
         .in('id', Array.from(jobByOp.keys()));
       const phoneMap = new Map<string, string | null>(
-        (profiles || []).map((p: { id: string; phone: string | null; phone_number: string | null }) => [p.id, p.phone || p.phone_number || null])
+        (profiles || []).map((p: { id: string; phone: string | null; phone_number: string | null }) => [p.id, readProfilePhone(p)])
       );
 
       // ── Wall-clock MIDDAY phase (admin-configurable, default 11:55) ────────

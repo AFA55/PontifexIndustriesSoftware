@@ -184,3 +184,18 @@ export function endOfDayUTC(ymd: string, tz: string): string {
   const asUtc = new Date(guess.toLocaleString('en-US', { timeZone: 'UTC' }));
   return new Date(guess.getTime() + (asUtc.getTime() - asLocal.getTime())).toISOString();
 }
+
+/**
+ * The UTC instant for 00:00:00 LOCAL on `ymd` in IANA zone `tz`.
+ *
+ * The bookend to `endOfDayUTC`. Use it whenever "since the start of today" is
+ * compared against a `timestamptz` — `setUTCHours(0,0,0,0)` puts that boundary
+ * at 8pm ET, so an evening write falls into the next "day" and any per-day
+ * grouping built on it breaks exactly when crews are wrapping up.
+ */
+export function startOfDayUTC(ymd: string, tz: string): string {
+  const guess = new Date(`${ymd}T00:00:00Z`);
+  const asLocal = new Date(guess.toLocaleString('en-US', { timeZone: tz }));
+  const asUtc = new Date(guess.toLocaleString('en-US', { timeZone: 'UTC' }));
+  return new Date(guess.getTime() + (asUtc.getTime() - asLocal.getTime())).toISOString();
+}

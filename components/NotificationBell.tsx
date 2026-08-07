@@ -154,7 +154,7 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      await fetch('/api/notifications/mark-read', {
+      const res = await fetch('/api/notifications/mark-read', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -163,12 +163,26 @@ export default function NotificationBell({ className = '', variant = 'dark' }: N
         body: JSON.stringify({ mark_all: true }),
       });
 
+      // Only claim zero if the server actually agreed. This used to set the
+      // badge to 0 regardless, so a failed request looked like success until
+      // the two-minute poll silently put the count back — indistinguishable
+      // from "mark all read doesn't stick".
+      if (!res.ok) {
+        await fetchNotifications();
+        return;
+      }
+
       setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
       setUnreadCount(0);
+      // Re-read from the server so the badge reflects the database, not a guess.
+      await fetchNotifications();
     } catch {
       // silently fail
+    } finally {
+      // finally, not a trailing statement: the early returns above skipped it
+      // and left the spinner turning forever.
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // Row tap → the INBOX with this item focused/expanded (full message —

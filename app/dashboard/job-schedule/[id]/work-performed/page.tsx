@@ -1641,10 +1641,13 @@ export default function WorkPerformed() {
     // Show dropdown to select another work item. The input only exists once the
     // detail panel above has unmounted, so focus on the next paint — same
     // reason the panel's own scrollIntoView uses a timeout rather than rAF.
+    // A leftover query would silently pre-filter the reopened list.
+    setSearchQuery('');
     setShowDropdown(true);
     setTimeout(() => {
       searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      searchInputRef.current?.focus();
+      // preventScroll: focus otherwise jump-scrolls and cancels the smooth scroll above.
+      searchInputRef.current?.focus({ preventScroll: true });
     }, 80);
   };
 
