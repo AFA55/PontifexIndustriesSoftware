@@ -1136,8 +1136,19 @@ export default function JobDetailPage() {
             )}
             {/* Everyone ELSE on this ticket. Multi-person jobs are staffed
                 through job_crew, so without this the 3rd person on site is
-                invisible to the crew they're standing next to. */}
-            {(job.crew || []).map((member) => (
+                invisible to the crew they're standing next to.
+
+                FILTERED, and it must stay filtered: the lead and the helper are
+                normally in BOTH the assigned_to/helper_assigned_to slots AND
+                job_crew. Rendering this list raw printed each of them twice —
+                a 2-person crew showed as 4 people on the ticket. */}
+            {(job.crew || [])
+              .filter(
+                (member) =>
+                  member.user_id !== job.assigned_to &&
+                  member.user_id !== job.helper_assigned_to
+              )
+              .map((member) => (
               <div
                 key={member.user_id}
                 className={`flex items-center gap-3 p-3 rounded-xl border ${
