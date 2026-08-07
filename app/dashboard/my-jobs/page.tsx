@@ -908,8 +908,12 @@ export default function MyJobsPage() {
           questions={ratingForms[ratingModalItem.form_id].questions || []}
           onClose={() => setRatingModalItem(null)}
           onSubmitted={(formId, rateeId, jobId) => {
+            // Hide it immediately, then re-ask the server. The local set only
+            // survives this page view; the refetch is what makes "already rated"
+            // still true tomorrow.
             setDismissedRatings((prev) => new Set([...prev, `${formId}:${rateeId}:${jobId}`]));
             setRatingModalItem(null);
+            void fetchPendingRatings();
           }}
         />
       )}

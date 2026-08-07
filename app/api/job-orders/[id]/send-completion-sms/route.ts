@@ -3,13 +3,26 @@ export const dynamic = 'force-dynamic';
 /**
  * API Route: POST /api/job-orders/[id]/send-completion-sms
  * Send an SMS to the customer with a completion signature link.
- * Falls back to dev-log if no SMS provider is configured.
+ *
+ * Delegates to `sendSMSAny` (lib/sms.ts) rather than hand-rolling the provider
+ * calls. The hand-rolled copy that used to live here diverged in three ways
+ * that mattered:
+ *   1. It never metered the send, so completion texts were invisible in
+ *      `message_usage` — unbillable and unmeasurable.
+ *   2. It returned `{ success: true, method: 'dev_log' }` when NO provider was
+ *      configured, so a production misconfiguration told the operator the
+ *      customer had been texted when nobody had.
+ *   3. It duplicated the Telnyx→Twilio fallback, which now only lives in one
+ *      place.
+ *
+ * The send is timed and logged so a "the text arrived late" report can be
+ * pinned on us or on the carrier instead of guessed at.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { formatPhoneNumber } from '@/lib/sms';
+import { formatPhoneNumber, sendSMSAny } from '@/lib/sms';
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +34,7 @@ export async function POST(
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { phoneNumber, signUrl, jobNumber, customerName } = body;
+    const { phoneNumber, signUrl, jobNumber } = body;
 
     if (!phoneNumber || !signUrl) {
       return NextResponse.json(
@@ -33,93 +46,70 @@ export async function POST(
     const formattedPhone = formatPhoneNumber(phoneNumber);
     if (!formattedPhone) {
       return NextResponse.json(
-        { error: 'Invalid phone number format' },
+        { error: 'That phone number is not a valid US number.' },
         { status: 400 }
       );
     }
 
     const jobLabel = jobNumber || 'your job';
 
-    // Resolve tenant company name (fire-and-forget — default to generic if it fails)
+    // Resolve tenant + company name. tenant_id also drives usage metering, so
+    // it is read from the profile rather than assumed.
+    let tenantId: string | undefined;
     let companyName = 'Your contractor';
     try {
       const { data: profile } = await supabaseAdmin
         .from('profiles')
         .select('tenant_id')
         .eq('id', auth.userId)
-        .single();
+        .maybeSingle();
       if (profile?.tenant_id) {
+        tenantId = profile.tenant_id;
         const { data: branding } = await supabaseAdmin
           .from('tenant_branding')
           .select('company_name')
           .eq('tenant_id', profile.tenant_id)
-          .single();
+          .maybeSingle();
         if (branding?.company_name) companyName = branding.company_name;
       }
-    } catch (_) { /* use default */ }
+    } catch { /* use default */ }
 
     const message = `${companyName} has completed work on ${jobLabel}. Please review and sign here: ${signUrl}`;
 
-    // ── Try Telnyx ──────────────────────────────────────────────────────────
-    const telnyxApiKey = process.env.TELNYX_API_KEY;
-    const telnyxFrom = process.env.TELNYX_PHONE_NUMBER;
+    const startedAt = Date.now();
+    const result = await sendSMSAny({
+      to: formattedPhone,
+      message,
+      jobId: id,
+      tenantId,
+      source: 'completion_signature_sms',
+    });
+    const elapsedMs = Date.now() - startedAt;
 
-    if (telnyxApiKey && telnyxFrom) {
-      try {
-        const resp = await fetch('https://api.telnyx.com/v2/messages', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${telnyxApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ from: telnyxFrom, to: formattedPhone, text: message }),
-        });
-        if (resp.ok) {
-          return NextResponse.json({ success: true, method: 'telnyx' });
-        }
-        const errBody = await resp.text();
-        console.warn('[SMS] Telnyx error:', resp.status, errBody);
-      } catch (e) {
-        console.warn('[SMS] Telnyx fetch failed:', e);
-      }
+    if (!result.success) {
+      console.error(
+        `[SMS] completion link FAILED for job ${id} after ${elapsedMs}ms:`,
+        result.error
+      );
+      return NextResponse.json(
+        { error: 'The text could not be sent. Check the number and try again.' },
+        { status: 502 }
+      );
     }
 
-    // ── Try Twilio SDK (via lib/sms.ts) ─────────────────────────────────────
-    const twilioSid = process.env.TWILIO_ACCOUNT_SID;
-    const twilioToken = process.env.TWILIO_AUTH_TOKEN;
-    const twilioFrom = process.env.TWILIO_PHONE_NUMBER;
+    // Timing lives in the logs so "the text arrived 5 minutes late" can be
+    // attributed. A fast accepted-by-provider time with a slow arrival is a
+    // carrier queue, not our code.
+    console.log(
+      `[SMS] completion link accepted by ${result.provider} in ${elapsedMs}ms ` +
+      `(job ${id}, message ${result.messageId ?? 'n/a'})`
+    );
 
-    if (twilioSid && twilioToken && twilioFrom) {
-      try {
-        const encoded = Buffer.from(`${twilioSid}:${twilioToken}`).toString('base64');
-        const resp = await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Basic ${encoded}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              From: twilioFrom,
-              To: formattedPhone,
-              Body: message,
-            }).toString(),
-          }
-        );
-        if (resp.ok) {
-          return NextResponse.json({ success: true, method: 'twilio' });
-        }
-        const errBody = await resp.text();
-        console.warn('[SMS] Twilio error:', resp.status, errBody);
-      } catch (e) {
-        console.warn('[SMS] Twilio fetch failed:', e);
-      }
-    }
-
-    // ── Dev / no-provider fallback ───────────────────────────────────────────
-    console.log(`[DEV SMS] To: ${formattedPhone}\nJob: ${jobLabel}\nMessage: ${message}`);
-    return NextResponse.json({ success: true, method: 'dev_log', sign_url: signUrl });
+    return NextResponse.json({
+      success: true,
+      provider: result.provider,
+      accepted_in_ms: elapsedMs,
+    });
   } catch (error: any) {
     console.error('Error in send-completion-sms:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

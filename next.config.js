@@ -74,6 +74,17 @@ module.exports = withSentryConfig(nextConfig, {
   disableLogger: true,
   // Only attempt source-map upload when an auth token is present.
   sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
-  // Keep build output lean; tunnel disabled (no ad-blocker bypass needed yet).
-  tunnelRoute: undefined,
+  // ROUTE EVENTS THROUGH OUR OWN DOMAIN.
+  //
+  // Without this, the browser posts directly to ingest.sentry.io — which ad
+  // blockers and browser tracking protection block by default. Verified live on
+  // 7 Aug 2026: the DSN was set, the SDK was in the bundle, a real error was
+  // thrown, and NOTHING arrived. The request never left the browser.
+  //
+  // With a tunnel the SDK posts to /monitoring on our own origin and the server
+  // forwards it, so there is no third-party domain for a blocker to recognise.
+  // Operators are on personal phones with whatever blockers they have installed,
+  // so without this we would silently lose exactly the field errors we most
+  // need to see.
+  tunnelRoute: '/monitoring',
 })

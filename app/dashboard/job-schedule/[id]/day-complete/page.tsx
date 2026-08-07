@@ -114,6 +114,10 @@ export default function DayCompletePage() {
   const [remotePhone, setRemotePhone] = useState('');
   const [remoteSending, setRemoteSending] = useState(false);
   const [remoteSent, setRemoteSent] = useState(false);
+  /** Shown INSIDE the send-link panel. A toast alone was not enough — the
+   *  operator's eyes are on the button he just pressed, not the top of the
+   *  screen behind a dimmed overlay. */
+  const [remoteError, setRemoteError] = useState<string | null>(null);
   const [remoteSentPhone, setRemoteSentPhone] = useState('');
 
   // Signature canvas
@@ -651,19 +655,27 @@ export default function DayCompletePage() {
 
   // ─── REMOTE SIGNATURE — Send link & finish ────────────────────────────────
   const handleSendRemoteLink = async () => {
+    /** Every refusal has to be VISIBLE inside the panel and as a toast. This
+     *  button used to fail all three checks below in complete silence. */
+    const refuse = (message: string, type: 'error' | 'warning' = 'error') => {
+      setRemoteError(message);
+      showNotif(message, type);
+    };
+
     // Same completion requirements as the on-site path — no skipping work/photos.
     if (workPerformedItems.length === 0) {
-      setNotification({ message: 'Add what work was performed before finishing the job.', type: 'error' });
+      refuse('Add what work was performed before finishing the job.');
       return;
     }
     if (completionPhotos.length === 0 && !photosProhibited) {
-      setNotification({ message: 'Add at least one job photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+      refuse('Add at least one job photo — or mark “Photos prohibited on this site” to skip.');
       return;
     }
     if (!remotePhone.trim()) {
-      showNotif('Please enter a phone number', 'warning');
+      refuse('Enter the contact’s phone number.', 'warning');
       return;
     }
+    setRemoteError(null);
     // Persist the photos on this path too (it previously never saved them).
     if (completionPhotos.length > 0) {
       try {
@@ -680,7 +692,10 @@ export default function DayCompletePage() {
     setRemoteSending(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        refuse('Your session expired. Log in again, then resend the link.');
+        return;
+      }
 
       // 1. Create a signature request and get the sign URL
       const sigRes = await fetch(`/api/job-orders/${jobId}/request-signature`, {
@@ -697,17 +712,19 @@ export default function DayCompletePage() {
       });
 
       if (!sigRes.ok) {
-        const err = await sigRes.json();
-        showNotif(err.error || 'Failed to generate signature link', 'error');
-        setRemoteSending(false);
+        const err = await sigRes.json().catch(() => ({}));
+        refuse(err.error || 'Could not generate the signature link. Try again.');
         return;
       }
 
       const sigData = await sigRes.json();
       const signUrl: string = sigData.data?.sign_url;
 
-      // 2. Send SMS
-      await fetch(`/api/job-orders/${jobId}/send-completion-sms`, {
+      // 2. Send SMS.
+      //    The result is CHECKED. It used to be fired and ignored, so a failed
+      //    text still showed the operator "Link Sent!" and he walked off site
+      //    believing the customer had it.
+      const smsRes = await fetch(`/api/job-orders/${jobId}/send-completion-sms`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -720,6 +737,12 @@ export default function DayCompletePage() {
           customerName: job?.customer_name,
         }),
       });
+
+      if (!smsRes.ok) {
+        const smsErr = await smsRes.json().catch(() => ({}));
+        refuse(smsErr.error || 'The text could not be sent. Check the number and try again.');
+        return;
+      }
 
       // 3. In dev: open the link in new tab so it can be tested
       if (process.env.NODE_ENV === 'development') {
@@ -764,7 +787,7 @@ export default function DayCompletePage() {
       setRemoteSent(true);
     } catch (err) {
       console.error('Error sending remote link:', err);
-      showNotif('Failed to send. Please try again.', 'error');
+      refuse('Could not reach the server. Check your signal and try again.');
     } finally {
       setRemoteSending(false);
     }
@@ -1154,9 +1177,13 @@ export default function DayCompletePage() {
         </div>
       </div>
 
-      {/* Notification */}
+      {/* Notification.
+          z-[100], NOT z-50: every modal on this page is z-50 and sits LATER in
+          the DOM, so an equal z-index put the toast *behind* the modal overlay.
+          Tapping "Send Link & Complete Job" with a missing photo showed the
+          operator absolutely nothing. The toast has to outrank the modals. */}
       {notification && (
-        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-50 px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium ${
+        <div className={`fixed top-20 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 rounded-xl shadow-lg text-white text-sm font-medium max-w-[90vw] text-center ${
           notification.type === 'success' ? 'bg-emerald-500 dark:bg-emerald-600' :
           notification.type === 'error' ? 'bg-red-500 dark:bg-red-600' : 'bg-amber-500 dark:bg-amber-600'
         }`}>
@@ -1346,7 +1373,7 @@ export default function DayCompletePage() {
 
             {/* Option 3 — Send remote link */}
             <button
-              onClick={() => setShowRemotePanel(true)}
+              onClick={() => { setRemoteError(null); setShowRemotePanel(true); }}
               disabled={submitting || subsistenceUnanswered}
               className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-brand to-brand-accent text-left shadow-lg shadow-brand/30 ring-1 ring-brand/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-brand/40 disabled:opacity-60 disabled:cursor-not-allowed"
             >
@@ -1667,6 +1694,13 @@ export default function DayCompletePage() {
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
               We&apos;ll text the customer a link so they can review the work and sign remotely.
             </p>
+
+            {remoteError && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 dark:border-red-500/30 bg-red-50 dark:bg-red-500/10 px-3 py-2.5">
+                <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+                <p className="text-sm font-medium text-red-700 dark:text-red-300">{remoteError}</p>
+              </div>
+            )}
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">

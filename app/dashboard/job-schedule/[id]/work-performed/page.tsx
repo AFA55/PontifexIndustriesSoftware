@@ -307,6 +307,10 @@ export default function WorkPerformed() {
   const [showQuantityModal, setShowQuantityModal] = useState(false);
   /** The inline detail panel, so picking a type can scroll it into view. */
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
+  /** The search input + its autocomplete dropdown. Used to focus the field after
+   *  "Add Another", and to close the dropdown when the operator taps away. */
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
+  const searchBoxRef = useRef<HTMLDivElement | null>(null);
   const [showAddMoreDialog, setShowAddMoreDialog] = useState(false);
   const [currentItem, setCurrentItem] = useState<string>('');
   const [currentQuantity, setCurrentQuantity] = useState(1);
@@ -952,6 +956,37 @@ export default function WorkPerformed() {
     return () => clearTimeout(id);
   }, [showQuantityModal, currentItem]);
 
+  /**
+   * Let the operator dismiss the work-item autocomplete.
+   *
+   * The list opens on focus and used to have NO way out: tapping the page,
+   * pressing Escape and tapping the field again all left it open, covering the
+   * Popular Items grid underneath. The only escape was picking something or
+   * emptying the box. Tapping away is the gesture people actually try, so
+   * honour it — pointerdown so it fires for touch as well as mouse.
+   */
+  useEffect(() => {
+    if (!showDropdown) return;
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (searchBoxRef.current?.contains(e.target as Node)) return;
+      setShowDropdown(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setShowDropdown(false);
+        searchInputRef.current?.blur();
+      }
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showDropdown]);
+
   /** The hole still sitting in the input row, or null when it's incomplete.
    *  Shared by "Add This Hole" and the auto-flush in handleAddItem. */
   const buildPendingHole = (): CoreDrillingHole | null => {
@@ -1565,6 +1600,14 @@ export default function WorkPerformed() {
   const handleAddMore = () => {
     // Reset for adding another work item
     setShowAddMoreDialog(false);
+    // CLOSE THE DETAIL PANEL FIRST.
+    //
+    // The panel, the search box, the work-type picker and the bottom action bar
+    // are ALL gated on `showQuantityModal`. Leaving it true while clearing
+    // `currentItem` rendered an empty-titled panel with no body and hid
+    // everything else on the page — the "Add Another lands on a blank page"
+    // the founder hit on his walkthrough. The picker must come back.
+    setShowQuantityModal(false);
     setCurrentItem('');
     setCurrentQuantity(1);
     setCurrentNotes('');
@@ -1595,8 +1638,14 @@ export default function WorkPerformed() {
       plasticSetup: false,
       ...EMPTY_REBAR
     });
-    // Show dropdown to select another work item
+    // Show dropdown to select another work item. The input only exists once the
+    // detail panel above has unmounted, so focus on the next paint — same
+    // reason the panel's own scrollIntoView uses a timeout rather than rAF.
     setShowDropdown(true);
+    setTimeout(() => {
+      searchInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      searchInputRef.current?.focus();
+    }, 80);
   };
 
   const handleContinue = () => {
@@ -2123,18 +2172,34 @@ export default function WorkPerformed() {
                 <Zap className="w-4 h-4 text-brand" />
                 Search and Add Work Items
               </label>
-              <div className="relative">
+              <div className="relative" ref={searchBoxRef}>
                 <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-white/30" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => handleSearchChange(e.target.value)}
                   onFocus={() => setShowDropdown(true)}
                   placeholder="Type to search work items..."
-                  className="w-full pl-12 pr-4 py-4 text-lg rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand dark:focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] font-medium placeholder:text-gray-400 dark:placeholder-white/30"
+                  className="w-full pl-12 pr-12 py-4 text-lg rounded-xl border-2 border-gray-200 dark:border-white/10 focus:border-brand dark:focus:border-brand focus:outline-none transition-colors text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] font-medium placeholder:text-gray-400 dark:placeholder-white/30"
                 />
+
+                {/* A visible way out of the list. Tapping away and Escape work
+                    too, but a gloved thumb needs something to aim at. */}
+                {showDropdown && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowDropdown(false); searchInputRef.current?.blur(); }}
+                    aria-label="Close work item list"
+                    className="absolute right-1 top-1/2 -translate-y-1/2 w-11 h-11 flex items-center justify-center text-gray-400 dark:text-white/40 hover:text-gray-700 dark:hover:text-white rounded-xl"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
 
                 {/* Autocomplete Dropdown */}
                 {showDropdown && getFilteredItems().length > 0 && (

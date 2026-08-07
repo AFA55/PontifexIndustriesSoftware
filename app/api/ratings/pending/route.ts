@@ -113,13 +113,22 @@ export async function GET(request: NextRequest) {
       .eq('tenant_id', tenantId)
       .gte('submitted_at', thirtyDaysAgo.toISOString());
 
-    // Build a set of already-rated combos: "form_id:ratee_id:job_id"
+    // Already rated, keyed on WHO was rated on WHICH job — deliberately NOT on
+    // form_id.
+    //
+    // WHY (founder, Aug 7 — "rate your crew still shows after someone's already
+    // rated"): this tenant has TWO byte-identical active "Field Performance
+    // Review" forms, created three minutes apart in May by a double-submit.
+    // Keying on form_id meant rating someone through one form left the other
+    // form's prompt sitting there, so the job never looked done. A rater has
+    // rated a person on a job, or they haven't — which of several interchangeable
+    // forms carried the answer is not a distinction the crew should have to see.
     const ratedSet = new Set<string>();
     for (const s of existingSubmissions || []) {
-      ratedSet.add(`${s.form_id}:${s.ratee_id}:${s.job_order_id || 'null'}`);
+      ratedSet.add(`${s.ratee_id}:${s.job_order_id || 'null'}`);
     }
 
-    // 6. Build pending list — deduplicate by (coworkerId, formId, jobId)
+    // 6. Build pending list — at most ONE prompt per (coworker, job).
     const seen = new Set<string>();
     const pending: any[] = [];
 
@@ -127,17 +136,17 @@ export async function GET(request: NextRequest) {
       const coworker = coworkerMap.get(pair.coworkerId);
       if (!coworker) continue;
 
-      // Find a form that applies to this coworker's role
+      const personJobKey = `${pair.coworkerId}:${pair.jobId}`;
+      if (ratedSet.has(personJobKey)) continue;
+      if (seen.has(personJobKey)) continue;
+
+      // Find a form that applies to this coworker's role. The first match wins;
+      // duplicates must not produce duplicate prompts.
       for (const form of eligibleForms) {
         const targetRoles: string[] = Array.isArray(form.target_roles) ? form.target_roles : [];
         if (!targetRoles.includes(coworker.role)) continue;
 
-        const comboKey = `${form.id}:${pair.coworkerId}:${pair.jobId}`;
-        const ratedKey = `${form.id}:${pair.coworkerId}:${pair.jobId}`;
-
-        if (ratedSet.has(ratedKey)) continue;
-        if (seen.has(comboKey)) continue;
-        seen.add(comboKey);
+        seen.add(personJobKey);
 
         pending.push({
           ratee: {
@@ -154,6 +163,7 @@ export async function GET(request: NextRequest) {
           form_id: form.id,
           form_title: form.title,
         });
+        break; // one prompt per person per job — never one per duplicate form
       }
     }
 

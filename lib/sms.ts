@@ -59,8 +59,10 @@ export async function sendSMSAny(options: SMSOptions): Promise<{
     }
   }
 
-  // 2. Fallback to Twilio
-  return sendSMS(options);
+  // 2. Fallback to Twilio. Stamp the provider so callers can log which one
+  //    actually accepted the message — sendSMS itself doesn't report it.
+  const twilioResult = await sendSMS(options);
+  return twilioResult.success ? { ...twilioResult, provider: 'twilio' } : twilioResult;
 }
 
 /**
