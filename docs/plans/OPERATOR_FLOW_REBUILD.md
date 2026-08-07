@@ -86,6 +86,33 @@ signup and never displayed.
 
 ---
 
+## BATCH 5 — dispatch and job sequencing (office-side, added Aug 7)
+
+**5a. One active job per operator — visible but LOCKED.** *(founder decided
+Aug 7)* An operator finishes one job before starting the next. The second
+dispatched job still SHOWS on their schedule — they can see what's coming — but
+cannot be started, and **the lock must say why**: "Finish DEMO-2026-000002
+first". Never a silently greyed button.
+Nuance: **"finished for today" on a multi-day job frees them for the next job**,
+while that job stays open and returns to their schedule tomorrow. Only
+"complete" closes it out.
+
+**5b. Smart dispatch — push only what changed.** Pressing Dispatch lists all 6
+tickets even when most were dispatched already and untouched. The real scenario:
+he dispatches the day, someone doesn't show, he swaps an operator or re-pairs a
+helper, and needs to re-push **only** those tickets.
+Separate NEW/CHANGED from ALREADY DISPATCHED & UNCHANGED, default the selection
+to the changed ones, and say WHAT changed per ticket ("operator: Zack →
+Devin"). Re-dispatching an unchanged ticket stays possible but deliberate.
+The point: the crew must not get a duplicate "you've been dispatched" alert for
+a ticket that didn't change.
+*Implementation note:* `updated_at > dispatched_at` is the naive test and it is
+wrong — `updated_at` moves on any write at all. Store a fingerprint of the
+fields the crew would actually notice (operator, helper, crew roster, dates,
+arrival time, scope) at dispatch time and compare against it.
+
+---
+
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
@@ -96,9 +123,14 @@ signup and never displayed.
 - **A disabled control must say why.** Devin lost three days to a button that
   was simply below the fold.
 
-## Open question for the founder
+## Answered by the founder
 
-On **1c**: when a multi-day job resets each morning, should the previous days'
-entries still count toward the job's SCOPE PROGRESS (they should — the work was
-done), while only the day's ENTRY FORM starts empty? That is the reading I am
-building to unless told otherwise.
+- **1c** — progress is KEPT; only the day's entry form starts clean. ✅ shipped.
+- **5a** — second job is **visible but locked**, and the lock states why.
+- **5a** — "finished for today" frees the operator for the next job.
+
+## Open question
+
+**5b** — does a SCOPE / work-type edit count as a change worth re-dispatching,
+or only crew and timing? He mentioned operators, helpers and work type, so the
+current assumption is that all three count. Confirm before building.
