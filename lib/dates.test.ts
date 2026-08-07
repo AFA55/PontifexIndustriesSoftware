@@ -16,6 +16,7 @@ import {
   enumerateYMDRange,
   formatMaybeDateTime,
   endOfDayUTC,
+  startOfDayUTC,
 } from './dates';
 
 describe('parseYMDLocal', () => {
@@ -185,5 +186,31 @@ describe('endOfDayUTC — end of the OPERATOR day, not of UTC', () => {
 
   it('handles UTC itself without shifting', () => {
     expect(endOfDayUTC('2026-08-03', 'UTC')).toBe('2026-08-03T23:59:59.000Z');
+  });
+});
+
+describe('startOfDayUTC — start of the OPERATOR day, not of UTC', () => {
+  it('is 04:00:00Z the SAME day for Eastern daylight time', () => {
+    // 2026-08-03 00:00:00 EDT (UTC-4) === 2026-08-03T04:00:00Z
+    expect(startOfDayUTC('2026-08-03', 'America/New_York')).toBe('2026-08-03T04:00:00.000Z');
+  });
+
+  it('shifts correctly for Eastern standard time', () => {
+    // 2026-01-15 00:00:00 EST (UTC-5) === 2026-01-15T05:00:00Z
+    expect(startOfDayUTC('2026-01-15', 'America/New_York')).toBe('2026-01-15T05:00:00.000Z');
+  });
+
+  it('is NOT UTC midnight — the trap it exists to replace', () => {
+    // setUTCHours(0,0,0,0) would give 2026-08-03T00:00:00Z, i.e. 8pm ET on the
+    // 2nd, so anything an operator saved that evening falls in the wrong day.
+    expect(startOfDayUTC('2026-08-03', 'America/New_York')).not.toBe('2026-08-03T00:00:00.000Z');
+  });
+
+  it('brackets the day with endOfDayUTC', () => {
+    const start = startOfDayUTC('2026-08-03', 'America/New_York');
+    const end = endOfDayUTC('2026-08-03', 'America/New_York');
+    expect(new Date(start).getTime()).toBeLessThan(new Date(end).getTime());
+    // Just under 24 hours apart (23:59:59, not 24:00:00).
+    expect(new Date(end).getTime() - new Date(start).getTime()).toBe(86399000);
   });
 });

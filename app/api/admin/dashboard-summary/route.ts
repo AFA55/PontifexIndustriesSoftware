@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { tenantToday } from '@/lib/tenant-timezone';
+import { parseYMDLocal } from '@/lib/dates';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,11 @@ function monthEndISO(offset = 0): string {
 }
 
 // ─── section fetchers ────────────────────────────────────────────────────────
+
+/** Ceiling on the jobs the tile will count in one day. Patriot's busiest day in
+ *  a ±30-day window is 8, so this is ~12x headroom — and the query warns if it
+ *  is ever actually reached rather than under-reporting in silence. */
+const JOBS_TODAY_LIMIT = 100;
 
 async function getJobsToday(
   tenantId: string,
@@ -86,7 +92,7 @@ async function getJobsToday(
       // today)` counted only jobs starting today; a multi-day job that began
       // on Monday and runs all week has scheduled_date = Monday, so from
       // Tuesday on it vanished from the count while staying on the board.
-      // Measured on the day this was written: 1 job started today, 7 were
+      // Measured on the day this was written: 1 job started today, 8 were
       // actually running. This predicate is copied from the schedule board
       // itself (app/api/admin/schedule-board/route.ts) so the number and the
       // board can no longer disagree — including its pending_approval
@@ -96,7 +102,17 @@ async function getJobsToday(
       .neq('status', 'pending_approval')
       .order('arrival_time', { ascending: true, nullsFirst: false })
       .order('customer_name', { ascending: true })
-      .limit(50);
+      .limit(JOBS_TODAY_LIMIT);
+
+    // Personal scope narrows SERVER-side, alongside the span filter above.
+    // postgrest-js `or()` appends (PostgrestFilterBuilder.or →
+    // searchParams.append), so two `or=(...)` params coexist and PostgREST ANDs
+    // all top-level filters — verified in node_modules. Narrowing in JS instead
+    // would run after the row limit and silently drop a user's jobs once the
+    // tenant's day exceeded it.
+    if (opts.isPersonal) {
+      query = query.or(`assigned_to.eq.${opts.targetUserId},helper_assigned_to.eq.${opts.targetUserId}`);
+    }
 
     const { data: jobs, error } = await query;
 
@@ -105,18 +121,34 @@ async function getJobsToday(
       return { count: 0, jobs: [] };
     }
 
-    // Personal scope narrows in JS, not with a second .or().
-    // The date-span filter above already spends this query's one `or=` param,
-    // and PostgREST does not reliably AND two of them — a second .or() here
-    // would silently widen or clobber the span filter. The row set is capped
-    // at 50, so filtering in memory costs nothing.
-    const scoped = opts.isPersonal
-      ? (jobs ?? []).filter(
-          (j) => j.assigned_to === opts.targetUserId || j.helper_assigned_to === opts.targetUserId
-        )
-      : (jobs ?? []);
+    // A silently truncated count is the bug this whole function just fixed.
+    if ((jobs?.length ?? 0) >= JOBS_TODAY_LIMIT) {
+      console.warn(
+        `[dashboard-summary] jobs_today hit the ${JOBS_TODAY_LIMIT}-row limit — the tile may be under-reporting. Raise the limit.`
+      );
+    }
 
-    const mapped = scoped.map((j) => {
+    // Overlay TODAY's crew, the same way the board does.
+    //
+    // `job_orders.assigned_to` holds the FIRST-EVER assignment, so on a
+    // multi-day job — which this tile now includes, by design — it names
+    // whoever started the job rather than whoever is on it today. The board
+    // overlays `job_daily_assignments` for exactly this reason
+    // (app/api/admin/schedule-board/route.ts). Without it the tile and the
+    // board would list the same jobs under different names, which is the same
+    // class of disagreement this change set out to end.
+    const dailyCrew = new Map<string, { operator_name?: string | null; helper_name?: string | null }>();
+    if (jobs && jobs.length > 0) {
+      const { data: dailyAssignments } = await supabaseAdmin
+        .from('job_daily_assignments')
+        .select('job_order_id, operator_name, helper_name')
+        .eq('tenant_id', tenantId)
+        .eq('assignment_date', today)
+        .in('job_order_id', jobs.map((j) => j.id));
+      for (const a of dailyAssignments ?? []) dailyCrew.set(a.job_order_id, a);
+    }
+
+    const mapped = (jobs ?? []).map((j) => {
       // Parse equipment from equipment_needed (comma-separated string) or equipment_selections (JSON)
       let equipment: string[] = [];
       if (j.equipment_needed) {
@@ -139,23 +171,29 @@ async function getJobsToday(
       const endDate = j.end_date ?? j.scheduled_end_date ?? null;
       if (endDate && j.scheduled_date && endDate > j.scheduled_date) {
         is_multi_day = true;
-        const start = new Date(j.scheduled_date);
-        const end = new Date(endDate);
+        // parseYMDLocal, not new Date('YYYY-MM-DD'): the raw form parses as UTC
+        // midnight. Only differences are taken here so it happened to be
+        // correct, but the pattern is banned in this codebase precisely because
+        // the next person copies it somewhere it isn't.
+        const start = parseYMDLocal(j.scheduled_date);
+        const end = parseYMDLocal(endDate);
         const diffMs = end.getTime() - start.getTime();
         total_days = Math.round(diffMs / 86400000) + 1;
         // day_number: today relative to start
-        const todayDate = new Date(today);
+        const todayDate = parseYMDLocal(today);
         const diffFromStart = todayDate.getTime() - start.getTime();
         day_number = Math.floor(diffFromStart / 86400000) + 1;
       }
+
+      const crewToday = dailyCrew.get(j.id);
 
       return {
         id: j.id,
         job_number: j.job_number,
         scheduled_time: j.arrival_time ?? null,
         customer_name: j.customer_name,
-        operator_name: j.operator_name ?? null,
-        helper_name: j.helper_name ?? null,
+        operator_name: crewToday?.operator_name ?? j.operator_name ?? null,
+        helper_name: crewToday?.helper_name ?? j.helper_name ?? null,
         status: j.status,
         job_type: j.job_type ?? null,
         location: j.location ?? j.address ?? null,
