@@ -786,7 +786,16 @@ export default function DayCompletePage() {
         }),
       }).catch(() => null);
 
-      if (!logRes?.ok || !completionRes?.ok) {
+      // 409 from completion-request means "already submitted", not a failure.
+      //
+      // Resending the link is normal: the operator sends it, the customer
+      // doesn't sign, he reopens the ticket (pending_completion jobs stay
+      // navigable) and sends again. The second attempt gets a 409 because the
+      // job is ALREADY pending_completion — which is the desired state. Treating
+      // that as failure would tell him to go find dispatch about a job that is
+      // perfectly fine, at the worst possible moment.
+      const completionOk = completionRes?.ok || completionRes?.status === 409;
+      if (!logRes?.ok || !completionOk) {
         refuse(
           'The text went out, but the job did not close. Tell dispatch before you leave the site.'
         );
