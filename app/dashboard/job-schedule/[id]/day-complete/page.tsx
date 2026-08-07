@@ -720,6 +720,13 @@ export default function DayCompletePage() {
       const sigData = await sigRes.json();
       const signUrl: string = sigData.data?.sign_url;
 
+      // In dev, open the link BEFORE the send. Local machines have no SMS
+      // provider, so the send returns 502 and returns early — opening the tab
+      // afterwards meant the remote-signature flow could not be tested at all.
+      if (process.env.NODE_ENV === 'development') {
+        window.open(signUrl, '_blank');
+      }
+
       // 2. Send SMS.
       //    The result is CHECKED. It used to be fired and ignored, so a failed
       //    text still showed the operator "Link Sent!" and he walked off site
@@ -744,15 +751,14 @@ export default function DayCompletePage() {
         return;
       }
 
-      // 3. In dev: open the link in new tab so it can be tested
-      if (process.env.NODE_ENV === 'development') {
-        window.open(signUrl, '_blank');
-      }
-
-      // 4. Log the day and submit for completion
+      // 3. Log the day and submit for completion.
+      //    These are the writes that actually CLOSE the job. They used to end
+      //    in .catch(() => {}) with no status check, so the text could go out,
+      //    both writes fail, and the operator still saw "Link Sent!" and drove
+      //    away from a job that was never submitted. If they fail, say so.
       const workPerformed = workPerformedItems;
 
-      await fetch(`/api/job-orders/${jobId}/daily-log`, {
+      const logRes = await fetch(`/api/job-orders/${jobId}/daily-log`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -767,9 +773,9 @@ export default function DayCompletePage() {
           longitude: null,
           stayed_overnight: stayedOvernight,
         }),
-      }).catch(() => {});
+      }).catch(() => null);
 
-      await fetch(`/api/jobs/${jobId}/completion-request`, {
+      const completionRes = await fetch(`/api/jobs/${jobId}/completion-request`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -778,7 +784,14 @@ export default function DayCompletePage() {
         body: JSON.stringify({
           operator_notes: `Remote signature link sent to customer at ${remotePhone.trim()}.`,
         }),
-      }).catch(() => {});
+      }).catch(() => null);
+
+      if (!logRes?.ok || !completionRes?.ok) {
+        refuse(
+          'The text went out, but the job did not close. Tell dispatch before you leave the site.'
+        );
+        return;
+      }
 
       localStorage.removeItem(`work-performed-${jobId}`);
       localStorage.removeItem(`work-draft-${jobId}`);

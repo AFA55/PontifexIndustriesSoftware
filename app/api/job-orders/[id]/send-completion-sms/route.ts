@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAuth } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { formatPhoneNumber, sendSMSAny } from '@/lib/sms';
+import { resolveAppOrigin } from '@/lib/app-url';
 
 export async function POST(
   request: NextRequest,
@@ -34,7 +35,7 @@ export async function POST(
     if (!auth.authorized) return auth.response;
 
     const body = await request.json();
-    const { phoneNumber, signUrl, jobNumber } = body;
+    const { phoneNumber, signUrl } = body;
 
     if (!phoneNumber || !signUrl) {
       return NextResponse.json(
@@ -46,42 +47,69 @@ export async function POST(
     const formattedPhone = formatPhoneNumber(phoneNumber);
     if (!formattedPhone) {
       return NextResponse.json(
-        { error: 'That phone number is not a valid US number.' },
+        { error: 'That phone number is not a valid number.' },
         { status: 400 }
       );
     }
 
-    const jobLabel = jobNumber || 'your job';
+    // The job must exist IN THE CALLER'S TENANT.
+    //
+    // Without this the route was an open SMS relay: any authenticated user
+    // could post an arbitrary number and an arbitrary URL and have the platform
+    // text it — and, since the send is now metered, have the tenant billed for
+    // it. The sibling request-signature route has always checked this.
+    // supabaseAdmin bypasses RLS, so the tenant filter is explicit.
+    const tenantId = auth.tenantId;
+    let jobQuery = supabaseAdmin
+      .from('job_orders')
+      .select('id, job_number')
+      .eq('id', id);
+    if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
+    const { data: job } = await jobQuery.maybeSingle();
 
-    // Resolve tenant + company name. tenant_id also drives usage metering, so
-    // it is read from the profile rather than assumed.
-    let tenantId: string | undefined;
+    if (!job) {
+      return NextResponse.json({ error: 'Job order not found' }, { status: 404 });
+    }
+
+    // The link is resolved from the signature request we hold for THIS job, not
+    // taken from the request body — the body could name any URL at all.
+    const { data: sigRequest } = await supabaseAdmin
+      .from('signature_requests')
+      .select('token')
+      .eq('job_order_id', id)
+      .eq('request_type', 'completion')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!sigRequest?.token) {
+      return NextResponse.json(
+        { error: 'No completion signature request exists for this job.' },
+        { status: 400 }
+      );
+    }
+
+    const trustedSignUrl = `${resolveAppOrigin(request.nextUrl.origin)}/sign/${sigRequest.token}`;
+
     let companyName = 'Your contractor';
-    try {
-      const { data: profile } = await supabaseAdmin
-        .from('profiles')
-        .select('tenant_id')
-        .eq('id', auth.userId)
+    if (tenantId) {
+      const { data: branding } = await supabaseAdmin
+        .from('tenant_branding')
+        .select('company_name')
+        .eq('tenant_id', tenantId)
         .maybeSingle();
-      if (profile?.tenant_id) {
-        tenantId = profile.tenant_id;
-        const { data: branding } = await supabaseAdmin
-          .from('tenant_branding')
-          .select('company_name')
-          .eq('tenant_id', profile.tenant_id)
-          .maybeSingle();
-        if (branding?.company_name) companyName = branding.company_name;
-      }
-    } catch { /* use default */ }
+      if (branding?.company_name) companyName = branding.company_name;
+    }
 
-    const message = `${companyName} has completed work on ${jobLabel}. Please review and sign here: ${signUrl}`;
+    const jobLabel = job.job_number || 'your job';
+    const message = `${companyName} has completed work on ${jobLabel}. Please review and sign here: ${trustedSignUrl}`;
 
     const startedAt = Date.now();
     const result = await sendSMSAny({
       to: formattedPhone,
       message,
       jobId: id,
-      tenantId,
+      tenantId: tenantId ?? undefined,
       source: 'completion_signature_sms',
     });
     const elapsedMs = Date.now() - startedAt;
@@ -91,8 +119,15 @@ export async function POST(
         `[SMS] completion link FAILED for job ${id} after ${elapsedMs}ms:`,
         result.error
       );
+      // Don't send an operator back to retype a number that was fine. A
+      // provider that isn't configured is our problem, not his.
+      const misconfigured = /not configured/i.test(result.error || '');
       return NextResponse.json(
-        { error: 'The text could not be sent. Check the number and try again.' },
+        {
+          error: misconfigured
+            ? 'Texting is not set up on this account — call the office to get the link to the customer.'
+            : 'The text could not be sent. Check the number and try again.',
+        },
         { status: 502 }
       );
     }

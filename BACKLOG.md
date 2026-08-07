@@ -23,6 +23,7 @@ outrank polish; anything an operator hits on a live jobsite outranks the office.
 
 ### P1 — the crew's day
 - [ ] **Work-performed redesign** — pick the work type first, then enter every measurement + notes below in one pass, instead of one modal at a time. Founder's biggest UX ask.
+- [ ] **Peer ratings: collapse duplicate FORMS, not all forms.** `/api/ratings/pending` now emits at most one prompt per (ratee, job) and keys "already rated" on `(ratee_id, job_order_id)` — correct today, because this tenant's only two `rating_forms` rows were byte-identical duplicates (one is now `is_active=false`). But the day a tenant adds a genuine second form (e.g. "Safety Review" alongside "Field Performance Review", both targeting `operator`), answering one will silently suppress the other. Proper fix: keep `form_id` in the key and dedupe on a title/questions fingerprint. (Aug 7, guardian MEDIUM.)
 - [x] ~~**ETA instead of In Route after day 1.**~~ BUILT Aug 5 (`d1f4f07f`, `ca030af5`) — `lib/eta.ts` + shop location now stored on the tenant. Live on the customer portal. Still to do: show it on the OPERATOR ticket too.
 - [ ] **Quick Add: address autofill + drive time** — still not integrated; feeds the ETA above.
 - [ ] **Helper history view** — DSM-style day toggle: who they worked with, what they did, hours. Stored so both the helper and the office can look back.
