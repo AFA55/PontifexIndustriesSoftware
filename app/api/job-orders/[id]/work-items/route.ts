@@ -258,22 +258,69 @@ export async function POST(
 
         if (!admins || admins.length === 0) return;
 
-        const notifications = admins.map((a: { id: string }) => ({
-          user_id: a.id,
-          type: 'work_performed',
-          title: 'Work performed update',
-          message,
-          job_id: jobId,
-          tenant_id: tenantId,
-          sender_id: auth.userId,
-          related_entity_type: 'job_order',
-          related_entity_id: jobId,
-          action_url: `/dashboard/admin/jobs/${jobId}`,
-          read: false,
-          is_read: false,
-        }));
+        // ONE live notification per (admin, job, operator, day) — not one per save.
+        //
+        // THE BUG (founder, Aug 7 — "notifications won't stay dismissed"):
+        // this inserted a fresh row on EVERY save of the work-performed form,
+        // and operators save repeatedly through the day. His bell showed 46
+        // unread personal items, of which 30 were `work_performed` and most
+        // were literal duplicates — "Conrade Richardson logged 8 CORE DRILL
+        // (+1 more) on JOB-2026-631148" five times, two of them 27 seconds
+        // apart. Mark-all-read was working correctly; the count simply refilled
+        // faster than he could clear it.
+        //
+        // A later save on the same job carries NEW information, so it still
+        // surfaces — by refreshing the existing row and marking it unread
+        // again, rather than stacking another one beside it.
+        const dayStart = new Date();
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayStartISO = dayStart.toISOString();
+        const nowISO = new Date().toISOString();
 
-        await supabaseAdmin.from('notifications').insert(notifications);
+        for (const admin of admins as { id: string }[]) {
+          const { data: existing } = await supabaseAdmin
+            .from('notifications')
+            .select('id')
+            .eq('user_id', admin.id)
+            .eq('type', 'work_performed')
+            .eq('job_id', jobId)
+            .eq('sender_id', auth.userId)
+            .gte('created_at', dayStartISO)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existing?.id) {
+            const { error: updErr } = await supabaseAdmin
+              .from('notifications')
+              .update({
+                message,
+                created_at: nowISO,
+                updated_at: nowISO,
+                read: false,
+                is_read: false,
+              })
+              .eq('id', existing.id);
+            if (updErr) console.error('Error refreshing work_performed notification:', updErr);
+            continue;
+          }
+
+          const { error: insErr } = await supabaseAdmin.from('notifications').insert({
+            user_id: admin.id,
+            type: 'work_performed',
+            title: 'Work performed update',
+            message,
+            job_id: jobId,
+            tenant_id: tenantId,
+            sender_id: auth.userId,
+            related_entity_type: 'job_order',
+            related_entity_id: jobId,
+            action_url: `/dashboard/admin/jobs/${jobId}`,
+            read: false,
+            is_read: false,
+          });
+          if (insErr) console.error('Error inserting work_performed notification:', insErr);
+        }
       } catch {
         // Non-critical — never block the operator's submit response.
       }

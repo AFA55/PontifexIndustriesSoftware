@@ -78,15 +78,25 @@ async function getJobsToday(
         scheduled_end_date
       `)
       .eq('tenant_id', tenantId)
-      .eq('scheduled_date', today)
+      // A job counts for TODAY if today falls inside its span — NOT if it
+      // STARTS today.
+      //
+      // THE BUG (founder, Aug 7): the tile read "Jobs Today: 0" while the
+      // schedule board beside it plainly listed jobs. `.eq('scheduled_date',
+      // today)` counted only jobs starting today; a multi-day job that began
+      // on Monday and runs all week has scheduled_date = Monday, so from
+      // Tuesday on it vanished from the count while staying on the board.
+      // Measured on the day this was written: 1 job started today, 7 were
+      // actually running. This predicate is copied from the schedule board
+      // itself (app/api/admin/schedule-board/route.ts) so the number and the
+      // board can no longer disagree — including its pending_approval
+      // exclusion, since a job awaiting approval isn't on the board either.
+      .lte('scheduled_date', today)
+      .or(`end_date.is.null,end_date.gte.${today}`)
+      .neq('status', 'pending_approval')
       .order('arrival_time', { ascending: true, nullsFirst: false })
       .order('customer_name', { ascending: true })
-      .limit(20);
-
-    // Personal scope: only jobs this user is assigned to
-    if (opts.isPersonal) {
-      query = query.or(`assigned_to.eq.${opts.targetUserId},helper_assigned_to.eq.${opts.targetUserId}`);
-    }
+      .limit(50);
 
     const { data: jobs, error } = await query;
 
@@ -95,7 +105,18 @@ async function getJobsToday(
       return { count: 0, jobs: [] };
     }
 
-    const mapped = (jobs ?? []).map((j) => {
+    // Personal scope narrows in JS, not with a second .or().
+    // The date-span filter above already spends this query's one `or=` param,
+    // and PostgREST does not reliably AND two of them — a second .or() here
+    // would silently widen or clobber the span filter. The row set is capped
+    // at 50, so filtering in memory costs nothing.
+    const scoped = opts.isPersonal
+      ? (jobs ?? []).filter(
+          (j) => j.assigned_to === opts.targetUserId || j.helper_assigned_to === opts.targetUserId
+        )
+      : (jobs ?? []);
+
+    const mapped = scoped.map((j) => {
       // Parse equipment from equipment_needed (comma-separated string) or equipment_selections (JSON)
       let equipment: string[] = [];
       if (j.equipment_needed) {

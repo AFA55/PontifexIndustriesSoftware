@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, ADMIN_ROLES } from '@/lib/api-auth';
 import { getRoleRank } from '@/lib/rbac';
+import { normalizeProfilePhone } from '@/lib/profile-phone';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -191,6 +192,13 @@ export async function PATCH(
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
+      }
+    }
+
+    // Same single shape as the self-serve profile route.
+    for (const phoneField of ['phone', 'phone_number', 'emergency_contact_phone']) {
+      if (typeof updateData[phoneField] === 'string') {
+        updateData[phoneField] = normalizeProfilePhone(updateData[phoneField] as string);
       }
     }
 

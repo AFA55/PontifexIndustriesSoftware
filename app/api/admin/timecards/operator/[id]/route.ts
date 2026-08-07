@@ -20,6 +20,7 @@ import { signTimecardPhoto } from '@/lib/timecard-photos';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
+import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
 
 export async function GET(
   request: NextRequest,
@@ -58,7 +59,7 @@ export async function GET(
     // 1. Fetch operator profile (tenant-scoped)
     const { data: profile, error: profileError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, role, phone, avatar_url, profile_picture_url')
+      .select(`id, full_name, email, role, ${PROFILE_PHONE_SELECT}, avatar_url, profile_picture_url`)
       .eq('id', operatorId)
       .eq('tenant_id', tenantId)
       .single();
@@ -325,7 +326,8 @@ export async function GET(
           full_name: profile.full_name,
           email: profile.email,
           role: profile.role,
-          phone: profile.phone,
+          // profiles has two phone columns and this read the empty one.
+          phone: readProfilePhone(profile),
           avatar_url: resolveAvatarUrl(profile as any),
         },
         weekStart: startDateStr,

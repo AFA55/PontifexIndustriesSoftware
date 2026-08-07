@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { normalizeProfilePhone } from '@/lib/profile-phone';
 
 // GET: Fetch own profile
 export async function GET(request: NextRequest) {
@@ -52,6 +53,15 @@ export async function PATCH(request: NextRequest) {
     for (const field of selfEditableFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
+      }
+    }
+
+    // One shape on the way in. Live values include `(864) 275-0064`,
+    // `+4706586313` and `470-658-6313` all at once; SMS needs something
+    // predictable and the office needs something readable.
+    for (const phoneField of ['phone', 'phone_number', 'emergency_contact_phone']) {
+      if (typeof updateData[phoneField] === 'string') {
+        updateData[phoneField] = normalizeProfilePhone(updateData[phoneField] as string);
       }
     }
 
