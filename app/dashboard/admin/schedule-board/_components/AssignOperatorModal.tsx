@@ -7,6 +7,10 @@ import type { JobCardData } from './JobCard';
 interface AssignOperatorModalProps {
   job: JobCardData;
   allOperators: string[];
+  /** Operator-slot names whose role is `apprentice`. Assignable as lead — they
+   *  get the full operator workflow, since the ticket branches on slot not role
+   *  — but the office should see who is stepping up. */
+  apprenticeOperatorNames?: Set<string>;
   allHelpers: string[];
   busyOperators: Record<string, string>; // name → current job customer_name
   busyHelpers: Record<string, string>;
@@ -15,7 +19,7 @@ interface AssignOperatorModalProps {
 }
 
 export default function AssignOperatorModal({
-  job, allOperators, allHelpers, busyOperators, busyHelpers, onConfirm, onClose,
+  job, allOperators, allHelpers, apprenticeOperatorNames, busyOperators, busyHelpers, onConfirm, onClose,
 }: AssignOperatorModalProps) {
   const [selectedOperator, setSelectedOperator] = useState<string>('');
   const [selectedHelper, setSelectedHelper] = useState<string>('');
@@ -124,7 +128,7 @@ export default function AssignOperatorModal({
                 <option value="">Select Operator...</option>
                 {allOperators.map(name => (
                   <option key={name} value={name}>
-                    {name}{busyOperators[name] ? ` — On: ${busyOperators[name]}` : ''}
+                    {name}{apprenticeOperatorNames?.has(name) ? ' (helper — will run the operator ticket)' : ''}{busyOperators[name] ? ` — On: ${busyOperators[name]}` : ''}
                   </option>
                 ))}
               </select>

@@ -76,7 +76,25 @@ export default function MyJobsPage() {
   const [ratingModalItem, setRatingModalItem] = useState<PendingRating | null>(null);
   const [dismissedRatings, setDismissedRatings] = useState<Set<string>>(new Set());
 
+  /**
+   * Role-based. Drives the shop-ticket panel, which genuinely belongs to the
+   * apprentice role rather than to any one job.
+   */
   const isHelper = userRole === 'apprentice';
+
+  /**
+   * Whether to frame this screen as a team member's.
+   *
+   * WHY (founder, Aug 7): an apprentice can be put in the OPERATOR slot — "sometimes
+   * we test helpers... if I assign them as operators I would like them to have to do
+   * operator workflow." The ticket itself already honours that, because it branches on
+   * SLOT not role. This header did not: it read the role alone, so Javier leading a job
+   * was still told "Team member duties for the day" and badged Team Member while running
+   * the full operator ticket. If any job in view has them in the operator slot, they are
+   * operating today — say so.
+   */
+  const showTeamMemberFraming =
+    isHelper && (jobs.length === 0 || jobs.every((j: any) => j.isHelper));
 
   // Check which of today's jobs have a "Done for Today" log (day_completed_at set today)
   const fetchDoneTodayStatus = useCallback(async (jobList: any[]) => {
@@ -500,14 +518,12 @@ export default function MyJobsPage() {
               <Briefcase className="w-5 h-5 text-brand" />
             </div>
             <div className="flex-1">
-              <h1 className="text-lg font-bold text-gray-900 dark:text-white">
-                {isHelper ? 'My Schedule' : 'My Schedule'}
-              </h1>
+              <h1 className="text-lg font-bold text-gray-900 dark:text-white">My Schedule</h1>
               <p className="text-gray-500 dark:text-white/60 text-xs">
-                {isHelper ? 'Team member duties for the day' : 'Dispatched job tickets'}
+                {showTeamMemberFraming ? 'Team member duties for the day' : 'Dispatched job tickets'}
               </p>
             </div>
-            {isHelper && (
+            {showTeamMemberFraming && (
               <span className="text-xs px-2.5 py-1 bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-lg font-semibold">
                 Team Member
               </span>
