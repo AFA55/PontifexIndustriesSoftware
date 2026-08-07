@@ -181,6 +181,36 @@ authoritative and learning may only SUGGEST. Tenant-scoped. And always show WHY
 
 ---
 
+## BATCH 8 — one waiver, one wording (added Aug 7)
+
+**8a. Delete the separate in-person waiver page.**
+
+The founder opened the `/sign/[token]` link and liked it — wording and layout
+both. Then he pressed **Sign in person** on the operator ticket and got a
+DIFFERENT page.
+
+**This is not cosmetic.** Verified: `app/sign/[token]/page.tsx` imports
+`lib/legal/utility-waiver` (the researched SC text — §32-2-10 savings clause,
+gross-negligence carve-out, SC811 statement). The in-person page,
+`app/dashboard/job-schedule/[id]/utility-waiver/page.tsx` (366 lines), **does not
+import it at all** and carries its own separate wording. A site contact signing
+in person is therefore agreeing to different, unreviewed text than one signing
+remotely. Two versions of a liability document in circulation is an exposure.
+
+**Build:** delete the in-person page; point "Sign in person"
+(`WaiverBanner.tsx:150`) at the same `/sign/[token]` experience — get-or-create
+the request, then open it on the operator's own device for the contact to sign
+there and then. Same component, same wording, same record; only the delivery
+differs. The remote path is unchanged, and the job should carry a visible
+**"Utility waiver pending"** affordance so the customer knows a signature is
+outstanding.
+
+Only `WaiverBanner` links to the old page today, but check before deleting.
+Once wording becomes editable (batch 5/task #55), having ONE source stops being
+tidiness and becomes mandatory.
+
+---
+
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
