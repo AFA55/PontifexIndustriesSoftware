@@ -589,6 +589,19 @@ export default function WorkPerformed() {
           } catch { /* corrupt storage — ignore */ }
         }
 
+        // ── Refuse a draft from a different day ───────────────────────────────
+        // A multi-day job keeps its progress, but the ENTRY FORM starts clean
+        // every morning (founder, Aug 2026). Older drafts have no `forDate`;
+        // those are pre-fix and equally untrustworthy, so they go too.
+        if (draft && draft.forDate !== toLocalYMD()) {
+          draft = null;
+          try {
+            localStorage.removeItem(`work-draft-${params.id}`);
+          } catch { /* storage unavailable — the date check already saved us */ }
+          // Clear the server copy as well, so it can't come back on another device.
+          saveDraft(null);
+        }
+
         // ── Restore state ─────────────────────────────────────────────────────
         const draftHasItems = !!(draft && (
           (draft.selectedItems && draft.selectedItems.length > 0) ||
@@ -627,16 +640,26 @@ export default function WorkPerformed() {
                 (wi: any) => wi.operator_id === session.user.id,
               );
               if (allItems.length > 0) {
-                // The latest day_number rows are today's submitted items.
-                // Mirrors the POST handler in /work-items which deletes-and-replaces
-                // by (job_order_id, day_number).
-                const maxDay = allItems.reduce(
-                  (m, wi) => Math.max(m, Number(wi.day_number) || 1),
-                  1
+                // ONLY items this operator submitted TODAY.
+                //
+                // This used to take the highest day_number and call it "today".
+                // On a multi-day job that is simply wrong: open day 2 before
+                // entering anything and the highest day_number rows are still
+                // DAY ONE's — so the operator's form came up with yesterday's
+                // work already ticked green and he couldn't tell what he had
+                // actually entered today. That was the founder's report.
+                //
+                // The day's log is the authority on what "today" means. Find
+                // this operator's log for today's date, then take only the work
+                // items linked to it. No log for today means nothing has been
+                // submitted today, and the form correctly stays empty.
+                const todayYMD = toLocalYMD();
+                const myLogToday = (histJson?.data?.logs || []).find(
+                  (l: any) => l.operator_id === session.user.id && l.log_date === todayYMD,
                 );
-                const todayItems = allItems.filter(
-                  (wi) => (Number(wi.day_number) || 1) === maxDay
-                );
+                const todayItems = myLogToday
+                  ? allItems.filter((wi: any) => wi.daily_log_id === myLogToday.id)
+                  : [];
                 if (todayItems.length > 0) {
                   const hydrated: WorkItem[] = todayItems.map((wi) => ({
                     name: wi.work_type,
@@ -645,7 +668,7 @@ export default function WorkPerformed() {
                     details: wi.details_json || undefined,
                   }));
                   setSelectedItems(hydrated);
-                  showNotification('Loaded today’s submitted work', 'success');
+                  showNotification('Loaded what you already submitted today', 'success');
                 }
               }
             }
@@ -671,6 +694,15 @@ export default function WorkPerformed() {
     setSaveStatus('saving');
     autoSaveTimerRef.current = setTimeout(async () => {
       const draft = {
+        // THE DAY THIS DRAFT BELONGS TO.
+        //
+        // Without it, a draft keyed only by job id survives the night: the
+        // operator submits Monday's work, opens the same multi-day ticket on
+        // Tuesday, and every work type he touched yesterday is already ticked
+        // green. He can't tell what he's actually entered today. Stamping the
+        // date means a stale draft is DISCARDED on load rather than restored,
+        // so a missed cleanup can never show him yesterday's answers again.
+        forDate: toLocalYMD(),
         selectedItems,
         sawingData,
         coreDrillingData,
@@ -1746,13 +1778,14 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
 
-      // NOTE: Intentionally do NOT clear the work-performed draft here. The draft
-      // belongs to "today's in-progress work" — if the user presses Back from the
-      // day-complete page, we want their items to still be visible. The draft
-      // should only be cleared on the final day-complete submission.
-      // TODO: day-complete page does not currently clear `work-draft-<id>` /
-      // `work_performed_draft` after final submission — when that page is touched
-      // next, add a draft clear there (saveDraft(null) + localStorage.removeItem).
+      // The draft is deliberately KEPT here: it belongs to "today's in-progress
+      // work", and pressing Back from the day-complete page must still show
+      // what they entered.
+      //
+      // It no longer leaks into tomorrow. The draft carries the date it was
+      // written for and is discarded on load if that isn't today — which is
+      // what the old TODO here was worrying about, solved at the read side so
+      // it holds even when a cleanup is missed or the operator switches device.
 
       showNotification('Work performed saved!', 'success');
 
