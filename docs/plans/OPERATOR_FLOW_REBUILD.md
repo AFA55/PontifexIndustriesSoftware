@@ -211,6 +211,43 @@ tidiness and becomes mandatory.
 
 ---
 
+## BATCH 9 — the team member's view + who grades whom (added Aug 7)
+
+**9a. The team member's ticket is missing what they need.** Add, as plain
+reference they can see the moment they open it — NOT as a step, and NOT gated
+behind anything (a team member has no equipment-checklist responsibility):
+  • Site contact
+  • **Job location / address**, with the same Open-in-Maps affordance the
+    operator gets — the helper may be driving their own vehicle
+  • **The operator's phone number** — working with Zack means Zack's number is
+    right there. This is the genuinely missing piece.
+
+`profiles.phone` is null or empty on essentially every real crew member
+(checked Aug 7 — even the founder's own profiles had none until today), so the
+ticket must handle "no number on file" gracefully AND offer a way to add it
+rather than showing a blank. Decide who may edit: the person themselves always,
+probably admin/ops too; never let one crew member silently overwrite another's
+contact details.
+
+**9b. Ratings — who grades whom.** Never one blended score; each SOURCE keeps its
+own average and its own count.
+
+An **operator** is graded by three sources: the **helpers** who worked with them,
+the **supervisor** from site visits, and **customers** at signature time.
+
+A **helper** is graded by two: the **operator** they worked with, and the
+**supervisor**.
+
+⚠️ **Schema gap:** `supervisor_visits` records ONE `operator_id` and rates only
+the operator. When the supervisor visits a site there is usually a team member
+there too, and he must be able to rate them as well. A visit therefore needs
+ratings for MULTIPLE people — a per-person child of the visit, not a UI tweak.
+
+Always show the COUNT beside the average. A 5.0 from one rating is not a 4.6
+from twelve and must not look like it.
+
+---
+
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
