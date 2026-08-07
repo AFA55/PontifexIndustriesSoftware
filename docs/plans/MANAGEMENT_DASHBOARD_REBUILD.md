@@ -141,12 +141,23 @@ crew's side — one status, honoured everywhere.)*
 
 ---
 
-## Open questions for the founder
+## Answered by the founder (Aug 7)
 
-1. **M1d** — "revenue" on completed jobs: is that the **job quote / project
-   total**, or **quote minus costs** (i.e. margin)? The tile says revenue but
-   the breakdown he described is labor + mileage cost, which is the cost side.
-2. **M2f** — he's sending a photo of the current invoicing sheet. Build waits
-   for it rather than guessing the fields.
-3. **M4b** — should Team Reports be visible to supervisors and project managers,
-   or admin/ops only? It contains individual performance data.
+**M1d — revenue.** The tile shows **total minus labor cost**. Clicking it opens
+a view showing **both gross and net**, so the headline is one number but the
+detail doesn't hide either.
+
+**M4b — who sees whose ratings.** Not one switch — four rules:
+| Role | Sees |
+|---|---|
+| **Supervisor** | **Everyone's** reviews — he leaves them, and he needs to pull that data back |
+| **Project manager** | Only the reviews left on **his own jobs** — not everybody's |
+| **Operations manager** | Everything |
+| **Admin** | Everything |
+Enforce this SERVER-SIDE, not by hiding UI. A project manager must not be able
+to reach another PM's people by changing a URL.
+
+## Still open
+
+**M2f — invoicing.** He is sending a photo of the sheet the office fills in
+today. Build to that, not to a guess.
