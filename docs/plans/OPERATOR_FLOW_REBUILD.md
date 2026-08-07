@@ -126,34 +126,38 @@ arrival time, scope) at dispatch time and compare against it.
 
 ---
 
-## BATCH 6 — the waiver sits at the wrong moment (added Aug 7)
+## BATCH 6 — waiver timing ✅ MOSTLY RESOLVED (revised Aug 7 after live test)
 
-**6a. Move the waiver prompt to AFTER "Start In Route".**
+**REVISED BY THE FOUNDER after testing the real flow.** He pressed Start In
+Route, received the "crew is on the way" notification AND the waiver request,
+and concluded the double message is **correct and wanted**: the site contact
+learns we're coming *and* what they need to sign before we arrive.
 
-*From a screenshot of the operator's ticket on DEMO-2026-000002, before
-departure.* The screen currently reads, top to bottom: the job description; a
-**SCOPE QUANTITIES** block (Floor Sawing / Electric Core Drilling / Wall Track
-Sawing, each with linear feet, cut depth and # of cuts, mostly blank dashes
-because nothing is entered yet); then an amber **"Waiver not signed yet"** card
-— *"The site contact has not been sent the waiver yet. Get it signed before you
-start cutting."* — with a solid orange **Send waiver** and an outlined **Sign in
-person**; and only BELOW that, the green **Start In Route** button, with a red
-**Job Not Ready** beneath it.
+So the earlier instruction — "move the waiver prompt to after In Route" — is
+**superseded**. The automatic send already fires on the first In Route tap
+(`lib/waiver-dispatch.ts`), which is exactly the moment he wants. Nothing to
+move.
 
-The waiver card sitting ABOVE Start In Route asks the operator to chase a
-signature while he is still at the shop, before he has set off and before he has
-any contact with the site. Wrong moment, and it clutters the pre-departure
-screen.
+**What the flow should be, confirmed:**
+1. Operator taps **Start In Route** → contact gets the en-route notice **and**
+   the waiver link. They can sign before the crew arrives.
+2. If it's still unsigned when the crew lands, the operator has
+   **Resend waiver** / **Sign in person** on the ticket — already built
+   (`WaiverBanner.tsx`) — so it gets signed **before work starts**.
+3. Either way the signed waiver is saved. → **batch 11b** (PDF stored against
+   the job).
 
-**Required order:** Start In Route → travelling / arrived → waiver prompt →
-work performed. The founder's reason, in his words: liability protection — get
-it signed once they are on site and **before any cutting starts**.
+**6a. STILL OPEN — the operator's card position.** The amber "Waiver not signed
+yet" card currently sits ABOVE the Start In Route button, so it greets the
+operator at the shop before he's set off or had any contact with the site. Move
+it BELOW Start In Route, so it appears once he's travelling/arrived — which is
+when he can actually do something about it. This is a placement change only; the
+send timing is right as it is.
 
-Keep the ability to send it early for an operator who knows the contact is
-already on site; just stop it being the first thing he sees before leaving.
-The send + reminder machinery in `lib/waiver-dispatch.ts` already fires on the
-first In Route tap — this is about WHERE the operator-facing card lives in the
-flow, not about re-plumbing the send.
+**6b. STILL OPEN — one waiver, one wording.** See batch 8: "Sign in person"
+opens a different page carrying different, unreviewed text. That matters more
+now that the founder has confirmed on-site signing is a normal path, not an edge
+case.
 
 ---
 
