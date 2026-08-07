@@ -116,6 +116,37 @@ arrival time, scope) at dispatch time and compare against it.
 
 ---
 
+## BATCH 6 — the waiver sits at the wrong moment (added Aug 7)
+
+**6a. Move the waiver prompt to AFTER "Start In Route".**
+
+*From a screenshot of the operator's ticket on DEMO-2026-000002, before
+departure.* The screen currently reads, top to bottom: the job description; a
+**SCOPE QUANTITIES** block (Floor Sawing / Electric Core Drilling / Wall Track
+Sawing, each with linear feet, cut depth and # of cuts, mostly blank dashes
+because nothing is entered yet); then an amber **"Waiver not signed yet"** card
+— *"The site contact has not been sent the waiver yet. Get it signed before you
+start cutting."* — with a solid orange **Send waiver** and an outlined **Sign in
+person**; and only BELOW that, the green **Start In Route** button, with a red
+**Job Not Ready** beneath it.
+
+The waiver card sitting ABOVE Start In Route asks the operator to chase a
+signature while he is still at the shop, before he has set off and before he has
+any contact with the site. Wrong moment, and it clutters the pre-departure
+screen.
+
+**Required order:** Start In Route → travelling / arrived → waiver prompt →
+work performed. The founder's reason, in his words: liability protection — get
+it signed once they are on site and **before any cutting starts**.
+
+Keep the ability to send it early for an operator who knows the contact is
+already on site; just stop it being the first thing he sees before leaving.
+The send + reminder machinery in `lib/waiver-dispatch.ts` already fires on the
+first In Route tap — this is about WHERE the operator-facing card lives in the
+flow, not about re-plumbing the send.
+
+---
+
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
