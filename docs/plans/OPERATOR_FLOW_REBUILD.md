@@ -35,10 +35,23 @@ keystroke, commit `bb2023ce`). Still reported, so at least one more element is
 changing height mid-entry. Find it by MEASURING scroll position across a full
 entry session — not by eye. Every fix here must hold the viewport still.
 
-**1b. It doesn't remember where they were.**
-Two parts: the STEP (once they've gone In Route, that screen must never appear
-again) and the FIELD (coming back to work-performed must restore exactly what
-they had, not a fresh form). A draft already saves; the resume is what's missing.
+**1b. It doesn't remember where they were.** *(confirmed live Aug 7)*
+
+The founder went In Route, backed out to home — as operators will, since they
+won't keep the app open — and returning dropped him on the EQUIPMENT page again.
+He then had to press "Continue Work" to get back to where he was.
+
+Once In Route has been tapped, **the equipment step must not reappear**, even
+though it's ticked and shows "Equipment confirmed — checklist not required".
+Returning should land on: **location · site contact · scope of work · waiver
+state**. Going back further stays possible via the back button; the point is
+that the DEFAULT landing place is where they actually are in the day.
+
+Also the FIELD half: returning to work-performed must restore what they'd
+entered, not a fresh form.
+
+**Rename the button**: "Continue Work" → **"Input Work Performed"**, so it says
+what pressing it does.
 
 **1c. Yesterday's work shows as done.**
 Work types render green from a PREVIOUS day's entry, so an operator opens today's
@@ -46,10 +59,32 @@ ticket and it looks like he already did it. **Every day must start clean.**
 Add a read-only "View previous work performed" so history is still reachable —
 visible, not editable.
 
-**1d. Pick the work type first, then fill everything in.**
-Selecting a type must NOT immediately open a modal. They tick the types they did
-(core drill, slab saw, …), scroll down, and fill in each one's fields in
-sequence, then notes. Includes an **Other** type where they type what they did.
+**1d. Pick the work types first, then fill everything in.** *(fully specced Aug 7
+after the founder walked it — some operators were confused by the current UI)*
+
+Order on the page, top to bottom:
+
+1. **Choose the work items.** Tapping one must NOT immediately pop its fields —
+   that is what confuses them. They tick everything they did first.
+2. **Search** the work-item list — it is long, and scrolling it on a phone is
+   the slow path.
+3. **"Other"** button: they type what they did. If it matches something in the
+   directory it surfaces as they type; if not, they just finish typing it and
+   that stands as the work item.
+4. **Scroll down → the fields, broken up per work type.** Core drilling's inputs
+   under Core Drilling, slab sawing's under Slab Sawing, in the order they
+   picked them.
+5. **Notes** section.
+6. **Photos, optional here** — and if they add them here, the software must know
+   they are NOT required again at the photo step (batch 2a). Adding a photo
+   twice because the app forgot is exactly the kind of friction that stops them
+   adding any.
+7. **Difficulty**: keep easy / moderate / difficult, but **attach a number** to
+   each so the office can compare across jobs and operators rather than reading
+   adjectives.
+8. **"Rate your helper for the day"** — 1–10 plus optional notes. Stored and
+   visible to the office; feeds the HELPER rating track (batch 9b), which is
+   graded by the operator they worked with and by the supervisor.
 
 ---
 
@@ -341,6 +376,22 @@ CUSTOMER rating track, batch 9b).
 currently running for them rather than being stuck on the one they just signed.
 Portal tokens are per-customer with an optional job pin — check how a contact
 with multiple live jobs resolves today before building.
+
+---
+
+## BATCH 12 — tenant branding on the operator screens (added Aug 7)
+
+The location card, the site-contact card and the standby-time card carry
+**hardcoded colours**. They must come from the tenant's branding.
+
+Patriot is tenant #1, not the only tenant — every other company that comes on
+gets its own company code and its own colours, and the operator screens have to
+follow that automatically. `BrandingProvider` / `tenant_branding` already drive
+the login page and the emails; the operator ticket should read the same source
+rather than carrying its own palette.
+
+Small change, but it is the difference between a white-label platform and one
+that is quietly hardcoded to the first customer.
 
 ---
 
