@@ -222,12 +222,14 @@ behind anything (a team member has no equipment-checklist responsibility):
   • **The operator's phone number** — working with Zack means Zack's number is
     right there. This is the genuinely missing piece.
 
-`profiles.phone` is null or empty on essentially every real crew member
-(checked Aug 7 — even the founder's own profiles had none until today), so the
-ticket must handle "no number on file" gracefully AND offer a way to add it
-rather than showing a blank. Decide who may edit: the person themselves always,
-probably admin/ops too; never let one crew member silently overwrite another's
-contact details.
+⚠️ **CORRECTION (Aug 7):** I first reported these numbers as missing. They are
+not. `profiles` has **two** phone columns — signup and invite write
+`phone_number`, which is populated for every active crew member, while `phone`
+is empty. I read `phone`. The founder was right that the data is collected.
+See **batch 10a** — fix the column before building this, then the number is
+simply there to read. Still handle "no number on file" gracefully, and decide
+who may edit: the person themselves always, probably admin/ops too; never let
+one crew member silently overwrite another's contact details.
 
 **9b. Ratings — who grades whom.** Never one blended score; each SOURCE keeps its
 own average and its own count.
@@ -248,6 +250,37 @@ from twelve and must not look like it.
 
 ---
 
+## BATCH 10 — the phone-column bug + notifications centre (added Aug 7)
+
+**10a. `profiles` has TWO phone columns and everything reads the empty one.**
+*(P0 — do this first; it unblocks 9a.)*
+Signup and the invite flow write **`phone_number`**; it is populated for every
+active Patriot person. **`phone` is NULL for all of them.** Any code reading
+`phone` sees nothing — which is why crew numbers look missing across the app,
+and why the founder was told the data had never been collected. It had.
+
+Audit both columns' readers and writers, make `phone_number` canonical (it holds
+the real data — renaming a populated column is the risky direction), and
+**normalise on write**: live values include `(864) 275-0064`, `+4706586313` and
+`470-658-6313` all at once, and SMS needs a predictable shape.
+
+**10b. Notifications centre.** Admin should SEND, not only receive.
+  • Choose recipients — one operator, several, or all.
+  • Attach an ACTION the recipient ticks off, same pattern as the equipment
+    checklist: "verify your phone number", "edit your phone number", "your
+    personal info is incomplete" — and let them update it from that prompt.
+  • Time-off decisions send the confirmation back to the requester.
+  • **See and control the AUTOMATED notifications too** — clock-in, work-performed,
+    clock-out, dispatch, waiver chase, midday — at minimum on/off and timing.
+
+*Build note:* there are already two notification tables — `notifications` (what
+the bell reads) and `schedule_notifications`. Writing to only one is exactly why
+PM hand-backs went unseen. Be explicit about which is canonical instead of
+adding a third path. The founder asked that this be **merged into the dashboard
+grouping work (batch 5 / task #56)** rather than becoming another top-level tab.
+
+---
+
 ## Working rules for this rebuild
 
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
@@ -257,6 +290,13 @@ from twelve and must not look like it.
   Aug 6 is why.)
 - **A disabled control must say why.** Devin lost three days to a button that
   was simply below the fold.
+- **Before reporting data as "missing", check for a second column.** `profiles`
+  has both `phone` and `phone_number`; reading the wrong one produced a
+  confident, wrong report to the founder. Read/write path mismatches are the
+  single most common defect class in this codebase.
+- **Merge overlapping tasks in this file rather than letting them multiply.**
+  The founder repeats himself across sessions by design; the file should stay
+  short enough to read in one sitting.
 
 ## Answered by the founder
 
