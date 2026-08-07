@@ -154,6 +154,29 @@ it BELOW Start In Route, so it appears once he's travelling/arrived — which is
 when he can actually do something about it. This is a placement change only; the
 send timing is right as it is.
 
+**6c. STILL OPEN — the ticket must KNOW when it's been signed digitally.**
+*(founder, Aug 7 — "the ticket must know that a field is missing, and when that
+field is proven true, that changes their ticket")*
+
+Half of this exists: `WaiverBanner` already fetches
+`GET /api/job-orders/[id]/waiver` and renders three states — **signed**
+("Waiver signed by {name}"), **sent but unsigned**, and **not sent** — with
+Resend / Sign-in-person on the unsigned ones.
+
+**The gap is that it only fetches ONCE, on mount.** If the site contact signs on
+their phone while the operator has the ticket open — which is exactly the case
+the founder describes — the operator's screen still says "not signed yet" and
+he goes chasing a signature that already exists.
+
+Needs: re-check the waiver status when the ticket regains focus, on a light
+poll while a waiver is outstanding, and after any In Route / arrival transition.
+When it flips to signed, say so plainly — **"Waiver signed ✓"** — so the crew
+stop chasing it and can start work.
+
+After In Route, the ticket should show, together: **address · site contact ·
+additional notes · the waiver state and its action**. That grouping is what the
+operator needs in front of him on arrival.
+
 **6b. STILL OPEN — one waiver, one wording.** See batch 8: "Sign in person"
 opens a different page carrying different, unreviewed text. That matters more
 now that the founder has confirmed on-site signing is a normal path, not an edge
