@@ -1,6 +1,74 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Aug 6, 2026 (Opus 5) | **Branch:** `main` | **Prod:** ✅ LIVE — everything pushed through `45850db8`. Working tree clean.
+**Last updated:** Aug 7, 2026 (Opus 5) | **Branch:** `fix/operator-walkthrough-p0` (4 commits, **UNPUSHED — awaiting founder go-ahead; he has spent $15 on Vercel and asked to batch pushes**) | **Prod:** ✅ LIVE on `main` through `9dcc2b88`.
+
+> ## 📌 Aug 7 (Opus 5) — tasks #64, #66, #60. Three review rounds, every fix verified against production data or in the live app.
+>
+> **THE THEME, again:** the read path not matching the write path, failing silently — plus a new
+> variant: **software that reports success it never checked**, and **software that shouts about a
+> failure that didn't happen**. Both cost a crew member time on site.
+>
+> ### Task #64 — the four bugs from the founder's operator walkthrough
+> - **"Add Another" → blank page.** `handleAddMore` cleared `currentItem` but left
+>   `showQuantityModal` true; the detail panel, the search box, the work-type picker and the
+>   bottom bar are ALL gated on `!showQuantityModal`.
+> - **The work-item dropdown had no way out.** Opened on focus, ignored taps away and Escape.
+>   Now pointerdown-outside + Escape + a 44px close button. Taps INSIDE still select (verified).
+> - **"Send Link & Complete Job" gave no feedback.** The toast is `z-50`; every modal is also
+>   `z-50` but LATER in the DOM, so it rendered *behind* the overlay. Raised to `z-[100]`, added
+>   an inline error in the panel, and started checking the SMS + daily-log + completion-request
+>   responses — all three were fired and ignored, so a failed text still said "Link Sent!".
+> - **"Rate your crew" never went away — because it had NEVER WORKED.** The client fetched form
+>   questions from `/api/admin/rating-forms/[id]`, which is `requireAdmin`; every eligible rater
+>   is an operator/apprentice/supervisor, so it 403'd, the error was swallowed, and the Rate
+>   button rendered nothing. `rating_submissions` had **zero rows in production**. Questions now
+>   ship with the pending prompt. **First rating ever recorded during this session's testing.**
+>   Separately, the tenant had TWO byte-identical active `rating_forms` (created 3 min apart in
+>   May) so "already rated" keyed on `form_id` left the duplicate's prompt — now keyed on
+>   (ratee, job). Duplicate form set `is_active=false` in prod.
+>
+> ### Task #66 — the dashboard was lying
+> - **"Jobs Today" read 0/1 while the board listed 8.** `.eq('scheduled_date', today)` counts jobs
+>   that *start* today; a multi-day job vanishes from the count the day after it begins. Now uses
+>   the schedule board's own span predicate + its `job_daily_assignments` overlay, so the tile and
+>   the board cannot disagree. Verified live: tile 8, board 8.
+> - **Notifications "wouldn't stay dismissed."** Mark-all-read was never broken. The work-items
+>   route inserted a fresh row per admin on EVERY save of the work-performed form. 30 of his 46
+>   unread were `work_performed`, mostly literal repeats — two 27 seconds apart. Now ONE live row
+>   per (admin, job, operator, tenant-day), and it **collapses existing duplicates as each job is
+>   next saved**, so his backlog drains on its own.
+>
+> ### Task #60 — `profiles` has two phone columns
+> `lib/profile-phone.ts` is now the single place that knows: `PROFILE_PHONE_SELECT`,
+> `readProfilePhone()` (canonical `phone_number` first), `normalizeProfilePhone()` on write.
+> Fixed two timecard routes and three cron SMS routes that read the legacy column *first*.
+> ⚠️ **NOT backfilled, deliberately** — the only two rows with `phone` are both the founder's own
+> accounts and the columns DISAGREE there. Logged as a founder decision in `BACKLOG.md`.
+>
+> ### New shared helpers (reuse these)
+> - `lib/dates.ts` → **`startOfDayUTC(ymd, tz)`** — the bookend to `endOfDayUTC`. Use for any
+>   "since the start of today" comparison against a `timestamptz`. `setUTCHours(0,0,0,0)` puts
+>   that boundary at **8pm ET** and breaks exactly when crews are wrapping up.
+> - `lib/tenant-timezone.ts` → **`tenantDayStartUTC(tenantId)`**.
+> - `lib/profile-phone.ts` → the phone-column helpers above.
+>
+> ### Things I got wrong this session (caught by the review agents, so run them)
+> - I claimed PostgREST won't AND two `.or()` params. **False** — `postgrest-js` `or()` calls
+>   `searchParams.append`. My JS workaround ran *after* the row limit and could silently drop a
+>   user's jobs — the same under-reporting I was fixing. Verify claims about libraries in
+>   `node_modules`, not from memory.
+> - I keyed the notification dedupe on UTC midnight in a tenant that runs on Eastern.
+> - I made a 409 from `completion-request` an error. 409 means "already submitted", which is what
+>   a *successful* first send produces — so resending a link told the operator to go find
+>   dispatch about a job that was fine.
+>
+> ### State
+> - **4 commits on `fix/operator-walkthrough-p0`, nothing pushed.** 699 tests pass (up from 686),
+>   `tsc` clean. The 2 failing suites are the known pre-existing `postal-mime`/`resend` import.
+> - **DEMO-2026-000002 reset to the very top of the flow** — status `scheduled`, work_items and
+>   the day log cleared, and `in_route_at`/`arrived_at_jobsite_at`/`work_started_at` nulled (without
+>   that last part the ticket renders as already under way).
+> - **NEXT: Batch 1** of `docs/plans/OPERATOR_FLOW_REBUILD.md` — the entry-flow rebuild. Not started.
 
 > ## 📌 Aug 5–6 (Opus 5) — bug-hunting on a live system. 12 pushes, all verified against production data.
 >
