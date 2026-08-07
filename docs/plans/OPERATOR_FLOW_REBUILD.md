@@ -12,6 +12,16 @@ very start with In Route untapped.
 Logins: `zztest.operator@pontifexqa.com` / `zztest.helper@pontifexqa.com`,
 password `DemoTest2026!`, company code `PATRIOT`.
 
+**Founder / demo site contact:** Andres Altamirano — **470-658-6313**. This is
+the number to put on any demo ticket so he receives the waiver, the customer
+notifications and the portal link himself. NEVER seed a demo with an invented
+number that might reach a real person; use his, or the reserved 555-01xx range.
+
+⚠️ **Seeding scope_details — use the keys the display actually reads**, or the
+fields render as "-". Cuts: `linear_feet`, `depth`, `num_cuts`. Holes: `qty`,
+`bit_size`, `depth`. (`length`/`width` are the AREA-mode keys and do not render
+in the cuts table — that mistake made the first demo ticket look half-empty.)
+
 ---
 
 ## BATCH 1 — the entry flow stops fighting them  ← START HERE
@@ -144,6 +154,30 @@ already on site; just stop it being the first thing he sees before leaving.
 The send + reminder machinery in `lib/waiver-dispatch.ts` already fires on the
 first In Route tap — this is about WHERE the operator-facing card lives in the
 flow, not about re-plumbing the send.
+
+---
+
+## BATCH 7 — equipment intelligence (added Aug 7, explicitly NOT urgent)
+
+**7a. Recommend equipment from the physics.** Floor sawing at 12in thick needs a
+30in blade and a 30in guard — usable depth is roughly (blade ÷ 2) minus arbor
+and guard allowance. Encode the table Patriot actually uses and recommend from
+it. **This part must never be "learned"**: it is a fact, and a wrong guess sends
+a crew out with a blade that cannot reach the depth.
+
+**7b. Learn from what PMs actually pick.** Today, equipment added that isn't in
+the quick-add list renders OFF TO THE SIDE as free text instead of matching the
+catalogue items. It should (a) render identically, and (b) be saved against the
+WORK TYPE it was chosen for, so next time that work type is scoped it is
+offered. Over time the catalogue reflects how Patriot really works rather than
+what was hardcoded.
+
+*Cautions to state out loud when building:* recommend, never auto-add — a crew
+arriving without gear because software silently dropped it is far worse than an
+extra tick box. Frequency is not correctness: if three PMs pick the wrong blade
+the system will cheerfully learn the wrong blade, so the physics table stays
+authoritative and learning may only SUGGEST. Tenant-scoped. And always show WHY
+("30in blade — needed for 12in depth") so an operator can overrule it knowingly.
 
 ---
 
