@@ -458,6 +458,39 @@ His words: "I would like to be able to actually manipulate and use the data that
 we are collecting." Until that exists, every rating the crew submits is going
 into a hole.
 
+## BATCH 15 — shop time (added Aug 7, closes the operator walkthrough)
+
+Applies to **operators and team members alike**.
+
+**15a. "Switch to shop time" below Clock Out.** They're already clocked in —
+they should not have to clock out and clock back in just to change where they
+are. Switching creates a **shop ticket** on their schedule automatically: a very
+simple form asking what they did at the shop, in the same spirit as the team
+member's "how did you help the operator". The result is that jobsite hours and
+shop hours are separable, and each carries a record of what was actually done.
+
+**15b. A shop page for the office** — shop tickets only, so you can see who is
+at the shop and what they did. His reasoning: three or four hours at the shop
+matters, one or two doesn't. Today that time can sit inside field time and be
+invisible.
+
+**15c. The prompt is the mechanism.** If they pressed Job Completed and are
+**still clocked in an hour later**, ask: *"Switch to shop time, or stay on field
+time?"* Choosing shop time switches them and opens the shop ticket. No nagging
+before that hour.
+
+> ⚠️ **RETRACTED BY THE FOUNDER — DO NOT BUILD.** He first suggested letting
+> admin reassign or split someone's time after the fact, then withdrew it:
+> *"if they stayed at the shop and didn't put shop time, that falls on us
+> because we should tell them."* The prompt in 15c is the fix. Retroactively
+> editing someone's recorded hours is not, and should not be reintroduced.
+
+**15d. Late entry, and courtesy about it.** They should be able to enter work
+completed **late** if they forgot during the day — they shouldn't need to, but
+the system must never trap the record. And when fields are entered **after they
+have clocked out**, do **not** fire the contractor SMS. Nobody wants a 10pm text
+about a job that finished at 4. Same for a continuing job: no dispatch noise.
+
 ---
 
 ## Working rules for this rebuild
