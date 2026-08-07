@@ -85,6 +85,23 @@ Order on the page, top to bottom:
 8. **"Rate your helper for the day"** — 1–10 plus optional notes. Stored and
    visible to the office; feeds the HELPER rating track (batch 9b), which is
    graded by the operator they worked with and by the supervisor.
+   **If there was more than one helper, rate each of them separately.**
+
+**Per-work-type additions (Aug 7):**
+- **Core drilling: "on wall" or "on floor".** The fields themselves read well;
+  what's missing is WHERE. A hole in a wall is a different job from one in a
+  floor.
+- **Setup difficulty**, separate from the work itself — a wall core needing a
+  ladder is harder to set up than one at waist height, and that cost is real
+  even when the hole is identical.
+- **"Was any equipment required to perform the work above?"** asked once at the
+  end. Yes → a type-ahead equipment field: matches surface as they type, and if
+  it isn't there they add it and **it is saved for next time**. This is the
+  same growing-catalogue idea as batch 7b — build it once.
+
+**Previous work performed, on this page.** They should be able to see what has
+already been done on this job without leaving the form: linear feet done vs
+remaining, per work type. Read-only.
 
 ---
 
@@ -392,6 +409,54 @@ rather than carrying its own palette.
 
 Small change, but it is the difference between a white-label platform and one
 that is quietly hardcoded to the first customer.
+
+## BATCH 13 — progress, completion and reviews (added Aug 7, full walkthrough)
+
+**13a. Delete the "update job progress" step.** The operator should never be
+asked to update progress by hand — the software already has the numbers he just
+typed. Progress derives from the work items (that plumbing exists,
+`lib/job-progress.ts`). Asking him to restate it is duplicate data entry and a
+chance to disagree with itself.
+
+**13b. Original scope vs added work must be visibly different.** When the site
+contact adds work, progress should show the ORIGINAL SCOPE and the ADDED SCOPE
+in **different colours**, not just different labels — so the distinction is
+readable at a glance rather than requiring someone to read a legend.
+
+**13c. Smart completion — don't ask "done for today" on the last day.** If the
+job was scheduled to finish today, skip that question and offer the real
+choices: **Complete job — get signature on site**, or **send the completion
+link**. Asking someone to choose "done for today" on a job that ends today is
+asking them to get it wrong.
+
+**13d. "Send link to review operator" after completion.** Once the job is
+complete, a button that texts the site contact a link to review the operator,
+walking them through it. This feeds the CUSTOMER rating track (batch 9b).
+*Keep* "show directions back to the shop" — the founder called it a great touch.
+
+**13e. Rating completion is PER RATER.** "Rate your crew" must flip to a done
+state for whoever has already rated, independently of the other side. The team
+member rating the operator does not mean the operator has rated the helper.
+
+**13f. The helper's rating and work log belong on the ticket.** Saved into the
+active job where the helper's work performed already sits, openable by the
+office so they can see what the helper did AND what the operator said about them.
+
+---
+
+## BATCH 14 — do something with the data (added Aug 7)
+
+*The founder has raised this three times. It is the point of collecting any of
+it, and it keeps being deferred.*
+
+A place where the ratings become usable: **average rating and average review per
+person**, per source (batch 9b), plus the questions he actually wants answered —
+**who is the top-reviewed operator**, how someone trends over time, who is
+slipping. Counts beside every average.
+
+His words: "I would like to be able to actually manipulate and use the data that
+we are collecting." Until that exists, every rating the crew submits is going
+into a hole.
 
 ---
 
