@@ -78,6 +78,16 @@ export default function JobDetailPage() {
   // Equipment checklist state
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
   const [workDetailsOpen, setWorkDetailsOpen] = useState(true);
+  /**
+   * Equipment Confirmation starts COLLAPSED once the crew is on the road.
+   *
+   * WHY (founder, 1b): he tapped In Route, backed out to the home screen — as
+   * operators will, since they won't sit with the app open — and coming back
+   * was greeted by the equipment step again, ticked, reading "Equipment
+   * confirmed — checklist not required". A step you have already completed
+   * should not be the first thing you see; what you need on the road is where
+   * you're going and who to call. Still one tap away for anyone who wants it.
+   */
   const [equipmentOpen, setEquipmentOpen] = useState(true);
   const [contactOpen, setContactOpen] = useState(true);
   const [crewOpen, setCrewOpen] = useState(true);
@@ -130,6 +140,12 @@ export default function JobDetailPage() {
               ...found,
               isHelper: helperView,
             });
+            // Collapse the (already-completed) equipment step once they've set
+            // off — see the comment on equipmentOpen. Anything before In Route
+            // still leads with it, because there it IS the next thing to do.
+            if (['in_route', 'on_site', 'in_progress', 'working', 'pending_completion', 'completed'].includes(found.status)) {
+              setEquipmentOpen(false);
+            }
             const daysWorked = found?.total_days_worked || 0;
             setDayNumber(daysWorked + 1);
 
@@ -860,8 +876,15 @@ export default function JobDetailPage() {
         {/* ── FULL OPERATOR JOB VIEW ────────────────────────────────────── */}
         {job.status !== 'in_route' && !jobIsHelper && <>
 
-        {/* Equipment already confirmed banner */}
-        {equipmentAlreadyConfirmed && (
+        {/* Equipment already confirmed banner.
+            Only BEFORE they set off. Once In Route is tapped this is the
+            founder's 1b complaint verbatim — coming back to the ticket and
+            being greeted by the equipment step again, ticked, reading
+            "Equipment confirmed — checklist not required". At that point it
+            answers a question nobody is asking; what they need on site is the
+            address, the contact and the work. The collapsed Equipment
+            Confirmation panel further down still says so for anyone checking. */}
+        {equipmentAlreadyConfirmed && !inRouteReached && (
           <div className="bg-gradient-to-r from-brand to-brand-accent text-white px-4 py-3 rounded-xl text-base font-semibold flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
             Equipment confirmed — checklist not required
@@ -1469,7 +1492,7 @@ export default function JobDetailPage() {
                 className="w-full py-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl font-bold text-base transition-all shadow-lg flex items-center justify-center gap-3"
               >
                 <PlayCircle className="w-6 h-6" />
-                {job.status === 'in_route' ? 'Continue to Jobsite' : isPendingCompletion ? 'View Work Log' : 'Continue Work'}
+                {job.status === 'in_route' ? 'Continue to Jobsite' : isPendingCompletion ? 'View Work Log' : 'Input Work Performed'}
               </button>
             ) : (
               <button
