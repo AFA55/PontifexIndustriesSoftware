@@ -13,6 +13,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireScheduleBoardAccess, resolveTenantScope } from '@/lib/api-auth';
+import { CREW_SLOT_ROLES } from '@/lib/rbac';
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,7 +51,11 @@ export async function GET(request: NextRequest) {
       .from('profiles')
       .select('id, full_name, role, skill_level_numeric, active')
       .eq('tenant_id', tenantId)
-      .in('role', ['operator', 'apprentice'])
+      // Supervisors and ops managers can be dispatched into a crew slot too
+      // (founder, Aug 9). Excluding them here made a job assigned to David
+      // silently VANISH from the crew grid — it matched no operator row and the
+      // unassigned bucket only takes jobs with no assignee at all.
+      .in('role', CREW_SLOT_ROLES as unknown as string[])
       .order('full_name', { ascending: true });
 
     // Fetch all jobs in the date range (assigned + unassigned)

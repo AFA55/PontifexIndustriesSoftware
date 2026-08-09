@@ -19,6 +19,7 @@ import {
 } from '@/lib/geolocation';
 import { estimateDrive } from '@/lib/drive-time';
 import { findUnfinishedTickets, type UnfinishedTicketJob } from '@/lib/unfinished-tickets';
+import { canBeCrewMember } from '@/lib/rbac';
 
 /**
  * Write one "you left this ticket unfinished" bell notification per job,
@@ -163,7 +164,11 @@ export async function POST(request: NextRequest) {
       // longer silence the warning, which was why it almost never fired.
       // "Done for Today" on multi-day jobs stamps day_completed_at, so it
       // still must never trip this.
-      if (userRole === 'operator') {
+      // Slot, not role: findUnfinishedTickets now checks the operator slot
+      // first and falls back to the helper slot, so an apprentice leading a job
+      // and a supervisor/ops manager on one are both gated. Guarding on
+      // `role === 'operator'` here would put the hole straight back.
+      if (canBeCrewMember(userRole)) {
         const found = await findUnfinishedTickets({
           userId: auth.userId,
           role: userRole,

@@ -2140,6 +2140,7 @@ export default function ScheduleBoardPage() {
                 canEdit={canEdit}
                 isAvailable={(operatorJobs[idx] || []).length === 0}
                 allOperators={allOperatorsList}
+                operatorSlotNotes={operatorSlotNotes}
                 allHelpers={allHelpersList}
                 busyOperators={busyOperators}
                 busyHelpers={busyHelpers}

@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { CREW_SLOT_ROLES } from '@/lib/rbac';
 import {
   SERVICE_SKILL_MAP,
   parseServiceCodes,
@@ -66,7 +67,11 @@ export async function GET(request: NextRequest) {
     let opQuery = supabaseAdmin
       .from('profiles')
       .select('id, full_name, role, active, skill_level_numeric, tasks_qualified_for')
-      .in('role', ['operator', 'apprentice'])
+      // Supervisors and ops managers can be dispatched into a crew slot too
+      // (founder, Aug 9). Excluding them here made a job assigned to David
+      // silently VANISH from the crew grid — it matched no operator row and the
+      // unassigned bucket only takes jobs with no assignee at all.
+      .in('role', CREW_SLOT_ROLES as unknown as string[])
       .order('full_name');
     if (tenantId) opQuery = opQuery.eq('tenant_id', tenantId);
 

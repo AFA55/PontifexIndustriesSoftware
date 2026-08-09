@@ -146,3 +146,33 @@ describe('helperUnfinishedJobs', () => {
     expect(helperUnfinishedJobs(jobs, logs)).toEqual([]);
   });
 });
+
+// ── Who the clock-out gate applies to ───────────────────────────────────────
+// Regression guard for the Aug 9 bug: findUnfinishedTickets branched on the
+// ROLE, so an apprentice dispatched as LEAD (Javier — which the founder
+// explicitly asked for) was queried against `helper_assigned_to`, matched
+// nothing, and clocked out clean without filing the operator ticket he owed.
+// Supervisors and ops managers hit `return null` and had no gate at all.
+describe('canBeCrewMember — who the ticket gate covers', () => {
+  const { canBeCrewMember } = require('./rbac');
+
+  it('covers everyone who can be dispatched into a crew slot', () => {
+    expect(canBeCrewMember('operator')).toBe(true);
+    expect(canBeCrewMember('apprentice')).toBe(true);
+    // These two were silently exempt from the clock-out ticket gate.
+    expect(canBeCrewMember('supervisor')).toBe(true);
+    expect(canBeCrewMember('operations_manager')).toBe(true);
+  });
+
+  it('does not cover office-only roles, who own no tickets', () => {
+    expect(canBeCrewMember('admin')).toBe(false);
+    expect(canBeCrewMember('salesman')).toBe(false);
+    expect(canBeCrewMember('shop_manager')).toBe(false);
+  });
+
+  it('is safe for a missing role', () => {
+    expect(canBeCrewMember(null)).toBe(false);
+    expect(canBeCrewMember(undefined)).toBe(false);
+    expect(canBeCrewMember('')).toBe(false);
+  });
+});

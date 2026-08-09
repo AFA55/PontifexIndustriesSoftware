@@ -134,8 +134,13 @@ const NAV_SECTIONS: NavSection[] = [
     label: 'MY ACCOUNT',
     accent: 'text-emerald-400',
     items: [
-      { label: 'My Timecard', href: '/dashboard/timecard', icon: Clock, roles: ['shop_manager', 'shop_help', 'supervisor'] },
-      { label: 'Request Time Off', href: '/dashboard/request-time-off', icon: CalendarOff, roles: ['shop_manager', 'shop_help', 'supervisor'] },
+      // operations_manager included (founder, Aug 9): he can be dispatched onto a
+      // job now, and the clock-in reminder cron already texts him a link to
+      // /dashboard/timecard — a page he otherwise had no way to reach, since
+      // management roles are redirected off /dashboard and the admin layout has
+      // no clock widget.
+      { label: 'My Timecard', href: '/dashboard/timecard', icon: Clock, roles: ['shop_manager', 'shop_help', 'supervisor', 'operations_manager'] },
+      { label: 'Request Time Off', href: '/dashboard/request-time-off', icon: CalendarOff, roles: ['shop_manager', 'shop_help', 'supervisor', 'operations_manager'] },
       // Field-facing issue reporting — operators/apprentices + field/shop roles
       // can report a bug or request a feature. (Page built by the feedback agent.)
       { label: 'Report an Issue', href: '/dashboard/feedback/new', icon: MessageSquareWarning, roles: ['operator', 'apprentice', 'shop_manager', 'shop_help', 'supervisor', 'inventory_manager'] },

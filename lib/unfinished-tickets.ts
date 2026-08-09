@@ -28,6 +28,7 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { canBeCrewMember } from '@/lib/rbac';
 
 export type ClockOutWarningType = 'incomplete_tickets_warning' | 'helper_work_log_warning';
 
@@ -144,7 +145,22 @@ export async function findUnfinishedTickets(opts: {
 }): Promise<UnfinishedTicketsResult | null> {
   const { userId, role, tenantId, today } = opts;
 
-  if (role === 'operator') {
+  // Anyone who can be put on a crew gets checked — and by SLOT, not by role.
+  //
+  // THE BUG (found Aug 9): this branched on the role alone. `role ===
+  // 'apprentice'` queried `helper_assigned_to`, so Javier — an apprentice
+  // dispatched as LEAD, which the founder asked for and the ticket already
+  // supports — matched nothing and clocked out clean, never prompted for the
+  // operator ticket he owed. Supervisors and operations managers fell through
+  // to `return null`: no gate at all, so David and the founder could work a job
+  // and file nothing with no warning to anyone.
+  //
+  // Operator slot is checked FIRST: it carries the heavier obligation (the full
+  // work-performed ticket), and someone leading one job while helping on
+  // another should be chased for the lead ticket.
+  if (!canBeCrewMember(role)) return null;
+
+  {
     let q = supabaseAdmin
       .from('job_orders')
       .select('id, job_number, customer_name')
@@ -158,24 +174,28 @@ export async function findUnfinishedTickets(opts: {
     const { data: candidateJobs } = await q;
 
     const jobs = (candidateJobs ?? []) as UnfinishedTicketJob[];
-    if (jobs.length === 0) return { blockType: 'incomplete_tickets_warning', jobs: [] };
 
-    const { data: todaysLogs } = await supabaseAdmin
-      .from('daily_job_logs')
-      // day_completed_at is what separates a REAL submission from a draft /
-      // day-note skeleton row — selecting only job_order_id was the bug.
-      .select('job_order_id, day_completed_at')
-      .eq('operator_id', userId)
-      .eq('log_date', today)
-      .in('job_order_id', jobs.map((j) => j.id));
+    // Only fall through to the helper gate when they are NOT leading anything
+    // today. (This used to `return { jobs: [] }` here, which is why the helper
+    // branch below was unreachable for anyone with an operator role.)
+    if (jobs.length > 0) {
+      const { data: todaysLogs } = await supabaseAdmin
+        .from('daily_job_logs')
+        // day_completed_at is what separates a REAL submission from a draft /
+        // day-note skeleton row — selecting only job_order_id was the bug.
+        .select('job_order_id, day_completed_at')
+        .eq('operator_id', userId)
+        .eq('log_date', today)
+        .in('job_order_id', jobs.map((j) => j.id));
 
-    return {
-      blockType: 'incomplete_tickets_warning',
-      jobs: operatorUnfinishedJobs(jobs, (todaysLogs ?? []) as OperatorDailyLogRow[]),
-    };
+      return {
+        blockType: 'incomplete_tickets_warning',
+        jobs: operatorUnfinishedJobs(jobs, (todaysLogs ?? []) as OperatorDailyLogRow[]),
+      };
+    }
   }
 
-  if (role === 'apprentice') {
+  {
     // Mirror of the operator gate, minus parked/terminal states: a job parked to
     // Pending (on_hold) must NOT count as an outstanding helper ticket.
     let q = supabaseAdmin
@@ -206,6 +226,4 @@ export async function findUnfinishedTickets(opts: {
       jobs: helperUnfinishedJobs(jobs, (workLogs ?? []) as HelperWorkLogRow[]),
     };
   }
-
-  return null;
 }

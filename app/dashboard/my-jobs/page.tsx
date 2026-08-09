@@ -175,7 +175,7 @@ export default function MyJobsPage() {
 
       // Fetch jobs for the selected date (including completed for lookback)
       const res = await fetch(
-        `/api/job-orders?scheduled_date=${date}&include_helper_jobs=true&includeCompleted=true`,
+        `/api/job-orders?scheduled_date=${date}&include_helper_jobs=true&includeCompleted=true&as=operator`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
 
@@ -234,7 +234,7 @@ export default function MyJobsPage() {
       const weekStr = toDateString(weekAhead);
 
       const res = await fetch(
-        `/api/job-orders?date_from=${today}&date_to=${weekStr}&include_helper_jobs=true&includeCompleted=false`,
+        `/api/job-orders?date_from=${today}&date_to=${weekStr}&include_helper_jobs=true&includeCompleted=false&as=operator`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
 
@@ -268,12 +268,12 @@ export default function MyJobsPage() {
       // clock-out reminder has a landing place and late completion works)
       const authH = { headers: { Authorization: `Bearer ${session.access_token}` } };
       const [onHoldRes, inProgressRes, pendingCompletionRes, scheduledRes, assignedRes, inRouteRes] = await Promise.all([
-        fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false`, authH),
-        fetch(`/api/job-orders?status=in_progress&include_helper_jobs=true&includeCompleted=false`, authH),
-        fetch(`/api/job-orders?status=pending_completion&include_helper_jobs=true&includeCompleted=false`, authH),
-        fetch(`/api/job-orders?status=scheduled&include_helper_jobs=true&includeCompleted=false`, authH),
-        fetch(`/api/job-orders?status=assigned&include_helper_jobs=true&includeCompleted=false`, authH),
-        fetch(`/api/job-orders?status=in_route&include_helper_jobs=true&includeCompleted=false`, authH),
+        fetch(`/api/job-orders?status=on_hold&include_helper_jobs=true&includeCompleted=false&as=operator`, authH),
+        fetch(`/api/job-orders?status=in_progress&include_helper_jobs=true&includeCompleted=false&as=operator`, authH),
+        fetch(`/api/job-orders?status=pending_completion&include_helper_jobs=true&includeCompleted=false&as=operator`, authH),
+        fetch(`/api/job-orders?status=scheduled&include_helper_jobs=true&includeCompleted=false&as=operator`, authH),
+        fetch(`/api/job-orders?status=assigned&include_helper_jobs=true&includeCompleted=false&as=operator`, authH),
+        fetch(`/api/job-orders?status=in_route&include_helper_jobs=true&includeCompleted=false&as=operator`, authH),
       ]);
 
       const onHoldData = onHoldRes.ok ? (await onHoldRes.json()).data || [] : [];
@@ -327,7 +327,7 @@ export default function MyJobsPage() {
       const cutoffStr = toDateString(cutoff);
 
       const res = await fetch(
-        `/api/job-orders?includeCompleted=true&include_helper_jobs=true&date_from=${cutoffStr}`,
+        `/api/job-orders?includeCompleted=true&include_helper_jobs=true&date_from=${cutoffStr}&as=operator`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
 

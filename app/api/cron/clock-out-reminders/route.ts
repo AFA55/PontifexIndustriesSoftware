@@ -34,6 +34,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
 import { getTenantShopLocationOrDefault } from '@/lib/geolocation-server';
 import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
+import { CREW_SLOT_ROLES } from '@/lib/rbac';
 import {
   ESCALATION_AFTER_MINUTES,
   driveMinutesForJob,
@@ -249,7 +250,10 @@ interface DailyLogRow {
 }
 
 /** Field roles that get the ticket-completion nudge (never admins). */
-const REMINDED_ROLES = ['operator', 'apprentice'];
+// Anyone who can be put on a crew — a supervisor or ops manager who worked a
+// job owes the same ticket as the crew, and used to be dropped before the
+// slot-aware logic below ever ran.
+const REMINDED_ROLES = CREW_SLOT_ROLES as readonly string[];
 
 const JOB_SELECT =
   'id, job_number, customer_name, status, work_completed_at, drive_time, jobsite_latitude, jobsite_longitude, assigned_to, helper_assigned_to';

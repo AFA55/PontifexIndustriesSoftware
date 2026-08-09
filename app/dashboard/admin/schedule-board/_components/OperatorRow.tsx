@@ -24,6 +24,8 @@ interface OperatorRowProps {
   canEdit: boolean;
   isAvailable?: boolean;
   allOperators: string[];
+  /** See PersonDropdown.noteMap — labels the non-operators in the operator list. */
+  operatorSlotNotes?: Record<string, string>;
   allHelpers: string[];
   busyOperators: Record<string, string>; // name → current job customer_name
   busyHelpers: Record<string, string>;
@@ -90,6 +92,7 @@ function PersonDropdown({
   value,
   options,
   busyMap,
+  noteMap,
   placeholder,
   onSelect,
   colorScheme,
@@ -97,6 +100,9 @@ function PersonDropdown({
   value: string | null;
   options: string[];
   busyMap: Record<string, string>;
+  /** name → their day job ("helper", "supervisor", "ops manager") for anyone in
+   *  the operator list who isn't day-to-day an operator. */
+  noteMap?: Record<string, string>;
   placeholder: string;
   onSelect: (name: string | null) => void;
   colorScheme: { bg: string; text: string };
@@ -151,6 +157,11 @@ function PersonDropdown({
               >
                 <div>
                   <span className="font-medium">{name}</span>
+                  {noteMap?.[name] && (
+                    <span className="ml-1.5 text-[10px] font-semibold text-sky-600 dark:text-sky-400">
+                      {noteMap[name]}
+                    </span>
+                  )}
                   {busyJob && !isCurrent && (
                     <p className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">Assigned: {busyJob}</p>
                   )}
@@ -175,6 +186,7 @@ export default function OperatorRow({
   canEdit,
   isAvailable = false,
   allOperators,
+  operatorSlotNotes,
   allHelpers,
   busyOperators,
   busyHelpers,
@@ -289,6 +301,7 @@ export default function OperatorRow({
                     value={operatorName}
                     options={allOperators}
                     busyMap={busyOperators}
+                    noteMap={operatorSlotNotes}
                     placeholder="Select Operator"
                     onSelect={(name) => onChangeOperator?.(name)}
                     colorScheme={isBlocked ? { bg: 'bg-rose-100 dark:bg-rose-500/20', text: 'text-rose-700 dark:text-rose-300' } : colorScheme}

@@ -11,6 +11,7 @@ import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantShopContext, DEFAULT_TENANT_TIMEZONE } from '@/lib/geolocation-server';
 import { findUnfinishedTickets, type UnfinishedTicketJob, type ClockOutWarningType } from '@/lib/unfinished-tickets';
 import { endOfDayUTC } from '@/lib/dates';
+import { canBeCrewMember } from '@/lib/rbac';
 
 export async function GET(request: NextRequest) {
   try {
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
     // (findUnfinishedTickets returns null for them anyway).
     let unfinishedTickets: UnfinishedTicketJob[] = [];
     let unfinishedType: ClockOutWarningType | null = null;
-    if (auth.role === 'operator' || auth.role === 'apprentice') {
+    if (canBeCrewMember(auth.role)) {
       try {
         // Tenant-local calendar date (never toISOString — the recurring UTC
         // off-by-a-day bug); must match the date the clock-out gate uses.

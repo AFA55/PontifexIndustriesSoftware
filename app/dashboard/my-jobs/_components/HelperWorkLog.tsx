@@ -117,7 +117,7 @@ export default function HelperWorkLog({ jobId, jobNumber, customerName, job }: H
     try {
       const today = toDateString(new Date());
       const res = await fetch(
-        `/api/job-orders?scheduled_date=${today}&include_helper_jobs=true&includeCompleted=false`,
+        `/api/job-orders?scheduled_date=${today}&include_helper_jobs=true&includeCompleted=false&as=operator`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
 

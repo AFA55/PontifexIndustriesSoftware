@@ -298,6 +298,32 @@ export const ADMIN_CARDS: AdminCard[] = [
 // All card keys for iteration
 export const ALL_CARD_KEYS = ADMIN_CARDS.map(c => c.key);
 
+/**
+ * Roles that may be dispatched into a crew SLOT on a job.
+ *
+ * The office role someone holds is not the job they are doing today: Javier is
+ * an apprentice who leads jobs, David is a supervisor with scanning work of his
+ * own, and the founder is an operations manager who still goes out.
+ *
+ * ⚠️ Anything that decides "is this person doing field work today" must key off
+ * the SLOT they occupy on the job, not their role — the operator ticket already
+ * does. This list exists for the places that legitimately need to ask "could
+ * this person be on a crew at all" (dispatch pickers, the clock-out ticket
+ * gate). Reaching for a hardcoded `['operator','apprentice']` instead is how
+ * Javier ended up able to clock out without filing the ticket he owed.
+ */
+export const CREW_SLOT_ROLES = [
+  'operator',
+  'apprentice',
+  'supervisor',
+  'operations_manager',
+  'super_admin',
+] as const;
+
+export function canBeCrewMember(role: string | null | undefined): boolean {
+  return !!role && (CREW_SLOT_ROLES as readonly string[]).includes(role);
+}
+
 // ============================================================
 // Roles
 // ============================================================

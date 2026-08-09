@@ -107,7 +107,29 @@ export async function GET(request: NextRequest) {
       .single();
 
     const userRole = profile?.role || 'operator';
-    const isAdmin = ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'inventory_manager'].includes(userRole);
+
+    /**
+     * `?as=operator` — answer as a CREW MEMBER even for a management role.
+     *
+     * WHY (founder, Aug 9): he is an operations_manager who "does go do jobs
+     * sometimes", and David is a supervisor with jobs of his own. They reach
+     * the crew screen through the new "Open Operator View" card. Without this,
+     * an ops manager took the admin branch, which:
+     *   - returns the WHOLE tenant's jobs (the operator screen then relies on a
+     *     client-side filter to hide them — scoping that belongs on the server),
+     *   - never sets `viewer_is_helper` / `viewer_is_co_operator` /
+     *     `viewer_is_daily`, so a job he is on via `job_crew` or the per-day
+     *     ledger rather than the `assigned_to` column **did not appear at all**,
+     *   - never sets `day_ticket_status`, so his card lost the "you still owe
+     *     this ticket" badge,
+     *   - skips the `dispatched_at` gate, so undispatched work leaked in.
+     * In short: the founder's half of the feature did not work for the founder.
+     */
+    const asCrewMember = searchParams.get('as') === 'operator';
+
+    const isAdmin =
+      !asCrewMember &&
+      ['super_admin', 'operations_manager', 'admin', 'salesman', 'shop_manager', 'inventory_manager'].includes(userRole);
     const tenantId = await getTenantId(user.id);
 
     // Non-super-admins must have a resolved tenant; null means the profile lookup

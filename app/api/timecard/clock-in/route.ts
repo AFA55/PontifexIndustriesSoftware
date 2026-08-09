@@ -25,6 +25,7 @@ import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
 import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS, ShopOverride } from '@/lib/geolocation';
 import { resolveEffectiveStart, computeLate } from '@/lib/timecard-start';
 import { endOfDayUTC } from '@/lib/dates';
+import { canBeCrewMember } from '@/lib/rbac';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
@@ -606,7 +607,8 @@ export async function POST(request: NextRequest) {
     // powers the dashboard modal; /api/job-orders/[id]/status enforces it
     // server-side (overdue_ticket_block) so it can't be skipped.
     let overdueTickets: Array<{ id: string; job_number: string; customer_name: string; scheduled_date: string }> = [];
-    if (profile?.role === 'operator') {
+    // Anyone who can lead a job can carry an overdue ticket into the next day.
+    if (canBeCrewMember(profile?.role)) {
       try {
         const { data: overdueCandidates } = await supabaseAdmin
           .from('job_orders')
