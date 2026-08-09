@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
     // One read — both lists are drawn from it.
     const { data: crew, error: crewError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, avatar_url')
+      .select('id, full_name, email, role, avatar_url')
       .eq('tenant_id', tenantId)
       .eq('active', true)
       .in('role', OPERATOR_SLOT_ROLES)
@@ -92,9 +92,32 @@ export async function GET(request: NextRequest) {
       operations_manager: 'ops manager',
     };
 
-    const toEntry = (p: { id: string; full_name: string | null; role: string | null; avatar_url: string | null }) => ({
+    /**
+     * Names shared by more than one ACTIVE person in this list.
+     *
+     * The whole schedule board is keyed on NAME (`operatorIdMap: name → id`), so
+     * two people with the same `full_name` don't just look confusing — the
+     * second one silently overwrites the first in that map and dispatch lands on
+     * whichever won. The founder deliberately keeps two accounts (business and
+     * personal), so "just don't have duplicates" is not an answer we get to give.
+     * Where a name is ambiguous we append the email, which is the thing that
+     * actually distinguishes them, and the key becomes unique again.
+     */
+    const nameCounts = new Map<string, number>();
+    for (const p of rows) {
+      const n = (p.full_name || 'Unknown').trim();
+      nameCounts.set(n, (nameCounts.get(n) ?? 0) + 1);
+    }
+
+    const displayName = (p: { full_name: string | null; email: string | null }) => {
+      const base = (p.full_name || 'Unknown').trim();
+      if ((nameCounts.get(base) ?? 0) <= 1) return base;
+      return p.email ? `${base} (${p.email})` : base;
+    };
+
+    const toEntry = (p: { id: string; full_name: string | null; email: string | null; role: string | null; avatar_url: string | null }) => ({
       id: p.id,
-      name: p.full_name || 'Unknown',
+      name: displayName(p),
       avatarUrl: p.avatar_url || null,
       role: p.role || 'operator',
       /** Set when this person's day job is something other than operating.
