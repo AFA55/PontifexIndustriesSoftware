@@ -9,6 +9,7 @@ import {
 import { supabase } from '@/lib/supabase';
 import type { User } from '@/lib/auth';
 import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
+import OperatorViewCard from './OperatorViewCard';
 
 interface VisitRow {
   id: string;
@@ -505,6 +506,9 @@ export default function SupervisorDashboard({ user }: { user: User }) {
           />
         </div>
       </div>
+
+      {/* David runs jobs of his own — the door to the crew side. */}
+      <OperatorViewCard role={user?.role} />
 
       {/* Command Center launch (supervisor is an office/management role) */}
       <CommandCenterLaunch />

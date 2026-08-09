@@ -85,11 +85,12 @@ export default function ScheduleBoardPage() {
 
   // Crew roster from API
   const [allOperatorsList, setAllOperatorsList] = useState<string[]>([]);
-  /** Names in the operator dropdown whose role is `apprentice`. They are fully
-   *  assignable as lead — and get the operator workflow, because the ticket
-   *  branches on SLOT not role — but the office should be able to see who is
-   *  stepping up rather than reading a flat list. */
-  const [apprenticeOperatorNames, setApprenticeOperatorNames] = useState<Set<string>>(new Set());
+  /** Operator-dropdown name → what that person's day job is ("helper",
+   *  "supervisor", "ops manager"), for anyone who isn't day-to-day an operator.
+   *  They are fully assignable as lead — and get the operator workflow, because
+   *  the ticket branches on SLOT not role — but the office should see who is
+   *  stepping into the seat rather than reading a flat list. */
+  const [operatorSlotNotes, setOperatorSlotNotes] = useState<Record<string, string>>({});
   const [allHelpersList, setAllHelpersList] = useState<string[]>([]);
   const [operatorIdMap, setOperatorIdMap] = useState<Record<string, string>>({}); // name → id
   const [helperIdMap, setHelperIdMap] = useState<Record<string, string>>({}); // name → id
@@ -311,16 +312,17 @@ export default function ScheduleBoardPage() {
         const res = await apiFetch('/api/admin/schedule-board/operators');
         if (res.ok) {
           const json = await res.json();
-          const ops: { id: string; name: string; avatarUrl?: string | null; isApprentice?: boolean }[] = json.data?.operators || [];
+          const ops: { id: string; name: string; avatarUrl?: string | null; slotNote?: string | null }[] = json.data?.operators || [];
           const helpers: { id: string; name: string; avatarUrl?: string | null }[] = json.data?.helpers || [];
           setAllOperatorsList(ops.map(o => o.name));
           setAllHelpersList(helpers.map(h => h.name));
-          // Which of the operator-slot names are normally helpers. The board is
-          // keyed on name, so this is what lets a dropdown say "Javier (helper)"
-          // instead of quietly blurring the two roles together.
-          setApprenticeOperatorNames(
-            new Set(ops.filter(o => o.isApprentice).map(o => o.name))
-          );
+          // For operator-slot names whose day job is something else, what to
+          // call them. The board is keyed on name, so this is what lets a
+          // dropdown say "Javier (helper)" or "David schadt (supervisor)"
+          // instead of quietly blurring the roles together.
+          const notes: Record<string, string> = {};
+          ops.forEach(o => { if (o.slotNote) notes[o.name] = o.slotNote; });
+          setOperatorSlotNotes(notes);
           const opMap: Record<string, string> = {};
           ops.forEach(o => { opMap[o.name] = o.id; });
           setOperatorIdMap(opMap);
@@ -2278,7 +2280,7 @@ export default function ScheduleBoardPage() {
         <AssignOperatorModal
           job={assignTarget.job}
           allOperators={allOperatorsList}
-          apprenticeOperatorNames={apprenticeOperatorNames}
+          operatorSlotNotes={operatorSlotNotes}
           allHelpers={allHelpersList}
           busyOperators={busyOperators}
           busyHelpers={busyHelpers}
@@ -2292,7 +2294,7 @@ export default function ScheduleBoardPage() {
           canEdit={canEdit || userRole === 'admin' || userRole === 'salesman'}
           userRole={userRole}
           allOperators={allOperatorsList}
-          apprenticeOperatorNames={apprenticeOperatorNames}
+          operatorSlotNotes={operatorSlotNotes}
           allHelpers={allHelpersList}
           currentOperatorName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.operator ?? null : null}
           currentHelperName={editTarget.rowIndex !== null ? rowAssignments[editTarget.rowIndex]?.helper ?? null : null}

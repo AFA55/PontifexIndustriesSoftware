@@ -103,6 +103,31 @@ Order on the page, top to bottom:
 already been done on this job without leaving the form: linear feet done vs
 remaining, per work type. Read-only.
 
+**1e. Anyone on the crew can be put in the operator slot.** *(founder, Aug 9)*
+
+Two separate asks, same root idea: the ROLE someone holds in the office is not
+the same as the JOB they are doing today.
+
+- **Helpers** — ✅ DONE Aug 7. Javier is an apprentice who leads jobs. The board's
+  operator dropdown was hard-filtered to `role = 'operator'`.
+- **Supervisors** — David is a supervisor "but sometimes also has jobs of his
+  own that involve scanning", so supervisors must be assignable to the operator
+  slot too.
+- **Operations managers** — the founder does jobs himself.
+
+The workflow half needs NO work and must not be broken: the ticket branches on
+the **slot**, not the role (`app/dashboard/my-jobs/[id]/page.tsx`), so whoever
+sits in `assigned_to` runs the full operator flow. The only thing ever missing
+is being allowed into the dropdown.
+
+**1f. "Open Operator View" for management.** *(founder, Aug 9)*
+
+David (supervisor) and the founder (operations_manager) both need a card on
+their management dashboard that opens the operator side, so they can **view and
+submit their own tickets** — and a **button to get back to the management view**.
+Not a role change and not a second login: one person, two hats, a door between
+them that goes both ways.
+
 ---
 
 ## BATCH 2 — the order of the day

@@ -34,8 +34,8 @@ interface EditJobPanelProps {
   canEdit: boolean;
   userRole?: string;
   allOperators: string[];
-  /** Operator-slot names whose role is `apprentice` — see AssignOperatorModal. */
-  apprenticeOperatorNames?: Set<string>;
+  /** Operator-slot name → their day job — see AssignOperatorModal. */
+  operatorSlotNotes?: Record<string, string>;
   allHelpers: string[];
   currentOperatorName: string | null;
   currentHelperName: string | null;
@@ -53,7 +53,7 @@ interface EditJobPanelProps {
 }
 
 export default function EditJobPanel({
-  job, canEdit, userRole, allOperators, allHelpers, apprenticeOperatorNames,
+  job, canEdit, userRole, allOperators, allHelpers, operatorSlotNotes,
   currentOperatorName, currentHelperName,
   busyOperators, busyHelpers, operatorSkillMap,
   onSave, onChangeRequestSuccess, onClose, onViewNotes, onMakeWillCall, onRemoveFromSchedule, onDuplicate, onRefresh,
@@ -882,7 +882,7 @@ export default function EditJobPanel({
                             const skillLabel = skill !== null && skill !== undefined ? ` [Skill: ${skill}]` : '';
                             return (
                               <option key={name} value={name}>
-                                {name}{apprenticeOperatorNames?.has(name) ? ' (helper — will run the operator ticket)' : ''}{skillLabel}{busyOperators[name] && name !== currentOperatorName ? ` — On: ${busyOperators[name]}` : ''}
+                                {name}{operatorSlotNotes?.[name] ? ` (${operatorSlotNotes[name]} — will run the operator ticket)` : ''}{skillLabel}{busyOperators[name] && name !== currentOperatorName ? ` — On: ${busyOperators[name]}` : ''}
                               </option>
                             );
                           })}

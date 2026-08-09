@@ -6,13 +6,23 @@ export const dynamic = 'force-dynamic';
  * Access: admin, super_admin, salesman
  *
  * ── Who can go in the OPERATOR slot ──────────────────────────────────────────
- * Operators AND apprentices.
+ * Operators, apprentices, supervisors and operations managers.
+ *
+ * The office role someone holds is not the job they are doing today.
  *
  * WHY (founder, Aug 7): "sometimes we test helpers... I would like ability to
  * make them and assign them as operators, and if I do I would like them to have
  * to do operator workflow since they were assigned as operators." Javier is an
  * apprentice running a job as lead. The dropdown was hard-filtered to
  * `role = 'operator'`, so the office simply could not put him in the slot.
+ *
+ * WHY (founder, Aug 9): "David is supervisor but sometimes also has jobs of his
+ * own that involve scanning, so allow David or supervisors for that matter to be
+ * able to be assigned jobs" — and "I'm operations manager but I do go do jobs
+ * sometimes." Both now appear in the operator dropdown. They are NOT added to
+ * the helper list: nobody asked for a supervisor to be dispatched as somebody
+ * else's helper, and putting them there would clutter the pick the office makes
+ * every day.
  *
  * The second half of that ask is ALREADY true and must stay true: the operator
  * ticket decides which workflow to show from the SLOT, not the role — see
@@ -49,13 +59,18 @@ export async function GET(request: NextRequest) {
 
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
 
+    /** Roles that may be dispatched into the OPERATOR slot. */
+    const OPERATOR_SLOT_ROLES = ['operator', 'apprentice', 'supervisor', 'operations_manager'];
+    /** Roles offered in the HELPER slot. */
+    const HELPER_SLOT_ROLES = ['apprentice'];
+
     // One read — both lists are drawn from it.
     const { data: crew, error: crewError } = await supabaseAdmin
       .from('profiles')
       .select('id, full_name, role, avatar_url')
       .eq('tenant_id', tenantId)
       .eq('active', true)
-      .in('role', ['operator', 'apprentice'])
+      .in('role', OPERATOR_SLOT_ROLES)
       .order('full_name');
 
     if (crewError) {
@@ -67,23 +82,35 @@ export async function GET(request: NextRequest) {
     }
 
     const rows = crew || [];
+
+    /** What to call someone in the operator dropdown who isn't day-to-day an
+     *  operator, so the office can see who is stepping into the seat rather
+     *  than reading a flat list. */
+    const SLOT_NOTE: Record<string, string> = {
+      apprentice: 'helper',
+      supervisor: 'supervisor',
+      operations_manager: 'ops manager',
+    };
+
     const toEntry = (p: { id: string; full_name: string | null; role: string | null; avatar_url: string | null }) => ({
       id: p.id,
       name: p.full_name || 'Unknown',
       avatarUrl: p.avatar_url || null,
       role: p.role || 'operator',
-      /** True for an apprentice offered in the OPERATOR list, so the board can
-       *  mark them as normally-a-helper rather than silently mixing the roster. */
+      /** Set when this person's day job is something other than operating.
+       *  They are fully assignable and get the operator ticket either way. */
+      slotNote: p.role && p.role !== 'operator' ? SLOT_NOTE[p.role] ?? null : null,
+      /** Kept for the existing board consumers. */
       isApprentice: p.role === 'apprentice',
     });
 
-    // Operators first, then apprentices — the usual pick stays at the top.
+    // Operators first — the everyday pick stays at the top of the list.
     const operators = [
       ...rows.filter((p) => p.role === 'operator'),
-      ...rows.filter((p) => p.role === 'apprentice'),
+      ...rows.filter((p) => p.role !== 'operator'),
     ].map(toEntry);
 
-    const helpers = rows.filter((p) => p.role === 'apprentice').map(toEntry);
+    const helpers = rows.filter((p) => HELPER_SLOT_ROLES.includes(p.role || '')).map(toEntry);
 
     return NextResponse.json({
       success: true,

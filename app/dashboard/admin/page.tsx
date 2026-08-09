@@ -43,6 +43,7 @@ const AdminOnboardingTour = nextDynamic(() => import('@/components/AdminOnboardi
 
 // Supervisor dashboard branch — clock-in widget + site visit reports
 const SupervisorDashboard = nextDynamic(() => import('./_components/SupervisorDashboard'), { ssr: false, loading: () => null });
+import OperatorViewCard from './_components/OperatorViewCard';
 
 // Shop Manager + Shop Helper dashboards (Phase 1A skeletons)
 const ShopManagerDashboard = nextDynamic(() => import('./_components/ShopManagerDashboard'), { ssr: false, loading: () => null });
@@ -1053,6 +1054,9 @@ export default function AdminDashboard() {
           </div>
         )}
       </div>
+
+      {/* The founder runs jobs himself — the door to the crew side. */}
+      <OperatorViewCard role={user?.role} />
 
       {/* ── Operational Alerts strip ─────────────────────────────────────── */}
       {!dashLoading && dashData?.operational_alerts && (() => {

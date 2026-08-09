@@ -1,0 +1,49 @@
+'use client';
+
+import Link from 'next/link';
+import { HardHat, ChevronRight } from 'lucide-react';
+import { getCardPermission } from '@/lib/rbac';
+
+/**
+ * "Open Operator View" — the door from the management side to the crew side.
+ *
+ * WHY (founder, Aug 9): "David is supervisor but sometimes also has jobs of his
+ * own that involve scanning... I'm operations manager but I do go do jobs
+ * sometimes, and David and I should both have a card that says open operator
+ * view so we can view and submit tickets and be able to go back to management
+ * view with a button."
+ *
+ * One person, two hats. Not a role change and not a second login — the operator
+ * ticket already branches on the crew SLOT rather than the role, so a supervisor
+ * or ops manager dispatched into `assigned_to` runs the full operator flow. All
+ * that was missing was a way in, and a way back (that half lives on
+ * app/dashboard/my-jobs, which shows a "Back to management" button to these
+ * same roles).
+ *
+ * Visibility is driven by the `operator_view` card permission in lib/rbac.ts, so
+ * it follows the same role presets as every other card rather than a hardcoded
+ * role list here.
+ */
+export default function OperatorViewCard({ role }: { role: string | undefined }) {
+  // null user-permissions → falls through to the role preset, which is what we
+  // want: this card follows lib/rbac.ts rather than a hardcoded role list.
+  if (!role || getCardPermission(null, 'operator_view', role) === 'none') return null;
+
+  return (
+    <Link
+      href="/dashboard/my-jobs"
+      className="group flex items-center gap-4 rounded-xl border border-sky-200 dark:border-sky-800/50 bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-900/20 dark:to-blue-900/20 p-4 shadow-sm transition-all hover:shadow-md"
+    >
+      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-sky-500 shadow-sm">
+        <HardHat className="h-5 w-5 text-white" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-bold text-gray-900 dark:text-white">Open Operator View</p>
+        <p className="mt-0.5 text-xs text-gray-600 dark:text-white/60">
+          Run your own jobs — view and submit tickets like the crew. You can switch back anytime.
+        </p>
+      </div>
+      <ChevronRight className="h-4 w-4 flex-shrink-0 text-sky-400 transition-colors group-hover:text-sky-600" />
+    </Link>
+  );
+}

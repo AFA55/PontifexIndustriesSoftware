@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, History, Star } from 'lucide-react';
+import { ArrowLeft, Loader2, Inbox, Briefcase, Building2, CheckCircle2, Clock, AlertCircle, PauseCircle, PlayCircle, RefreshCw, ChevronDown, ChevronUp, ChevronRight, History, Star, HardHat } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import DayNavigator from './_components/DayNavigator';
 import JobTicketCard, { type JobTicketData } from './_components/JobTicketCard';
@@ -13,6 +13,7 @@ import NotificationBanner from './_components/NotificationBanner';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import SubmitRatingModal from './_components/SubmitRatingModal';
 import { formatMaybeDateTime } from '@/lib/dates';
+import { getCardPermission } from '@/lib/rbac';
 
 interface PendingRating {
   ratee: { id: string; name: string; role: string };
@@ -95,6 +96,16 @@ export default function MyJobsPage() {
    */
   const showTeamMemberFraming =
     isHelper && (jobs.length === 0 || jobs.every((j: any) => j.isHelper));
+
+  /**
+   * This viewer's home is the MANAGEMENT dashboard, not this one.
+   *
+   * Gated on the same `operator_view` card permission that puts the "Open
+   * Operator View" card on their dashboard, so the door and the way back can
+   * never disagree — change the preset in lib/rbac.ts and both follow.
+   */
+  const isManagementViewer =
+    !!userRole && getCardPermission(null, 'operator_view', userRole) !== 'none';
 
   // Check which of today's jobs have a "Done for Today" log (day_completed_at set today)
   const fetchDoneTodayStatus = useCallback(async (jobList: any[]) => {
@@ -507,9 +518,32 @@ export default function MyJobsPage() {
       {/* Header */}
       <div className="bg-white dark:bg-white/5 border-b border-gray-200 dark:border-white/10 sticky top-0 z-10 shadow-sm pt-safe">
         <div className="container mx-auto px-4 py-4 max-w-lg">
+          {/* The way back for someone wearing two hats.
+              The founder (operations_manager) and David (supervisor) both run
+              jobs of their own and reach this screen from the "Open Operator
+              View" card. Without a named exit, the only route back to the
+              management side is an unlabelled arrow — so say it plainly. */}
+          {isManagementViewer && (
+            <Link
+              href="/dashboard/admin"
+              className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-sky-200 dark:border-sky-800/50 bg-sky-50 dark:bg-sky-900/20 px-3 py-2.5 transition-colors hover:bg-sky-100 dark:hover:bg-sky-900/40"
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <HardHat className="h-4 w-4 flex-shrink-0 text-sky-600 dark:text-sky-400" />
+                <span className="truncate text-xs font-semibold text-sky-800 dark:text-sky-300">
+                  You&apos;re in operator view
+                </span>
+              </span>
+              <span className="flex flex-shrink-0 items-center gap-1 text-xs font-bold text-sky-700 dark:text-sky-300">
+                Back to management
+                <ArrowLeft className="h-3.5 w-3.5 rotate-180" />
+              </span>
+            </Link>
+          )}
+
           <div className="flex items-center gap-3">
             <Link
-              href="/dashboard"
+              href={isManagementViewer ? '/dashboard/admin' : '/dashboard'}
               className="p-2 bg-gray-100 dark:bg-white/10 hover:bg-gray-200 dark:hover:bg-white/20 rounded-xl border border-gray-200 dark:border-white/10 transition-all"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600 dark:text-white/80" />

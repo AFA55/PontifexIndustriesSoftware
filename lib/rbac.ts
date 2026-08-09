@@ -283,6 +283,16 @@ export const ADMIN_CARDS: AdminCard[] = [
     iconBg: 'bg-rose-500',
     features: ['Supervisor walkthroughs', 'Customer surveys', 'Crew feedback', 'Composite standing'],
   },
+  {
+    key: 'operator_view',
+    title: 'Open Operator View',
+    description: 'Run your own jobs — view and submit tickets like the crew',
+    icon: '🦺',
+    href: '/dashboard/my-jobs',
+    bgColor: 'from-sky-500 to-blue-600',
+    iconBg: 'bg-sky-500',
+    features: ['Your dispatched tickets', 'Equipment + route', 'Submit work performed', 'Back to management anytime'],
+  },
 ];
 
 // All card keys for iteration
@@ -435,6 +445,10 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     equipment: 'view',
     fleet: 'view',
     voice_checkout: 'submit',
+    // David is a supervisor who "sometimes also has jobs of his own that involve
+    // scanning" (founder, Aug 9). He can be dispatched into the operator slot,
+    // so he needs the door through to the crew side to submit those tickets.
+    operator_view: 'submit',
   }),
   shop_manager: preset({
     timecards: 'view',
