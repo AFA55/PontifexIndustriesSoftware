@@ -1,6 +1,57 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Aug 7, 2026 (Opus 5) | **Branch:** `fix/operator-walkthrough-p0` (4 commits, **UNPUSHED — awaiting founder go-ahead; he has spent $15 on Vercel and asked to batch pushes**) | **Prod:** ✅ LIVE on `main` through `9dcc2b88`.
+**Last updated:** Aug 9, 2026 (Opus 5) | **Branch:** `main` | **Prod:** ✅ LIVE through `17f34b06`. **2 commits UNPUSHED (`2bcb7d18`, `a86fb2f1`) — one of them fixes a bug that is live right now.**
+
+> ## 📌 Aug 9 (Opus 5) — one office role ≠ one job. Helpers, supervisors and ops managers can all run jobs now.
+>
+> **THE THEME:** *role* is not *slot*. The operator ticket has always branched on the crew
+> SLOT (`assigned_to` / `helper_assigned_to`) rather than the person's role — but a dozen
+> other places still asked "is your role `operator`?" Every one of them was wrong the moment
+> a helper led a job.
+>
+> ### Shipped and LIVE (`17f34b06`)
+> - **An apprentice can be assigned as OPERATOR** and runs the full operator ticket. Javier
+>   leads jobs; the board's dropdown was hard-filtered to `role = 'operator'` so the office
+>   simply could not put him in the slot. Verified live on the demo ticket: OPERATOR label,
+>   equipment checklist, route gate, full scope — no helper work-log.
+> - Crew lists are now `active`-only (three deactivated rows all named "Deleted User" were
+>   colliding in the board's name→id map).
+> - My Schedule stopped calling someone a "Team Member" while they ran the operator ticket.
+>
+> ### Built, reviewed, NOT pushed (`2bcb7d18` + `a86fb2f1`)
+> - **Supervisors + operations managers can be dispatched too** (David does scanning jobs;
+>   the founder goes out). Dropdowns label them "(supervisor — will run the operator ticket)".
+> - **"Open Operator View" card** on the management dashboard + a "You're in operator view /
+>   Back to management" bar on the crew side. Both read the SAME `operator_view` permission in
+>   `lib/rbac.ts`, so the door and the way back can't disagree. Verified round-trip; a plain
+>   operator does NOT see the bar.
+> - **⚠️ `a86fb2f1` FIXES A BUG THAT IS LIVE ON MAIN.** `lib/unfinished-tickets.ts` branched on
+>   role, so an apprentice leading a job (Javier, today) was queried against
+>   `helper_assigned_to`, matched nothing, and **could clock out without filing his ticket**.
+>   Supervisors/ops managers had no gate at all. Now slot-based, with the four callers
+>   (clock-out, timecard/current, clock-in overdue check, clock-out reminder cron) converted.
+> - Also: `?as=operator` so the founder's operator view actually returns HIS jobs with the
+>   viewer flags and ticket badge (the admin branch returned the whole tenant and none of the
+>   flags); crew-grid/week-capacity/week-snapshot no longer make a supervisor's job vanish;
+>   ops manager finally has a "My Timecard" link the clock-in cron already texts him.
+>
+> ### New shared vocabulary — use it
+> `lib/rbac.ts` → **`CREW_SLOT_ROLES`** / **`canBeCrewMember(role)`**. The one answer to "could
+> this person be on a crew". **Never** write `['operator','apprentice']` again — that literal is
+> what caused the clock-out hole. And for "is this person on a job TODAY", ask the slot.
+>
+> ### Needs the founder
+> - **Two profiles named EXACTLY "Andres Altamirano"** — his live ops-manager account and a
+>   deactivated operator account still `assigned_to` JOB-2026-880425. The board is name-keyed,
+>   so dispatching on that row lands on the other account of the same person. Fix the data.
+> - **Two conflicting phone numbers** on his accounts (see Aug 7 below).
+> - Five pre-existing job routes have no crew-slot check; `job-orders/[id]/notes` POST has no
+>   tenant filter either (cross-tenant write). All logged in BACKLOG.
+>
+> ### The review agents earned their keep again
+> Three rounds. They caught: the ratings feature had NEVER worked (zero rows in prod), a false
+> claim I made about PostgREST, a UTC day boundary in an Eastern tenant, a 409 I turned into a
+> scary error, and the live clock-out hole above. **Run them behind every batch.**
 
 > ## 📌 Aug 7 (Opus 5) — tasks #64, #66, #60. Three review rounds, every fix verified against production data or in the live app.
 >
