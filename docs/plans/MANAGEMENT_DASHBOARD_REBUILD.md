@@ -127,6 +127,53 @@ form where they left off. Never make them start again.
 
 ---
 
+## BATCH M7 — what did we actually tell the customer? (added Aug 10)
+
+*The founder: "I would like to be able to see in active jobs what notifications
+have been sent out to contacts on site, so I know what they text me about."*
+
+**M7a. A per-job log of every outbound customer message.** On the Active Job:
+what was sent, to which number/email, at what time, through which channel, and
+**the exact text**. When a contact texts him asking something, he should be able
+to open the job and see what they were told — instead of reconstructing it.
+
+⚠️ **This data does not exist yet.** `message_usage` records only tenant,
+channel, provider, segment count, cost and a `source` string. `sendSMSAny`
+receives `jobId` and **throws it away** — `meterSms()` never stores it, nor the
+recipient, nor the body. So today there is NO way to answer "what did we send
+this customer". Needs a proper outbound-message log (job_id, recipient, channel,
+body, provider message id, status, sent_at) written at every send site, then the
+Active Job surface reads it. Tenant-scoped, and treat the body as customer PII.
+
+**M7b. The audit he asked for — DONE Aug 10, and it found something worse.**
+
+*His report: Southern Basements texted asking if we were on site, but the ticket
+said In Route at 7:43, so no message should have gone earlier.*
+
+**He was right that nothing went early, and the wording is fine.** Exactly one
+customer SMS was sent for JOB-2026-277097, at **07:43:56 ET — two seconds AFTER**
+In Route (07:43:54), and it reads *"your crew is on the way… Track your job:
+{portal link}"*. Honest, correctly timed.
+
+**But `arrived_at_jobsite_at` is a lie on every job in the database.** It is
+stamped 1–3 seconds after `in_route_at` — 15 of 15 jobs checked, going back to
+July. Southern Basements: In Route 07:43:54, "arrived" 07:43:56. Nobody drives to
+a jobsite in two seconds.
+
+So at the moment the contact was told *"on the way"*, the system already had the
+crew **arrived and working**, and the SMS hands them a portal link. The strong
+hypothesis for Jay Harn's text: he opened the link, saw the crew marked on site,
+looked outside, saw nobody, and asked. ⚠️ NOT yet verified — confirm what the
+customer portal actually renders for a job in that state before calling it
+proven.
+
+This is the same rotten field as **operator batch 2c** ("Remove 'Arrived on
+site' entirely… GPS already tells us when they arrived — the button adds a step
+and produces a lie"). 2c is now more urgent than it looked: the bad value is not
+just making Active Jobs read 0 hours internally, it is reaching CUSTOMERS.
+
+---
+
 ## BATCH M6 — small but blocking
 
 **M6a. The scan ticket has never worked.** He wants it working *now*, precisely
