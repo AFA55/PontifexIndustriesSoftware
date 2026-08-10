@@ -87,21 +87,30 @@ top to bottom, with where each field already exists in the platform:
 | **DATE(S) WORK PERFORMED** | distinct `daily_job_logs.log_date` — a RANGE or list, not one date | ✅ derivable |
 | **Job Ticket #(S)** | plural — the job's number PLUS every linked/duplicate ticket | ✅ `linked_copies` exists |
 | **INVOICE DESCRIPTION OF WORK** (8 lines) | `buildWorkPerformedSummary()` over all days | ✅ this is the piece that kills the retyping |
-| **INVOICE TOTAL** | — | ❌ **NOT CAPTURED** — this is exactly why M1f exists |
+| **INVOICE TOTAL** | — | ⏸️ **DEFERRED by the founder (Aug 10)** — see below |
 
 **Build notes.**
 - The two plural fields are the ones a naive build gets wrong: **DATE(S)** and
   **Job Ticket #(S)**. A multi-day job spans several dates, and a job worked by
   two crews has several tickets. Both must render as lists.
-- **INVOICE TOTAL blocks a complete draft.** M1f ("capture the project total from
-  now on") is a prerequisite, not a parallel task — without it the draft always
-  has a blank where the number goes, which is the one field the office cannot
-  look up.
+- **INVOICE TOTAL — the founder DEFERRED this (Aug 10):** *"right now you are
+  right, we don't have that. Eventually we have to add quoted total — we have
+  something similar to that already that we input — but we will need a way to
+  add change order totals and other totals. That is later on, we can save that
+  for later down the road."*
+  So the draft ships with the money fields BLANK for the office to write in, the
+  way the paper form works today. Do NOT block M2f on pricing. When it is picked
+  up it is three things, not one: the QUOTED total, CHANGE ORDER totals, and
+  other/extra totals — and there is already a similar field being entered
+  somewhere, so find and reuse it rather than adding a fourth number.
 - Output should be a PDF that matches this layout, so the office can print it and
   file it exactly as they do today. Reuse `components/pdf/DispatchTicketPDF.tsx`
   as the pattern.
-- Still to confirm with the founder: **SUBCONTRACT** and **JOB NAME** — neither
-  maps to an existing field and guessing them would put the wrong thing on a bill.
+- Still to confirm with the founder: **SUBCONTRACT** and **JOB NAME** — two
+  printed blanks on his own paper form that map to nothing we store. Asked Aug 10;
+  he wasn't sure what was being referred to, so the question needs putting
+  concretely: *what do you write on those two lines when you fill this in by
+  hand?* Guessing puts the wrong thing on a customer's bill.
 
 **M2g. Print the COMPLETED ticket.** Same idea as printing a job ticket at the
 start, but for a finished job: job ID, project manager, salesperson, what was
@@ -156,6 +165,60 @@ job properly.
 If it becomes too much to answer conversationally, a **"continue on the schedule
 form instead"** button that **saves the progress so far** and hands them into the
 form where they left off. Never make them start again.
+
+---
+
+## BATCH M8 — many operators, ONE job (clarified by the founder, Aug 10)
+
+*This is why DATE(S) and Job Ticket #(S) are plural on the paper invoice. It is
+not a formatting detail — it is how Patriot actually works.*
+
+**His words:** "There can be multiple operators inputting data… they can all be
+on the same job but we need a way for each of them to input data into the same
+ticket… some days some operators might have only gone 1 day to a job to help
+someone out, or half a day. I need to duplicate a ticket to send them to a job
+and collect work-performed data, but it should all be plugged into the 1 job…
+**I need to track the work being done for the specific JOB, not the operator** —
+but I need to see who has worked on it, when, their hours."
+
+**The model he wants:**
+- **One JOB** — the thing the customer is billed for, holding the scope, the
+  progress and the total.
+- **Many TICKETS** hanging off it — one per operator, so each can record their
+  own work and hours without fighting over one form.
+- Every ticket's work-performed rolls up into the ONE job.
+- The office can see, per job: **who worked it, which days, how many hours each,
+  and who contributed to the scope/progress.**
+
+**What ALREADY exists — do not rebuild it:**
+- `job_orders.parent_job_id` — duplicates are linked children. Live today: two
+  Parkk Concrete jobs each have a linked ticket (Devin, Aiden).
+- `lib/duplicate-job-order.ts` — the duplicate flow.
+- `linked_copies_count` on the job detail view.
+- Recorded earlier: *"Duplicates = linked children; scope + progress roll up to
+  the parent, only hours/work are per-person."*
+
+**The gap is the ROLL-UP VIEW, not the ticket mechanism.** On an Active Job the
+office should see one consolidated picture — every operator who touched it, the
+days each was there, hours each, and their contribution to the scope — instead of
+having to open each linked ticket separately.
+
+✅ **Checked, and the hard part is already done.** `lib/job-progress-server.ts`
+resolves the ROOT via `parent_job_id` and gathers `work_items` across every
+linked ticket before deriving progress. So a two-crew job's scope and progress
+already roll up correctly — "all plugged into the 1 job" is true at the data
+level today. (I flagged this as a suspected bug first and it wasn't one; leaving
+the correction here so nobody re-investigates.)
+
+**So the work is presentation, not plumbing:** an Active Job needs a per-person
+breakdown — for each operator who touched this job or any of its linked tickets:
+which DAYS they were there, HOURS each day, and what they recorded. The numbers
+exist (`daily_job_logs`, `timecards`, `work_items` + the parent resolution
+above); nothing surfaces them together.
+
+Design note the founder was explicit about: the JOB is the unit, not the
+operator. Per-person detail is a breakdown WITHIN one job's page — not a
+separate per-operator view of the same work.
 
 ---
 
