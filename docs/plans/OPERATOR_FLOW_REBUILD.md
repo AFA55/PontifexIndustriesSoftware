@@ -29,11 +29,32 @@ in the cuts table — that mistake made the first demo ticket look half-empty.)
 The single biggest complaint, and it is really four separate faults that feel
 like one.
 
-**1a. The page moves while they type.**
+**1a. The page moves while they type.** ⚠️ **MEASURED Aug 9 — NOT REPRODUCIBLE. Needs one detail from the founder before anyone writes code.**
 Partly fixed Aug 5 (the autosave indicator was reflowing the header on every
 keystroke, commit `bb2023ce`). Still reported, so at least one more element is
 changing height mid-entry. Find it by MEASURING scroll position across a full
 entry session — not by eye. Every fix here must hold the viewport still.
+
+**What the measurement actually found (Aug 9, live page at 390px, ResizeObserver
+on all 71 layout elements + focused-field position sampled around every action):**
+
+| Action | Doc height | Focused field moved |
+|---|---|---|
+| Typing into a field | no change at all, **0 reflow events** | 0px |
+| "Add This Hole" | +148px, all **below** the cursor | 0px |
+| Rebar size tapped | grows below | 0px |
+| "Did you chainsaw?" reveal | +72px below | −2px (scroll rounding) |
+
+So the Aug 5 header fix **holds**, and none of the core-drilling or slab-sawing
+paths move content above the cursor. One earlier reading of −550px was a
+**measurement artifact** — switching to Cut Areas mode remounts the form, and a
+detached node reports `top: 0`. Don't chase it.
+
+**The remaining suspect is the one a headless browser cannot emulate: the
+phone's soft keyboard resizing the visual viewport.** Before writing any fix,
+get from the founder: which WORK TYPE, which FIELD, and whether the jump happens
+as the keyboard OPENS or while already typing. A fix aimed at the wrong cause
+here just adds another scroll call to a page that already has three.
 
 **1b. It doesn't remember where they were.** *(confirmed live Aug 7)*
 
