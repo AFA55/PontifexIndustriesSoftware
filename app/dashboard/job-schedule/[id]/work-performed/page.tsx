@@ -890,16 +890,50 @@ export default function WorkPerformed() {
   const handleTogglePick = (itemName: string) => {
     setSearchQuery('');
     setShowDropdown(false);
+
+    const existing = selectedItems.find((si) => si.name === itemName);
+
+    // TAPPING AN ALREADY-MEASURED ITEM MUST NOT DELETE IT.
+    //
+    // The picker tiles show a green tick and "Qty: 12" for items that are done,
+    // and this flow actively tells operators to go back to the picker ("tick
+    // everything first"). A plain toggle would have thrown away every hole and
+    // cut behind that tile on a tap that looks like "open it" — with no confirm,
+    // no undo, and the 500ms autosave writing the deletion straight to the draft.
+    // Removing work has a proper home: the ✕ on the "What you did" list.
+    if (existing && !needsMeasurements(existing)) {
+      handleSelectItem(itemName);
+      return;
+    }
+
     setSelectedItems((prev) =>
-      prev.some((si) => si.name === itemName)
-        ? prev.filter((si) => si.name !== itemName)
+      existing
+        ? prev.filter((si) => si.name !== itemName)   // ticked but empty — untick
         : [...prev, { name: itemName, quantity: 0 }]
     );
   };
 
-  /** Ticked, but nobody has entered what they actually did yet. */
-  const needsMeasurements = (item: WorkItem) =>
-    (item.quantity ?? 0) <= 0 && !item.details;
+  /**
+   * Ticked, but nobody has entered what they actually did yet.
+   *
+   * OR, not AND. `handleAddItem` always attaches a `details` object for generic
+   * work types even when the Amount box was left blank, so an && test let a
+   * zero-quantity item through and the list rendered it GREEN as "0 recorded" —
+   * a false all-clear on exactly the row this exists to catch.
+   */
+  const needsMeasurements = (item: WorkItem) => {
+    if ((item.quantity ?? 0) > 0) return false;
+    const d = item.details as
+      | (Partial<CoreDrillingDetails> & Partial<SawingDetails> & Partial<DemolitionDetails>)
+      | undefined;
+    // A zero quantity is still real if measurements were actually entered.
+    const hasRows =
+      (Array.isArray(d?.holes) && d!.holes!.length > 0) ||
+      (Array.isArray(d?.cuts) && d!.cuts!.length > 0) ||
+      (Array.isArray((d as DemolitionDetails | undefined)?.areas) &&
+        (d as DemolitionDetails).areas.length > 0);
+    return !hasRows;
+  };
 
   const pendingItems = selectedItems.filter(needsMeasurements);
 
@@ -977,13 +1011,15 @@ export default function WorkPerformed() {
       | undefined;
     if (existingDetails) {
       if (Array.isArray(existingDetails.holes)) {
-        setCoreDrillingData({ holes: existingDetails.holes, notes: existingDetails.notes || '' });
+        // notes deliberately NOT hydrated here — currentNotes already carries it,
+        // and duplicating it makes an emptied Quick Notes box un-clearable.
+        setCoreDrillingData({ holes: existingDetails.holes, notes: '' });
       }
       if (Array.isArray(existingDetails.cuts)) {
         setSawingData({
           cuts: existingDetails.cuts,
           cutType: existingDetails.cutType === 'dry' ? 'dry' : 'wet',
-          notes: existingDetails.notes || '',
+          notes: '', // see the note above — currentNotes owns this
         });
       }
       if (Array.isArray((existingDetails as DemolitionDetails).areas)) {
@@ -992,6 +1028,12 @@ export default function WorkPerformed() {
       if (typeof existing?.quantity === 'number' && existing.quantity > 0) {
         setCurrentQuantity(existing.quantity);
       }
+      // The UNIT is what makes the number mean anything on the customer's
+      // ticket ("400" vs "400 sq ft"). Without this, opening a finished generic
+      // item to fix a typo reset it to the default and saved that over the
+      // operator's choice — GRINDING 400 sq ft became GRINDING 400 each.
+      const storedUnit = (existing?.details as GeneralDetails | undefined)?.unit;
+      if (storedUnit) setCurrentUnit(storedUnit);
     }
 
     setShowQuantityModal(true);

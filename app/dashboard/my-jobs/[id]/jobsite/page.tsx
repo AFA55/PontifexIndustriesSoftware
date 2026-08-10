@@ -110,6 +110,7 @@ export default function JobsitePage() {
   }, [fetchJob, fetchDocuments]);
 
   const [startingWork, setStartingWork] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   /**
    * "I'm on site and starting." THIS is what stamps arrival + work start —
@@ -126,17 +127,38 @@ export default function JobsitePage() {
       const { data: { session } } = await supabase.auth.getSession();
       // Co-operators don't drive ticket status — the server 403s it anyway.
       if (session && job?.status === 'in_route' && (job as any)?.viewer_is_co_operator !== true) {
-        await fetch(`/api/job-orders/${jobId}/status`, {
+        // The result is CHECKED, and a failure STOPS here.
+        //
+        // The old code re-fired this on every mount, so a swallowed failure
+        // healed itself next time. Moving it onto a button made it one-shot —
+        // and `in_route` is a state that, until this change, never lasted more
+        // than two seconds in production. Nothing downstream was built for it
+        // lasting: `LEGAL_TRANSITIONS` has no in_route → completed edge, so a
+        // job stranded here CANNOT be completed. The operator would find that
+        // out at day-complete, staring at "Illegal status transition:
+        // in_route → completed" with the customer's signature already captured.
+        // Better to fail loudly here, on the jobsite, where pressing it again
+        // costs nothing.
+        const res = await fetch(`/api/job-orders/${jobId}/status`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ status: 'in_progress' }),
-        }).catch(console.error);
+        }).catch(() => null);
+
+        if (!res?.ok) {
+          let msg = 'Could not start the job. Check your signal and press it again.';
+          try { msg = (await res?.json())?.error || msg; } catch { /* not json */ }
+          setStartError(msg);
+          setStartingWork(false);
+          return; // stay on the jobsite screen — do NOT walk into a dead end
+        }
       }
-    } finally {
       router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
+    } finally {
+      setStartingWork(false);
     }
   };
 
@@ -460,6 +482,12 @@ export default function JobsitePage() {
         {/* Start Work — marks them ON SITE (stamps arrival + work start) and
             advances to the work-performed log. */}
         <div className="pt-2 pb-safe">
+          {startError && (
+            <div className="mb-3 flex items-start gap-2 rounded-xl border border-red-300 dark:border-red-500/40 bg-red-50 dark:bg-red-500/10 px-3 py-2.5">
+              <AlertTriangle className="w-4 h-4 text-red-500 mt-0.5 flex-shrink-0" />
+              <p className="text-sm font-medium text-red-700 dark:text-red-300">{startError}</p>
+            </div>
+          )}
           <button
             onClick={handleStartWork}
             disabled={startingWork}
