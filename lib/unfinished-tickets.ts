@@ -160,70 +160,141 @@ export async function findUnfinishedTickets(opts: {
   // another should be chased for the lead ticket.
   if (!canBeCrewMember(role)) return null;
 
+  /**
+   * WHICH SEAT WERE THEY IN **ON THIS DAY**?
+   *
+   * WHY (founder, Aug 9): "Saturday Javi was marked as operator so he should
+   * have to fill operator ticket for Saturday. Software should know what days
+   * they are listed as operator and what days they aren't."
+   *
+   * `job_orders.assigned_to` is a single value for the whole job, so on a
+   * multi-day job it cannot answer that — the office swaps crew day to day, and
+   * the board already knows because it overlays `job_daily_assignments`
+   * (assignment_date + operator_id + helper_id, one row per job per day). This
+   * gate was reading only the job-level column, so on any day the ledger
+   * disagreed we would chase the wrong person, or the right person for the
+   * wrong ticket.
+   *
+   * The ledger WINS for a day it has a row for; the job-level columns are the
+   * fallback for days it doesn't (single-day jobs, mostly).
+   */
+  const dayLedger = new Map<string, { operatorId: string | null; helperId: string | null }>();
   {
-    let q = supabaseAdmin
-      .from('job_orders')
-      .select('id, job_number, customer_name')
-      .eq('assigned_to', userId)
-      .lte('scheduled_date', today)
-      .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
-      .not('dispatched_at', 'is', null)
-      .is('work_completed_at', null)
-      .not('status', 'in', statusNotInList(OPERATOR_EXCLUDED_STATUSES));
-    if (tenantId) q = q.eq('tenant_id', tenantId);
-    const { data: candidateJobs } = await q;
-
-    const jobs = (candidateJobs ?? []) as UnfinishedTicketJob[];
-
-    // Only fall through to the helper gate when they are NOT leading anything
-    // today. (This used to `return { jobs: [] }` here, which is why the helper
-    // branch below was unreachable for anyone with an operator role.)
-    if (jobs.length > 0) {
-      const { data: todaysLogs } = await supabaseAdmin
-        .from('daily_job_logs')
-        // day_completed_at is what separates a REAL submission from a draft /
-        // day-note skeleton row — selecting only job_order_id was the bug.
-        .select('job_order_id, day_completed_at')
-        .eq('operator_id', userId)
-        .eq('log_date', today)
-        .in('job_order_id', jobs.map((j) => j.id));
-
-      return {
-        blockType: 'incomplete_tickets_warning',
-        jobs: operatorUnfinishedJobs(jobs, (todaysLogs ?? []) as OperatorDailyLogRow[]),
-      };
+    let lq = supabaseAdmin
+      .from('job_daily_assignments')
+      .select('job_order_id, operator_id, helper_id')
+      .eq('assignment_date', today);
+    if (tenantId) lq = lq.eq('tenant_id', tenantId);
+    const { data: ledgerRows } = await lq;
+    for (const r of ledgerRows ?? []) {
+      dayLedger.set(r.job_order_id, { operatorId: r.operator_id, helperId: r.helper_id });
     }
   }
 
-  {
-    // Mirror of the operator gate, minus parked/terminal states: a job parked to
-    // Pending (on_hold) must NOT count as an outstanding helper ticket.
-    let q = supabaseAdmin
-      .from('job_orders')
-      .select('id, job_number, customer_name')
-      .eq('helper_assigned_to', userId)
-      .lte('scheduled_date', today)
-      .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
-      .not('dispatched_at', 'is', null)
-      .not('status', 'in', statusNotInList(HELPER_EXCLUDED_STATUSES));
-    if (tenantId) q = q.eq('tenant_id', tenantId);
-    const { data: helperJobs } = await q;
+  /** This user's seat on a given job TODAY, ledger first. */
+  const seatToday = (
+    jobId: string,
+    jobAssignedTo: string | null,
+    jobHelperAssignedTo: string | null
+  ): 'operator' | 'helper' | null => {
+    const led = dayLedger.get(jobId);
+    if (led) {
+      // An explicit row for today is the whole truth for today — including when
+      // it names somebody else, which means this person is simply not on it.
+      if (led.operatorId === userId) return 'operator';
+      if (led.helperId === userId) return 'helper';
+      return null;
+    }
+    if (jobAssignedTo === userId) return 'operator';
+    if (jobHelperAssignedTo === userId) return 'helper';
+    return null;
+  };
 
-    const jobs = (helperJobs ?? []) as UnfinishedTicketJob[];
-    if (jobs.length === 0) return { blockType: 'helper_work_log_warning', jobs: [] };
+  // Candidate jobs: anything they hold a job-level slot on, PLUS anything the
+  // day ledger puts them on today even when the job-level columns name somebody
+  // else. Then each one is classified by the seat they actually hold TODAY.
+  const ledgerJobIdsForUser = [...dayLedger.entries()]
+    .filter(([, v]) => v.operatorId === userId || v.helperId === userId)
+    .map(([jobId]) => jobId);
 
-    const { data: workLogs } = await supabaseAdmin
-      .from('helper_work_logs')
-      // completed_at / work_description separate a real log from the empty
-      // "start" row /api/helper-work-log inserts on start_now.
-      .select('job_order_id, completed_at, work_description')
-      .eq('helper_id', userId)
+  const orParts = [`assigned_to.eq.${userId}`, `helper_assigned_to.eq.${userId}`];
+  if (ledgerJobIdsForUser.length > 0) {
+    orParts.push(`id.in.(${ledgerJobIdsForUser.join(',')})`);
+  }
+
+  let q = supabaseAdmin
+    .from('job_orders')
+    .select('id, job_number, customer_name, assigned_to, helper_assigned_to, work_completed_at, status')
+    .or(orParts.join(','))
+    .lte('scheduled_date', today)
+    .or(`scheduled_date.eq.${today},end_date.gte.${today}`)
+    .not('dispatched_at', 'is', null);
+  if (tenantId) q = q.eq('tenant_id', tenantId);
+  const { data: allCandidates } = await q;
+
+  const rows = (allCandidates ?? []) as Array<
+    UnfinishedTicketJob & {
+      assigned_to: string | null;
+      helper_assigned_to: string | null;
+      work_completed_at: string | null;
+      status: string | null;
+    }
+  >;
+
+  const operatorJobs: UnfinishedTicketJob[] = [];
+  const helperJobs: UnfinishedTicketJob[] = [];
+  for (const r of rows) {
+    const seat = seatToday(r.id, r.assigned_to, r.helper_assigned_to);
+    if (!seat) continue;
+    const slim: UnfinishedTicketJob = {
+      id: r.id,
+      job_number: r.job_number,
+      customer_name: r.customer_name,
+    };
+    if (seat === 'operator') {
+      // A finished job owes nothing, and the operator gate excludes more states
+      // than the helper one does.
+      if (r.work_completed_at) continue;
+      if ((OPERATOR_EXCLUDED_STATUSES as readonly string[]).includes(String(r.status))) continue;
+      operatorJobs.push(slim);
+    } else {
+      if ((HELPER_EXCLUDED_STATUSES as readonly string[]).includes(String(r.status))) continue;
+      helperJobs.push(slim);
+    }
+  }
+
+  // Operator seat first: it carries the heavier obligation (the full
+  // work-performed ticket), so someone leading one job while helping on another
+  // is chased for the lead ticket.
+  if (operatorJobs.length > 0) {
+    const { data: todaysLogs } = await supabaseAdmin
+      .from('daily_job_logs')
+      // day_completed_at is what separates a REAL submission from a draft /
+      // day-note skeleton row — selecting only job_order_id was the bug.
+      .select('job_order_id, day_completed_at')
+      .eq('operator_id', userId)
       .eq('log_date', today)
-      .in('job_order_id', jobs.map((j) => j.id));
+      .in('job_order_id', operatorJobs.map((j) => j.id));
 
     return {
-      blockType: 'helper_work_log_warning',
-      jobs: helperUnfinishedJobs(jobs, (workLogs ?? []) as HelperWorkLogRow[]),
+      blockType: 'incomplete_tickets_warning',
+      jobs: operatorUnfinishedJobs(operatorJobs, (todaysLogs ?? []) as OperatorDailyLogRow[]),
     };
   }
+
+  if (helperJobs.length === 0) return { blockType: 'helper_work_log_warning', jobs: [] };
+
+  const { data: workLogs } = await supabaseAdmin
+    .from('helper_work_logs')
+    // completed_at / work_description separate a real log from the empty
+    // "start" row /api/helper-work-log inserts on start_now.
+    .select('job_order_id, completed_at, work_description')
+    .eq('helper_id', userId)
+    .eq('log_date', today)
+    .in('job_order_id', helperJobs.map((j) => j.id));
+
+  return {
+    blockType: 'helper_work_log_warning',
+    jobs: helperUnfinishedJobs(helperJobs, (workLogs ?? []) as HelperWorkLogRow[]),
+  };
 }
