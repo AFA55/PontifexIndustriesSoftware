@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, MapPin, Users } from 'lucide-react';
+import { AlertCircle, MapPin, Users, Printer, Loader2 } from 'lucide-react';
 import type { JobCardData } from './JobCard';
 import { asArray } from '@/lib/job-arrays';
 
@@ -9,6 +9,15 @@ interface UnassignedSectionProps {
   canEdit: boolean;
   onJobClick: (job: JobCardData) => void;
   onAssign: (job: JobCardData) => void;
+  /** Print the paper dispatch ticket for a job with NO operator on it yet.
+   *  WHY (founder, Aug 10): "not all operators are in the app, some we still
+   *  have to get tickets to." The PDF has always supported an unassigned job —
+   *  it prints a blank line for the name to be written on — but the only button
+   *  on this card said "Assign Operator", so the paper route looked like it
+   *  required assigning someone first. */
+  onPrint: (job: JobCardData) => void;
+  /** Job id currently generating, so the button can show it's working. */
+  printingJobId?: string | null;
 }
 
 export default function UnassignedSection({
@@ -16,6 +25,8 @@ export default function UnassignedSection({
   canEdit,
   onJobClick,
   onAssign,
+  onPrint,
+  printingJobId,
 }: UnassignedSectionProps) {
   if (jobs.length === 0) return null;
 
@@ -57,14 +68,28 @@ export default function UnassignedSection({
                   ))}
                 </div>
               )}
-              {canEdit && (
+              <div className="flex gap-2">
+                {canEdit && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); onAssign(job); }}
+                    className="flex-1 py-2 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
+                  >
+                    <Users className="w-3.5 h-3.5 inline mr-1.5" /> Assign Operator
+                  </button>
+                )}
+                {/* Printing does NOT require assigning first — see onPrint. */}
                 <button
-                  onClick={(e) => { e.stopPropagation(); onAssign(job); }}
-                  className="w-full py-2 bg-gradient-to-r from-brand to-brand-accent hover:from-brand-dark hover:to-brand text-white rounded-lg text-xs font-bold transition-all shadow-sm hover:shadow-md"
+                  onClick={(e) => { e.stopPropagation(); onPrint(job); }}
+                  disabled={printingJobId === job.id}
+                  title="Print the paper ticket — no operator needed"
+                  className={`${canEdit ? 'px-3' : 'flex-1 py-2'} py-2 bg-white dark:bg-white/10 border border-orange-300 dark:border-orange-500/40 text-orange-700 dark:text-orange-300 rounded-lg text-xs font-bold transition-all hover:bg-orange-50 dark:hover:bg-white/20 disabled:opacity-60 flex items-center justify-center gap-1.5`}
                 >
-                  <Users className="w-3.5 h-3.5 inline mr-1.5" /> Assign Operator
+                  {printingJobId === job.id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Printer className="w-3.5 h-3.5" />}
+                  {canEdit ? '' : 'Print Ticket'}
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </div>

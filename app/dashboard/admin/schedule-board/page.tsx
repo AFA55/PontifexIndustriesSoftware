@@ -305,6 +305,44 @@ export default function ScheduleBoardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flagsLoading, featureFlags.can_view_schedule_board, userRole]);
 
+  // ═══ PRINT A PAPER DISPATCH TICKET ══════════════════════════════════════
+  // WHY (founder, Aug 10): "not all operators are in app, some we still have to
+  // get tickets to." The PDF has always handled an unassigned job — it prints a
+  // blank line for the name — but there was no button to reach it from the
+  // board without opening the job and hunting, and the only button on an
+  // unassigned card said "Assign Operator", which made assigning look mandatory.
+  //
+  // Failures are REPORTED. The existing print handlers do `if (res.ok)` with no
+  // else, so a failed ticket looks exactly like a working one that printed
+  // nothing — and he'd be standing at the printer wondering.
+  const [printingJobId, setPrintingJobId] = useState<string | null>(null);
+  const handlePrintTicket = useCallback(async (job: JobCardData) => {
+    setPrintingJobId(job.id);
+    try {
+      const res = await apiFetch(`/api/job-orders/${job.id}/dispatch-pdf`);
+      if (!res.ok) {
+        let msg = 'Could not generate the ticket.';
+        try { msg = (await res.json())?.error || msg; } catch { /* not json */ }
+        addToast('error', 'Print Failed', msg);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const win = window.open(url, '_blank');
+      if (!win) {
+        addToast('error', 'Popup Blocked', 'Allow popups for this site, then press Print again.');
+        return;
+      }
+      // Revoke late so the new tab has finished loading the blob.
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      addToast('success', 'Ticket Ready', `${job.job_number || 'Ticket'} opened in a new tab — print it from there.`);
+    } catch {
+      addToast('error', 'Print Failed', 'Could not reach the server. Check your connection.');
+    } finally {
+      setPrintingJobId(null);
+    }
+  }, [addToast]);
+
   // ═══ FETCH OPERATORS/HELPERS ═══
   useEffect(() => {
     async function fetchCrew() {
@@ -2251,6 +2289,8 @@ export default function ScheduleBoardPage() {
             canEdit={canEdit}
             onJobClick={(job) => setJobDetailTarget({ job, rowIndex: null, operatorName: null, helperName: null })}
             onAssign={(job) => setAssignTarget({ job, source: 'unassigned' })}
+            onPrint={handlePrintTicket}
+            printingJobId={printingJobId}
           />
         )}
 

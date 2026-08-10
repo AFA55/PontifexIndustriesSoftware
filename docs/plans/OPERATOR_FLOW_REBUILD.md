@@ -91,7 +91,13 @@ Order on the page, top to bottom:
    the slow path.
 3. **"Other"** button: they type what they did. If it matches something in the
    directory it surfaces as they type; if not, they just finish typing it and
-   that stands as the work item.
+   that stands as the work item — **and it is SAVED, so the list grows**
+   *(founder decided Aug 10)*. Same growing-catalogue mechanism as the equipment
+   field in 7b; build it once and use it for both.
+   ⚠️ He accepted the known cost: typos and one-offs will accumulate. So the
+   office needs a way to tidy the catalogue (merge/rename/hide) — that is part
+   of this item, not a follow-up, or the list degrades into noise within weeks.
+   Tenant-scoped: one company's vocabulary must never leak into another's.
 4. **Scroll down → the fields, broken up per work type.** Core drilling's inputs
    under Core Drilling, slab sawing's under Slab Sawing, in the order they
    picked them.
@@ -100,9 +106,11 @@ Order on the page, top to bottom:
    they are NOT required again at the photo step (batch 2a). Adding a photo
    twice because the app forgot is exactly the kind of friction that stops them
    adding any.
-7. **Difficulty**: keep easy / moderate / difficult, but **attach a number** to
-   each so the office can compare across jobs and operators rather than reading
-   adjectives.
+7. **Difficulty**: **1–10 slider, with easy / moderate / difficult as labels
+   along it** *(founder decided Aug 10)*. He chose resolution over speed here —
+   three buckets can't separate a hard job from a brutal one, and the whole
+   point is comparing across jobs and operators. The words stay as guides so
+   nobody has to invent what a 7 means.
 8. **"Rate your helper for the day"** — 1–10 plus optional notes. Stored and
    visible to the office; feeds the HELPER rating track (batch 9b), which is
    graded by the operator they worked with and by the supervisor.

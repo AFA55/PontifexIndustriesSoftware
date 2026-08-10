@@ -269,16 +269,26 @@ export default function EditJobPanel({
     try {
       const { supabase } = await import('@/lib/supabase');
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) { alert('Your session expired. Log in again, then press Print.'); return; }
       const res = await fetch(`/api/job-orders/${job.id}/dispatch-pdf`, {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
-      if (res.ok) {
-        const blob = await res.blob();
-        window.open(URL.createObjectURL(blob), '_blank');
+      if (!res.ok) {
+        // Was `if (res.ok)` with no else: a failed ticket looked exactly like a
+        // working one that printed nothing.
+        let msg = 'Could not generate the ticket.';
+        try { msg = (await res.json())?.error || msg; } catch { /* not json */ }
+        alert(`Print failed — ${msg}`);
+        return;
       }
+      const blob = await res.blob();
+      const pdfUrl = URL.createObjectURL(blob);
+      const win = window.open(pdfUrl, '_blank');
+      if (!win) alert('Your browser blocked the popup. Allow popups for this site, then press Print again.');
+      setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
     } catch (err) {
       console.error('Error generating dispatch PDF:', err);
+      alert('Print failed — could not reach the server. Check your connection.');
     } finally {
       setPrintingPdf(false);
     }
