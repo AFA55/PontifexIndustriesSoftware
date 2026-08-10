@@ -67,11 +67,27 @@ export const BIOMETRIC_DECLINED_KEY = 'pontifex.biometricDeclined';
 const ACCESS_CONTROL_BIOMETRY_CURRENT_SET = 1;
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-async function getPlugin(): Promise<any | null> {
+/**
+ * NEVER return the Capacitor plugin proxy directly from an async function.
+ *
+ * THE BUG (Sentry JAVASCRIPT-NEXTJS-2 — 91 events, 20 users, culprit /login):
+ *   Error: "NativeBiometric.then()" is not implemented on ios
+ *
+ * Resolving a promise probes whatever you return for a `.then` property to see
+ * if it is itself a thenable. Capacitor's plugin proxy forwards ANY property
+ * access to a native method call — so that innocuous probe became a real call
+ * to a native method named `then`, which does not exist, and every operator
+ * opening the login screen on iOS threw.
+ *
+ * Returning the plugin wrapped in a plain object means the probe hits an
+ * ordinary object with no `then`, and the proxy is never touched.
+ */
+async function getPlugin(): Promise<{ NB: any } | null> {
   if (!isNativeApp()) return null;
   try {
     const mod = await import('@capgo/capacitor-native-biometric');
-    return (mod as any).NativeBiometric ?? null;
+    const plugin = (mod as any).NativeBiometric;
+    return plugin ? { NB: plugin } : null;
   } catch {
     return null; // plugin not present in this build (older app) — degrade gracefully
   }
@@ -85,7 +101,7 @@ export interface BiometricStatus {
 
 /** Is biometric hardware available + enrolled on this device (native only)? */
 export async function biometricAvailable(): Promise<BiometricStatus> {
-  const NB = await getPlugin();
+  const NB = (await getPlugin())?.NB ?? null;
   if (!NB) return { available: false, biometryType: 'none' };
   try {
     const res = await NB.isAvailable({ useFallback: false });
@@ -119,7 +135,7 @@ export interface BiometricDiagnostics {
 /** Non-throwing snapshot of biometric state for the settings UI. Native-only. */
 export async function biometricDiagnostics(): Promise<BiometricDiagnostics> {
   const nativeShell = isNativeApp();
-  const NB = await getPlugin();
+  const NB = (await getPlugin())?.NB ?? null;
   const pluginPresent = !!NB;
   let available = false;
   let biometryType = 'none';
@@ -164,7 +180,7 @@ export function biometryLabel(biometryType: string): string {
  * No-op on web/SSR and on older native builds without the plugin (returns false).
  */
 export async function enrollBiometric(email: string, refreshToken: string): Promise<boolean> {
-  const NB = await getPlugin();
+  const NB = (await getPlugin())?.NB ?? null;
   if (!NB || !email || !refreshToken) return false;
   try {
     // Delete any prior entry first so a re-enroll with a fresh accessControl flag /
@@ -210,7 +226,7 @@ export function enrolledBiometricEmail(): string | null {
  * so we can decide whether to render the button without prompting the user.
  */
 export async function hasEnrolledBiometric(): Promise<boolean> {
-  const NB = await getPlugin();
+  const NB = (await getPlugin())?.NB ?? null;
   if (!NB) return false;
   try {
     if (typeof NB.isCredentialsSaved === 'function') {
@@ -240,7 +256,7 @@ export const hasSavedCredentials = hasEnrolledBiometric;
 export async function verifyAndGetSession(
   reason = 'Sign in to Pontifex'
 ): Promise<{ email: string; refreshToken: string } | null> {
-  const NB = await getPlugin();
+  const NB = (await getPlugin())?.NB ?? null;
   if (!NB) return null;
   try {
     // getSecureCredentials (since 8.4.0) triggers the OS biometric prompt for an
@@ -283,7 +299,7 @@ export async function disableBiometric(): Promise<void> {
   // Always clear the email binding, even if the plugin is absent (web/old build),
   // so a stale binding can't linger.
   try { window.localStorage.removeItem(BIOMETRIC_EMAIL_KEY); } catch { /* non-fatal */ }
-  const NB = await getPlugin();
+  const NB = (await getPlugin())?.NB ?? null;
   if (!NB) return;
   try {
     await NB.deleteCredentials({ server: SERVER });

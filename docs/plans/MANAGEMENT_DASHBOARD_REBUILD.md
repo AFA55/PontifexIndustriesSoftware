@@ -68,8 +68,40 @@ no question anyone actually has. *(Same principle as operator batch 9b.)*
 
 **M2f. "Proceed to invoice".** A button on the completed job that drafts an
 invoice sheet. Today the office manually pulls the completion ticket and the
-work ticket and retypes them into a separate invoicing ticket. The founder will
-share a photo of that sheet — build to it, not to a guess.
+work ticket and retypes them into a separate invoicing ticket.
+
+**✅ THE SHEET — photo received Aug 10.** Patriot's paper "INVOICE/BILLING" form,
+top to bottom, with where each field already exists in the platform:
+
+| Field on the sheet | Where it comes from | Status |
+|---|---|---|
+| *(Patriot logo)* | `tenant_branding.logo_url` | ✅ have it — white-label, don't hardcode |
+| **CUSTOMER** (4 lines — name + address block) | `job_orders.customer_name` + the customer's billing address | ⚠️ billing address may not be stored; check `customers` |
+| **SUBCONTRACT** | — | ❓ no field. Ask what fills this |
+| **CHANGE ORDER #** | `change_orders` on the job | ✅ have it |
+| **PO #** | `job_orders.po_number` | ✅ |
+| **JOB #** | `job_orders.job_number` | ✅ |
+| **SALES REP** | `job_orders.salesman_name` | ✅ |
+| **JOB NAME** | — | ❓ distinct from customer? Probably the site/project name |
+| **JOB LOCATION** *(incl. city/state)* | `address` / `location` | ✅ |
+| **DATE(S) WORK PERFORMED** | distinct `daily_job_logs.log_date` — a RANGE or list, not one date | ✅ derivable |
+| **Job Ticket #(S)** | plural — the job's number PLUS every linked/duplicate ticket | ✅ `linked_copies` exists |
+| **INVOICE DESCRIPTION OF WORK** (8 lines) | `buildWorkPerformedSummary()` over all days | ✅ this is the piece that kills the retyping |
+| **INVOICE TOTAL** | — | ❌ **NOT CAPTURED** — this is exactly why M1f exists |
+
+**Build notes.**
+- The two plural fields are the ones a naive build gets wrong: **DATE(S)** and
+  **Job Ticket #(S)**. A multi-day job spans several dates, and a job worked by
+  two crews has several tickets. Both must render as lists.
+- **INVOICE TOTAL blocks a complete draft.** M1f ("capture the project total from
+  now on") is a prerequisite, not a parallel task — without it the draft always
+  has a blank where the number goes, which is the one field the office cannot
+  look up.
+- Output should be a PDF that matches this layout, so the office can print it and
+  file it exactly as they do today. Reuse `components/pdf/DispatchTicketPDF.tsx`
+  as the pattern.
+- Still to confirm with the founder: **SUBCONTRACT** and **JOB NAME** — neither
+  maps to an existing field and guessing them would put the wrong thing on a bill.
 
 **M2g. Print the COMPLETED ticket.** Same idea as printing a job ticket at the
 start, but for a finished job: job ID, project manager, salesperson, what was

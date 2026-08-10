@@ -185,13 +185,17 @@ number** — it may reach a real person. Use his, or the reserved 555-01xx range
 
 ## 9. Blocked on the founder
 
-- **Sentry receives nothing.** Code is complete and correct (client init, server
-  init, `onRequestError`, `global-error.tsx`, `withSentryConfig`). Verified via
-  the Sentry MCP: **zero issues in 7 days.** `NEXT_PUBLIC_SENTRY_DSN` is inlined
-  at BUILD time — it needs to be set for **Production** and then redeployed.
-  Also wants `SENTRY_ORG`, `SENTRY_PROJECT`, `SENTRY_AUTH_TOKEN` for readable
-  stack traces. Once live, **verify arrival via the MCP** — never stop at "go
-  check your dashboard".
+- **Sentry is LIVE ✅ (confirmed Aug 10).** The founder set the DSN and is
+  receiving notifications. Verified via the MCP: events arriving, most recent 10
+  minutes old. This section previously said "receives nothing" — that was stale,
+  and I repeated it to him before checking. **Query the MCP before asserting
+  anything about Sentry.**
+  It immediately earned its keep: `JAVASCRIPT-NEXTJS-2` —
+  *"NativeBiometric.then() is not implemented on ios"*, 91 events, **20 users**,
+  culprit `/login`. Cause: `getPlugin()` was an async function RETURNING the
+  Capacitor plugin proxy, and promise resolution probes any returned value for
+  `.then` — which the proxy forwarded as a native call. Fixed by returning the
+  plugin wrapped in a plain object.
 - **Wages** — `hourly_rate` is NULL on all 37 profiles and there is nowhere in
   the UI to enter it (batch 4b). Labor cost reads "not set" everywhere until
   both are fixed.
