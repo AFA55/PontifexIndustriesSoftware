@@ -875,11 +875,39 @@ export default function WorkPerformed() {
     setShowDropdown(value.length > 0);
   };
 
-  // Handle item selection from dropdown
-  const handleQuickAddItem = (itemName: string) => {
+  /**
+   * BATCH 1d — tapping a work type TICKS it. It does not open its fields.
+   *
+   * WHY (founder): "Tapping one must NOT immediately pop its fields — that is
+   * what confuses them. They tick everything they did first." Operators were
+   * dropped into a measurement form the instant they touched a work type, so
+   * they lost their place in the list and couldn't just say what they'd done.
+   *
+   * The item goes in with quantity 0 and no details, which is what "still needs
+   * measurements" MEANS — derived, never stored, so nothing new has to be
+   * written into the JSON operators have already saved.
+   */
+  const handleTogglePick = (itemName: string) => {
     setSearchQuery('');
     setShowDropdown(false);
-    handleSelectItem(itemName);
+    setSelectedItems((prev) =>
+      prev.some((si) => si.name === itemName)
+        ? prev.filter((si) => si.name !== itemName)
+        : [...prev, { name: itemName, quantity: 0 }]
+    );
+  };
+
+  /** Ticked, but nobody has entered what they actually did yet. */
+  const needsMeasurements = (item: WorkItem) =>
+    (item.quantity ?? 0) <= 0 && !item.details;
+
+  const pendingItems = selectedItems.filter(needsMeasurements);
+
+  // Handle item selection from dropdown
+  const handleQuickAddItem = (itemName: string) => {
+    // Ticks it. Opening the measurement form here is the behaviour batch 1d
+    // exists to remove — see handleTogglePick.
+    handleTogglePick(itemName);
   };
 
   // Check if item requires detailed data collection
@@ -934,6 +962,37 @@ export default function WorkPerformed() {
     setCutInputMode('linear');
     setTempAreas([]);
     setCurrentArea({ length: 0, width: 0, depth: 0, quantity: 1, ...EMPTY_REBAR, overcut: false, chainsawed: false, chainsawAreas: 0, chainsawWidthInches: 0 });
+
+    // RE-OPENING AN ITEM MUST NOT WIPE WHAT THEY ALREADY ENTERED.
+    //
+    // Everything above resets the forms to blank, which was survivable while the
+    // only way in was picking a fresh work type. Batch 1d makes "Edit" a
+    // first-class button on every item they've already filled in, so a blank
+    // form here would show no holes/cuts and then SAVE that emptiness over their
+    // real measurements (handleAddItem replaces details for an existing item).
+    // Hydrate from what's already stored.
+    const existing = selectedItems.find((si) => si.name === itemName);
+    const existingDetails = existing?.details as
+      | (Partial<CoreDrillingDetails> & Partial<SawingDetails> & Partial<DemolitionDetails>)
+      | undefined;
+    if (existingDetails) {
+      if (Array.isArray(existingDetails.holes)) {
+        setCoreDrillingData({ holes: existingDetails.holes, notes: existingDetails.notes || '' });
+      }
+      if (Array.isArray(existingDetails.cuts)) {
+        setSawingData({
+          cuts: existingDetails.cuts,
+          cutType: existingDetails.cutType === 'dry' ? 'dry' : 'wet',
+          notes: existingDetails.notes || '',
+        });
+      }
+      if (Array.isArray((existingDetails as DemolitionDetails).areas)) {
+        setDemolitionData(existing!.details as DemolitionDetails);
+      }
+      if (typeof existing?.quantity === 'number' && existing.quantity > 0) {
+        setCurrentQuantity(existing.quantity);
+      }
+    }
 
     setShowQuantityModal(true);
   };
@@ -1742,6 +1801,22 @@ export default function WorkPerformed() {
       return;
     }
 
+    // A ticked work type with nothing entered is not a record of anything.
+    // Batch 1d lets them tick everything first, which means they can now reach
+    // Submit with items still empty — name them so it's one tap to fix, rather
+    // than sending the office a row that says a work type happened and nothing
+    // about it.
+    if (pendingItems.length > 0) {
+      const names = pendingItems.map((i) => i.name).join(', ');
+      showNotification(
+        pendingItems.length === 1
+          ? `Add the measurements for ${names} before submitting.`
+          : `${pendingItems.length} work types still need measurements: ${names}`,
+        'warning'
+      );
+      return;
+    }
+
     // PHOTOS ARE OPTIONAL HERE (founder, Aug 3 2026 — an operator was standing
     // on a jobsite unable to submit his day). Requiring a photo to log work
     // performed blocks the day's numbers on a slow upload over site LTE. The
@@ -2240,32 +2315,80 @@ export default function WorkPerformed() {
             {!showQuantityModal && (
               <>
 
-            {/* Selected Items Display */}
+            {/* ── WHAT YOU DID — then fill each one in ─────────────────────
+                BATCH 1d. This replaces a row of read-only chips. Ticking a work
+                type used to throw the operator straight into a measurement form;
+                now everything they did gets ticked first and lands here, IN THE
+                ORDER THEY PICKED IT, each waiting to be filled in. */}
             {selectedItems.length > 0 && (
-              <div className="bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-500/20 rounded-2xl p-4 mb-4">
-                <h3 className="font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  Selected Items ({selectedItems.length})
-                </h3>
-                <div className="flex flex-wrap gap-2">
-                  {selectedItems.map((item, index) => (
-                    <div
-                      key={index}
-                      className="bg-gradient-to-r from-brand to-brand-accent text-white px-3 py-1.5 rounded-full font-medium flex items-center gap-1.5 shadow-sm text-sm"
-                    >
-                      <span>{item.name} <span className="opacity-80">×{item.quantity}</span></span>
-                      <button
-                        onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))}
-                        className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+              <div className="bg-white dark:bg-white/[0.05] border-2 border-green-200 dark:border-green-500/30 rounded-2xl p-4 mb-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <h3 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    What you did ({selectedItems.length})
+                  </h3>
+                  {pendingItems.length > 0 && (
+                    <span className="flex-shrink-0 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-500/30">
+                      {pendingItems.length} need{pendingItems.length === 1 ? 's' : ''} measurements
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
+                  Tick everything first. Then tap each one to enter what you did.
+                </p>
+
+                <div className="space-y-2">
+                  {selectedItems.map((item, index) => {
+                    const pending = needsMeasurements(item);
+                    return (
+                      <div
+                        key={`${item.name}-${index}`}
+                        className={`flex items-center gap-3 rounded-xl border-2 p-3 transition-all ${
+                          pending
+                            ? 'border-amber-300 dark:border-amber-500/40 bg-amber-50/60 dark:bg-amber-500/10'
+                            : 'border-green-200 dark:border-green-500/30 bg-green-50/60 dark:bg-green-500/10'
+                        }`}
                       >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
+                        <button
+                          onClick={() => handleSelectItem(item.name)}
+                          className="flex-1 min-w-0 text-left"
+                        >
+                          <p className="font-bold text-sm text-gray-900 dark:text-white truncate">{item.name}</p>
+                          <p className={`text-xs font-semibold mt-0.5 ${
+                            pending ? 'text-amber-700 dark:text-amber-300' : 'text-green-700 dark:text-green-300'
+                          }`}>
+                            {pending
+                              ? 'Tap to add measurements'
+                              : `${item.quantity} recorded${item.notes ? ' · note added' : ''}`}
+                          </p>
+                        </button>
+
+                        <button
+                          onClick={() => handleSelectItem(item.name)}
+                          aria-label={pending ? `Add measurements for ${item.name}` : `Edit ${item.name}`}
+                          className={`flex-shrink-0 min-h-[44px] px-3 rounded-xl text-xs font-bold transition-all ${
+                            pending
+                              ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-sm'
+                              : 'bg-white dark:bg-white/10 border border-green-300 dark:border-green-500/40 text-green-700 dark:text-green-300'
+                          }`}
+                        >
+                          {pending ? 'Add' : 'Edit'}
+                        </button>
+
+                        <button
+                          onClick={() => setSelectedItems(selectedItems.filter((_, i) => i !== index))}
+                          aria-label={`Remove ${item.name}`}
+                          className="flex-shrink-0 w-11 h-11 flex items-center justify-center text-gray-400 dark:text-white/40 hover:text-red-600 dark:hover:text-red-400 rounded-xl transition-colors"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -2286,7 +2409,7 @@ export default function WorkPerformed() {
                 return (
                   <button
                     key={item}
-                    onClick={() => handleSelectItem(item)}
+                    onClick={() => handleTogglePick(item)}
                     className={`p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
                       isSelected
                         ? 'bg-green-50 dark:bg-green-900/20 border-green-400 dark:border-green-500/40 shadow-md'
@@ -2296,11 +2419,16 @@ export default function WorkPerformed() {
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
                         <h3 className={`font-bold text-sm ${isSelected ? 'text-green-800 dark:text-green-300' : 'text-gray-800 dark:text-white group-hover:text-brand dark:group-hover:text-brand'}`}>{item}</h3>
-                        {isSelected && (
-                          <p className="text-xs text-green-600 dark:text-green-400 mt-0.5 font-semibold">
-                            Qty: {selectedItems.find(si => si.name === item)?.quantity}
-                          </p>
-                        )}
+                        {isSelected && (() => {
+                          const picked = selectedItems.find(si => si.name === item);
+                          return (
+                            <p className="text-xs mt-0.5 font-semibold text-green-600 dark:text-green-400">
+                              {picked && needsMeasurements(picked)
+                                ? 'Ticked — add measurements below'
+                                : `Qty: ${picked?.quantity}`}
+                            </p>
+                          );
+                        })()}
                       </div>
                       {isSelected ? (
                         <div className="w-7 h-7 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
