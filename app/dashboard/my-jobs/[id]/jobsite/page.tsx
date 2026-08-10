@@ -53,19 +53,24 @@ export default function JobsitePage() {
               return;
             }
             setJob(found);
-            // If status is still in_route, update to in_progress (arrived at
-            // site). LEAD-only: crew co-operators don't drive ticket status
-            // (the server would 403 this anyway — don't even fire it).
-            if (found.status === 'in_route' && found.viewer_is_co_operator !== true) {
-              fetch(`/api/job-orders/${jobId}/status`, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-                body: JSON.stringify({ status: 'in_progress' }),
-              }).catch(console.error);
-            }
+            // ⚠️ DO NOT move the job to in_progress here.
+            //
+            // This used to fire on MOUNT, and "Start In Route" navigates
+            // straight to this screen — so `arrived_at_jobsite_at` and
+            // `work_started_at` were being stamped about two seconds after the
+            // crew tapped In Route, while they were still at the shop. Measured
+            // Aug 10: 15 of 15 jobs in the database, back to July, all 1–3
+            // seconds apart. Arrival meant "the jobsite SCREEN loaded".
+            //
+            // That is not an internal-only inaccuracy: the en-route SMS hands
+            // the customer a portal link, and the portal read this field — so a
+            // contact was told "on the way" while the system showed the crew
+            // already on site and working. It is the likeliest reason Southern
+            // Basements texted the founder asking if we were there.
+            //
+            // The transition now happens on the "Start Work" button below,
+            // which is a real operator action meaning "I am here and starting".
+            // (Batch 2c goes further and derives arrival from GPS.)
           } else {
             router.push('/dashboard/my-jobs');
           }
@@ -104,8 +109,35 @@ export default function JobsitePage() {
     fetchDocuments();
   }, [fetchJob, fetchDocuments]);
 
-  const handleStartWork = () => {
-    router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
+  const [startingWork, setStartingWork] = useState(false);
+
+  /**
+   * "I'm on site and starting." THIS is what stamps arrival + work start —
+   * see the note in fetchJob about why it must not happen on page load.
+   *
+   * Navigation still happens even if the status call fails: the operator's job
+   * is to record their work, and blocking them at the jobsite over a status
+   * write would be a worse failure than a late timestamp. The server stamps
+   * only the FIRST transition, so pressing it twice is harmless.
+   */
+  const handleStartWork = async () => {
+    setStartingWork(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      // Co-operators don't drive ticket status — the server 403s it anyway.
+      if (session && job?.status === 'in_route' && (job as any)?.viewer_is_co_operator !== true) {
+        await fetch(`/api/job-orders/${jobId}/status`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ status: 'in_progress' }),
+        }).catch(console.error);
+      }
+    } finally {
+      router.push(`/dashboard/job-schedule/${jobId}/work-performed`);
+    }
   };
 
   if (loading) {
@@ -425,15 +457,16 @@ export default function JobsitePage() {
           </div>
         )}
 
-        {/* Start Work — advances to the work-performed log (status already moved to
-            in_progress on load; no separate "Arrived" step). */}
+        {/* Start Work — marks them ON SITE (stamps arrival + work start) and
+            advances to the work-performed log. */}
         <div className="pt-2 pb-safe">
           <button
             onClick={handleStartWork}
-            className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
+            disabled={startingWork}
+            className="w-full py-5 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:opacity-70 text-white rounded-2xl font-bold text-lg transition-all shadow-lg flex items-center justify-center gap-3"
           >
             <CheckCircle className="w-6 h-6" />
-            Start Work
+            {startingWork ? 'Starting…' : "I'm On Site — Start Work"}
           </button>
         </div>
 
