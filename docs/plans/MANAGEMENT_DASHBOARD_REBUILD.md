@@ -174,6 +174,64 @@ form where they left off. Never make them start again.
 
 ---
 
+## BATCH M11 — reminders: mostly ALREADY BUILT, three real gaps (added Aug 11)
+
+*Founder: "can we send and edit reminders — 6:58 to clock in, again 7:05, then
+remind them to clock out at 6pm unless night shift… or instead make it smart: add
+start time in the schedule form, pre-fill at 7am, send notifications 5 mins
+before start and 5 after if they still haven't clocked in, then a reminder 10 hrs
+after start time to clock out unless they already clocked out."*
+
+**He designed the second option himself, and it is the better one — it handles
+night shift for free instead of special-casing it. It is also, almost exactly,
+what is already running.** Checked before writing any code:
+
+| What he asked for | Status |
+|---|---|
+| Start time on the job, pre-filled 7am | ✅ `job_orders.arrival_time`, falling back to `tenants.default_start_time` = **07:00:00**, then a hardcoded 07:00 |
+| Notify **5 min before** start | ✅ `clockInReminderPhase` 'pre' — window start−7 → start−2 |
+| Notify **5 min after**, only if not clocked in | ✅ 'post' — window start+3 → start+8 |
+| Clock-out reminder **10 h after** start | ✅ `clock_out_10h`, plus 12 h and 15 h escalations |
+| Don't nag someone who already clocked out | ✅ the cron only looks at open cards |
+
+**And it fired this morning.** From `reminder_log`, last 10 days:
+`clock_in_pre` 41 sent (most recent **today 07:25 ET**), `clock_in_post` 30
+(today 07:35), `clock_out_10h` 28, plus 12h, auto-clockout warnings, and the
+work-performed lunch/midday/overdue set. The 07:25/07:35 timings confirm it keys
+off the JOB's start time, not a fixed clock.
+
+### So the three things that are genuinely missing
+
+**M11a. `arrival_time` is set on only 12 of 30 recent jobs.** The other 18 fall
+back to the tenant's 7:00. That is a safe default, but it means a job with a real
+9am start still gets nagged at 06:55. The founder's own words — *"add start time
+in schedule form, standard, pre-fill at 7am"* — are the fix: make the schedule
+form always carry a start time, pre-filled 07:00, so the per-job accuracy the
+engine already supports actually gets used.
+
+**M11b. NIGHT SHIFT is not excluded from clock-in reminders.** `is_night_shift`
+lives on `timecards` — it is recorded AFTER the fact, from the shift worked.
+Nothing on the JOB or the person marks them as a night-shift crew beforehand, so
+the clock-in cron has nothing to check and will nag a night operator at 7am.
+Needs a scheduled attribute (on the job or the assignment), not a derived one.
+*(Note: with a per-job start time this mostly solves itself — a 19:00 arrival
+time produces 18:55/19:05 reminders. M11a may be the whole fix. Verify before
+building anything separate.)*
+
+**M11c. There is NO WAY TO EDIT ANY OF IT.** This is what he actually asked for
+first — "send and **edit** reminders". Every threshold is a constant in code:
+`lib/reminder-timing.ts` (the ±5 min windows, LUNCH_HOURS 4, OVERDUE_HOURS 7) and
+the 10/12/15-hour ladder in the clock-out cron. `tenants.default_start_time`
+exists in the DB but has no settings screen. Ties directly into operator batch
+**10b**, which already asks to "see and control the AUTOMATED notifications —
+clock-in, work-performed, clock-out, dispatch, waiver chase, midday — at minimum
+on/off and timing."
+
+⚠️ Build 10b and M11c as ONE screen. Two places to configure notification timing
+is how the waiver ended up with two wordings.
+
+---
+
 ## BATCH M9 — hours by contractor and project (added Aug 11)
 
 *Founder: "I would like to see contractor name and project name in timecards, to
