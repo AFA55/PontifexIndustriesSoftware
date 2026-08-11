@@ -68,6 +68,15 @@ async function updateJobStatus(
       on_site: ['in_progress', 'cancelled'],
       in_progress: ['completed', 'pending_completion', 'cancelled'],
       pending_completion: ['completed', 'in_progress', 'scheduled'],  // admin can approve or reopen
+      // ON_HOLD WAS MISSING ENTIRELY — a parked job was a DEAD END.
+      //
+      // With no key here, LEGAL_TRANSITIONS['on_hold'] was undefined and every
+      // move out of it failed with "Illegal status transition: on_hold → …
+      // Allowed next states: (none)". Conrade hit exactly that on BWC
+      // (JOB-2026-521763) — he could not start the job, and could not finish it
+      // either; the ticket walked him all the way to the customer signature
+      // screen before refusing. Parking a job must be reversible.
+      on_hold: ['scheduled', 'assigned', 'in_route', 'in_progress', 'cancelled'],
       completed: ['archived'],
       cancelled: [],
       archived: [],

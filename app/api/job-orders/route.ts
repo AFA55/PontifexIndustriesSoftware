@@ -352,10 +352,23 @@ export async function GET(request: NextRequest) {
       }
       // Operators only see DISPATCHED tickets — no peeking at tomorrow's work
       // until it's dispatched (founder). BUT always show a job that is actively
-      // in the field (in_progress/on_hold/on_site/pending_completion) even if
-      // some path left dispatched_at null — so a same-day or continuing/unfinished
-      // job an operator is working can never be hidden from them.
-      query = query.or('dispatched_at.not.is.null,status.in.(in_progress,on_hold,on_site,pending_completion)');
+      // in the field (in_progress/on_site/pending_completion) even if some path
+      // left dispatched_at null — so a same-day or continuing/unfinished job an
+      // operator is working can never be hidden from them.
+      query = query.or('dispatched_at.not.is.null,status.in.(in_progress,on_site,pending_completion)');
+
+      // A PARKED JOB IS THE OFFICE'S PROBLEM, NOT THE CREW'S.
+      //
+      // `on_hold` used to be in the always-show list above, so a parked job
+      // stayed on the operator's schedule. Conrade opened BWC (JOB-2026-521763),
+      // could not start it, and the ticket still walked him all the way to the
+      // customer signature screen before failing with "Illegal status
+      // transition: on_hold → completed".
+      // Founder: "when a job is on hold operators shouldn't see it, it should be
+      // stored in pending jobs." It already is — /api/admin/pending-jobs lists
+      // exactly these for the office. Un-parking it puts it back on their
+      // schedule.
+      query = query.neq('status', 'on_hold');
     }
 
     // Filter by scheduled_date if provided.
