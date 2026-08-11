@@ -149,6 +149,46 @@ the **slot**, not the role (`app/dashboard/my-jobs/[id]/page.tsx`), so whoever
 sits in `assigned_to` runs the full operator flow. The only thing ever missing
 is being allowed into the dropdown.
 
+**1g. ASK WHICH TICKET when adding someone to a job.** *(founder, Aug 11)*
+
+*"Sometimes operators can be helpers and I would like them to just fill out the
+helper ticket. I think the best way is to have an option when I click the ticket
+to add an operator — an if statement to ask if I want them to fill out an
+operator ticket or a helper ticket, that way the backend knows exactly what it
+is."*
+
+**He is right, and it is the correct fix rather than a convenience.** Today the
+system INFERS which ticket someone owes from WHICH SLOT they were dropped into:
+`assigned_to` → operator ticket, `helper_assigned_to` → helper log. That
+inference is exactly what has broken twice already:
+- an apprentice put in the operator slot got the full operator ticket (right,
+  and what he asked for) — but the clock-out gate still queried the helper slot
+  and let him clock out having filed nothing;
+- and there is no way at all to put an OPERATOR on a job as a helper, because
+  the helper slot is treated as the apprentice's.
+
+**Asking at assignment time removes the guess.** The office says what this person
+is doing on this job, once, and every downstream surface reads that answer
+instead of re-deriving it from a slot.
+
+**Build:**
+- When adding someone to a ticket, ask: **"Operator ticket or helper ticket?"**
+  Default to what their role suggests, so the common case stays one tap.
+- Store the answer explicitly. `job_crew.role` ALREADY carries `'operator' |
+  'helper'` and is already honoured (`crewHelperJobIds` / `crewOperatorJobIds` in
+  `/api/job-orders`) — extend that rather than inventing a second mechanism. The
+  gap is the two legacy SLOT columns, which carry no such flag.
+- The per-day ledger (`job_daily_assignments`) needs the same answer, since it is
+  authoritative for who is on a job on a given DAY.
+- Then make the ticket, the clock-out gate and the reminders all read that one
+  field. `lib/unfinished-tickets.ts` currently infers from the slot; it should
+  ask what the office recorded.
+
+⚠️ **Do not change what the two legacy slots mean.** Every existing job, every
+report and every roll-up reads them. Add the explicit answer alongside and derive
+the old behaviour when it is absent — the same pattern used for rebar and phone
+numbers.
+
 **1f. "Open Operator View" for management.** *(founder, Aug 9)*
 
 David (supervisor) and the founder (operations_manager) both need a card on
@@ -549,6 +589,22 @@ about a job that finished at 4. Same for a continuing job: no dispatch noise.
 
 ## Working rules for this rebuild
 
+- **CHECK THE BACKEND BEFORE AND AFTER.** *(founder, Aug 11: "we are coming into
+  lots of issues now with new changes and this is normal, but let's make sure we
+  are analysing and testing on backend to ensure we minimise these.")*
+  He is right, and the record backs him: every regression that reached his crew
+  this week was invisible in the UI and obvious in the data.
+  - **Before building**, query production for the thing you are about to rely on.
+    `timecards.job_order_id` looked fine until it turned out to be empty on 40%
+    of field entries; `on_hold` looked like a status until it turned out to have
+    no entry in the transitions map at all.
+  - **After building**, exercise the API directly — not just the screen. Both
+    critical regressions this week (the submit block, the arrival stamp) passed a
+    UI click-through and failed the moment the actual request was inspected.
+  - **Test the path you did NOT write.** The submit guard was verified by driving
+    the list; the crew took the other route — the fixed button sitting on screen
+    — and were blocked. The untested path is the one they take first.
+  - A 200 response is not proof. Read what came back.
 - **Two or three items, then stop.** Agent review behind each batch before moving on.
 - **Nothing ships without the founder seeing it** on DEMO-2026-000002.
 - **Never break what operators already recorded.** Add fields, derive old ones;
