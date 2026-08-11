@@ -480,39 +480,6 @@ export default function AdminJobDetailPage({
   const [pageError, setPageError] = useState<{ status?: number; message: string } | null>(null);
 
   const [showEditSchedule, setShowEditSchedule] = useState(false);
-  const [draftingInvoice, setDraftingInvoice] = useState(false);
-
-  /**
-   * Draft the INVOICE/BILLING sheet for this job (M2f).
-   *
-   * Failure is REPORTED. The other print handlers on this platform were written
-   * as `if (res.ok)` with no else, so a failed document looked exactly like a
-   * working one that printed nothing — and whoever pressed it stood at the
-   * printer waiting. Not repeating that here.
-   */
-  const handleProceedToInvoice = async () => {
-    setDraftingInvoice(true);
-    try {
-      const token = await getToken();
-      const res = await fetch(`/api/job-orders/${jobId}/invoice-pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) {
-        let msg = 'Could not draft the invoice sheet.';
-        try { msg = (await res.json())?.error || msg; } catch { /* not json */ }
-        alert(`Invoice draft failed — ${msg}`);
-        return;
-      }
-      const url = URL.createObjectURL(await res.blob());
-      const win = window.open(url, '_blank');
-      if (!win) alert('Your browser blocked the popup. Allow popups for this site, then press it again.');
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      alert('Invoice draft failed — could not reach the server.');
-    } finally {
-      setDraftingInvoice(false);
-    }
-  };
   const [reviewNotes, setReviewNotes] = useState('');
   const [approving, setApproving] = useState(false);
   const [rejecting, setRejecting] = useState(false);
@@ -1455,27 +1422,6 @@ export default function AdminJobDetailPage({
                 <Printer className="w-4 h-4" />
                 Print Work Ticket
               </Link>
-              {/* PROCEED TO INVOICE (M2f) — only once the work is actually done.
-                  Drafts Patriot's own INVOICE/BILLING sheet with everything the
-                  platform already knows filled in, so the office stops retyping
-                  the completion ticket and the work ticket into a third form.
-                  The money lines print blank, as they are written by hand today. */}
-              {['completed', 'pending_completion'].includes(String(job.status)) && (
-                <button
-                  onClick={handleProceedToInvoice}
-                  disabled={draftingInvoice}
-                  className="
-                    inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
-                    text-emerald-800 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 disabled:opacity-60
-                    dark:text-emerald-300 dark:bg-emerald-500/10 dark:border-emerald-500/30 dark:hover:bg-emerald-500/20
-                  "
-                >
-                  {draftingInvoice
-                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                    : <FileText className="w-4 h-4" />}
-                  Proceed to Invoice
-                </button>
-              )}
               <button
                 onClick={() => setShowEditSchedule(true)}
                 className="
