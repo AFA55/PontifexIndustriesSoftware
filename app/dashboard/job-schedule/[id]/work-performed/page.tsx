@@ -3029,8 +3029,22 @@ export default function WorkPerformed() {
           </>
         )}
 
-        {/* Submit Button */}
-        {selectedItems.length > 0 && !dayAlreadySubmitted && !coOpSubmitted && (
+        {/* Submit Button.
+            HIDDEN while the measurement panel is open (`!showQuantityModal`).
+            THE BUG (Devin + Zack, Aug 10): this bar is `fixed bottom-0`, so it
+            sat on screen the whole time an operator was entering holes. They
+            added "6 bit, 10in deep, 7 holes", typed a note, saw "Next: Job
+            Survey" right there and pressed it — but those holes live in the
+            panel's own state until "Add Work Item" commits them to
+            selectedItems. So the item was still empty, the new pending-items
+            guard fired, and they got "Add the measurements for CORE DRILL"
+            while staring at the measurements they had just added. They could
+            not submit their day.
+            Every other action on this page is already hidden behind the panel
+            (see the !showQuantityModal blocks above); this bar was missed. While
+            you are filling in a work type, the only action is to save that work
+            type. */}
+        {selectedItems.length > 0 && !dayAlreadySubmitted && !coOpSubmitted && !showQuantityModal && (
           <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-safe z-50">
             <div className="container mx-auto max-w-lg">
               {/* Co-operator: submit YOUR work — the lead runs day-complete. */}
