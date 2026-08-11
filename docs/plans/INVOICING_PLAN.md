@@ -113,10 +113,58 @@ does now. A guessed number on a customer's bill is far worse than a blank line.
 
 ---
 
-## 5. Still to decide
+## 5. ⚠️ THERE IS ALREADY AN INVOICING MODULE — read this before building anything
 
-- **Billing address** — is the customer's billing address stored anywhere, or is
-  it only ever on the paper? The CUSTOMER block has four lines for a reason.
+Found **after** the draft above was built, while confirming main was clean. I did
+not check for one first. That is the miss to learn from: grep the repo for the
+noun before building a second one.
+
+**What already exists on `main`, fully built:**
+
+| | |
+|---|---|
+| `invoices` table | **0 rows** — built, never used in production |
+| `components/pdf/InvoicePDF.tsx` | A customer-facing invoice with LINE ITEMS (description, quantity, rate, amount) |
+| `app/dashboard/admin/billing/_components/CreateInvoiceForm.tsx` | Customer search, **"Or Select Completed Job"**, customer name, contact email, **billing address** |
+| `app/api/admin/invoices/*` | create, preview, send, send-confirmed, confirm, remind, payment, mark-paid, pdf |
+| `app/api/cron/invoice-30d-reminders` | chases unpaid invoices |
+| `emails/InvoiceEmail.tsx` | the outbound email |
+
+`InvoicePDF` already carries `invoice_number, invoice_date, due_date, po_number,
+job_number, job_name, job_location, work_completed_date, sales_person` — nearly
+the same fields as the paper sheet, plus priced line items.
+
+**This answers an open question:** the **billing address IS captured**, on the
+create-invoice form.
+
+### So which is M2f actually asking for?
+
+The founder's words: *"the office manually pulls the completion ticket and the
+work ticket and retypes them into a separate invoicing ticket."* That "separate
+invoicing ticket" is the PAPER sheet — an internal worksheet, not the customer's
+invoice. So the two documents may both be legitimate and different:
+
+- **A — draft the paper worksheet** (what was built on `feat/invoice-draft`).
+  Matches what he asked for literally and fits the office's current filing habit.
+- **B — pre-fill the existing invoice flow** from a completed job. That module
+  already has "Or Select Completed Job", so it was designed for exactly this —
+  and it inherits pricing, sending, reminders and paid-tracking, which A has none
+  of. But it has never been used once, so it is unproven.
+
+**Decide with the founder before writing more code.** Doing both means two
+documents drifting apart, which is how the utility waiver ended up with two
+different wordings in circulation.
+
+Worth asking directly: *does the office want the paper worksheet drafted, or do
+they want to stop using it and invoice from the platform?* The answer changes
+which of these is dead code.
+
+---
+
+## 6. Still to decide
+
+- ~~**Billing address**~~ — ✅ answered by §5: it is captured on the existing
+  create-invoice form.
 - **Where the draft belongs** — currently a button on the job page. The founder
   originally described it on **completed jobs** (M2f). Confirm which surface.
 - **Does it need saving?** Right now it renders on demand. If the office needs a
