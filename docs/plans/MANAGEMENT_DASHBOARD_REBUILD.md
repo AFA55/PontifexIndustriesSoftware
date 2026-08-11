@@ -66,9 +66,15 @@ nobody visited, show nothing rather than an empty frame.
 **operator** and by **helper**. A single blended figure across every job answers
 no question anyone actually has. *(Same principle as operator batch 9b.)*
 
-**M2f. "Proceed to invoice".** A button on the completed job that drafts an
-invoice sheet. Today the office manually pulls the completion ticket and the
-work ticket and retypes them into a separate invoicing ticket.
+**M2f. "Proceed to invoice". ⏸️ PARKED — see `docs/plans/INVOICING_PLAN.md`.**
+*Founder, Aug 11: "don't start pushing invoice — we need to make sure the
+schedule board and all other task areas are completed before then."*
+A working draft was BUILT and verified against a real job, then deliberately
+reverted off `main` (revert `f3a848cb`) so an unrelated push could not carry it
+live. The work is preserved on branch `feat/invoice-draft` (`e15c30f9`).
+Everything below stays true; do not extend it until the board, the schedule form
+and the job ticket are solid. The full spec, what was built, what was verified
+and what remains now lives in the plan file.
 
 **✅ THE SHEET — photo received Aug 10.** Patriot's paper "INVOICE/BILLING" form,
 top to bottom, with where each field already exists in the platform:
