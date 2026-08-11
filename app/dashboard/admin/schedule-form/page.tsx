@@ -615,7 +615,20 @@ const initialFormData: FormData = {
   end_date: '',
   special_arrival: false,
   special_arrival_time: '',
-  arrival_time: '',
+  /**
+   * CREW START TIME — defaults to 07:00 (founder, Aug 11: "most jobs start at 7…
+   * make it automatically 7, if not they can change the time").
+   *
+   * This is not cosmetic. It drives the clock-in reminders: the cron fires 5 min
+   * BEFORE and 5 min AFTER this time. Left blank it fell back to the tenant
+   * default of 07:00, which is right for most jobs and WRONG for the rest — a
+   * 9am start still got nagged at 06:55, and a night crew got nagged in the
+   * morning. Only 12 of 30 recent jobs carried a start time.
+   *
+   * Filling it in also removes the need to special-case night shift: a 19:00
+   * start simply produces 18:55 / 19:05 reminders.
+   */
+  arrival_time: '07:00',
   can_work_fridays: true,
   can_work_weekends: false,
   outside_hours: false,
@@ -4117,7 +4130,11 @@ export default function ScheduleFormPage() {
                   value={form.arrival_time}
                   onChange={e => updateForm({ arrival_time: e.target.value })}
                 />
-                <p className="text-xs text-slate-500 dark:text-white/40">Used to remind the crew to clock in.</p>
+                <p className="text-xs text-slate-500 dark:text-white/40">
+                  Drives the clock-in reminders — the crew is nudged 5 minutes
+                  before and 5 minutes after this time. Defaults to 7:00; change
+                  it for an early, late or <strong>night</strong> start.
+                </p>
               </div>
               <Toggle
                 checked={form.special_arrival}
