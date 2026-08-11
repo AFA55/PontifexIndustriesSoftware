@@ -390,21 +390,75 @@ export async function POST(request: NextRequest) {
     // Associate the job the operator is on today so the timecard shows WHERE
     // they were (job) and WHO they're with (crew is derived from same job+date).
     // Best-effort — never blocks the clock-in.
+    //
+    // THE GAP (measured Aug 11): this only ever looked at the two job-level
+    // slots, so 37 of 90 recent FIELD timecards carried no job at all — roughly
+    // 40%. That makes "hours by contractor / by project" (M9) quietly omit
+    // nearly half the hours, which is worse than having no number because the
+    // founder would trust it. Two more places know where someone is:
+    //   - job_crew — extra crew on a job beyond the two slots
+    //   - job_daily_assignments — the per-day ledger, which is AUTHORITATIVE for
+    //     who is on a job on a given day (the clock-out gate already defers to
+    //     it, and the office swaps crew day to day)
+    // The ledger is checked FIRST for exactly that reason.
     if (tenantId) {
       try {
-        const { data: todaysJob } = await supabaseAdmin
-          .from('job_orders')
-          .select('id')
+        let resolvedJobId: string | null = null;
+
+        // 1. Today's ledger entry — the most specific answer there is.
+        const { data: ledgerRow } = await supabaseAdmin
+          .from('job_daily_assignments')
+          .select('job_order_id')
           .eq('tenant_id', tenantId)
-          .or(`assigned_to.eq.${user.id},helper_assigned_to.eq.${user.id}`)
-          .lte('scheduled_date', todayDate)
-          .or(`scheduled_date.eq.${todayDate},end_date.gte.${todayDate}`)
-          .not('status', 'in', '("completed","cancelled","archived","on_hold")')
-          .not('dispatched_at', 'is', null)
-          .order('scheduled_date', { ascending: false })
+          .eq('assignment_date', todayDate)
+          .or(`operator_id.eq.${user.id},helper_id.eq.${user.id}`)
           .limit(1)
           .maybeSingle();
-        if (todaysJob?.id) insertData.job_order_id = todaysJob.id;
+        if (ledgerRow?.job_order_id) resolvedJobId = ledgerRow.job_order_id;
+
+        // 2. A job-level slot on a job running today.
+        if (!resolvedJobId) {
+          const { data: todaysJob } = await supabaseAdmin
+            .from('job_orders')
+            .select('id')
+            .eq('tenant_id', tenantId)
+            .or(`assigned_to.eq.${user.id},helper_assigned_to.eq.${user.id}`)
+            .lte('scheduled_date', todayDate)
+            .or(`scheduled_date.eq.${todayDate},end_date.gte.${todayDate}`)
+            .not('status', 'in', '("completed","cancelled","archived","on_hold")')
+            .not('dispatched_at', 'is', null)
+            .order('scheduled_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (todaysJob?.id) resolvedJobId = todaysJob.id;
+        }
+
+        // 3. Crewed on a job running today (neither slot, but on the crew).
+        if (!resolvedJobId) {
+          const { data: crewRows } = await supabaseAdmin
+            .from('job_crew')
+            .select('job_order_id')
+            .eq('user_id', user.id);
+          const crewJobIds = (crewRows ?? [])
+            .map((c: { job_order_id: string }) => c.job_order_id)
+            .filter(Boolean);
+          if (crewJobIds.length > 0) {
+            const { data: crewJob } = await supabaseAdmin
+              .from('job_orders')
+              .select('id')
+              .eq('tenant_id', tenantId)
+              .in('id', crewJobIds)
+              .lte('scheduled_date', todayDate)
+              .or(`scheduled_date.eq.${todayDate},end_date.gte.${todayDate}`)
+              .not('status', 'in', '("completed","cancelled","archived","on_hold")')
+              .order('scheduled_date', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+            if (crewJob?.id) resolvedJobId = crewJob.id;
+          }
+        }
+
+        if (resolvedJobId) insertData.job_order_id = resolvedJobId;
       } catch { /* job link is best-effort */ }
     }
 

@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { resolveTimecardJobContext, formatJobContextLabel } from '@/lib/timecard-job-context';
 
 export async function GET(request: NextRequest) {
   try {
@@ -85,6 +86,67 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // ── WHERE WAS EACH PERSON? (M9a) ────────────────────────────────────────
+    // The founder wants the CONTRACTOR and PROJECT on a timecard, and hours
+    // totalled per contractor/project. `timecards.job_order_id` alone answers
+    // that for only ~60% of recent field entries, so this resolver also derives
+    // it from the day's ledger and work logs. READ-time only — nothing is
+    // written back into the payroll record. See lib/timecard-job-context.ts.
+    const jobContext = await resolveTimecardJobContext(
+      (timecards ?? []).map((tc: any) => ({
+        id: tc.id,
+        user_id: tc.user_id,
+        date: tc.date,
+        job_order_id: tc.job_order_id ?? null,
+      })),
+      tenantId
+    );
+
+    for (const tc of timecards ?? []) {
+      const ctx = jobContext.get(tc.id);
+      tc.job_context = ctx ?? null;
+      tc.job_context_label = formatJobContextLabel(ctx);
+    }
+
+    // Hours by contractor and by project — the actual question ("how many hours
+    // are we working on this customer / this project"). Anything we could not
+    // attribute is counted SEPARATELY and reported, never folded into a total
+    // that would then read as complete.
+    const byContractor = new Map<string, { name: string; hours: number; entries: number }>();
+    const byProject = new Map<string, { name: string; contractor: string | null; hours: number; entries: number }>();
+    let unattributedHours = 0;
+    let unattributedEntries = 0;
+
+    for (const tc of timecards ?? []) {
+      const hours = Number(tc.total_hours) || 0;
+      const ctx = tc.job_context as { customerName?: string | null; projectName?: string | null } | null;
+      if (!ctx?.customerName && !ctx?.projectName) {
+        unattributedHours += hours;
+        unattributedEntries += 1;
+        continue;
+      }
+      if (ctx.customerName) {
+        const k = ctx.customerName;
+        const row = byContractor.get(k) ?? { name: k, hours: 0, entries: 0 };
+        row.hours += hours; row.entries += 1;
+        byContractor.set(k, row);
+      }
+      if (ctx.projectName) {
+        const k = `${ctx.customerName ?? ''}|${ctx.projectName}`;
+        const row = byProject.get(k) ?? { name: ctx.projectName, contractor: ctx.customerName ?? null, hours: 0, entries: 0 };
+        row.hours += hours; row.entries += 1;
+        byProject.set(k, row);
+      }
+    }
+
+    const round1 = (n: number) => Math.round(n * 10) / 10;
+    const hoursByContractor = [...byContractor.values()]
+      .map((r) => ({ ...r, hours: round1(r.hours) }))
+      .sort((a, b) => b.hours - a.hours);
+    const hoursByProject = [...byProject.values()]
+      .map((r) => ({ ...r, hours: round1(r.hours) }))
+      .sort((a, b) => b.hours - a.hours);
+
     // Calculate summary statistics
     const totalHours = timecards?.reduce((sum: number, tc: any) => sum + (tc.total_hours || 0), 0) || 0;
     const totalEntries = timecards?.length || 0;
@@ -120,6 +182,15 @@ export async function GET(request: NextRequest) {
             activeEntries,
           },
           userSummary: Object.values(userSummary),
+          // M9b — hours by contractor and by project. `unattributed` is reported
+          // rather than hidden: a total that silently omits hours we could not
+          // place is worse than no total, because it would be trusted.
+          hoursByContractor,
+          hoursByProject,
+          unattributed: {
+            hours: round1(unattributedHours),
+            entries: unattributedEntries,
+          },
         },
       },
       { status: 200 }

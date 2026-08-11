@@ -174,6 +174,93 @@ form where they left off. Never make them start again.
 
 ---
 
+## BATCH M9 — hours by contractor and project (added Aug 11)
+
+*Founder: "I would like to see contractor name and project name in timecards, to
+see where operators were within a timecard. For certain contractors we like to
+see how many hours we are working on certain projects."*
+
+**M9a. Show the CONTRACTOR and PROJECT on every timecard entry** — so a timecard
+says not just "8.5 hours" but "8.5 hours, Collins Custom Builds — Purple Power".
+
+**M9b. Total hours by contractor / by project.** The actual business question:
+how many hours are we pouring into this customer, this project. Needs the answer
+to M9a to be trustworthy first.
+
+### ⚠️ MEASURE FIRST — the link is missing on most timecards
+
+`timecards.job_order_id` EXISTS, but is mostly empty. Measured Aug 11:
+
+| | All time | Last 21 days |
+|---|---|---|
+| Timecards | 251 | 90 |
+| Shop hours (no job expected — correct) | — | 2 |
+| **Linked to a job directly** | **34** | 34 |
+| Derivable from that day's work logs | 14 | 14 |
+| **Field time with NO job connection at all** | ~200 | **37** |
+
+So **roughly 40% of recent field timecards cannot say which job they were on.**
+Building the report without fixing this gives the founder a number that quietly
+omits nearly half the hours — worse than no number, because he would trust it.
+
+### Why the link is missing
+`app/api/timecard/clock-in/route.ts` DOES try to associate the job, but it only
+looks at the two job-level slots (`assigned_to`, `helper_assigned_to`). It does
+NOT consider:
+- **`job_crew`** — extra crew members on a job,
+- **`job_daily_assignments`** — the per-day ledger, which is authoritative for
+  who is on a job on a given DAY (see the clock-out gate, which was fixed to
+  respect it),
+- anyone who clocks in **before** the job is dispatched (the query requires
+  `dispatched_at`).
+
+### Build order
+1. **Widen the clock-in lookup** to job_crew + the day ledger, so new timecards
+   carry the link. Cheapest fix, biggest effect, and it compounds daily.
+2. **Derive at read time** for anything still unlinked: the day's
+   `daily_job_logs` / `helper_work_logs` for that user+date name the job. Covers
+   history without rewriting stored rows.
+3. **Say "not recorded" honestly** where neither works. Never a blank cell that
+   reads as zero hours.
+4. Only then the by-contractor / by-project totals, with a visible note of how
+   many hours could not be attributed.
+
+⚠️ Do NOT backfill historic `job_order_id` by guessing. Deriving at read time is
+reversible and auditable; writing a guess into the payroll record is not.
+
+---
+
+## BATCH M10 — edit the original scope after a job goes active (added Aug 11)
+
+*Founder: "I would like to be able to add to / edit original scopes of work once
+a job becomes active."*
+
+Scope is set on the schedule form before dispatch. Once the crew is on site,
+reality changes — the customer adds an opening, a dimension was wrong, something
+was missed. Today that scope is effectively frozen.
+
+**What this must NOT become:** a way to quietly rewrite what was agreed.
+- Progress is measured AGAINST scope (`lib/job-progress.ts`). Editing scope moves
+  the goalposts, so a job at 80% can jump to 40% or vice versa.
+- Added work that the CUSTOMER asked for is a **change order** and already has a
+  flow (`change_orders`), which carries a price and a signature.
+
+**So the distinction has to be explicit at the point of editing:**
+- **Correcting** the original scope (it was recorded wrong) — edits in place,
+  keeps the original visible in history.
+- **Adding** scope (new work the customer wants) — becomes a change order, not a
+  silent edit of the original.
+
+Operator batch **13b** already asks for exactly this to be visible: *"original
+scope and added scope in DIFFERENT COLOURS, so the distinction is readable at a
+glance."* Build the data model so 13b is possible — original and added must stay
+distinguishable after the edit, not merged into one number.
+
+**Also required:** an audit trail. Who changed the scope, when, and what it was
+before. A scope edit changes what we bill and what the crew is measured against.
+
+---
+
 ## BATCH M8 — many operators, ONE job (clarified by the founder, Aug 10)
 
 *This is why DATE(S) and Job Ticket #(S) are plural on the paper invoice. It is

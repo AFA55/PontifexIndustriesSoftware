@@ -1816,6 +1816,37 @@ function OperatorTimecardDetailPageInner() {
                           {dayEntries[0].job_number ? ` (${dayEntries[0].job_number})` : ''}
                         </p>
                       )}
+                      {/* WHO the day was worked FOR (M9a). The founder wants the
+                          contractor and project on the timecard so he can see
+                          where operators were, and total hours per contractor.
+                          Every distinct one on the day is listed — two jobs in a
+                          day is normal here. */}
+                      {hasEntries && (() => {
+                        const labels = [...new Set(
+                          dayEntries.map((e: any) => e.job_context_label).filter(Boolean)
+                        )] as string[];
+                        if (labels.length === 0) {
+                          // Say it plainly. A blank reads as "no hours", which is
+                          // the opposite of what an unattributed entry means.
+                          return (
+                            <p className="text-[10px] text-gray-300 dark:text-slate-600 mt-0.5 italic">
+                              Job not recorded
+                            </p>
+                          );
+                        }
+                        return (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {labels.map((label) => (
+                              <span
+                                key={label}
+                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30"
+                              >
+                                {label}
+                              </span>
+                            ))}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Hours for the day */}

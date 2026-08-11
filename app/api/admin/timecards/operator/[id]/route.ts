@@ -21,6 +21,7 @@ import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
 import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
+import { resolveTimecardJobContext, formatJobContextLabel } from '@/lib/timecard-job-context';
 
 export async function GET(
   request: NextRequest,
@@ -302,10 +303,28 @@ export async function GET(
     // signTimecardPhoto mints a short-lived (1 hr) signed URL for each real
     // path; legacy sentinel/null/full-URL values are left alone (the UI
     // hardens them to a "No photo" placeholder).
+    // WHERE WAS HE, EACH DAY (M9a). The founder wants the CONTRACTOR and PROJECT
+    // on the timecard, "to see where operators were within a timecard".
+    // timecards.job_order_id alone answers that for only ~60% of recent field
+    // entries, so this also derives it from the day's ledger and work logs.
+    // Read-time only — nothing is written back into the payroll record.
+    const jobContext = await resolveTimecardJobContext(
+      enrichedEntries.map((e: any) => ({
+        id: e.id,
+        user_id: e.user_id ?? operatorId,
+        date: e.date,
+        job_order_id: e.job_order_id ?? null,
+      })),
+      tenantId ?? null
+    );
+
     const finalEntries = await Promise.all(enrichedEntries.map(async (entry: any) => {
       const jobKey = `${entry.job_order_id}_${entry.date}`;
+      const ctx = jobContext.get(entry.id);
       return {
         ...entry,
+        job_context: ctx ?? null,
+        job_context_label: formatJobContextLabel(ctx),
         gps_logs: gpsLogsByTimecard[entry.id] || [],
         found_coworkers: coworkersByJob[jobKey] || [],
         remote_photo_signed_url: await signTimecardPhoto(entry.remote_photo_url),
