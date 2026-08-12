@@ -60,7 +60,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
          scheduled_date, scheduled_end_date, end_date, actual_end_date,
          assigned_to, helper_assigned_to, parent_job_id,
          completion_signature, completion_signer_name, completion_signed_at,
-         customer_signature, customer_signed_at`
+         customer_signature, customer_signed_at,
+         require_waiver_signature, utility_waiver_signed, utility_waiver_signed_at,
+         utility_waiver_signer_name, liability_release_signed_at`
       )
       .eq('id', jobId)
       .maybeSingle();
@@ -286,6 +288,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
           signature_url: job.completion_signature || job.customer_signature || null,
           signer_name: job.completion_signer_name ?? null,
           signed_at: job.completion_signed_at ?? job.customer_signed_at ?? null,
+          // Signature STATUS, not the wall of legal text (founder, Aug 12: "it
+          // just has to show if it's been signed or not, because it gets signed
+          // digitally — I don't need the verbiage").
+          waiver_required: job.require_waiver_signature === true,
+          waiver_signed: job.utility_waiver_signed === true,
+          waiver_signed_at: job.utility_waiver_signed_at ?? null,
+          waiver_signer_name: job.utility_waiver_signer_name ?? null,
+          completion_signed: !!(job.completion_signature || job.customer_signature),
           parent_job: parentJob,
           sibling_jobs: ((childRows || []) as Array<{ id: string; job_number: string }>).map((c) => ({
             id: c.id,

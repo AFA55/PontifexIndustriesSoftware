@@ -13,8 +13,7 @@ export const dynamic = 'force-dynamic';
  *
  * SUPERSEDES app/dashboard/admin/jobs/[id]/completed-print (now a redirect
  * here): same fields, but per-day + per-operator separation, the real paper
- * structure (agreement block, 4 day blocks, the numbered checklist verbatim,
- * three-copy footer), and a range picker.
+ * structure (4 day blocks, three-copy footer), and a range picker.
  *
  * FILLED vs BLANK — a carbon form is half pre-printed, half hand-written. What
  * the SYSTEM knows prints FILLED (customer, address, job no., dates, clock
@@ -24,7 +23,7 @@ export const dynamic = 'force-dynamic';
  * barrels, removal dimensions, the customer's wet-ink signatures). Every choice
  * is commented at its render site.
  *
- * PRINT: letter portrait, print-isolated, forced white background / black text
+ * PRINT: letter LANDSCAPE, one page, print-isolated, forced white background / black text
  * (never inherit the app's dark theme). Tenant-branded via useBranding() — no
  * tenant name or color is hardcoded.
  */
@@ -47,11 +46,7 @@ import {
   type TicketPersonDay,
   type TicketRange,
 } from '@/lib/work-ticket';
-import {
-  TICKET_COPY_FOOTER,
-  preWorkUnderstandings,
-  ticketChecklist,
-} from '@/lib/legal/prework-understandings';
+import { TICKET_COPY_FOOTER } from '@/lib/legal/prework-understandings';
 
 interface TicketJob {
   id: string;
@@ -73,6 +68,11 @@ interface TicketJob {
   signature_url: string | null;
   signer_name: string | null;
   signed_at: string | null;
+  waiver_required: boolean;
+  waiver_signed: boolean;
+  waiver_signed_at: string | null;
+  waiver_signer_name: string | null;
+  completion_signed: boolean;
   parent_job: { id: string; job_number: string } | null;
   sibling_jobs: Array<{ id: string; job_number: string }>;
 }
@@ -145,6 +145,57 @@ function Field({
   );
 }
 
+/**
+ * "Signed: YES / no" with the box round the answer that applies — the founder
+ * reads this at a glance to know whether a document is outstanding, so the
+ * answer has to be visible without reading the label. Prints in black only.
+ */
+function SignedFlag({
+  label,
+  signed,
+  notRequired,
+  at,
+  by,
+}: {
+  label: string;
+  signed: boolean;
+  notRequired?: boolean;
+  at?: string | null;
+  by?: string | null;
+}) {
+  const box = (on: boolean) => ({
+    padding: '0 5px',
+    border: on ? '1.5px solid #000' : '1px solid #bbb',
+    fontWeight: on ? 800 : 400,
+    color: on ? '#000' : '#888',
+    borderRadius: 2,
+  });
+  return (
+    <div>
+      <div style={{ fontSize: 7.5, textTransform: 'uppercase', letterSpacing: 0.4, color: '#444' }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 10 }}>
+        {notRequired ? (
+          <span style={{ fontSize: 9.5, color: '#555' }}>Not required</span>
+        ) : (
+          <>
+            <span style={box(signed)}>YES</span>
+            <span style={box(!signed)}>NO</span>
+          </>
+        )}
+      </div>
+      {signed && (at || by) && (
+        <div style={{ fontSize: 7.5, color: '#444', marginTop: 1 }}>
+          {[by, at ? new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null]
+            .filter(Boolean)
+            .join(' · ')}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SectionBar({ accent, children }: { accent: string; children: React.ReactNode }) {
   return (
     <div
@@ -157,8 +208,8 @@ function SectionBar({ accent, children }: { accent: string; children: React.Reac
         letterSpacing: '0.12em',
         textTransform: 'uppercase',
         padding: '3px 8px',
-        marginTop: 10,
-        marginBottom: 6,
+        marginTop: 6,
+        marginBottom: 4,
       }}
     >
       {children}
@@ -358,22 +409,25 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   const hourRows = (days || []).flatMap((d) => (d.people || []).map((p) => ({ date: d.date, p })));
   // The paper form has FOUR day blocks — always print at least four so the crew
   // can add days by hand on a light week.
-  const padRows = Math.max(0, 4 - hourRows.length);
+  // Two spare write-in rows, not four — the old count came from the paper
+  // form's fixed four day-blocks and is most of what pushed a short job onto a
+  // second page in landscape.
+  const padRows = Math.max(0, 2 - hourRows.length);
 
-  const understandings = preWorkUnderstandings({
-    companyName: branding.company_name,
-    standbyRate: data?.standby_rate,
-    standbyMinimumHours: data?.standby_minimum_hours,
-  });
-  // No tenant-level slurry price exists yet, so the price stays off the printed
-  // line (see ticketChecklist) — the crew logs barrels, the office prices them.
-  const checklist = ticketChecklist();
+  // The pre-work understandings and the field checklist no longer PRINT (Aug 12
+  // — signed digitally / captured in the app), so neither is built here any
+  // more. lib/legal/prework-understandings remains the source of the wording
+  // the customer agrees to on screen; don't delete it.
 
   return (
     <div style={{ background: '#fff', color: '#000', colorScheme: 'light', minHeight: '100vh' }}>
       <style>{`
         @media print {
-          @page { size: letter portrait; margin: 0.35in; }
+          /* Landscape, one page (founder, Aug 12: "let's make it landscape mode…
+             we gotta try to fit all of this in one page"). Dropping the legal
+             verbiage and the Before You Leave checklist is what buys the room —
+             both are on this sheet's own line items now or captured in the app. */
+          @page { size: letter landscape; margin: 0.3in; }
           html, body { background: #fff !important; }
           body * { visibility: hidden; }
           .work-ticket, .work-ticket * { visibility: visible; }
@@ -499,9 +553,12 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
         <div
           className="work-ticket"
           style={{
-            maxWidth: '8in',
+            // 10.4in = letter landscape (11in) minus the 0.3in @page margins.
+            // It was 8in, sized for the old portrait sheet, which wasted a fifth
+            // of the width and pushed the ticket onto a second page.
+            maxWidth: '10.4in',
             margin: '0 auto',
-            padding: '18px 24px 32px',
+            padding: '12px 20px 18px',
             background: '#fff',
             color: '#000',
             fontFamily: 'Arial, Helvetica, sans-serif',
@@ -512,7 +569,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             <div style={{ display: 'flex', gap: 10, alignItems: 'center', minWidth: 0 }}>
               {branding.logo_url && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={branding.logo_url} alt="" style={{ height: 54, width: 'auto', objectFit: 'contain' }} />
+                <img src={branding.logo_url} alt="" style={{ height: 38, width: 'auto', objectFit: 'contain' }} />
               )}
               <div style={{ minWidth: 0 }}>
                 <h1 style={{ fontSize: 17, fontWeight: 900, letterSpacing: '0.02em', lineHeight: 1.1, margin: 0 }}>
@@ -587,23 +644,45 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             <Field label="Contact" value={data.job.contact_name} />
           </div>
 
-          {/* ── Pre-work understandings ── */}
-          <SectionBar accent={accent}>Pre-Work Understandings / Customer Agreement</SectionBar>
-          <div style={{ border: '1px solid #000', padding: '6px 8px' }}>
-            {understandings.map((p, i) => (
-              <p key={i} style={{ fontSize: 8.2, lineHeight: 1.35, margin: i === 0 ? 0 : '4px 0 0' }}>
-                {p}
-              </p>
-            ))}
-            {/* Signed with wet ink in the field BEFORE work starts — always blank. */}
-            <div style={{ display: 'flex', gap: 20, marginTop: 8 }}>
-              <div style={{ flex: 2 }}>
-                <Field label="Customer Signature" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <Field label="Date" />
-              </div>
-            </div>
+          {/* ── Signatures: STATUS ONLY ──────────────────────────────────────
+              Founder, Aug 12: "the pre-work understandings and customer
+              agreement just has to show if it's been signed or not, because it
+              gets signed digitally. I don't need the verbiage. It just needs to
+              say pre-work understanding or liability waiver signed, checked off
+              yes or no."
+
+              The full text used to print here for a wet-ink signature. It is
+              now signed in the app before the crew starts, so reprinting three
+              paragraphs of indemnity language on every ticket wasted a third of
+              the page and asked for a signature that already exists. The
+              wording itself still lives in lib/legal/prework-understandings and
+              is what the customer actually agrees to on screen. */}
+          <SectionBar accent={accent}>Signatures</SectionBar>
+          <div
+            style={{
+              border: '1px solid #000',
+              padding: '5px 8px',
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: 12,
+              breakInside: 'avoid',
+            }}
+          >
+            <SignedFlag
+              label="Utility / liability waiver"
+              signed={data.job.waiver_signed}
+              // A job that never required one is not "missing" it.
+              notRequired={!data.job.waiver_required && !data.job.waiver_signed}
+              at={data.job.waiver_signed_at}
+              by={data.job.waiver_signer_name}
+            />
+            <SignedFlag
+              label="Work completion sign-off"
+              signed={data.job.completion_signed}
+              at={data.job.signed_at}
+              by={data.job.signer_name}
+            />
+            <Field label="Office initials" />
           </div>
 
           {/* ── Description of work performed — BY DAY, BY OPERATOR ── */}
@@ -626,7 +705,27 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               ))}
             </div>
           ) : (
-            (days || []).map((day) => (
+            /* TWO DAYS ACROSS (founder, Aug 12: "make it landscape mode… we
+               gotta try to fit all of this in one page"). Landscape buys width,
+               not height, so one day per full-width row spent the format's only
+               advantage: a five-day week was five stacked blocks and three
+               pages. Side by side it is three rows and one page. */
+            <div
+              style={{
+                display: 'grid',
+                // Adaptive: one day gets the full width, a short week goes
+                // two across, a full week three. A busy five-day week still
+                // runs to a second page — the work detail is the point of the
+                // sheet and is not worth shrinking to illegibility to save
+                // paper — but a single day and a light week now fit one.
+                gridTemplateColumns:
+                  (days || []).length >= 5 ? '1fr 1fr 1fr'
+                  : (days || []).length > 1 ? '1fr 1fr'
+                  : '1fr',
+                columnGap: 18,
+              }}
+            >
+            {(days || []).map((day) => (
               <div key={day.date} style={{ breakInside: 'avoid', marginBottom: 9 }}>
                 <div
                   style={{
@@ -646,7 +745,8 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                   <PersonBlock key={`${day.date}-${p.user_id}`} person={p} showNotes={showNotes} accent={accent} />
                 ))}
               </div>
-            ))
+            ))}
+            </div>
           )}
 
           {/* ── Day blocks (the paper's Date / Job Hours / Lunch / Total grid) ── */}
@@ -707,54 +807,28 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             </tbody>
           </table>
 
-          {/* ── Field checklist (verbatim from the paper ticket) ── */}
-          <SectionBar accent={accent}>Before You Leave</SectionBar>
-          <ol style={{ margin: 0, paddingLeft: 16, breakInside: 'avoid' }}>
-            {checklist.map((item) => (
-              <li key={item.n} style={{ fontSize: 9.5, lineHeight: 1.6 }}>
-                <span>{item.text}</span>
-                {item.answer === 'yesno' && (
-                  <span style={{ marginLeft: 8, fontWeight: 700 }}>Yes&nbsp;&nbsp;/&nbsp;&nbsp;No</span>
-                )}
-                {item.answer === 'blank' && (
-                  <span style={{ marginLeft: 8, display: 'inline-block', width: '55%' }}>
-                    {/* Item 8 (total footage cut) is the ONE checklist answer the
-                        system knows. A CORES-ONLY job has no linear feet — it
-                        must still print the core count here or the count appears
-                        nowhere on the ticket. */}
-                    {item.n === 8 && (footage.linearFeet > 0 || footage.cores > 0) ? (
-                      <span style={{ borderBottom: '1px solid #000', fontWeight: 700, display: 'inline-block', width: '100%' }}>
-                        {[
-                          footage.linearFeet > 0 ? `${footage.linearFeet} LF` : null,
-                          footage.cores > 0 ? `${footage.cores} cores drilled` : null,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    ) : item.n === 2 && data.standby.length > 0 ? (
-                      <span style={{ borderBottom: '1px solid #000', fontWeight: 700, display: 'inline-block', width: '100%' }}>
-                        {data.totals.standby_hours} hrs
-                        {data.standby[0]?.client_representative_name
-                          ? ` — ${data.standby[0].client_representative_name}`
-                          : ''}
-                      </span>
-                    ) : (
-                      <Blank />
-                    )}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ol>
+          {/* ── "Before You Leave" checklist: REMOVED (founder, Aug 12) ──
+              "Before you leave, we don't need that information."
+
+              It was the paper ticket's numbered field checklist, reprinted
+              verbatim for the crew to fill in by hand. The answers that matter
+              — slurry disposed off site, concrete removed, barrels used,
+              standby time — are moving into the operator's app at the end of
+              work-performed entry, so they arrive typed instead of handwritten
+              and land on this sheet already answered. Removing it is also most
+              of what makes the ticket fit one landscape page.
+
+              The one thing it uniquely surfaced, total footage cut, is already
+              on every work line above and in the totals strip below. */}
 
           {/* ── Totals strip ── */}
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(5, 1fr)',
+              gridTemplateColumns: 'repeat(6, 1fr)',
               gap: 10,
-              marginTop: 10,
-              paddingTop: 6,
+              marginTop: 6,
+              paddingTop: 5,
               borderTop: '1.5px solid #000',
               breakInside: 'avoid',
             }}
@@ -765,6 +839,20 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             />
             <Field label="Night Stayed" value={data.totals.subsistence_nights > 0 ? 'Yes' : null} />
             <Field label="Total Hours" value={data.totals.hours.toFixed(2)} bold />
+            {/* Total footage cut was the one answer the removed checklist knew.
+                It belongs on the sheet, so it moved here instead of vanishing. */}
+            <Field
+              label="Total Cut"
+              value={
+                [
+                  footage.linearFeet > 0 ? `${footage.linearFeet} LF` : null,
+                  footage.cores > 0 ? `${footage.cores} cores` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || null
+              }
+              bold
+            />
             <Field
               label="Standby Time"
               value={data.totals.standby_hours > 0 ? `${data.totals.standby_hours} hrs` : null}
@@ -787,12 +875,12 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               <p style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '2px 0 0' }}>
                 Customer Approval Signature
               </p>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 8 }}>
+              {/* One row instead of two stacked — landscape has the width, and
+                  the page does not have the height. */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.6fr', gap: 10, marginTop: 5 }}>
                 <Field label="Print Name" value={data.job.signer_name} />
                 {/* The customer's company is not stored — hand-written. */}
                 <Field label="Company" />
-              </div>
-              <div style={{ marginTop: 6, width: '50%' }}>
                 <Field
                   label="Date"
                   value={

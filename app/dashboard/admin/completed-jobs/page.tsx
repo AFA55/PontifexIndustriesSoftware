@@ -30,6 +30,7 @@ import {
   HardHat,
   AlertTriangle,
   RefreshCw,
+  Printer,
 } from 'lucide-react';
 
 interface CompletedJob {
@@ -686,6 +687,21 @@ export default function CompletedJobsArchivePage() {
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                           Job Details
                         </h2>
+                        {/* A finished job is exactly when the office needs the
+                            ticket — to file it and to bill from it. There was
+                            no way to print one from here at all (founder,
+                            Aug 12: "I can't print out the tickets for the work
+                            that they've done"). Week mode, so a multi-day job
+                            prints every day on one sheet. */}
+                        <Link
+                          href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/work-ticket?mode=week`}
+                          target="_blank"
+                          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
+                          title="Print the work ticket for this job"
+                        >
+                          <Printer className="w-3.5 h-3.5" />
+                          Print Ticket
+                        </Link>
                         <button
                           onClick={() =>
                             handleDeleteJob(
