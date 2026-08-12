@@ -144,26 +144,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
       )
     );
 
+    // ── WHICH CARDS BELONG TO THIS JOB ───────────────────────────────────────
+    //
+    // A clock card is one PERSON'S DAY. It is not a job record, and no amount of
+    // inference makes it one. There are exactly two cases where attributing a
+    // card to this job is a fact rather than a guess:
+    //
+    //   1. the card is explicitly linked to this job, or
+    //   2. the card has no link at all AND that person touched only this one
+    //      job that day — so every hour on the card can only have gone here.
+    //
+    // Everything else is unknowable and must NOT be counted. A first cut of this
+    // guard only consulted `daily_job_logs`, which let three kinds of card leak:
+    // helpers (who file helper_work_logs and no daily log), people merely
+    // ASSIGNED to a second job, and cards linked to another job entirely. The
+    // result was 62 cards attributed 73 times — 666 hours displayed against 565
+    // real ones, 101 invented. On Parkk Concrete alone, Aug 4 showed 28.19
+    // crew-hours of which 18.36 were simultaneously billed to two other jobs.
+    // That is the founder's original complaint, re-created by the fix for it.
     let timecards: any[] = [];
+    let unattributableDates = new Set<string>();
     {
-      // Always include cards explicitly linked to the job…
       const { data: linked } = await supabaseAdmin
         .from('timecards')
-        .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date')
+        .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date, job_order_id')
         .eq('job_order_id', jobId)
         .order('clock_in_time', { ascending: true });
       timecards = linked ?? [];
 
-      // …plus this job's crew on the days it ran, which is where the hours
-      // actually live for the ~86% of cards with no job link.
-      //
-      // BUT a clock card is per PERSON per DAY, not per job. If someone split a
-      // day between this job and another one, their whole card would land here
-      // and overstate it. So a card with no job link only counts when that
-      // person filed work on NO OTHER job that day — otherwise we would be
-      // inventing a number, which is the thing we are trying to stop doing.
       if (jobOperatorIds.length > 0 && jobLogDates.length > 0) {
-        const [{ data: byCrew }, { data: elsewhere }] = await Promise.all([
+        const [{ data: byCrew }, { data: opLogs }, { data: helpLogs }] = await Promise.all([
           supabaseAdmin
             .from('timecards')
             .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date, job_order_id')
@@ -172,20 +182,44 @@ export async function GET(request: NextRequest, context: RouteContext) {
             .order('clock_in_time', { ascending: true }),
           supabaseAdmin
             .from('daily_job_logs')
-            .select('operator_id, log_date')
+            .select('operator_id, log_date, job_order_id')
             .in('operator_id', jobOperatorIds)
-            .in('log_date', jobLogDates)
-            .neq('job_order_id', jobId),
+            .in('log_date', jobLogDates),
+          supabaseAdmin
+            .from('helper_work_logs')
+            .select('helper_id, log_date, job_order_id')
+            .in('helper_id', jobOperatorIds)
+            .in('log_date', jobLogDates),
         ]);
 
-        const splitDay = new Set(
-          (elsewhere ?? []).map((r: any) => `${r.operator_id}|${r.log_date}`)
-        );
+        // Every job each person touched that day, from BOTH log tables.
+        const touched = new Map<string, Set<string>>();
+        const note = (uid: string, d: string, jid: string) => {
+          if (!uid || !d || !jid) return;
+          const k = `${uid}|${d}`;
+          const s = touched.get(k) ?? new Set<string>();
+          s.add(jid);
+          touched.set(k, s);
+        };
+        for (const r of opLogs ?? []) note(r.operator_id, r.log_date, r.job_order_id);
+        for (const r of helpLogs ?? []) note(r.helper_id, r.log_date, r.job_order_id);
+
         const seenTc = new Set(timecards.map((t) => t.id));
         for (const t of byCrew ?? []) {
           if (seenTc.has(t.id)) continue;
-          const isLinkedHere = t.job_order_id === jobId;
-          if (!isLinkedHere && splitDay.has(`${t.user_id}|${t.date}`)) continue;
+          // Linked to a DIFFERENT job — those hours are already that job's.
+          if (t.job_order_id && t.job_order_id !== jobId) continue;
+          if (!t.job_order_id) {
+            const jobsThatDay = touched.get(`${t.user_id}|${t.date}`);
+            // Only this job, and provably so.
+            if (!jobsThatDay || jobsThatDay.size !== 1 || !jobsThatDay.has(jobId)) {
+              // They were on more than one job (or on none we can see): their
+              // hours cannot be divided, so this day is reported as unknown
+              // rather than guessed at.
+              if (jobsThatDay && jobsThatDay.size > 1) unattributableDates.add(t.date);
+              continue;
+            }
+          }
           seenTc.add(t.id);
           timecards.push(t);
         }
@@ -301,8 +335,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // still open (no clock-out) contributes nothing rather than counting to
       // now — an un-clocked-out card is what produced "213 hours" elsewhere.
       const clockHours = tcs.reduce((s: number, t: any) => {
-        const stated = t.net_hours ?? t.total_hours;
-        if (stated != null && Number.isFinite(Number(stated))) return s + Number(stated);
+        // A stated ZERO is not an answer. Two production cards carry
+        // `net_hours = 0` against a real 9–10 hour span (a gross-hours
+        // miscalculation upstream); `??` would have let that zero win over a
+        // perfectly good `total_hours` and printed the very 0.00 the founder
+        // complained about. Take the first POSITIVE figure, then measure.
+        const stated = [t.net_hours, t.total_hours]
+          .map(Number)
+          .find((v) => Number.isFinite(v) && v > 0);
+        if (stated !== undefined) return s + stated;
         if (t.clock_in_time && t.clock_out_time) {
           const mins =
             (new Date(t.clock_out_time).getTime() - new Date(t.clock_in_time).getTime()) / 60000;
@@ -314,6 +355,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // Fall back to the operator-entered hours only when nobody clocked in
       // that day, so a day is never silently blank.
       const hours = clockHours > 0 ? Math.round(clockHours * 100) / 100 : loggedHours;
+      // Say where the number came from, so the panel can be honest instead of
+      // printing a guess with the same authority as a measurement.
+      const hoursSource: 'clock' | 'logged' | 'split_day' =
+        clockHours > 0 ? 'clock' : unattributableDates.has(date) ? 'split_day' : 'logged';
 
       // Unique operators active on this day (from logs + entries + timecards)
       const operatorMap: Record<string, { id: string; name: string }> = {};
@@ -346,6 +391,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         work_started_at: workStart,
         day_completed_at: dayComplete,
         hours_worked: hours,
+        hours_source: hoursSource,
         notes: logs.map((l) => l.notes).filter(Boolean).join(' | ') || null,
         operators: Object.values(operatorMap),
         entries,

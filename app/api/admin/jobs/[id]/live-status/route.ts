@@ -189,16 +189,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
     let standbySegmentsToday: StandbySegment[] = [];
     if (!standbyTableMissing) {
       try {
-        const tomorrow = new Date(todayStr);
-        tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-        const tomorrowStr = tomorrow.toISOString().split('T')[0];
+        // `started_at` is a timestamptz and the database runs in UTC, so
+        // comparing it against a bare local date string shifted the window to
+        // 8pm–8pm Eastern: a standby started after 8pm fell out of "today".
+        // Use the tenant's real day boundary instead.
+        const dayStartIso = await tenantDayStartUTC(tenantId ?? null);
+        const dayEndIso = new Date(new Date(dayStartIso).getTime() + 24 * 60 * 60 * 1000).toISOString();
 
         let segQuery = supabaseAdmin
           .from('standby_logs')
           .select('id, started_at, ended_at, reason')
           .eq('job_order_id', jobId)
-          .gte('started_at', todayStr)
-          .lt('started_at', tomorrowStr)
+          .gte('started_at', dayStartIso)
+          .lt('started_at', dayEndIso)
           .order('started_at', { ascending: false });
         if (tenantId) segQuery = segQuery.eq('tenant_id', tenantId);
 
@@ -366,7 +369,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     if (clockInTime) {
       const start = new Date(clockInTime).getTime();
       const end = clockOutTime ? new Date(clockOutTime).getTime() : Date.now();
-      timeOnSiteMinutes = Math.max(0, Math.floor((end - start) / 60000));
+      // Clamped to 24h. A forgotten clock-out is closed by the hourly
+      // auto-clockout cron, but one card in production ran 89 hours before it
+      // was auto-closed four days late. Without a ceiling this panel could
+      // print another 213 through a different door.
+      timeOnSiteMinutes = Math.min(24 * 60, Math.max(0, Math.floor((end - start) / 60000)));
     } else {
       const onSiteAnchor = arrivedAt ?? workStartedAt;
       const dayStart = await tenantDayStartUTC(tenantId ?? null);
