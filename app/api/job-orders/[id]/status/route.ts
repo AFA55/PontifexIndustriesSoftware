@@ -219,7 +219,15 @@ async function updateJobStatus(
           .lt('scheduled_date', today)
           .not('dispatched_at', 'is', null)
           .is('work_completed_at', null)
-          .not('status', 'in', '("cancelled","completed","pending_completion")');
+          // `on_hold` is EXCLUDED (founder, Aug 12: "remove BWC from Nate — he
+          // can't see his real schedule because of BWC"). A job the office put
+          // on hold is not a ticket the operator failed to file, but this gate
+          // counted it as one: JOB-2026-521763 (BWC Contracting) sat on_hold
+          // from Aug 5 with no completion, so every morning it returned a 409
+          // and Nate could not start ANY job. Being told to "finish" a job
+          // nobody is allowed to work is a dead end — the operator cannot
+          // clear it, so the block never lifts on its own.
+          .not('status', 'in', '("cancelled","completed","pending_completion","on_hold")');
         // Multi-day jobs still running today are NOT overdue.
         const blocking = (overdueCandidates ?? []).filter(
           (j: any) => !(j.end_date && j.end_date >= today)

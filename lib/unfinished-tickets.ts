@@ -41,6 +41,14 @@ export type ClockOutWarningType = 'incomplete_tickets_warning' | 'helper_work_lo
  * satisfied, and without this a parked multi-day job would warn — and fire a
  * bell reminder — on EVERY clock-out until its end_date passed. (Before the
  * day_completed_at fix, a leftover draft skeleton row masked this.)
+ *
+ * ⚠️ This list is only HALF the rule, and the other half is easy to miss. The
+ * OVERDUE gate in the same status route kept its own inline status list, and it
+ * did NOT exclude on_hold — so a parked job stayed silent here while returning
+ * a hard 409 there. JOB-2026-521763 (BWC Contracting) parked on Aug 5 meant
+ * Nate could not start ANY job for a week, and could not clear it either: the
+ * error told him to finish a job nobody was allowed to work. Fixed Aug 12. If
+ * you add a status here, check that gate too.
  */
 export const OPERATOR_EXCLUDED_STATUSES = [
   'cancelled',
