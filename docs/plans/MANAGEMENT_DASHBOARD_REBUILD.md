@@ -454,3 +454,142 @@ to reach another PM's people by changing a URL.
 
 **M2f — invoicing.** He is sending a photo of the sheet the office fills in
 today. Build to that, not to a guess.
+
+---
+
+# Batch 16 — Aug 12, 2026. The founder's build order.
+
+He gave an explicit order. Work it top-down; don't jump ahead.
+
+> "lets work on job documents then filter on completed jobs then the new end of
+> work questions"
+
+## M12 — Job documents: the signed PDFs (DO FIRST)
+
+> "in office documents in active jobs i would like to see the pdfs of the signed
+> waivers and job completion tickets — i haven't seen any of that yet"
+> …and on completed jobs: "I should be able to see the waiver signed and work
+> completion signature there in documents as well."
+
+Both surfaces, ACTIVE and COMPLETED. He has never once seen a signed document
+come back out of the system, which is the tell: something is generated and then
+lost, or never generated at all.
+
+**Before building, verify which of these is true** — the answer changes the job
+entirely:
+1. Are the PDFs actually being produced and stored? Check the storage bucket and
+   whatever column points at them (`utility_waiver_signature_data`,
+   `completion_signature`, `customer_signature` are signature *images*, not the
+   PDF). `CompletionSignOffPDF.tsx` and `LiabilityReleasePDF.tsx` exist — find
+   out whether anything WRITES their output anywhere.
+2. If they are produced but not listed → this is a read/link job.
+3. If they were never persisted → this is "generate on demand from the stored
+   signature + job data", which is cheap and also fixes every past job.
+
+Do NOT assume (2). The pattern this session has been: the data exists and the
+read path is wrong — but the invoicing module and the ratings both turned out to
+have never written a row at all.
+
+## M13 — Filter the completed-jobs list
+
+> "let me be able to filter the jobs, because right now it just has jobs
+> completed and a whole list of them. Let me be able to search it up by project
+> manager or by day."
+
+Filter by **project manager** and by **day / date range**, plus free-text search
+on customer + job number while we are in there. `app/dashboard/admin/completed-jobs`.
+
+## M14 — End-of-work questions (replaces the printed "Before You Leave")
+
+> "What we can start asking them is if they dispose of slurry off-site… these are
+> questions to ask AFTER they already input all the scopes of work. If they
+> remove slurry off-site, if they remove concrete, how many barrels they used,
+> and standby time."
+
+Asked at the END of work-performed entry, once the scope is in. Keep it to one
+short screen — he was explicit that the entry flow must get simpler, not longer.
+Answers land on the printed ticket already filled in; that is the whole point of
+having removed the paper checklist.
+
+Fields: slurry disposed off-site (y/n) · concrete removed (y/n) · barrels used
+(number) · standby time (hours + who authorised).
+
+## M15 — Wages → labour cost on a completed job
+
+> "i dont have a place to put current wage of employees to see labor cost after
+> job is complete, so allow me to view that"
+
+A wage per employee, and a labour-cost roll-up once the job completes.
+
+⚠️ **Two things to get right.** `timecards.labor_cost` ALREADY EXISTS as a
+column — find out what writes it before adding a second source of truth. And
+wages are sensitive: whatever holds them needs its own RLS, readable by
+admin/ops-manager only, never by the crew. This is exactly the shape of the bug
+that hid work_items from the founder — check who can read it, by impersonating,
+before calling it done.
+
+Depends on the hours being right, which they now are (see the Aug 12 clock-card
+attribution work). Labour cost built on the old numbers would have been fiction.
+
+## M16 — Show the quote on completed jobs
+
+> "show me in jobs completed the job quote that was input in schedule form to be
+> able to track the financials"
+
+The schedule form already captures a number — find it (`estimated_cost` is the
+likely candidate; INVOICING_PLAN.md §4 flags the same question) and surface it
+against actual hours/labour on the completed job. **Reuse the existing field.
+Do not add a fourth money column.**
+
+## M17 — Per-day work on completed jobs + print from there
+
+> "still need to be able to see work performed for each day, not just tell me in
+> total, so i can print out tickets on work completed tickets as well"
+
+The completed-jobs panel shows a flat list. It needs the same per-day, per-
+operator breakdown the work ticket already builds — `lib/work-ticket.ts`
+`buildTicketDays()` does exactly this. Reuse it; do not write a second grouper.
+
+## M18 — SHOP TIME (new, Aug 12 — he is telling the crew about it now)
+
+> "im about to tell them about shop time, because once they get to the shop they
+> should clock out then clock back in with shop time, and in timecards show if
+> they were at shop as well. And I would like them, when they click clock in
+> shop, to automatically create a ticket in their schedule that asks what they
+> did at the shop — something simple, doesn't have to be multi-step, just so we
+> can know — and requires signature of completion from admin. And create a shop
+> tickets page under active jobs so we can see and print off those tickets as
+> well, and show properly the time that they were in the shop for."
+
+Six parts:
+1. **Clock out of the job, clock back in as SHOP.** The toggle exists —
+   `timecards.is_shop_hours` / `is_shop_time` / `hour_type` / `work_location`
+   are all already columns. Establish which one is authoritative before writing
+   a seventh.
+2. **Timecards show shop vs field** at a glance, per entry and in the totals.
+3. **Clocking in to shop auto-creates a shop ticket** on that person's schedule:
+   "what did you do at the shop?" ONE screen. `helper_work_logs.is_shop_ticket`
+   already exists — there may be half of this built already. CHECK FIRST.
+4. **Admin signs it off.** A completion signature from management, not the crew.
+5. **Shop Tickets page under Active Jobs** — view and print, same treatment as
+   the work ticket.
+6. **Shop time totals shown properly**, separated from field hours.
+
+⚠️ This touches clock-in, which is the one thing that must not break at 7am.
+Ship it behind verification and test the ordinary field clock-in path after,
+not just the new shop path.
+
+---
+
+## Ticket layout — DONE Aug 12 (M11)
+
+Landscape; type scaled up throughout; boxed JOB ID that cannot wrap; legal
+verbiage replaced by a Signatures YES/NO strip; "Before You Leave" removed with
+total footage moved into the totals; day blocks 1–3 across by week length.
+
+Founder: *"clean and legible and modern UI, clear job ID… make the size of words
+bigger."* Screenshot verified against Southern Basements, not asserted.
+
+**Known trade-off:** a single day and a light week fit one landscape page. A busy
+five-day week runs to ~1.4 pages. Closing that means shrinking the work detail,
+which is the reason the sheet exists — his call, not ours to make silently.

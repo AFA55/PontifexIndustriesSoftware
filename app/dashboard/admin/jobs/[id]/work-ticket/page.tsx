@@ -119,7 +119,7 @@ function Field({
 }) {
   return (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, minWidth: 0 }}>
-      <span style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }}>
+      <span style={{ fontSize: 10.5, textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap', color: '#333' }}>
         {label}
       </span>
       {value ? (
@@ -127,8 +127,8 @@ function Field({
           style={{
             flex: 1,
             borderBottom: '1px solid #000',
-            fontWeight: bold ? 700 : 600,
-            fontSize: 11,
+            fontWeight: bold ? 800 : 600,
+            fontSize: 13,
             lineHeight: 1.3,
             minWidth: 0,
             overflowWrap: 'anywhere',
@@ -164,20 +164,20 @@ function SignedFlag({
   by?: string | null;
 }) {
   const box = (on: boolean) => ({
-    padding: '0 5px',
-    border: on ? '1.5px solid #000' : '1px solid #bbb',
+    padding: '1px 8px',
+    border: on ? '2px solid #000' : '1px solid #ccc',
     fontWeight: on ? 800 : 400,
     color: on ? '#000' : '#888',
     borderRadius: 2,
   });
   return (
     <div>
-      <div style={{ fontSize: 7.5, textTransform: 'uppercase', letterSpacing: 0.4, color: '#444' }}>
+      <div style={{ fontSize: 9.5, textTransform: 'uppercase', letterSpacing: 0.4, color: '#333', fontWeight: 700 }}>
         {label}
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 2, fontSize: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 3, fontSize: 12.5 }}>
         {notRequired ? (
-          <span style={{ fontSize: 9.5, color: '#555' }}>Not required</span>
+          <span style={{ fontSize: 11.5, color: '#555' }}>Not required</span>
         ) : (
           <>
             <span style={box(signed)}>YES</span>
@@ -186,7 +186,7 @@ function SignedFlag({
         )}
       </div>
       {signed && (at || by) && (
-        <div style={{ fontSize: 7.5, color: '#444', marginTop: 1 }}>
+        <div style={{ fontSize: 9.5, color: '#444', marginTop: 2 }}>
           {[by, at ? new Date(at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null]
             .filter(Boolean)
             .join(' · ')}
@@ -203,12 +203,12 @@ function SectionBar({ accent, children }: { accent: string; children: React.Reac
       style={{
         background: accent,
         color: '#fff',
-        fontSize: 10,
+        fontSize: 11.5,
         fontWeight: 800,
         letterSpacing: '0.12em',
         textTransform: 'uppercase',
-        padding: '3px 8px',
-        marginTop: 6,
+        padding: '4px 9px',
+        marginTop: 8,
         marginBottom: 4,
       }}
     >
@@ -226,7 +226,12 @@ function WorkLine({ item, showNote }: { item: WorkItemLike; showNote: boolean })
   const unit = workTypeUnit(item.work_type);
   const parts = [
     item.work_type || 'Work',
-    Number.isFinite(qty) && qty > 0 ? (unit ? `${qty} ${unit}` : `×${qty}`) : null,
+    // "1 holes" reads like a bug to the customer holding the sheet.
+    Number.isFinite(qty) && qty > 0
+      ? unit
+        ? `${qty} ${qty === 1 ? unit.replace(/s$/, '') : unit}`
+        : `×${qty}`
+      : null,
     detail || null,
   ].filter(Boolean);
   // The operator's quick note is the INTERNAL conditions narrative. This sheet
@@ -234,10 +239,10 @@ function WorkLine({ item, showNote }: { item: WorkItemLike; showNote: boolean })
   // office explicitly ticks "office notes" in the toolbar.
   const note = showNote ? workItemQuickNote(item) : '';
   return (
-    <li style={{ fontSize: 11, lineHeight: 1.45 }}>
+    <li style={{ fontSize: 12.5, lineHeight: 1.5 }}>
       {parts.join(' — ')}
       {note && (
-        <span style={{ display: 'block', fontSize: 9.5, fontStyle: 'italic', paddingLeft: 10 }}>
+        <span style={{ display: 'block', fontSize: 11, fontStyle: 'italic', paddingLeft: 10 }}>
           office note: {note}
         </span>
       )}
@@ -575,20 +580,48 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                 <h1 style={{ fontSize: 17, fontWeight: 900, letterSpacing: '0.02em', lineHeight: 1.1, margin: 0 }}>
                   {branding.company_name}
                 </h1>
-                {companyLine && <p style={{ fontSize: 9.5, margin: '2px 0 0' }}>{companyLine}</p>}
-                {branding.support_phone && <p style={{ fontSize: 9.5, margin: 0 }}>{branding.support_phone}</p>}
+                {companyLine && <p style={{ fontSize: 11, margin: '2px 0 0' }}>{companyLine}</p>}
+                {branding.support_phone && <p style={{ fontSize: 11, margin: 0 }}>{branding.support_phone}</p>}
               </div>
             </div>
 
-            <div style={{ width: '2.5in', flexShrink: 0 }}>
+            <div style={{ width: '3.1in', flexShrink: 0 }}>
               {/* Ticket No. = the PRE-PRINTED number on the paper pad. We can't
                   know it, so it stays a blank the office writes for cross-ref. */}
               <div style={{ marginBottom: 4 }}>
                 <Field label="Ticket No." />
               </div>
-              <div style={{ textAlign: 'right', marginBottom: 4 }}>
-                <p style={{ fontSize: 8.5, fontWeight: 800, letterSpacing: '0.14em', margin: 0 }}>JOB NO.</p>
-                <p style={{ fontSize: 19, fontWeight: 900, fontFamily: 'monospace', lineHeight: 1, margin: 0, color: accent }}>
+              {/* THE JOB ID, unmissable (founder, Aug 12: "clear job ID… and
+                  I'd like to add job ID when I print the tickets out as well").
+                  It is the number the office files, invoices and searches by,
+                  so it is boxed and set large rather than being one small line
+                  among the header fields. Prints black-on-white — a coloured
+                  number goes grey on a mono office printer. */}
+              <div
+                style={{
+                  border: '2.5px solid #000',
+                  borderRadius: 4,
+                  padding: '4px 10px 5px',
+                  marginBottom: 6,
+                  textAlign: 'right',
+                }}
+              >
+                <p style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '0.18em', margin: 0, color: '#333' }}>
+                  JOB ID
+                </p>
+                <p
+                  style={{
+                    fontSize: 21,
+                    fontWeight: 900,
+                    fontFamily: 'ui-monospace, Menlo, Consolas, monospace',
+                    lineHeight: 1.1,
+                    margin: 0,
+                    letterSpacing: '-0.02em',
+                    // A wrapped job number is unusable — it is the thing the
+                    // office files and searches by. Never break it.
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {data.job.job_number}
                 </p>
               </div>
@@ -690,7 +723,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             Description of Work Performed{data.mode === 'week' ? ' — Week' : ''}
           </SectionBar>
           {data.job.description && (
-            <p style={{ fontSize: 9.5, fontStyle: 'italic', margin: '0 0 6px' }}>
+            <p style={{ fontSize: 11.5, fontStyle: 'italic', margin: '0 0 6px' }}>
               Scope: {data.job.description}
             </p>
           )}
@@ -751,7 +784,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
 
           {/* ── Day blocks (the paper's Date / Job Hours / Lunch / Total grid) ── */}
           <SectionBar accent={accent}>Job Hours</SectionBar>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>
               <tr>
                 {['Date', 'Employee', 'Start', 'End', 'Lunch', 'Total', 'Office Use Only'].map((h) => (
@@ -825,7 +858,9 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
           <div
             style={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(6, 1fr)',
+              // Total Cut carries the longest value ("1,240 LF · 12 cores"),
+              // so it gets a wider column instead of wrapping under its label.
+              gridTemplateColumns: '0.8fr 0.8fr 0.9fr 1.6fr 1fr 0.8fr',
               gap: 10,
               marginTop: 6,
               paddingTop: 5,
@@ -846,7 +881,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               value={
                 [
                   footage.linearFeet > 0 ? `${footage.linearFeet} LF` : null,
-                  footage.cores > 0 ? `${footage.cores} cores` : null,
+                  footage.cores > 0 ? `${footage.cores} core${footage.cores === 1 ? '' : 's'}` : null,
                 ]
                   .filter(Boolean)
                   .join(' · ') || null
