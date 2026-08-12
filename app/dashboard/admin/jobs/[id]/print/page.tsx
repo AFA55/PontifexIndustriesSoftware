@@ -217,7 +217,11 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               <Field label="Arrival Time" value={job.is_will_call ? 'Will Call' : arrival || '—'} />
               {job.operator_name && <Field label="Operator" value={job.helper_name ? `${job.operator_name} + ${job.helper_name}` : job.operator_name} />}
               {job.project_manager_name && <Field label="Project Manager" value={job.project_manager_name} />}
-              {job.difficulty_rating ? <Field label="Difficulty" value={`${job.difficulty_rating} / 10`} /> : null}
+              {/* Difficulty is an INTERNAL scheduling signal (it drives operator
+                  skill matching and capacity), not something to hand a crew or
+                  a customer. Removed from the printed sheet at the founder's
+                  request, Aug 12. It still shows on the schedule board and the
+                  approval modal, where the office actually uses it. */}
             </Section>
 
             <Section title="Customer">

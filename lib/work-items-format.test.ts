@@ -171,7 +171,31 @@ describe('workItemDetailLine', () => {
       work_type: 'SLAB SAW',
       details_json: { cutType: 'dry', cuts: [{ linearFeet: 26, cutDepth: 4, areas: [{ length: 5, width: 8 }] }] },
     });
-    expect(line).toBe('26 LF @ 4" (dry)');
+    // Still the SAWING shape (LF-led), not the demolition "N sq ft" shape —
+    // but the rectangle the crew measured is now printed alongside it.
+    expect(line).toBe(`26 LF @ 4" (5' × 8') (dry)`);
+  });
+
+  // Founder, Aug 12: "it'll tell you the depths, but it's not telling you the
+  // linear footage or the size of the areas — we need them to show the sizes."
+  it('prints the size of every rectangle on an area-entered cut', () => {
+    const line = workItemDetailLine({
+      work_type: 'SLAB SAW',
+      details_json: {
+        cuts: [{ linearFeet: 190, areas: [{ length: 10, width: 9, depth: 9.5, quantity: 5 }] }],
+      },
+    });
+    // Depth comes off the AREA here — an area-entered cut has no cutDepth, and
+    // this line used to print with no depth at all.
+    expect(line).toBe(`190 LF @ 9.5" (5× 10' × 9')`);
+  });
+
+  it('still prints the rectangle when the linear feet were never computed', () => {
+    const line = workItemDetailLine({
+      work_type: 'WALL SAW',
+      details_json: { cuts: [{ linearFeet: 0, areas: [{ length: 7, width: 4, depth: 10 }] }] },
+    });
+    expect(line).toBe(`@ 10" (7' × 4')`);
   });
 });
 
@@ -511,6 +535,8 @@ describe('rebar helpers', () => {
         ],
       },
     });
-    expect(line).toBe('106 LF @ 6" (wet)');
+    // The 40' × 13' rectangle is the measurement the crew actually took; the
+    // 106 LF is derived from its perimeter. The printed ticket needs both.
+    expect(line).toBe(`106 LF @ 6" (40' × 13') (wet)`);
   });
 });

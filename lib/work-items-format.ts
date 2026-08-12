@@ -149,19 +149,52 @@ function describeDemoArea(a: any): string {
   return s;
 }
 
-/** `120 LF @ 6"` style descriptor for one sawing cut spec. */
+/** `5× 10' × 9'` — one rectangle a saw cut, when the crew entered L × W. */
+function describeCutArea(a: any): string {
+  const l = round2(n(a?.length));
+  const w = round2(n(a?.width));
+  if (l <= 0 && w <= 0) return '';
+  const qty = n(a?.quantity) || 1;
+  const dims = w > 0 ? `${l}' × ${w}'` : `${l}'`;
+  return qty > 1 ? `${qty}× ${dims}` : dims;
+}
+
+/**
+ * `120 LF @ 6"` style descriptor for one sawing cut spec.
+ *
+ * WHY THE AREAS ARE HERE (founder, Aug 12, printing tickets): "it just has
+ * dashes across it — it'll tell you the depths, but it's not telling you the
+ * linear footage or the size of the areas, and we need them to show the sizes
+ * of areas."
+ *
+ * A cut entered as L × W stores its rectangles under `cuts[i].areas[]`, and
+ * this function never looked at them — it printed the computed linear feet and
+ * nothing else, so the sheet lost the dimensions the crew actually measured.
+ * Worse, for those entries the DEPTH lives on the area (`areas[i].depth`), not
+ * on `cutDepth`, so an area-mode cut could print with no depth at all.
+ */
 function describeCut(c: any): string {
   const lf = n(c?.linearFeet);
-  const depth = n(c?.cutDepth);
-  let s = lf > 0 ? `${lf} LF` : 'cut';
-  if (depth > 0) s += ` @ ${depth}"`;
+  const areas = (Array.isArray(c?.areas) ? c.areas : []).filter(
+    (a: any) => n(a?.length) > 0 || n(a?.width) > 0
+  );
+  // Depth off the cut, else off the first area it was measured on.
+  const depth = n(c?.cutDepth) || (areas.length > 0 ? n(areas[0]?.depth) : 0);
+
+  let s = lf > 0 ? `${round2(lf)} LF` : areas.length > 0 ? '' : 'cut';
+  if (depth > 0) s += `${s ? ' ' : ''}@ ${round2(depth)}"`;
+
   const flags: string[] = [];
+  for (const a of areas) {
+    const dim = describeCutArea(a);
+    if (dim) flags.push(dim);
+  }
   const rebar = rebarTag(c);
   if (rebar) flags.push(rebar);
   if (c?.overcut) flags.push('overcut');
   if (c?.chainsawed) flags.push('chainsawed');
-  if (flags.length) s += ` (${flags.join(', ')})`;
-  return s;
+  if (flags.length) s += `${s ? ' ' : ''}(${flags.join(', ')})`;
+  return s || 'cut';
 }
 
 /**
