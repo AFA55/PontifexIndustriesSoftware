@@ -896,51 +896,20 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             <Field label="Initials" />
           </div>
 
-          {/* ── Signatures ── */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20, marginTop: 14, breakInside: 'avoid' }}>
-            <div>
-              {data.job.signature_url ? (
-                <div style={{ height: 40, display: 'flex', alignItems: 'flex-end', borderBottom: '1px solid #000' }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={data.job.signature_url} alt="" style={{ maxHeight: 38, objectFit: 'contain' }} />
-                </div>
-              ) : (
-                <div style={{ height: 40, borderBottom: '1px solid #000' }} />
-              )}
-              <p style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '2px 0 0' }}>
-                Customer Approval Signature
-              </p>
-              {/* One row instead of two stacked — landscape has the width, and
-                  the page does not have the height. */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.6fr', gap: 10, marginTop: 5 }}>
-                <Field label="Print Name" value={data.job.signer_name} />
-                {/* The customer's company is not stored — hand-written. */}
-                <Field label="Company" />
-                <Field
-                  label="Date"
-                  value={
-                    data.job.signed_at
-                      ? new Date(data.job.signed_at).toLocaleDateString('en-US', {
-                          month: 'numeric',
-                          day: 'numeric',
-                          year: '2-digit',
-                        })
-                      : null
-                  }
-                />
-              </div>
-            </div>
-            <div>
-              {/* Wet-ink employee signature — always blank. */}
-              <div style={{ height: 40, borderBottom: '1px solid #000' }} />
-              <p style={{ fontSize: 8.5, textTransform: 'uppercase', letterSpacing: '0.05em', margin: '2px 0 0' }}>
-                Employee Signature
-              </p>
-              <div style={{ marginTop: 8 }}>
-                <Field label="Crew" value={[data.job.lead_name, data.job.helper_name].filter(Boolean).join(' + ') || null} />
-              </div>
-            </div>
-          </div>
+          {/* ── Wet-ink signature block: REMOVED (founder, Aug 12) ──────────
+              "Let's remove approval signature again — they're supposed to get
+               that digitally, so no need for him to have employee signature,
+               print name, company and date."
+
+              Customer approval, print name, company, date and the employee
+              signature were all ruled lines for a pen. Both signatures are
+              captured in the app now, and the SIGNATURES strip at the top of
+              this sheet already states whether each one exists, who signed it
+              and when — so this was asking the crew to re-collect, by hand, a
+              signature the office already holds. The crew names are on every
+              row of JOB HOURS above, so nothing is lost with it.
+
+              This is also what finally gets a short week onto one page. */}
 
           {/* ── Three-copy carbon footer ── */}
           <p

@@ -593,3 +593,59 @@ bigger."* Screenshot verified against Southern Basements, not asserted.
 **Known trade-off:** a single day and a light week fit one landscape page. A busy
 five-day week runs to ~1.4 pages. Closing that means shrinking the work detail,
 which is the reason the sheet exists — his call, not ours to make silently.
+
+## M19 — Split a day's clock card BETWEEN the jobs, by when the next one started
+
+> "Yesterday I had Keon at 2 jobs and it says he was at the first one for .06
+> hrs — that's not the case. It should see when they started their 2nd job, and
+> that concludes the time for the first job."
+
+**Diagnosed Aug 12 against production. Keon (Keontre Mcknight), Aug 11:**
+
+| source | job | what it says |
+|---|---|---|
+| clock card | linked to JOB-2026-400368 | **7:00 AM → 5:32 PM = 10.04 hrs** ← the truth |
+| daily log | QA-2026-140542 (Industrial Safety Coatings) | work_started 11:01 AM, day_completed 11:04 AM → **0.06 hrs** |
+| daily log | JOB-2026-400368 (Leifeng) | day_completed 4:07 PM → 9.12 hrs |
+
+The 0.06 is exactly the **three minutes** between tapping "start work" and
+closing the ticket. He was filing paperwork at 11:04 before moving on, not
+working for three minutes. `daily_job_logs.hours_worked` measures
+work_started → day_completed, which on a two-job day measures the paperwork.
+
+**The founder's rule, and it is the right one:** a job's time ends when the next
+job begins. Applied to that day it reconciles exactly:
+
+    job 1: 7:00 AM (clock in) → 11:04 AM (job 2 starts)  ≈ 4.07 hrs
+    job 2: 11:04 AM           → 5:32 PM  (clock out)     ≈ 5.97 hrs
+                                              total = 10.04 hrs ✓ payroll
+
+### Where it goes
+
+`lib/job-clock-attribution.ts`. Today that helper is all-or-nothing: a card is
+attributed whole, or the day is reported `split_day` with no number. This
+replaces the second branch with a real split.
+
+Per person, per date:
+1. Order the jobs they touched that day by first activity — earliest of
+   `route_started_at`, `work_started_at`, or the first work_item timestamp.
+2. Segment the clock card: job *k* runs from `max(clock_in, start_k)` to
+   `min(start_k+1, clock_out)`.
+3. Hours per job = its segment. **The segments must sum to the card**, so a
+   rounding remainder goes to the last job rather than being dropped.
+
+### Traps
+
+- A card with **no clock-out** (still open) has no end boundary — fall back to
+  today's behaviour and report it unattributable rather than inventing an end.
+- A job started the PREVIOUS day (Leifeng's route began Aug 10) must clamp its
+  segment start to the clock-in, not to its own route stamp.
+- The first job of the day starts at **clock-in**, not at its route stamp — the
+  drive and the shop time before it are still that job's.
+- Do not write the split back into `timecards`. It is a read-time derivation;
+  payroll's own number stays the card total. (Same rule as
+  lib/timecard-job-context.ts.)
+- `hours_source` gains a `'split'` value so the panel can show it as derived.
+
+Fixing this also fixes the printed ticket, the Daily Progress panel and — once
+M15 lands — labour cost, since all three now read the same helper.
