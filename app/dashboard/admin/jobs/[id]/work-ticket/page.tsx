@@ -268,7 +268,7 @@ function PersonBlock({
     times[0] || times[1] ? `${times[0] || '—'} – ${times[1] || 'open'}` : null;
 
   return (
-    <div style={{ breakInside: 'avoid', paddingLeft: 8, borderLeft: `2px solid ${accent}`, marginBottom: 7 }}>
+    <div style={{ breakInside: 'avoid', paddingLeft: 8, borderLeft: `2px solid ${accent}`, marginBottom: 5 }}>
       <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
         <span style={{ fontSize: 11.5, fontWeight: 800 }}>{person.name}</span>
         <span
@@ -295,7 +295,7 @@ function PersonBlock({
       {(work || []).length > 0 ? (
         <ul style={{ margin: '2px 0 0 14px', listStyle: 'disc' }}>
           {(work || []).map((item, i) => (
-            <WorkLine key={(item as { id?: string }).id || `w${i}`} item={item} showNote={showNotes} />
+            <WorkLine key={(item as { id?: string }).id || `w${i}`} item={item} showNote={false} />
           ))}
         </ul>
       ) : (
@@ -303,15 +303,84 @@ function PersonBlock({
         // crew two ruled lines, exactly like the paper ticket.
         <div style={{ margin: '3px 0 0 14px' }}>
           <Blank />
-          <div style={{ height: 6 }} />
-          <Blank />
         </div>
       )}
 
-      {showNotes && (person.log_note || person.helper_note) && (
-        <p style={{ fontSize: 9.5, fontStyle: 'italic', margin: '3px 0 0 14px' }}>
-          office note: {[person.log_note, person.helper_note].filter(Boolean).join(' · ')}
-        </p>
+      {/* ── WHAT THEY TYPED ─────────────────────────────────────────────────
+          Founder, Aug 12: "just add space where the work performed that they
+          typed can be at, and leave space blank if they didn't put anything —
+          just so that can be our standard ticket."
+
+          ALWAYS rendered, filled or empty. That is the point: the sheet has the
+          same shape every time, so the office knows where to look and the crew
+          knows where to write when they had nothing to type. Before this, a
+          typed description either appeared (behind the office-notes toggle) or
+          the row simply vanished, and the layout moved with it.
+
+          Sources, in the order an operator would expect to see them: the per-
+          item note they wrote while entering the work, then the day's own note. */}
+      <TypedNotes person={person} work={work} show={showNotes} />
+    </div>
+  );
+}
+
+/**
+ * The operator's own words for the day — or ruled lines when there are none.
+ * Kept as its own component so the "always present" rule is impossible to
+ * accidentally gate behind a condition later.
+ */
+function TypedNotes({
+  person,
+  work,
+  show,
+}: {
+  person: TicketPersonDay;
+  work: WorkItemLike[];
+  show: boolean;
+}) {
+  const typed = [
+    ...work.map((w) => workItemQuickNote(w)).filter(Boolean),
+    person.log_note || '',
+    person.helper_note || '',
+  ]
+    .map((t) => String(t).trim())
+    .filter(Boolean);
+
+  // De-duplicate: the same sentence often sits on both the item and the day.
+  const seen = new Set<string>();
+  const lines = typed.filter((t) => {
+    const k = t.toLowerCase();
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+
+  return (
+    <div style={{ margin: '3px 0 0 14px' }}>
+      <p
+        style={{
+          fontSize: 8.5,
+          fontWeight: 800,
+          letterSpacing: '0.1em',
+          textTransform: 'uppercase',
+          color: '#444',
+          margin: '0 0 2px',
+        }}
+      >
+        Notes
+      </p>
+      {show && lines.length > 0 ? (
+        lines.map((t, i) => (
+          <p key={i} style={{ fontSize: 11, lineHeight: 1.4, margin: i === 0 ? 0 : '2px 0 0' }}>
+            {t}
+          </p>
+        ))
+      ) : (
+        <>
+          <Blank />
+          <div style={{ height: 5 }} />
+          <Blank />
+        </>
       )}
     </div>
   );
@@ -323,7 +392,10 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
 
   const [mode, setMode] = useState<TicketMode>('day');
   const [anchor, setAnchor] = useState<string>('');
-  const [showNotes, setShowNotes] = useState(false);
+  // Default ON (Aug 12): the founder's standard ticket carries what the crew
+  // typed. The toggle now suppresses that text for a customer-facing copy — the
+  // SPACE is always there either way, so the sheet keeps one shape.
+  const [showNotes, setShowNotes] = useState(true);
   const [data, setData] = useState<TicketPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -336,7 +408,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
     if (q.get('mode') === 'week') setMode('week');
     const d = q.get('date');
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setAnchor(d);
-    if (q.get('notes') === '1') setShowNotes(true);
+    if (q.get('notes') === '0') setShowNotes(false);
     setReady(true);
   }, []);
 
@@ -376,7 +448,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   useEffect(() => {
     if (!ready || !anchor) return;
     const q = new URLSearchParams({ mode, date: anchor });
-    if (showNotes) q.set('notes', '1');
+    if (!showNotes) q.set('notes', '0');
     window.history.replaceState(null, '', `${window.location.pathname}?${q.toString()}`);
   }, [ready, mode, anchor, showNotes]);
 
@@ -496,7 +568,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
 
           <label style={{ fontSize: 12, color: '#52525b', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <input type="checkbox" checked={showNotes} onChange={(e) => setShowNotes(e.target.checked)} />
-            Office notes (not customer-facing)
+            Print crew notes (untick for the customer copy)
           </label>
 
           <button
