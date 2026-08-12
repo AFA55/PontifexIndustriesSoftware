@@ -59,6 +59,8 @@ const JobScopePanel = dynamicImport(() => import('@/components/JobScopePanel'), 
   ssr: false,
   loading: () => <div className="h-64 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />,
 });
+import JobDocuments from '@/components/JobDocuments';
+
 const OfficeDocumentsPanel = dynamicImport(() => import('@/components/admin/OfficeDocumentsPanel'), {
   ssr: false,
   loading: () => <div className="h-48 rounded-2xl bg-slate-100 dark:bg-white/5 animate-pulse" />,
@@ -2009,6 +2011,18 @@ export default function AdminJobDetailPage({
 
             {/* ── Customer Messages (2-way customer ↔ staff thread) ── */}
             <CustomerCommentsPanel jobId={jobId} />
+
+            {/* ── Signed paperwork (waiver / completion sign-off) ──────────────
+                The office-documents panel below holds files someone UPLOADS.
+                This holds the ones the SYSTEM captured — and until now they had
+                nowhere to appear at all, which is why the founder had never
+                seen one (Aug 12). Sits above uploads because a signed waiver is
+                the thing you go looking for. */}
+            {['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(userRole) && (
+              <div className="rounded-2xl p-5 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
+                <JobDocuments jobId={jobId} />
+              </div>
+            )}
 
             {/* ── Office Documents (management-only; component self-guards) ── */}
             {['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(userRole) && (

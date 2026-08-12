@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import JobDocuments from '@/components/JobDocuments';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
@@ -910,6 +911,15 @@ export default function CompletedJobsArchivePage() {
                           </span>
                         </div>
                       )}
+
+                      {/* Signed paperwork — founder, Aug 12: "I should be able
+                          to see the waiver signed and work completion signature
+                          there in documents as well." On a finished job this is
+                          what gets filed and billed against, so it sits above
+                          the scope comparison. */}
+                      <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 mb-6">
+                        <JobDocuments jobId={selectedJobDetails.job.id} />
+                      </div>
 
                       {/* Scope */}
                       <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 mb-6">
