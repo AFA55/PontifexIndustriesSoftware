@@ -41,6 +41,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
+import { attributableTimecards } from '@/lib/job-clock-attribution';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -162,69 +163,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // real ones, 101 invented. On Parkk Concrete alone, Aug 4 showed 28.19
     // crew-hours of which 18.36 were simultaneously billed to two other jobs.
     // That is the founder's original complaint, re-created by the fix for it.
-    let timecards: any[] = [];
-    let unattributableDates = new Set<string>();
-    {
-      const { data: linked } = await supabaseAdmin
-        .from('timecards')
-        .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date, job_order_id')
-        .eq('job_order_id', jobId)
-        .order('clock_in_time', { ascending: true });
-      timecards = linked ?? [];
-
-      if (jobOperatorIds.length > 0 && jobLogDates.length > 0) {
-        const [{ data: byCrew }, { data: opLogs }, { data: helpLogs }] = await Promise.all([
-          supabaseAdmin
-            .from('timecards')
-            .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date, job_order_id')
-            .in('user_id', jobOperatorIds)
-            .in('date', jobLogDates)
-            .order('clock_in_time', { ascending: true }),
-          supabaseAdmin
-            .from('daily_job_logs')
-            .select('operator_id, log_date, job_order_id')
-            .in('operator_id', jobOperatorIds)
-            .in('log_date', jobLogDates),
-          supabaseAdmin
-            .from('helper_work_logs')
-            .select('helper_id, log_date, job_order_id')
-            .in('helper_id', jobOperatorIds)
-            .in('log_date', jobLogDates),
-        ]);
-
-        // Every job each person touched that day, from BOTH log tables.
-        const touched = new Map<string, Set<string>>();
-        const note = (uid: string, d: string, jid: string) => {
-          if (!uid || !d || !jid) return;
-          const k = `${uid}|${d}`;
-          const s = touched.get(k) ?? new Set<string>();
-          s.add(jid);
-          touched.set(k, s);
-        };
-        for (const r of opLogs ?? []) note(r.operator_id, r.log_date, r.job_order_id);
-        for (const r of helpLogs ?? []) note(r.helper_id, r.log_date, r.job_order_id);
-
-        const seenTc = new Set(timecards.map((t) => t.id));
-        for (const t of byCrew ?? []) {
-          if (seenTc.has(t.id)) continue;
-          // Linked to a DIFFERENT job — those hours are already that job's.
-          if (t.job_order_id && t.job_order_id !== jobId) continue;
-          if (!t.job_order_id) {
-            const jobsThatDay = touched.get(`${t.user_id}|${t.date}`);
-            // Only this job, and provably so.
-            if (!jobsThatDay || jobsThatDay.size !== 1 || !jobsThatDay.has(jobId)) {
-              // They were on more than one job (or on none we can see): their
-              // hours cannot be divided, so this day is reported as unknown
-              // rather than guessed at.
-              if (jobsThatDay && jobsThatDay.size > 1) unattributableDates.add(t.date);
-              continue;
-            }
-          }
-          seenTc.add(t.id);
-          timecards.push(t);
-        }
-      }
-    }
+    const { cards: timecards, splitDates: unattributableDates } =
+      await attributableTimecards(jobId, jobOperatorIds, jobLogDates);
 
     // ── scope_progress summary (cumulative totals) ───────────────────────────
     const scopeProgress = loaded.scope_progress;

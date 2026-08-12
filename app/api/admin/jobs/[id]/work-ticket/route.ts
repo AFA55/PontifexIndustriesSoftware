@@ -20,6 +20,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { toLocalYMD } from '@/lib/dates';
+import { attributableTimecards } from '@/lib/job-clock-attribution';
 import { STANDBY_HOURLY_RATE, STANDBY_MINIMUM_HOURS } from '@/lib/legal/standby-policy';
 import {
   buildTicketDays,
@@ -77,17 +78,8 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const scoped = (q: any) => (tenantId ? q.eq('tenant_id', tenantId) : q);
 
     // ── 2. Crew, times, work, notes ─────────────────────────────────────────
-    const [crewRes, tcRes, logRes, wiRes, helperRes, standbyRes, subsistRes] = await Promise.all([
+    const [crewRes, logRes, wiRes, helperRes, standbyRes, subsistRes] = await Promise.all([
       scoped(supabaseAdmin.from('job_crew').select('user_id, role').eq('job_order_id', jobId)),
-      scoped(
-        supabaseAdmin
-          .from('timecards')
-          .select(
-            `id, user_id, date, clock_in_time, clock_out_time, lunch_duration_minutes,
-             break_minutes, net_hours, total_hours, is_shop_hours, is_shop_time, work_location`
-          )
-          .eq('job_order_id', jobId)
-      ),
       scoped(
         supabaseAdmin
           .from('daily_job_logs')
@@ -126,7 +118,6 @@ export async function GET(request: NextRequest, context: RouteContext) {
     ]);
 
     const crewRows = (crewRes.data || []) as Array<{ user_id: string; role: string | null }>;
-    const timecards = (tcRes.data || []) as TicketTimecardRow[];
     const logs = (logRes.data || []) as TicketDailyLog[];
     const workItems = (wiRes.data || []) as TicketWorkItem[];
     const helperLogs = (helperRes.data || []) as TicketHelperLog[];
@@ -139,6 +130,43 @@ export async function GET(request: NextRequest, context: RouteContext) {
       client_representative_name: string | null;
     }>;
     const subsistence = (subsistRes.data || []) as Array<{ night_date: string | null }>;
+
+    // ── 2b. The crew's CLOCK CARDS ───────────────────────────────────────────
+    // `tcRes` above only asked for cards tagged `job_order_id = this job`, and
+    // only 34 of 251 production cards carry that tag — so the printed ticket
+    // showed START and END blank and "0.00" against real work days. On
+    // JOB-2026-424813 the whole week printed 47.47 hours with Aug 3 at 0.00,
+    // even though Zack was on the clock 9.82 hours that day.
+    //
+    // `attributableTimecards` is the same rule the Daily Progress panel uses —
+    // one shared implementation so the printed sheet and the screen can never
+    // disagree about a day. It counts a card only when it is linked to this
+    // job, or when it has no link and its owner touched no other job that day.
+    const ticketUserIds = Array.from(
+      new Set(
+        [
+          job.assigned_to,
+          job.helper_assigned_to,
+          ...crewRows.map((c) => c.user_id),
+          ...logs.map((l) => l.operator_id),
+          ...helperLogs.map((h) => h.helper_id),
+        ].filter(Boolean) as string[]
+      )
+    );
+    const ticketDates = Array.from(
+      new Set(
+        [
+          ...logs.map((l) => l.log_date),
+          ...helperLogs.map((h) => h.log_date),
+        ].filter(Boolean) as string[]
+      )
+    );
+    const { cards: attributedCards } = await attributableTimecards(
+      jobId,
+      ticketUserIds,
+      ticketDates
+    );
+    const timecards = attributedCards as TicketTimecardRow[];
 
     // ── 3. Names for everyone who can appear on the ticket ─────────────────
     const memberIds = new Set<string>();
