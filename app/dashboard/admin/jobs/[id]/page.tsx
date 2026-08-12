@@ -1535,6 +1535,27 @@ export default function AdminJobDetailPage({
                     {dailyLogs.length} {dailyLogs.length === 1 ? 'day' : 'days'} logged
                   </span>
                 )}
+                {/* "…or choose a weekly option if they were there the whole
+                    week" — one sheet, every day, for the office to file. */}
+                {dailyLogs.length > 0 && (
+                  <Link
+                    href={`/dashboard/admin/jobs/${job.id}/work-ticket?mode=week${
+                      dailyLogs[dailyLogs.length - 1]?.log_date
+                        ? `&date=${dailyLogs[dailyLogs.length - 1].log_date}`
+                        : ''
+                    }`}
+                    target="_blank"
+                    className="
+                      inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg
+                      min-h-[32px] transition-colors
+                      text-slate-700 bg-white border border-slate-200 hover:bg-slate-50
+                      dark:text-white/80 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10
+                    "
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    Print week
+                  </Link>
+                )}
               </div>
 
               {dailyLogs.length === 0 && workItemsByDay.length === 0 ? (
@@ -1610,6 +1631,27 @@ export default function AdminJobDetailPage({
                               <Clock className="w-3 h-3" />
                               {log.hours_worked.toFixed(1)}h
                             </span>
+                          )}
+                          {/* Print THIS day's ticket (founder, Aug 11: "a button
+                              next to the date that says print"). The work-ticket
+                              page already understood ?mode=day&date= — it was
+                              only ever reachable from one link at the top of the
+                              page, with no way to say WHICH day. */}
+                          {log.log_date && (
+                            <Link
+                              href={`/dashboard/admin/jobs/${job.id}/work-ticket?mode=day&date=${log.log_date}`}
+                              target="_blank"
+                              title={`Print the ticket for ${logDate}`}
+                              className="
+                                inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0
+                                min-h-[32px] transition-colors
+                                text-slate-600 bg-white border border-slate-200 hover:bg-slate-50
+                                dark:text-white/75 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10
+                              "
+                            >
+                              <Printer className="w-3 h-3" />
+                              Print
+                            </Link>
                           )}
                         </div>
 
