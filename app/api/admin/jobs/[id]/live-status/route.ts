@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
 import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
+import { tenantToday, tenantDayStartUTC } from '@/lib/tenant-timezone';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -126,7 +127,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // ── 3. Today's timecard for assigned operator ────────────────────────────
-    const todayStr = new Date().toISOString().split('T')[0];
+    // `new Date().toISOString().split('T')[0]` was UTC — the exact pattern
+    // CLAUDE.md forbids. After 8pm Eastern it asked for TOMORROW's date, found
+    // no timecard, and fell through to the job-level arrival stamp below. That
+    // is half of the "213 hours on site" reading.
+    const todayStr = await tenantToday(tenantId ?? null);
     let clockInTime: string | null = null;
     let clockOutTime: string | null = null;
 
@@ -339,9 +344,38 @@ export async function GET(request: NextRequest, context: RouteContext) {
     }
 
     // ── 7. Computed durations ────────────────────────────────────────────────
-    const onSiteAnchor = arrivedAt ?? workStartedAt;
-    const timeOnSiteMinutes =
-      onSiteAnchor && !clockOutTime ? minutesSince(onSiteAnchor) : null;
+    //
+    // TIME ON SITE COMES FROM THE CREW CLOCK, NOT THE JOB TIMESTAMPS
+    // (founder, Aug 11: "212 hours is not real, and that's on multiple active
+    //  jobs — let's pull that from crew clock-ins").
+    //
+    // It used to anchor on `arrived_at_jobsite_at`, which is stamped ONCE per
+    // job and never reset. JOB-2026-424813 (Parkk Concrete) was stamped on
+    // Aug 3, ran multi-day, and by Aug 11 the panel read 213 hours on site —
+    // it was measuring calendar time since the job began, not a shift.
+    //
+    // The clock card is the honest source: it is per-day, it is what payroll
+    // uses, and it is the number the founder already trusts on the "Crew Clock
+    // Ins" panel right beside this one. Clocked out now shows the day's total
+    // instead of blanking.
+    //
+    // The job stamps remain the fallback for a crew that has not clocked in,
+    // but CLAMPED to today — a stale anchor can now overstate by at most one
+    // day instead of by a week.
+    let timeOnSiteMinutes: number | null = null;
+    if (clockInTime) {
+      const start = new Date(clockInTime).getTime();
+      const end = clockOutTime ? new Date(clockOutTime).getTime() : Date.now();
+      timeOnSiteMinutes = Math.max(0, Math.floor((end - start) / 60000));
+    } else {
+      const onSiteAnchor = arrivedAt ?? workStartedAt;
+      const dayStart = await tenantDayStartUTC(tenantId ?? null);
+      const anchoredToday =
+        onSiteAnchor && new Date(onSiteAnchor).getTime() >= new Date(dayStart).getTime()
+          ? onSiteAnchor
+          : null;
+      timeOnSiteMinutes = anchoredToday && !clockOutTime ? minutesSince(anchoredToday) : null;
+    }
 
     return NextResponse.json({
       success: true,

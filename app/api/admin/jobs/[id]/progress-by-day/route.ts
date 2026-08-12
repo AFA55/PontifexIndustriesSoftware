@@ -94,12 +94,103 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .eq('job_id', jobId)
       .order('changed_at', { ascending: true });
 
-    // 5. Timecards — fallback for in_route if no daily_job_logs.route_started_at
-    const { data: timecards } = await supabaseAdmin
-      .from('timecards')
-      .select('id, user_id, clock_in_time, date')
-      .eq('job_order_id', jobId)
-      .order('clock_in_time', { ascending: true });
+    // 5. Timecards — the CLOCK CARD, which is now the source of a day's hours.
+    //
+    // WHY (founder, Aug 11): "The hours it shows next to day one aren't
+    // accurate… the total hours worked day to day is in Crew Clock Ins. We just
+    // need to pull the data from a different place."
+    //
+    // Two problems with what was here. It filtered on `job_order_id`, and only
+    // 34 of 251 timecards carry that link — so for most days it found nothing.
+    // And the day's hours came from `daily_job_logs.hours_worked`, which is
+    // derived from the en-route / work-started stamps the crew taps, not from
+    // when they were actually on the clock.
+    //
+    // So: pull every clock card belonging to anyone who worked this job, on any
+    // day this job ran, whether or not the card was linked to the job. Payroll
+    // already trusts these numbers; the panel should show the same ones.
+    // Everyone who touched this job: the two job-level slots, plus every
+    // operator and helper who actually filed something. Several operators can
+    // work one job (the founder's "the fields are plural for a reason"), so the
+    // slots alone would miss most of the crew's hours.
+    const [{ data: jobSlots }, { data: helperLogRows }] = await Promise.all([
+      supabaseAdmin
+        .from('job_orders')
+        .select('assigned_to, helper_assigned_to')
+        .eq('id', jobId)
+        .maybeSingle(),
+      supabaseAdmin
+        .from('helper_work_logs')
+        .select('helper_id, log_date')
+        .eq('job_order_id', jobId),
+    ]);
+
+    const jobOperatorIds = Array.from(
+      new Set(
+        [
+          ...(dailyLogs ?? []).map((l: any) => l.operator_id),
+          ...(helperLogRows ?? []).map((h: any) => h.helper_id),
+          (jobSlots as any)?.assigned_to,
+          (jobSlots as any)?.helper_assigned_to,
+        ].filter(Boolean) as string[]
+      )
+    );
+    const jobLogDates = Array.from(
+      new Set(
+        [
+          ...(dailyLogs ?? []).map((l: any) => l.log_date),
+          ...(helperLogRows ?? []).map((h: any) => h.log_date),
+        ].filter(Boolean) as string[]
+      )
+    );
+
+    let timecards: any[] = [];
+    {
+      // Always include cards explicitly linked to the job…
+      const { data: linked } = await supabaseAdmin
+        .from('timecards')
+        .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date')
+        .eq('job_order_id', jobId)
+        .order('clock_in_time', { ascending: true });
+      timecards = linked ?? [];
+
+      // …plus this job's crew on the days it ran, which is where the hours
+      // actually live for the ~86% of cards with no job link.
+      //
+      // BUT a clock card is per PERSON per DAY, not per job. If someone split a
+      // day between this job and another one, their whole card would land here
+      // and overstate it. So a card with no job link only counts when that
+      // person filed work on NO OTHER job that day — otherwise we would be
+      // inventing a number, which is the thing we are trying to stop doing.
+      if (jobOperatorIds.length > 0 && jobLogDates.length > 0) {
+        const [{ data: byCrew }, { data: elsewhere }] = await Promise.all([
+          supabaseAdmin
+            .from('timecards')
+            .select('id, user_id, clock_in_time, clock_out_time, net_hours, total_hours, date, job_order_id')
+            .in('user_id', jobOperatorIds)
+            .in('date', jobLogDates)
+            .order('clock_in_time', { ascending: true }),
+          supabaseAdmin
+            .from('daily_job_logs')
+            .select('operator_id, log_date')
+            .in('operator_id', jobOperatorIds)
+            .in('log_date', jobLogDates)
+            .neq('job_order_id', jobId),
+        ]);
+
+        const splitDay = new Set(
+          (elsewhere ?? []).map((r: any) => `${r.operator_id}|${r.log_date}`)
+        );
+        const seenTc = new Set(timecards.map((t) => t.id));
+        for (const t of byCrew ?? []) {
+          if (seenTc.has(t.id)) continue;
+          const isLinkedHere = t.job_order_id === jobId;
+          if (!isLinkedHere && splitDay.has(`${t.user_id}|${t.date}`)) continue;
+          seenTc.add(t.id);
+          timecards.push(t);
+        }
+      }
+    }
 
     // ── scope_progress summary (cumulative totals) ───────────────────────────
     const scopeProgress = loaded.scope_progress;
@@ -204,7 +295,25 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .sort()
         .reverse()[0] || null;
 
-      const hours = logs.reduce((s, l) => s + Number(l.hours_worked || 0), 0);
+      // The day's hours come from the CLOCK CARD (see the timecard fetch above).
+      // `net_hours` is the payroll figure (gross minus lunch); `total_hours` is
+      // the older column; otherwise measure clock-out minus clock-in. A card
+      // still open (no clock-out) contributes nothing rather than counting to
+      // now — an un-clocked-out card is what produced "213 hours" elsewhere.
+      const clockHours = tcs.reduce((s: number, t: any) => {
+        const stated = t.net_hours ?? t.total_hours;
+        if (stated != null && Number.isFinite(Number(stated))) return s + Number(stated);
+        if (t.clock_in_time && t.clock_out_time) {
+          const mins =
+            (new Date(t.clock_out_time).getTime() - new Date(t.clock_in_time).getTime()) / 60000;
+          if (mins > 0) return s + mins / 60;
+        }
+        return s;
+      }, 0);
+      const loggedHours = logs.reduce((s, l) => s + Number(l.hours_worked || 0), 0);
+      // Fall back to the operator-entered hours only when nobody clocked in
+      // that day, so a day is never silently blank.
+      const hours = clockHours > 0 ? Math.round(clockHours * 100) / 100 : loggedHours;
 
       // Unique operators active on this day (from logs + entries + timecards)
       const operatorMap: Record<string, { id: string; name: string }> = {};

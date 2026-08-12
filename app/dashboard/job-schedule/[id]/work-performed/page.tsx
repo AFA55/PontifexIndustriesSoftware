@@ -3343,38 +3343,48 @@ export default function WorkPerformed() {
                           used to be gated to Hand Saw, which left slab/wall/
                           wire/ring/push crews with no way to report an L × W
                           area even though the whole area path already worked. */}
-                      <div className="mb-4 bg-gray-50 dark:bg-white/[0.04] rounded-xl p-3 border border-gray-200 dark:border-white/10">
-                        <label className="block text-sm font-bold text-gray-900 dark:text-white mb-2">How do you want to enter this cut?</label>
-                        <div className="flex gap-3">
-                          <button
-                            type="button"
-                            onClick={() => setCutInputMode('linear')}
-                            className={`flex-1 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all border-2 ${
-                              cutInputMode === 'linear'
-                                ? 'border-brand bg-brand text-white shadow-md'
-                                : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-700 dark:text-white/70 hover:border-brand'
-                            }`}
-                          >
-                            Linear Feet
-                          </button>
+                      {/* NO FORK BEFORE THEY CAN TYPE (founder, Aug 11: "for
+                          linear feet you don't need a width — they just need
+                          the linear footage plus depth, that's it. Make it as
+                          easy as possible.")
+
+                          This used to be a 50/50 choice — "How do you want to
+                          enter this cut?" — that every operator had to answer
+                          on every cut before a single field appeared, and half
+                          of it asked for a width that linear-foot work does not
+                          have. Linear feet is now simply what you get. The area
+                          helper is still here for the crew who cut a rectangle
+                          and would rather give L × W, but it is one quiet link,
+                          not a gate. */}
+                      {cutInputMode === 'linear' ? (
+                        <div className="mb-3 flex justify-end">
                           <button
                             type="button"
                             onClick={() => setCutInputMode('area')}
-                            className={`flex-1 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition-all border-2 ${
-                              cutInputMode === 'area'
-                                ? 'border-brand bg-brand text-white shadow-md'
-                                : 'border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-700 dark:text-white/70 hover:border-brand'
-                            }`}
+                            className="min-h-[44px] px-3 text-sm font-semibold text-brand underline underline-offset-2"
                           >
-                            Cut Areas (L × W)
+                            Cut a rectangle instead (L × W)
                           </button>
                         </div>
-                        {cutInputMode === 'area' && (
+                      ) : (
+                        <div className="mb-4 bg-gray-50 dark:bg-white/[0.04] rounded-xl p-3 border border-gray-200 dark:border-white/10">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className="text-sm font-bold text-gray-900 dark:text-white">
+                              Entering a rectangle (L × W)
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCutInputMode('linear')}
+                              className="min-h-[44px] px-3 text-sm font-semibold text-brand underline underline-offset-2 whitespace-nowrap"
+                            >
+                              Use linear feet
+                            </button>
+                          </div>
                           <p className="mt-2 text-xs text-gray-500 dark:text-white/45">
                             Linear feet are calculated from the perimeter of each area (2 × L + 2 × W).
                           </p>
-                        )}
-                      </div>
+                        </div>
+                      )}
 
                       {/* LINEAR MODE - Traditional linear feet input */}
                       {cutInputMode === 'linear' && (
