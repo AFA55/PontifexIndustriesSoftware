@@ -397,13 +397,26 @@ export async function GET(request: NextRequest) {
     // site with no ticket. (Devin, Aug 4 2026: he could log yesterday but
     // nothing for today.)
     //
-    // Overlap test: starts on/before D, and ends on/after D (end_date is NULL
-    // on single-day jobs). A past single-day job correctly drops out because
-    // its end_date is before D.
+    // …but ONLY a job that is actually multi-day. `end_date` alone was never a
+    // safe span source: JOB-2026-895358 (Pratt) is flagged `is_multi_day=false`
+    // and still carries `end_date` a week past its start, and nine of the 33
+    // live jobs since June have that shape. The overlap test happily painted
+    // that ticket on the crew's schedule for seven consecutive days.
+    //
+    // Fixing the ledger writer (lib/reassign.ts) was not enough on its own: with
+    // no ledger row for day 2, the "no ledger row → base slots apply" fallback
+    // below handed the job straight back to `assigned_to`, so Pratt would have
+    // reappeared on Aug 12, 13, 14… as each became today. This is the other half.
+    //
+    // So: show it on its own start date, OR — only when the job really is
+    // multi-day — on any day inside its span. `end_date IS NULL` still counts as
+    // open-ended for a multi-day job.
     if (scheduledDate) {
-      query = query
-        .lte('scheduled_date', scheduledDate)
-        .or(`end_date.is.null,end_date.gte.${scheduledDate}`);
+      query = query.or(
+        `scheduled_date.eq.${scheduledDate},` +
+          `and(is_multi_day.is.true,scheduled_date.lte.${scheduledDate},` +
+          `or(end_date.is.null,end_date.gte.${scheduledDate}))`
+      );
     }
 
     // Date range filters (used by 7-day lookahead on my-jobs)

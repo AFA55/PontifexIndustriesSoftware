@@ -279,7 +279,14 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
       // job's start date. Single-day jobs always use 'remaining' (same thing).
       const sched = fullData?.scheduled_date || job.scheduled_date || '';
       const end = fullData?.end_date || job.end_date || null;
-      const multiDay = !!end && end !== sched;
+      // The job's OWN flag, not "end_date differs from scheduled_date" — nine
+      // live jobs are flagged single-day yet carry a stale end_date a week out.
+      // For those the server collapses 'remaining' to one day, so offering the
+      // choice was a lie: the office picked "and remaining days" and got one.
+      // Only the detail record carries the flag (the board payload does not),
+      // and it is the same record the radio below renders from — so if it has
+      // not loaded there was no span choice to make either.
+      const multiDay = fullData?.is_multi_day === true;
       const anchor = boardDate && sched && boardDate >= sched && boardDate <= (end || sched) ? boardDate : sched;
       const res = await fetch('/api/admin/schedule-board/assign', {
         method: 'POST',
@@ -289,7 +296,9 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
           operatorId: pickedOperatorId,
           helperId: (fullData?.helper_assigned_to as string) ?? null, // keep the current helper
           assignment_date: anchor,
-          scope: multiDay ? pickScope : 'remaining',
+          // Not multi-day ⇒ 'day'. Identical outcome to 'remaining' for a real
+          // single-day job, but it cannot smear a stale end_date across a week.
+          scope: multiDay ? pickScope : 'day',
           position: pickPosition,
         }),
       });
@@ -925,8 +934,10 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                           </select>
                         </div>
 
-                        {/* Multi-day jobs: this day only vs this + remaining days */}
-                        {!!(d?.end_date && d.end_date !== d.scheduled_date) && (
+                        {/* Multi-day jobs: this day only vs this + remaining days.
+                            Gated on the job's is_multi_day flag — a stale
+                            end_date on a single-day job is not a span. */}
+                        {d?.is_multi_day === true && (
                           <div className="flex flex-col gap-1.5">
                             <span className="text-[10px] font-bold text-gray-400 dark:text-slate-500 uppercase">Applies to</span>
                             {([

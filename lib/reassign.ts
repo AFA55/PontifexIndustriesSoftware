@@ -11,9 +11,11 @@
  *                                     an operator's several jobs within a day.
  *
  * Scopes:
- *   • 'remaining' (default) — "I put the wrong operator on": upsert JDA rows
- *     for every date from assignment_date → end_date AND set assigned_to.
- *   • 'day' — "different operator for day 2 only": upsert JDA for that one
+ *   • 'remaining' — "I put the wrong operator on": upsert JDA rows for every
+ *     date from assignment_date → end_date AND set assigned_to. Only written
+ *     when a caller asks for it explicitly, and only on genuinely multi-day
+ *     jobs (is_multi_day; a stale end_date is not a span).
+ *   • 'day' (DEFAULT) — "different operator for day 2 only": upsert JDA for that one
  *     date; set assigned_to ONLY if that date is tenant-local today (future
  *     'day' overrides are applied by the morning dispatch sync).
  *
@@ -472,16 +474,20 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   //    'remaining' always rewrites the lead; 'day' only when the day is today
   //    (a future 'day' override is applied by the morning dispatch sync).
   //
-  //    …OR when the job has no lead at all yet. That last clause is what makes
-  //    per-day assignment safe (founder, Aug 11: "once a job gets assigned the
-  //    first time and added to the job board, keep it on there and let me just
-  //    reassign operators"). The lead is the job's DEFAULT crew: every day
-  //    without an explicit ledger row falls back to it, so a multi-day job
-  //    stays covered without fabricating a ledger row per day. Without this,
-  //    a first assignment made for a FUTURE date would leave the job with no
-  //    lead and every later day of its span empty for everyone.
+  //    DO NOT add `|| !job.assigned_to` here. It looks like the natural way to
+  //    make the new scope-'day' default safe ("a first assignment for a future
+  //    date would otherwise leave the job with no lead"), and it is not needed:
+  //    the morning sync in lib/dispatch.ts promotes that day's ledger row into
+  //    assigned_to when the day arrives, and every later day then falls back to
+  //    it. Reviewed and reverted on Aug 11 because it broke two things:
+  //
+  //      • It routed around the `previousDayOperatorId` branch below, so the
+  //        operator who lost their day was never told they had been taken off.
+  //      • A ONE-DAY action on a lead-less job took the writeLead branch and
+  //        rewrote job_orders globally — clearing a row for a single day
+  //        stripped the helper from every day of the job.
   const today = await tenantLocalToday(tenantId);
-  const writeLead = scope === 'remaining' || assignmentDate === today || !job.assigned_to;
+  const writeLead = scope === 'remaining' || assignmentDate === today;
 
   let updatedJob = {
     id: job.id,

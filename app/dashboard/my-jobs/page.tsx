@@ -30,11 +30,6 @@ function toDateString(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-function parseDate(dateStr: string) {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
 export default function MyJobsPage() {
   const router = useRouter();
   const [selectedDate, setSelectedDate] = useState(toDateString(new Date()));
@@ -275,9 +270,19 @@ export default function MyJobsPage() {
 
       setContinuingProjects(unique);
 
-      // Multi-day jobs in scheduled status (reset after "Done for Today") assigned to this user
+      // Multi-day jobs in scheduled status (reset after "Done for Today") assigned to this user.
+      //
+      // `j.scheduled_date <= today` matters: these six status queries carry no
+      // date at all, so the server's "the crew queue stops at today" guard —
+      // which only fires on a scheduled_date param — cannot see them. Without
+      // this, a multi-day job that has not STARTED yet (Parkk runs to Sep 3)
+      // rendered in the amber "Multi-Day In Progress" panel on the default
+      // view, which is the very phantom the day clamp was meant to remove.
+      // A job that hasn't begun is not in progress.
       const multiDay = scheduledData.filter((j: any) =>
-        isPrimaryOrHelper(j) && j.is_multi_day === true
+        isPrimaryOrHelper(j) &&
+        j.is_multi_day === true &&
+        (!j.scheduled_date || j.scheduled_date <= today)
       );
       const seenMulti = new Set<string>();
       const uniqueMulti = multiDay.filter((j: any) => { if (seenMulti.has(j.id)) return false; seenMulti.add(j.id); return true; });

@@ -491,8 +491,9 @@ export default function ScheduleBoardPage() {
           jobId: jobId,
           newOperatorId: targetOpId || null,
           newHelperId: targetHelpId || null,
-          // Anchor on the board's viewed date so the per-day ledger + the
-          // job's lead are BOTH written (scope 'remaining' server-side).
+          // Anchor on the board's viewed date. Scope defaults to 'day'
+          // server-side, so this states who is on the job THAT day; the lead
+          // is also written when the anchor is today.
           assignment_date: selectedDate,
         }),
       });
@@ -987,8 +988,9 @@ export default function ScheduleBoardPage() {
       const targetOperatorId = targetOperator ? operatorIdMap[targetOperator] : null;
       const targetHelperId = targetHelper ? operatorIdMap[targetHelper] : null;
 
-      // Update backend (scope defaults to 'remaining' server-side — a slot
-      // drag means "this operator runs the job from this date on")
+      // Update backend. Scope defaults to 'day' server-side (founder, Aug 11):
+      // a slot drag means "this operator runs the job THIS day", not from here
+      // on. Days left unstated fall back to the job's lead.
       const res = await apiFetch('/api/admin/schedule-board/assign', {
         method: 'POST',
         body: JSON.stringify({
