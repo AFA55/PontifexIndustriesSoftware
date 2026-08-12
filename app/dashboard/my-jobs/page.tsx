@@ -43,7 +43,6 @@ export default function MyJobsPage() {
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('operator');
   const [userId, setUserId] = useState<string>('');
-  const [hasLongDurationJob, setHasLongDurationJob] = useState(false);
   const [continuingProjects, setContinuingProjects] = useState<any[]>([]);
   const [multiDayScheduled, setMultiDayScheduled] = useState<any[]>([]);
   const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
@@ -222,37 +221,10 @@ export default function MyJobsPage() {
     }
   }, [router, fetchDoneTodayStatus, fetchHelperLogStatus]);
 
-  // Check for long-duration jobs (>3 days) for 7-day lookahead
-  const checkLongDurationJobs = useCallback(async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const today = toDateString(new Date());
-      const weekAhead = new Date();
-      weekAhead.setDate(weekAhead.getDate() + 7);
-      const weekStr = toDateString(weekAhead);
-
-      const res = await fetch(
-        `/api/job-orders?date_from=${today}&date_to=${weekStr}&include_helper_jobs=true&includeCompleted=false&as=operator`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } }
-      );
-
-      if (res.ok) {
-        const json = await res.json();
-        const hasLong = (json.data || []).some((j: any) => {
-          if (!j.end_date || !j.scheduled_date) return false;
-          const start = parseDate(j.scheduled_date);
-          const end = parseDate(j.end_date);
-          const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-          return days > 3;
-        });
-        setHasLongDurationJob(hasLong);
-      }
-    } catch {
-      // silent
-    }
-  }, []);
+  // (Removed Aug 11) The 7-day lookahead that fed DayNavigator's forward arrow.
+  // The queue now stops at today, so there is nothing to look ahead for — and
+  // this was one network round-trip on every load to decide whether to show
+  // days the operator should never have been offered. See DayNavigator.
 
   // Fetch on_hold and in_progress jobs from past dates (continuing projects)
   const fetchContinuingProjects = useCallback(async () => {
@@ -427,11 +399,10 @@ export default function MyJobsPage() {
   }, [selectedDate, fetchJobs]);
 
   useEffect(() => {
-    checkLongDurationJobs();
     fetchContinuingProjects();
     fetchPastJobs();
     fetchPendingRatings();
-  }, [checkLongDurationJobs, fetchContinuingProjects, fetchPastJobs, fetchPendingRatings]);
+  }, [fetchContinuingProjects, fetchPastJobs, fetchPendingRatings]);
 
   useEffect(() => {
     fetchShopTicket();
@@ -678,7 +649,6 @@ export default function MyJobsPage() {
           <DayNavigator
             selectedDate={selectedDate}
             onChange={setSelectedDate}
-            hasLongDurationJob={hasLongDurationJob}
           />
         </div>
 

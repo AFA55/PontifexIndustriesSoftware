@@ -2,6 +2,7 @@
 
 import { Fragment } from 'react';
 import PushRegistration from '@/components/PushRegistration';
+import NativeStatusBar from '@/components/NativeStatusBar';
 import GeofenceRegistration from '@/components/GeofenceRegistration';
 import SubscriptionGate from '@/components/SubscriptionGate';
 import WelcomeProfileModal from '@/components/WelcomeProfileModal';
@@ -36,6 +37,9 @@ export default function DashboardLayout({
   return (
     <GoogleMapsProvider>
       <PushRegistration key="push-registration" />
+      {/* Android: stop the WebView painting under the status bar / camera.
+          iOS does this with the .pt-safe CSS utilities instead. Web no-op. */}
+      <NativeStatusBar key="native-status-bar" />
       {/* Headless native geofencing (auto-arrival + back-at-shop reminder). Web no-op. */}
       <GeofenceRegistration key="geofence-registration" />
       <SubscriptionGate key="subscription-gate" />

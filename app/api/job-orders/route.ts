@@ -178,6 +178,24 @@ export async function GET(request: NextRequest) {
       tenantToday = new Date().toLocaleDateString('en-CA', { timeZone: tz });
     }
 
+    // ── THE CREW QUEUE STOPS AT TODAY (founder, Aug 11) ────────────────────
+    // "It should show previous days and current, that's it."
+    //
+    // A multi-day job's span paints a ticket on every day it covers, and the
+    // per-day ledger had been copying today's crew forward to the job's end
+    // date — so Devin's phone offered him Pratt and Parkk for tomorrow when
+    // the office had assigned him neither. Tomorrow's crew is not decided
+    // until the office decides it.
+    //
+    // The DayNavigator no longer offers a forward arrow, but that is only the
+    // button. This is the rule: a crew-scoped request for a future day returns
+    // nothing, so a stale tab, a cached client or a hand-typed date cannot
+    // resurrect a phantom ticket. Admins are untouched — the schedule board is
+    // exactly where the future is supposed to be visible.
+    if (!isAdmin && scheduledDate && tenantToday && scheduledDate > tenantToday) {
+      return NextResponse.json({ success: true, data: [], user_role: userRole });
+    }
+
     // Per-day assignment (job_daily_assignments) visibility: a non-admin also
     // sees jobs where the per-day ledger maps them (operator OR helper) to the
     // requested date or ANY date from today forward — e.g. the "day-2 operator"

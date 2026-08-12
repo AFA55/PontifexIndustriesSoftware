@@ -329,7 +329,7 @@ export default function JobSurveyPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="sticky top-0 z-20 bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 shadow-sm">
+      <div className="sticky top-0 z-20 bg-white dark:bg-white/[0.03] border-b border-gray-200 dark:border-white/10 shadow-sm pt-safe">
         {/* Brand accent stripe */}
         <div className="h-1 w-full bg-gradient-to-r from-brand to-brand-accent" />
         <div className="container mx-auto px-4 py-3 max-w-lg">

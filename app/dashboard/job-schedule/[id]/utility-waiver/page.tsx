@@ -207,7 +207,7 @@ export default function UtilityWaiverPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-brand/5 to-brand/5">
       {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-brand to-brand-dark text-white sticky top-0 z-10 shadow-2xl">
+      <div className="bg-gradient-to-r from-slate-900 via-brand to-brand-dark text-white sticky top-0 z-10 shadow-2xl pt-safe">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link

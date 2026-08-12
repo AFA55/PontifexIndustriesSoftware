@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
  *   operatorId: string | null,
  *   helperId?: string | null,
  *   assignment_date?: 'YYYY-MM-DD',    // the board date the change anchors on
- *   scope?: 'day' | 'remaining',       // default 'remaining' ("wrong operator")
+ *   scope?: 'day' | 'remaining',       // DEFAULT 'day' — see below
  *   position?: 'first' | 'last',       // default 'last' — where in the
  *                                      // operator's day this job lands when
  *                                      // they already have a job that date
@@ -55,7 +55,15 @@ export async function POST(request: NextRequest) {
         operatorId: operatorId || null,
         helperId: helperId ?? null,
         assignmentDate: assignment_date,
-        scope: scope === 'day' ? 'day' : 'remaining',
+        // DEFAULT 'day', not 'remaining' (founder, Aug 11: "I have someone on
+        // one job one day — it doesn't mean they're going to be there the next
+        // day"). 'remaining' wrote a ledger row for EVERY day to the job's end
+        // date, so one drag pencilled Devin onto Parkk Concrete for 28
+        // consecutive days through Sep 3 — an assertion no one had made. Days
+        // with no ledger row fall back to the job's lead, so the job still
+        // stays covered; the office just states each day it actually means.
+        // 'remaining' remains available, but only when explicitly asked for.
+        scope: scope === 'remaining' ? 'remaining' : 'day',
         position: position === 'first' ? 'first' : 'last',
         tenantId,
         actor: { userId: auth.userId, userEmail: auth.userEmail, role: auth.role },

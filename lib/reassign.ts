@@ -52,13 +52,25 @@ export type ReassignPosition = 'first' | 'last';
  * 'remaining' → assignment date through the job's end_date (inclusive);
  *               single-day jobs (no end_date / end before the date) collapse
  *               to just the assignment date.
+ *
+ * `isMultiDay` is the job's own `is_multi_day` flag and it OVERRIDES end_date.
+ *
+ * WHY (founder, Aug 11): JOB-2026-895358 (Pratt) is flagged `is_multi_day =
+ * false` but carries `end_date = 2026-08-17`, a week past its start. Assigning
+ * an operator to it wrote SEVEN ledger rows — one per day to that phantom end
+ * date — so the crew's phone showed the same ticket waiting for them every day
+ * for a week. Nine of the 33 live jobs since June have this shape, so it is a
+ * data pattern, not a one-off. `end_date` alone was never a safe span source:
+ * a job the office called single-day must never claim anyone beyond its day.
  */
 export function expandScopeDates(
   scope: ReassignScope,
   assignmentDate: string,
-  endDate?: string | null
+  endDate?: string | null,
+  isMultiDay: boolean = true
 ): string[] {
   if (scope === 'day') return [assignmentDate];
+  if (!isMultiDay) return [assignmentDate];
   if (!endDate || endDate <= assignmentDate) return [assignmentDate];
   return enumerateYMDRange(assignmentDate, endDate);
 }
@@ -399,7 +411,7 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   const { data: job } = await supabaseAdmin
     .from('job_orders')
     .select(
-      'id, job_number, customer_name, location, job_type, arrival_time, assigned_to, helper_assigned_to, status, scheduled_date, end_date, dispatched_at, tenant_id'
+      'id, job_number, customer_name, location, job_type, arrival_time, assigned_to, helper_assigned_to, status, scheduled_date, end_date, is_multi_day, dispatched_at, tenant_id'
     )
     .eq('id', jobOrderId)
     .eq('tenant_id', tenantId)
@@ -412,7 +424,7 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   // undefined helper = preserve the job's current helper (reorder drag path).
   const helperId = params.helperId === undefined ? (job.helper_assigned_to ?? null) : params.helperId;
 
-  const dates = expandScopeDates(scope, assignmentDate, job.end_date);
+  const dates = expandScopeDates(scope, assignmentDate, job.end_date, job.is_multi_day === true);
 
   // 2. Names for the JDA ledger rows.
   const [operatorName, helperName] = await Promise.all([
@@ -459,8 +471,17 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   // 4. Decide whether job_orders.assigned_to (the "current lead") changes:
   //    'remaining' always rewrites the lead; 'day' only when the day is today
   //    (a future 'day' override is applied by the morning dispatch sync).
+  //
+  //    …OR when the job has no lead at all yet. That last clause is what makes
+  //    per-day assignment safe (founder, Aug 11: "once a job gets assigned the
+  //    first time and added to the job board, keep it on there and let me just
+  //    reassign operators"). The lead is the job's DEFAULT crew: every day
+  //    without an explicit ledger row falls back to it, so a multi-day job
+  //    stays covered without fabricating a ledger row per day. Without this,
+  //    a first assignment made for a FUTURE date would leave the job with no
+  //    lead and every later day of its span empty for everyone.
   const today = await tenantLocalToday(tenantId);
-  const writeLead = scope === 'remaining' || assignmentDate === today;
+  const writeLead = scope === 'remaining' || assignmentDate === today || !job.assigned_to;
 
   let updatedJob = {
     id: job.id,

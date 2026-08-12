@@ -49,6 +49,26 @@ describe('expandScopeDates', () => {
     expect(expandScopeDates('remaining', '2026-08-03', '2026-08-01')).toEqual(['2026-08-03']);
   });
 
+  // is_multi_day OVERRIDES end_date. Regression guard for JOB-2026-895358
+  // (Pratt): is_multi_day=false but end_date a week out, which wrote seven
+  // ledger rows and put the same ticket on the crew's phone every day for a
+  // week. Nine of 33 live jobs since June carry this shape.
+  it('a job flagged NOT multi-day never spans, even with a later end_date', () => {
+    expect(expandScopeDates('remaining', '2026-08-10', '2026-08-17', false)).toEqual(['2026-08-10']);
+  });
+
+  it('a job flagged multi-day still spans to its end_date', () => {
+    expect(expandScopeDates('remaining', '2026-08-10', '2026-08-12', true)).toEqual([
+      '2026-08-10',
+      '2026-08-11',
+      '2026-08-12',
+    ]);
+  });
+
+  it("scope 'day' stays one day whatever the multi-day flag says", () => {
+    expect(expandScopeDates('day', '2026-08-10', '2026-08-17', true)).toEqual(['2026-08-10']);
+  });
+
   it('spans a month boundary without UTC off-by-one', () => {
     expect(expandScopeDates('remaining', '2026-08-30', '2026-09-02')).toEqual([
       '2026-08-30',

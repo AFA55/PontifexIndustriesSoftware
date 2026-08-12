@@ -638,8 +638,71 @@ async function updateJobStatus(
     // exactly one customer email. (Previously this read the pre-update row, so
     // both racers saw null and both notified.) No-ops when there's no customer
     // email/phone. Reuses the customer_portal_tokens magic-link.
+    //
+    // ── LATE / DAY-AFTER SUPPRESSION (founder, Aug 11) ────────────────────
+    // "If they start the ticket late or the day after, don't notify the
+    //  contractor — that just messes up the customer experience. The customer
+    //  should get notified the first day on the job, that is it."
+    //
+    // The claim above already makes this once-per-JOB. What it could not tell
+    // was WHEN. An operator who forgot to tap In Route on day 1 and taps it at
+    // 2pm on day 2 was still firing "your crew is on the way" — to a customer
+    // whose slab has been cut since yesterday. (Southern Basements texted the
+    // founder asking whether anyone was coming, on a job already in progress.)
+    //
+    // So "crew is on the way" is suppressed in exactly two cases: the tap lands
+    // on a day AFTER the job's start date, or a day has already been closed out
+    // on this job. Either way the customer already knows we are there, and
+    // silence beats a text that contradicts what they can see out the window.
+    // They still hold the portal link and can check progress any time.
+    //
+    // TWO THINGS THIS DELIBERATELY DOES NOT DO — both caught in review, both
+    // would have silently and permanently lost a real notification, because
+    // `in_route_at` is claimed once and there is no second chance:
+    //
+    //   • It does not suppress an EARLY tap. Crews start ahead of the booked
+    //     date and the office moves the board afterwards; 2 of the 22 jobs that
+    //     have ever gone In Route were tapped before their scheduled_date, and
+    //     each was that job's genuine first start. Only `< today` is late.
+    //
+    //   • It does not count a draft. `daily_job_logs` gets a SKELETON row the
+    //     first time anyone autosaves the Work Performed form, which is
+    //     reachable while the job is still `scheduled` — so a helper typing one
+    //     character in the truck would have killed the lead's en-route text on
+    //     a job where nothing had been cut. Only a day that was actually closed
+    //     out (`day_completed_at` set) counts as work done.
+    //
+    // Completion is NOT gated — "your job is finished" is always worth sending,
+    // whenever it lands. Nor is the waiver: that signature is required by law
+    // regardless of how late the crew tapped.
+    let suppressedEnRouteReason: string | null = null;
+    if (claimedInRoute) {
+      // Resolve the tenant's own today. `tenantToday` above falls back to
+      // America/New_York for admin-role callers, and an ops manager tapping
+      // Start Route on their own job is a real path (founder + David).
+      const todayForTenant = await resolveTenantToday(existingJob.tenant_id ?? tenantId ?? null);
+
+      if (existingJob.scheduled_date && existingJob.scheduled_date < todayForTenant) {
+        suppressedEnRouteReason = `late start (job began ${existingJob.scheduled_date}, tapped ${todayForTenant})`;
+      } else {
+        const { count: closedDays } = await supabaseAdmin
+          .from('daily_job_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('job_order_id', jobId)
+          .not('day_completed_at', 'is', null);
+        if ((closedDays ?? 0) > 0) {
+          suppressedEnRouteReason = `${closedDays} day(s) already closed out on this job`;
+        }
+      }
+      if (suppressedEnRouteReason) {
+        console.warn(
+          `[job-status] en-route customer notice SUPPRESSED for job ${jobId}: ${suppressedEnRouteReason}`
+        );
+      }
+    }
+
     try {
-      const firstInRoute = claimedInRoute;
+      const firstInRoute = claimedInRoute && !suppressedEnRouteReason;
       const firstCompleted = claimedCompleted;
       if (firstInRoute || firstCompleted) {
         notifyCustomer({

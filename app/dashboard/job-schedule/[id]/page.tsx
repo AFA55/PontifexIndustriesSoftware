@@ -348,7 +348,7 @@ export default function JobDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-blue-50 dark:bg-none dark:bg-[#0b0618]">
       {/* Header */}
-      <div className="bg-white dark:bg-white/[0.03] border-b-4 border-red-500 dark:border-red-700 shadow-lg sticky top-0 z-10">
+      <div className="bg-white dark:bg-white/[0.03] border-b-4 border-red-500 dark:border-red-700 shadow-lg sticky top-0 z-10 pt-safe">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between gap-2">
             <Link

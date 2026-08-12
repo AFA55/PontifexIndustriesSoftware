@@ -583,7 +583,9 @@ export default function JobDetailPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:bg-[#0b0618] dark:bg-none">
       {/* Professional Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl">
+      {/* pt-safe: clears the iOS notch / Dynamic Island. Without it the back
+          and print buttons render behind the camera (founder, Aug 11). */}
+      <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-900 text-white sticky top-0 z-10 shadow-2xl pt-safe">
         <div className="container mx-auto px-4 py-4 max-w-lg">
           <div className="flex items-center gap-3">
             <Link

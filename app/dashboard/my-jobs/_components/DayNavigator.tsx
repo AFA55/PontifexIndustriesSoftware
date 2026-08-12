@@ -5,7 +5,6 @@ import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 interface DayNavigatorProps {
   selectedDate: string; // YYYY-MM-DD
   onChange: (date: string) => void;
-  hasLongDurationJob: boolean;
 }
 
 function toDateString(date: Date) {
@@ -36,15 +35,24 @@ function diffDays(a: string, b: string) {
   return Math.floor((da.getTime() - db.getTime()) / (1000 * 60 * 60 * 24));
 }
 
-export default function DayNavigator({ selectedDate, onChange, hasLongDurationJob }: DayNavigatorProps) {
+export default function DayNavigator({ selectedDate, onChange }: DayNavigatorProps) {
   const todayStr = toDateString(new Date());
 
-  const canGoForward = () => {
-    const diff = diffDays(selectedDate, todayStr);
-    if (diff < 1) return true; // Can always go to tomorrow
-    if (hasLongDurationJob && diff < 7) return true; // Up to 7 days for long jobs
-    return false;
-  };
+  // TODAY IS THE END OF THE LINE (founder, Aug 11).
+  //
+  // "It should show previous days and current, that's it."
+  //
+  // This used to allow tomorrow — and up to 7 days out on long jobs — which
+  // meant a multi-day job painted a ticket on every future day of its span.
+  // Devin's phone showed Pratt AND Parkk waiting for him tomorrow when neither
+  // had been assigned to him for that day: the per-day ledger had simply copied
+  // today's crew forward to the job's end date (Parkk was pencilled in through
+  // Sep 3). Being on a job one day does not mean you are on it the next.
+  //
+  // My Schedule is a WORK QUEUE — what you owe today and what you still owe
+  // from before. Tomorrow's crew is the office's decision until the office
+  // makes it, so the queue stops at today.
+  const canGoForward = () => selectedDate < todayStr;
 
   const canGoBack = () => {
     const diff = diffDays(todayStr, selectedDate);

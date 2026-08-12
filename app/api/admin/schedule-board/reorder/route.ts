@@ -53,7 +53,9 @@ export async function PATCH(request: NextRequest) {
           // carry one; explicit null clears it.
           helperId: newHelperId === undefined ? undefined : newHelperId || null,
           assignmentDate: assignment_date,
-          scope: scope === 'day' ? 'day' : 'remaining',
+          // Defaults to 'day' — see the note in /assign. A drag on the board
+          // states who is on the job THAT day, not for the rest of its span.
+          scope: scope === 'remaining' ? 'remaining' : 'day',
           position: position === 'first' ? 'first' : 'last',
           tenantId,
           actor: { userId: auth.userId, userEmail: auth.userEmail, role: auth.role },
