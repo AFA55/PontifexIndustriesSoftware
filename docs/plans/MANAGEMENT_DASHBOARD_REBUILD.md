@@ -867,3 +867,133 @@ Widening that constant would have handed a salesman every admin route on the
 platform — timecard edits, team permissions, deletions — to fix one button.
 4 tests lock the boundary: both roles can approve, the crew still cannot, and
 approving does not imply admin.
+
+---
+
+# Batch 19 — Aug 13 evening. The printed ticket, photos, and scheduling by DURATION.
+
+## M27 — Equipment on the printed ticket (supersedes M21c with the founder's detail)
+
+> "I wanna show all equipment required. Right now it doesn't show that when I
+> print out the ticket — it just shows radio boxes. That's not necessary. What I
+> need is to show me the equipment that is required for that job. If it's a
+> quick add job, let's make it smart so when it chooses hand saw it knows what to
+> grab or what goes with it usually. And if we can't do that, let's just have a
+> space where the project manager can write out equipment that is required."
+
+Three tiers, in order of preference:
+  a. **Print what the PM actually chose.** `equipment_selections` /
+     `equipment_rental_flags` / `equipment_needed` already carry it — read the
+     shape the schedule form writes before designing the layout.
+  b. **Infer for quick-add jobs.** A job type implies its kit: hand saw → blades,
+     water, hose, GFCI. Build the mapping as DATA, not code, so the office can
+     correct it without a deploy. It is a SUGGESTION and must be labelled as one.
+  c. **Always allow free text.** A PM writing "bring the 36in blade" beats any
+     inference. This is the fallback that makes (b) optional rather than blocking.
+
+## M28 — What the printed job order must and must not carry
+
+> "Remove difficulty rating and multi-day words, as well as employees and
+> employee names — that is not required on the ticket when I print it out. What
+> we need is the jobsite information, contact information, a space to put notes,
+> equipment required, jobsite specifications."
+
+REMOVE: difficulty rating · "Multi-Day" · crew names.
+KEEP / ADD: jobsite information · contact information · **a blank notes space** ·
+equipment required (M27) · jobsite specifications.
+Plus: the **job number bigger and more visible** — "I wanna hand out the ticket
+just so we know what ticket goes with what work-performed ticket." The work
+ticket got a boxed JOB ID on Aug 12; this sheet needs the same treatment, and
+the body text needs to come up a step like the work ticket's did.
+
+## M29 — 🔴 Daily progress drops a day the crew actually worked
+
+> "Aiden's clock shows him there the 4th, 5th, 6th and 7th, but the daily
+> progress shows the 5th, 6th, 7th. And instead of showing started-in-route,
+> show the clock-in / clock-out time. If they forget to input data but were
+> assigned to the job, just show the day."
+
+**Confirmed against production.** Aiden (14cb2d1a) on JOB-2026-402357:
+
+| day | clock hours | log filed against | ledger says he was on |
+|---|---|---|---|
+| Aug 4 | 9.89 | JOB-2026-**424813** | JOB-2026-**402357** |
+| Aug 5 | 10.27 | 402357 | 402357 |
+| Aug 6 | 10.02 | 402357 | 402357 |
+| Aug 7 | 8.84 | 402357 | 402357 |
+
+Aug 4 vanishes from 402357's daily progress because the day is built from
+`daily_job_logs`, and that day's log was filed against the sibling job. He was
+clocked in nearly ten hours and the per-day ledger puts him on 402357.
+
+**The rule:** a day belongs on a job when the ledger says the person was on it
+AND they were on the clock — a missing log is a missing TICKET, not a missing
+day. Render it with the clock in/out and an explicit "no ticket filed" marker,
+which also makes M30's remind button obvious where to put it.
+
+Same family as M19 (Keon's split day) and M23 (work dated to when it was typed).
+All three are "the day is derived from the wrong record". Build them together in
+`lib/job-clock-attribution.ts`, once.
+
+## M30 — "Remind operator to input work performed for this day"
+
+> "A button that says remind operator to input work performed for this day… if
+> they haven't input the work performed for that day, let us send out
+> notifications, and have a notification hub where the project manager for the
+> job can just click a button. And it's based on the day."
+
+Per-DAY, per-person, manual — sitting on the empty day M29 now renders. Reuse
+`sendNotification` + `reminder_log`; there is already an automatic
+work-performed cron, so this is the manual override for the office.
+⚠️ Device coverage again: Javier has zero push tokens and SMS off. A button that
+silently reaches nobody is worse than no button — surface the delivery result.
+
+## M31 — 🔴 PDFs in photos crash; images open off-site
+
+> "When PDFs get referenced in photos, right now it crashes. I'd like to input
+> PDF photos and view them. Right now when I click on them it sends me to a
+> supervised page. We need to have all this in house — so when I click on the
+> image I could zoom in, zoom out, and really get more details."
+
+Two defects and one feature:
+  a. a PDF in the photo flow **crashes** — reproduce it first, it is the only
+     one here that loses work;
+  b. clicking a photo leaves the app for a raw Supabase storage URL (the same
+     class as the dead completion-PDF links — storage URLs are not a UI);
+  c. an in-app viewer: zoom, pan, next/previous, and PDF support.
+
+## M32 — Schedule by DURATION, not by a date range (Doug)
+
+> "Right now it shows the work being Monday through Sunday all through the week.
+> Instead of putting a time frame, I could just put the job is expected to last
+> five days. That way when they input work performed, the schedule will
+> automatically update. If they can't work Fridays but it's a five-day job, the
+> schedule should not put it on Friday, Saturday or Sunday. It would show it for
+> the days we can work there and put it in the schedule accordingly — because
+> eventually we're gonna use that schedule to put NEW jobs on the schedule."
+
+The biggest idea in this batch, and the one to design before touching code.
+
+A job gains an **expected duration in WORKING days**. The calendar span becomes
+DERIVED: lay the duration onto the days this crew/site can actually work,
+skipping non-working days. As work is performed the remaining duration shrinks
+and the projected end date moves on its own.
+
+Depends on knowing which days are workable — per site (this customer allows no
+Friday work) and per company (holidays; `holidays` settings already exist).
+Feeds the eventual auto-scheduler, which is the real reason he wants it.
+
+⚠️ `end_date` is currently authoritative in a dozen read paths (board visibility,
+the ledger span, the work ticket). Duration must be introduced ALONGSIDE it —
+derive `end_date` from duration and keep writing it — or every one of those
+breaks at once. Do not flip the source of truth in one commit.
+
+## M33 — Quick-add jobs: fill in the rest later
+
+> "When I add quick-add jobs, I would like to be able to press on it and then
+> later go back and fill out the whole schedule form. The quick add is just gonna
+> be there to put space on the schedule."
+
+A quick-add is a placeholder that reserves a slot. Opening it should continue
+into the full schedule form, pre-filled with what little it has, and saving
+should upgrade it in place — same job, same number, no duplicate.

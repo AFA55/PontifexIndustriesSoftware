@@ -198,9 +198,19 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
       <div className="max-w-6xl mx-auto px-8 py-6">
         {/* Header */}
         <div className="border-b-2 border-black pb-3 mb-4">
-          <div className="flex items-baseline justify-between">
+          <div className="flex items-start justify-between gap-6">
             <h1 className="text-2xl font-bold tracking-wide">PATRIOT CONCRETE CUTTING</h1>
-            <p className="text-xl font-bold font-mono">{job.job_number}</p>
+            {/* Founder, Aug 13: "it needs to have the job number ID — I wanna
+                hand out the ticket just so we know what ticket goes with what
+                work-performed ticket, and I just need to have that more
+                visible." Boxed and set large, the same treatment the work
+                ticket got, so the two sheets pair up on the desk. Black, not
+                brand colour — a coloured number goes grey on a mono printer.
+                whitespace-nowrap because a broken job number is unusable. */}
+            <div className="border-[2.5px] border-black rounded px-3 py-1 text-right shrink-0">
+              <p className="text-[10px] font-bold tracking-[0.18em] text-gray-700 leading-none">JOB ID</p>
+              <p className="text-2xl font-black font-mono leading-tight whitespace-nowrap">{job.job_number}</p>
+            </div>
           </div>
           <p className="text-sm uppercase tracking-wide text-gray-700 mt-0.5">Job Ticket</p>
         </div>
@@ -215,7 +225,13 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
                 <Field label="End Date" value={formatDate(job.end_date)} />
               )}
               <Field label="Arrival Time" value={job.is_will_call ? 'Will Call' : arrival || '—'} />
-              {job.operator_name && <Field label="Operator" value={job.helper_name ? `${job.operator_name} + ${job.helper_name}` : job.operator_name} />}
+              {/* Crew names REMOVED (founder, Aug 13): "remove employees and
+                  employee names — that is not required on the ticket when I
+                  print it out… I can print that ticket out, but that doesn't
+                  mean the same people are always going to be in the same
+                  project." A sheet printed Monday must not assert who is on the
+                  job Thursday. Who actually worked it is recorded per day on the
+                  WORK ticket, from the clock cards. */}
               {job.project_manager_name && <Field label="Project Manager" value={job.project_manager_name} />}
               {/* Difficulty is an INTERNAL scheduling signal (it drives operator
                   skill matching and capacity), not something to hand a crew or
@@ -243,6 +259,18 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               {orientationReq && <Field label="Orientation" value="Required" />}
               {badgingReq && <Field label="Badging" value={(compliance.badging_type as string) || 'Required'} />}
               {specialInstructions && <Field label="Instructions" value={specialInstructions} />}
+            </Section>
+
+            {/* NOTES sits here, under Compliance & Permits (founder, Aug 13:
+                "have notes under compliance and permits so it can all fit in one
+                ticket"). It used to run full-width BELOW both columns, which
+                pushed the sheet onto a second page while the bottom half of this
+                left column sat empty. Same information, one page. */}
+            <Section title="Notes">
+              {job.additional_notes && (
+                <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{job.additional_notes}</p>
+              )}
+              <div className="border border-gray-400 h-20 rounded" />
             </Section>
           </div>
 
@@ -281,15 +309,28 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               </Section>
             )}
 
-            {(equipmentNeeded.length > 0 || equipmentSelections.length > 0) && (
-              <Section title="Equipment">
+            {/* EQUIPMENT REQUIRED — always printed, filled or blank.
+                Founder, Aug 13: "show me the equipment that is required for that
+                job… and if we can't do that, let's just have a space where the
+                project manager can write out equipment that is required."
+                A quick-add job carries no selections, so the crew gets ruled
+                lines to write on rather than the section disappearing — the
+                sheet keeps one shape. (Inferring a kit from the job type is
+                M27b and is deliberately NOT guessed at here.) */}
+            <Section title="Equipment Required">
+              {equipmentNeeded.length > 0 || equipmentSelections.length > 0 ? (
                 <div className="flex flex-wrap gap-1.5">
                   {[...equipmentNeeded, ...equipmentSelections].map((e, i) => (
-                    <span key={i} className="text-xs border border-gray-400 rounded px-2 py-0.5">{e}</span>
+                    <span key={i} className="text-sm border border-gray-500 rounded px-2 py-0.5">{e}</span>
                   ))}
                 </div>
-              </Section>
-            )}
+              ) : (
+                <div className="space-y-3 pt-1">
+                  <div className="border-b border-black h-4" />
+                  <div className="border-b border-black h-4" />
+                </div>
+              )}
+            </Section>
 
             {(conditions.length > 0 || insideOutside) && (
               <Section title="Jobsite Conditions">
@@ -314,22 +355,14 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
           </div>
         </div>
 
-        {/* Notes + signatures — full width */}
-        <div className="mt-4">
-          <p className="text-xs uppercase tracking-wide font-bold text-gray-700 mb-2">Notes</p>
-          {job.additional_notes && (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap mb-2">{job.additional_notes}</p>
-          )}
-          <div className="border border-gray-400 h-16 rounded" />
-        </div>
-
-        <div className="mt-6 grid grid-cols-2 gap-8">
+        {/* Signatures — the only full-width block left, so the sheet ends here. */}
+        <div className="mt-4 grid grid-cols-2 gap-8 break-inside-avoid">
           <div>
-            <div className="border-b border-black h-10" />
+            <div className="border-b border-black h-8" />
             <p className="text-xs text-gray-700 mt-1">Customer Signature / Date</p>
           </div>
           <div>
-            <div className="border-b border-black h-10" />
+            <div className="border-b border-black h-8" />
             <p className="text-xs text-gray-700 mt-1">Operator Signature / Date</p>
           </div>
         </div>

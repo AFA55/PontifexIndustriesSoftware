@@ -215,6 +215,39 @@ export async function PATCH(
       if (!('helper_assigned_to' in updateFields)) updateFields.helper_assigned_to = null;
     }
 
+    // ── LAST LINE OF DEFENCE: a job may never end before it starts ──────────
+    // The shift above is skipped when the caller supplies `end_date` — and the
+    // schedule form ALWAYS supplies it, echoing back whatever was loaded. So an
+    // admin who opens a job (Aug 10 → Aug 12), moves Start to Aug 13 and does
+    // not touch End posts {scheduled_date: 8/13, end_date: 8/12} and recreates
+    // the exact inversion that made JOB-2026-160762 vanish from every board
+    // date. Nothing validates it client-side either: the End picker's minDate
+    // only disables cells, it never clears a value already set.
+    //
+    // An inverted span is never a legitimate state, so it is corrected here
+    // rather than trusted, whatever the caller sent and whichever path it came
+    // from. Preserve the job's ORIGINAL duration when we know it; otherwise
+    // collapse to a single day.
+    const finalStart = (updateFields.scheduled_date ?? oldJobOrder.scheduled_date) as string | null;
+    const finalEnd = (updateFields.end_date ?? oldJobOrder.end_date) as string | null;
+    if (finalStart && finalEnd && finalEnd < finalStart) {
+      const dayMs = 24 * 60 * 60 * 1000;
+      const prevStart = oldJobOrder.scheduled_date as string | null;
+      const prevEnd = oldJobOrder.end_date as string | null;
+      let span = 0;
+      if (prevStart && prevEnd && prevEnd >= prevStart) {
+        span = Math.round(
+          (new Date(`${prevEnd}T00:00:00`).getTime() - new Date(`${prevStart}T00:00:00`).getTime()) / dayMs
+        );
+      }
+      const corrected = new Date(`${finalStart}T00:00:00`);
+      corrected.setDate(corrected.getDate() + span);
+      updateFields.end_date = `${corrected.getFullYear()}-${String(corrected.getMonth() + 1).padStart(2, '0')}-${String(corrected.getDate()).padStart(2, '0')}`;
+      console.warn(
+        `[job-update] corrected inverted span on ${id}: end ${finalEnd} was before start ${finalStart} → ${updateFields.end_date}`
+      );
+    }
+
     // Update job order (scoped to tenant)
     let updateQuery = supabaseAdmin
       .from('job_orders')
