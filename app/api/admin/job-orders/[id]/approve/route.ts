@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireJobApprover } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
 export async function POST(
@@ -23,7 +23,9 @@ export async function POST(
   try {
     const { id } = await params;
 
-    const auth = await requireAdmin(request);
+    // Supervisors and salesmen approve too (founder, Aug 13: "so they could
+    // push jobs if I'm not here"). Own guard, not widened ADMIN_ROLES.
+    const auth = await requireJobApprover(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = await getTenantId(auth.userId);

@@ -195,6 +195,53 @@ export async function requireSuperAdmin(request: NextRequest): Promise<AuthResul
   };
 }
 
+/** Roles allowed to APPROVE a pending job onto the schedule. */
+export const JOB_APPROVER_ROLES: string[] = [
+  'admin',
+  'super_admin',
+  'operations_manager',
+  'supervisor',
+  'salesman',
+];
+
+/**
+ * Guard for pushing a pending job onto the schedule.
+ *
+ * FOUNDER (Aug 13): "Give permission to Adam Ingalls and David Schadt, the
+ * supervisors — add this to their permissions so they could push jobs if I'm
+ * not here."
+ *
+ * Adam is a `salesman` and David a `supervisor`, and approval sat behind
+ * `requireAdmin` (admin | super_admin | operations_manager), so neither could
+ * release a job. Work stopped whenever the founder was away.
+ *
+ * Deliberately its OWN guard rather than widening ADMIN_ROLES. Widening that
+ * constant would have handed a salesman every admin route on the platform —
+ * timecard edits, team permissions, deletions — to fix one button. This grants
+ * exactly the one capability that was asked for.
+ */
+export async function requireJobApprover(request: NextRequest): Promise<AuthResult> {
+  const r = await resolveAuth(request);
+  if (!r.ok) return { authorized: false, response: r.response };
+
+  if (!JOB_APPROVER_ROLES.includes(r.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. You do not have permission to approve jobs.' },
+        { status: 403 }
+      ),
+    };
+  }
+  return {
+    authorized: true,
+    userId: r.userId,
+    userEmail: r.userEmail,
+    role: r.role,
+    tenantId: r.tenantId,
+  };
+}
+
 /**
  * Broad guard for read-only / sales-pipeline routes: admin, super_admin,
  * operations_manager, supervisor, salesman.

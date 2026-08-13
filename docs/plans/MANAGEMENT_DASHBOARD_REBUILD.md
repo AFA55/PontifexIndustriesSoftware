@@ -764,7 +764,42 @@ The log was CREATED on the 12th and took "today" as its date. The ticket then
 faithfully printed the day the paperwork was filed. Same family as Keon's
 0.06-hour job (M19): **submission time is being used as work time.**
 
-Two candidate fixes, and the founder should pick:
+### DECIDED (founder, Aug 13) — derive it, do not ask
+
+> "We should capture the real day as when the work was scheduled, and when they
+> started the job. Even if the job started on the twelfth but they didn't fill
+> their ticket in until the fifteenth, that work still started the twelfth. And
+> yes — you could double check from the clock in / clock out, because every day
+> they are somewhere, and they do get assigned to jobs. So the app should know.
+> Once you filled it out on Wednesday, he was there Monday, Tuesday."
+
+**No extra tap.** The system already holds everything it needs; it was just
+reading the wrong field. The work date is derived, in this order:
+
+1. **The clock card is the witness.** Which day(s) was this operator actually on
+   the clock, inside this job's scheduled span? That is when they were there.
+   `timecards` + the M19 split-day attribution answer this; both read
+   `lib/job-clock-attribution.ts`, so build it there once.
+2. **Bounded by the job's schedule.** `scheduled_date` → `end_date` is the only
+   window work can belong to. A ticket filed on the 15th for a job that ran the
+   12th–13th can only land on the 12th or 13th.
+3. **The job's start is the anchor.** If nothing else resolves, work belongs to
+   `scheduled_date` — the day the job started — never to the submission date.
+
+Submission time (`created_at`, and `log_date` when it was defaulted to "today")
+stops being a source of truth for WHEN work happened. It stays as an audit fact:
+when the paperwork was filed.
+
+⚠️ **The existing rows still need repairing** — Southern Basements' only log is
+dated the 12th for work done the 11th. Derivation fixes the read path; a
+one-time backfill (or an office-side date correction) fixes what is already
+stored. Do not skip this, or every ticket printed for past work stays wrong.
+
+⚠️ A multi-day job where the crew clocked in on several days must produce one
+row PER DAY, not one lump on the start date — the founder's "he was there
+Monday, Tuesday" is literally two days on one ticket.
+
+### The two options considered before that decision (kept for context):
   **A. Ask at entry.** Day Complete asks "what day was this work performed?",
      defaulting to today. One tap on the normal path; correct on the late path.
   **B. Infer from the clock card.** If the operator had no clocked hours on the
@@ -815,3 +850,20 @@ Founder: *"Pending — just like you're on pending."* So a rescheduled job shoul
 drop back to a pre-work state and clear the run stamps (`in_route_at`,
 `arrived_at_jobsite_at`, `work_started_at`) for the new day. Anything already
 logged stays — history is not rewritten, only the live flags.
+
+
+## M26 — ✅ DONE: Adam and David can approve pending jobs
+
+> "Give permission to Adam Ingalls and David Schadt, the supervisors — add this
+> to their permissions so they could push jobs if I'm not here."
+
+Adam is a `salesman`, David a `supervisor`. The approve endpoint sat behind
+`requireAdmin` (admin | super_admin | operations_manager), so neither could
+release a job and the schedule stalled whenever the founder was away. The pending
+jobs PAGE already admitted both roles — only the API said no.
+
+Fixed with a dedicated `requireJobApprover` guard, NOT by widening ADMIN_ROLES.
+Widening that constant would have handed a salesman every admin route on the
+platform — timecard edits, team permissions, deletions — to fix one button.
+4 tests lock the boundary: both roles can approve, the crew still cannot, and
+approving does not imply admin.
