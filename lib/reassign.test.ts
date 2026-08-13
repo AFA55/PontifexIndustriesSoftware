@@ -304,3 +304,45 @@ describe('ordinal', () => {
     expect(ordinal(21)).toBe('21st');
   });
 });
+
+// ── Helper-only crews (founder, Aug 13) ─────────────────────────────────────
+// "Sometimes helpers just need to know where the address is and get out there.
+//  I want to dispatch a ticket to them, but I can't right now unless I assign
+//  them as the operator, even though they don't have to fill an operator
+//  ticket. So I'd like to assign and choose a helper, and not have to assign an
+//  operator if I don't want to."
+describe('a helper counts as a crew', () => {
+  it('promotes a scheduled job when only a HELPER is assigned', () => {
+    expect(shouldPromoteToAssigned('scheduled', null, 'helper-1')).toBe(true);
+  });
+
+  it('still promotes on an operator alone, and on both', () => {
+    expect(shouldPromoteToAssigned('scheduled', 'op-1', null)).toBe(true);
+    expect(shouldPromoteToAssigned('scheduled', 'op-1', 'helper-1')).toBe(true);
+  });
+
+  it('does NOT promote when the job is left with nobody', () => {
+    expect(shouldPromoteToAssigned('scheduled', null, null)).toBe(false);
+  });
+
+  it('never promotes a job that is already live', () => {
+    for (const live of ['in_route', 'on_site', 'in_progress', 'pending_completion', 'completed']) {
+      expect(shouldPromoteToAssigned(live, null, 'helper-1')).toBe(false);
+    }
+  });
+
+  // The mirror bug: adding a helper to an assigned job used to push it BACK to
+  // scheduled, quietly un-dispatching a job the office had just crewed.
+  it('does NOT downgrade an assigned job that still has a helper on it', () => {
+    expect(shouldDowngradeToScheduled('assigned', null, 'helper-1')).toBe(false);
+  });
+
+  it('downgrades only when the last person comes off', () => {
+    expect(shouldDowngradeToScheduled('assigned', null, null)).toBe(true);
+    expect(shouldDowngradeToScheduled('assigned', 'op-1', null)).toBe(false);
+  });
+
+  it('never downgrades a live job even when emptied', () => {
+    expect(shouldDowngradeToScheduled('in_progress', null, null)).toBe(false);
+  });
+});

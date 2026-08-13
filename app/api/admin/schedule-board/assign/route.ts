@@ -86,9 +86,14 @@ export async function POST(request: NextRequest) {
         operatorId && result.operator_day_job_count > 1
           ? ` (operator's ${ordinal(result.day_sequence)} job that day)`
           : '';
+      // The message must reflect the CREW, not just the operator seat. A
+      // helper-only assignment is a real assignment (founder, Aug 13) and
+      // reporting it as "unassigned" told the office the opposite of what had
+      // just happened.
+      const someoneIsOnIt = !!operatorId || !!helperId;
       return NextResponse.json({
         success: true,
-        message: `Job ${operatorId ? 'assigned' : 'unassigned'} successfully${seqNote}`,
+        message: `Job ${someoneIsOnIt ? 'assigned' : 'unassigned'} successfully${seqNote}`,
         data: {
           ...result.job,
           day_sequence: result.day_sequence,
@@ -119,10 +124,10 @@ export async function POST(request: NextRequest) {
     };
 
     // STATUS GUARD: promote only pre-work statuses; never downgrade a live job.
-    if (shouldPromoteToAssigned(currentJob.status, operatorId || null)) {
+    if (shouldPromoteToAssigned(currentJob.status, operatorId || null, helperId ?? null)) {
       updateData.status = 'assigned';
       updateData.assigned_at = new Date().toISOString();
-    } else if (shouldDowngradeToScheduled(currentJob.status, operatorId || null)) {
+    } else if (shouldDowngradeToScheduled(currentJob.status, operatorId || null, helperId ?? null)) {
       updateData.status = 'scheduled';
       updateData.assigned_at = null;
     }
@@ -150,7 +155,7 @@ export async function POST(request: NextRequest) {
       userId: auth.userId,
       userEmail: auth.userEmail,
       userRole: auth.role,
-      action: operatorId ? 'assign' : 'unassign',
+      action: operatorId || helperId ? 'assign' : 'unassign',
       resourceType: 'job_order',
       resourceId: jobOrderId,
       details: { operatorId, helperId, jobNumber: updated?.job_number },

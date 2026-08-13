@@ -84,20 +84,45 @@ const PROMOTABLE_STATUSES = ['scheduled', 'pending_approval'];
  * Status-guard predicate: promote to 'assigned' only from a pre-work status.
  * Live jobs (in_route/on_site/in_progress/pending_completion/…) keep their
  * status and their original assigned_at.
+ *
+ * A job is ASSIGNED once anybody is on it — operator or helper.
+ *
+ * FOUNDER (Aug 13): "Sometimes helpers just need to know where the address is
+ * and get out there. I want to dispatch a ticket to them, but I can't right now
+ * unless I assign them as the operator, even though they don't have to fill an
+ * operator ticket. So I'd like to be able to assign and choose a helper, and not
+ * have to assign an operator if I don't want to."
+ *
+ * This used to read `!!operatorId` alone, which meant a helper-only job stayed
+ * `scheduled` forever: never promoted, never dispatched, never reaching the
+ * person expected on site. Worse, the downgrade below was its mirror — putting a
+ * helper on an already-assigned job pushed it BACK to `scheduled`, quietly
+ * un-dispatching a job the office had just crewed.
+ *
+ * Helper is optional so existing two-argument callers keep compiling; every
+ * caller that can know the helper now passes it.
  */
 export function shouldPromoteToAssigned(
   currentStatus: string | null | undefined,
-  operatorId: string | null
+  operatorId: string | null,
+  helperId?: string | null
 ): boolean {
-  return !!operatorId && !!currentStatus && PROMOTABLE_STATUSES.includes(currentStatus);
+  const someoneIsOnIt = !!operatorId || !!helperId;
+  return someoneIsOnIt && !!currentStatus && PROMOTABLE_STATUSES.includes(currentStatus);
 }
 
-/** Unassigning only downgrades a job that is merely 'assigned' (not live). */
+/**
+ * Unassigning only downgrades a job that is merely 'assigned' (not live) — and
+ * only when the job is left with NOBODY on it. A crew of one helper is still a
+ * crew.
+ */
 export function shouldDowngradeToScheduled(
   currentStatus: string | null | undefined,
-  operatorId: string | null
+  operatorId: string | null,
+  helperId?: string | null
 ): boolean {
-  return !operatorId && currentStatus === 'assigned';
+  const nobodyLeft = !operatorId && !helperId;
+  return nobodyLeft && currentStatus === 'assigned';
 }
 
 /**
@@ -510,10 +535,10 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
     };
     // STATUS GUARD: promote only pre-work statuses; never downgrade a live job;
     // never re-stamp assigned_at on a live job.
-    if (shouldPromoteToAssigned(job.status, operatorId)) {
+    if (shouldPromoteToAssigned(job.status, operatorId, helperId)) {
       updateData.status = 'assigned';
       updateData.assigned_at = nowIso;
-    } else if (shouldDowngradeToScheduled(job.status, operatorId)) {
+    } else if (shouldDowngradeToScheduled(job.status, operatorId, helperId)) {
       updateData.status = 'scheduled';
       updateData.assigned_at = null;
     }

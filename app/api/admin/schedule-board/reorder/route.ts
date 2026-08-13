@@ -97,9 +97,9 @@ export async function PATCH(request: NextRequest) {
         if (newHelperId !== undefined) {
           updateData.helper_assigned_to = newHelperId || null;
         }
-        if (shouldPromoteToAssigned(currentJob.status, newOperatorId || null)) {
+        if (shouldPromoteToAssigned(currentJob.status, newOperatorId || null, newHelperId ?? null)) {
           updateData.status = 'assigned';
-        } else if (shouldDowngradeToScheduled(currentJob.status, newOperatorId || null)) {
+        } else if (shouldDowngradeToScheduled(currentJob.status, newOperatorId || null, newHelperId ?? null)) {
           updateData.status = 'scheduled';
         }
 
