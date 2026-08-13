@@ -649,3 +649,76 @@ Per person, per date:
 
 Fixing this also fixes the printed ticket, the Daily Progress panel and — once
 M15 lands — labour cost, since all three now read the same helper.
+
+---
+
+# Batch 17 — Aug 13. Waiver chase + the operator's printed ticket.
+
+## M20 — 🔴 URGENT, NEXT: chase the operator until the waiver is signed
+
+> "I know we have a system set up so when they click In Route for the first time
+> it sends a notification to the contact on site letting them know our ETA and
+> sends the utility waiver. But we also need to have a notification go out to
+> THE OPERATOR based on their estimated arrival, if the utility waiver has not
+> been signed yet — to make them get it signed by the on-site contact, or to
+> resend it to the on-site contact. It's important we get that document signed,
+> and we need them to remember to get it signed."
+
+**Today only half the loop exists.** First In Route fires `sendWaiver()` to the
+site contact and then nothing ever checks whether it came back signed. Production
+proves the gap: of the jobs that have gone In Route, exactly ONE has
+`utility_waiver_signed = true`. The document that protects the company from a
+cut-conduit claim is being sent and quietly ignored.
+
+**The rule.** Once the crew is en route, if the waiver is still unsigned by the
+time they are due on site, tell the OPERATOR — not the customer — and give them
+two one-tap outs: get it signed on site now, or resend the link to the contact.
+Repeat while it is unsigned and the job is live; stop the moment it is signed.
+
+Timing hangs off the ETA work already scoped in batch 3 (ETA from the crew's real
+GPS at In Route, not from the shop). Until that lands, fall back to
+`arrival_time` on the job, and if that is missing, In Route + 30 minutes.
+
+- Use `sendNotification()` (lib/send-reminder.ts) so it honours preferences and
+  lands on the bell. ⚠️ **Push may not reach them** — Javier has zero registered
+  devices and SMS off, and he will not be the only one. Audit device coverage
+  before trusting push for something this important.
+- Idempotency: one nudge per escalation step per job. `reminder_log` is the
+  existing pattern; do not invent a second table.
+- **VERBATIM WORDING.** The founder sent a photo of paper ticket #9059 and asked
+  for "exact same verbiage as the ticket". That text already lives in
+  `lib/legal/prework-understandings.ts` — the PRE-WORK UNDERSTANDINGS / CUSTOMER
+  AGREEMENT block. Reuse it; do not paraphrase a legal clause.
+- **Test before it deploys.** His words. Drive it on the demo ticket end to end.
+
+## M21 — The ticket the OFFICE prints and hands to an operator
+
+This is the JOB ORDER print (`/dashboard/admin/jobs/[id]/print`), not the work
+ticket. It is handed to a crew at the start of a job.
+
+- **a. Remove Difficulty.** Already done Aug 12 — verify it stayed removed.
+- **b. Remove "Multi-Day" and the crew names.**
+  > "I can print that ticket out, but doesn't mean the same people are always
+  > going to be in the same project."
+  Printing a sheet on Monday must not assert who is on it Thursday. Same lesson
+  as the per-day assignment work: a name on paper outlives the assignment.
+- **c. Show the EQUIPMENT the project manager actually chose.**
+  > "Actually show the equipment required — show everything. You can change the
+  > layout to not just be radios that get checked off, but instead show what the
+  > project manager pushed and chose for equipment."
+  Today it prints a flat chip list from `equipment_needed` +
+  `equipment_selections`. It should show the PM's actual selections, grouped and
+  legible, so the crew loads the right truck. Read what the schedule form
+  writes into `equipment_selections` / `equipment_rental_flags` before
+  designing the layout — the shape is already there.
+- **d. Print the TICKET ID.**
+  > "Show the ticket ID number so then later we can match job ticket with the
+  > tickets I print for operators on their work performed."
+  The work ticket got a boxed JOB ID on Aug 12; this sheet needs the same number
+  in the same place so the two sheets pair up on the desk.
+
+## Data repairs done Aug 13
+- JOB-2026-160762 (Parkk, Industrial Park Dr) — span repaired Aug 13–15, unassigned.
+- JOB-2026-499921 (Gleeson) — founder: "same day done job" → Aug 21, single day.
+- JOB-2026-815303 (Pinnacle, starts Aug 26 ends Aug 7) — STILL INVERTED and
+  invisible. on_hold, so not urgent, but it needs a duration from the founder.
