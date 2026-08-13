@@ -49,6 +49,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { sendReminderOnce } from '@/lib/send-reminder';
 import { waiverChaseStep, type WaiverChaseStep } from '@/lib/waiver-chase';
+import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
 
 /** A crew is only chased while the job is actually live. */
 const LIVE_STATUSES = ['in_route', 'on_site', 'in_progress', 'pending_completion'];
@@ -119,8 +120,26 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
+      // SMS was structurally unreachable: sendNotification only texts when
+      // `smsPhone` is supplied, and this cron never supplied one. Two of the
+      // five people it chased have sms_enabled = true and a phone on file and
+      // still got nothing but a bell — for the document that shifts liability
+      // for unmarked conduit onto the customer.
+      const { data: profs } = await supabaseAdmin
+        .from('profiles')
+        .select(PROFILE_PHONE_SELECT)
+        .in('id', recipients);
+      const phoneById = new Map<string, string | null>(
+        (profs ?? []).map((p: any) => [p.id, readProfilePhone(p)])
+      );
+
       for (const userId of recipients) {
-        const sent = await sendReminderOnce(`waiver_unsigned:${job.id}:${step.key}`, {
+        // The key carries the DAY. `in_route_at` is stamped once, on the first
+        // tap ever, so without a date every step was already burned by the end
+        // of day one and a multi-day job went unchased for the rest of its run —
+        // BWC runs Aug 13–17 and had spent all three steps by 14:15 on the 13th.
+        // Per-day means the crew is reminded each morning they are still on it.
+        const sent = await sendReminderOnce(`waiver_unsigned:${job.id}:${todayYMD}:${step.key}`, {
           userId,
           tenantId: job.tenant_id ?? null,
           category: 'document_to_sign',
@@ -130,9 +149,12 @@ export async function GET(request: NextRequest) {
           message: step.message(job.customer_name || 'the customer'),
           actionUrl: `/dashboard/job-schedule/${job.id}/utility-waiver`,
           jobOrderId: job.id,
-          metadata: { step: step.key, job_number: job.job_number },
+          smsPhone: phoneById.get(userId) ?? null,
+          metadata: { step: step.key, job_number: job.job_number, day: todayYMD },
         });
-        if (sent) remindersSent += 1;
+        // `sent` is a DeliveryResult, not a boolean — it is truthy even when
+        // every channel failed. Count a delivery only if something landed.
+        if (sent && (sent.inApp || sent.push || sent.sms || sent.email)) remindersSent += 1;
       }
     }
 

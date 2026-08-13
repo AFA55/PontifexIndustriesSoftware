@@ -73,16 +73,52 @@ export async function PATCH(
       );
     }
 
-    // Check if user is admin or super_admin
-    if (!['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(profile.role)) {
+    // Parse request body (needed by the permission check below).
+    const updates = await request.json();
+
+    // ── WHO MAY EDIT A JOB, AND WHO MAY ONLY PUSH ONE ──────────────────────
+    // FOUNDER (Aug 13): "Give permission to Adam Ingalls and David Schadt so
+    // they could push jobs if I'm not here."
+    //
+    // The first attempt at this widened the dedicated /approve endpoint — which
+    // NOTHING CALLS. The board's Approve button PATCHes this route, whose own
+    // list already admitted `supervisor` (so David could always push) and still
+    // excluded `salesman`, so Adam stayed blocked by the very button being
+    // complained about. Caught in review: I verified the guard I edited and not
+    // the call path.
+    //
+    // Fixed here, narrowly. A salesman may push a job onto the schedule and
+    // nothing else: the payload must touch only approval fields. Adding
+    // `salesman` to the editor list outright would have handed them every job
+    // field — cost, scope, crew, status of a live job — to fix one button.
+    const APPROVAL_ONLY_FIELDS = new Set([
+      'status',
+      'scheduled_date',
+      'end_date',
+      'is_will_call',
+      'arrival_time',
+    ]);
+    const APPROVAL_STATUSES = new Set(['scheduled', 'assigned', 'pending_approval']);
+    const isApprovalOnlyUpdate =
+      Object.keys(updates).length > 0 &&
+      Object.keys(updates).every((k) => APPROVAL_ONLY_FIELDS.has(k)) &&
+      (!('status' in updates) || APPROVAL_STATUSES.has(String(updates.status)));
+
+    const canEditJobs = ['admin', 'super_admin', 'operations_manager', 'supervisor'].includes(profile.role);
+    const canPushJobs = profile.role === 'salesman' && isApprovalOnlyUpdate;
+
+    if (!canEditJobs && !canPushJobs) {
       return NextResponse.json(
-        { error: 'Only administrators can update job orders' },
+        {
+          error:
+            profile.role === 'salesman'
+              ? 'You can approve and schedule jobs, but not edit their details.'
+              : 'Only administrators can update job orders',
+        },
         { status: 403 }
       );
     }
 
-    // Parse request body
-    const updates = await request.json();
     console.log(`Updating job order ${id} with:`, updates);
 
     // Resolve tenant scope — supabaseAdmin bypasses RLS, must scope manually

@@ -33,7 +33,14 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
     .from('job_orders')
     .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date, end_date, dispatched_at')
     .eq('tenant_id', tenantId)
-    .not('assigned_to', 'is', null)
+    // A CREW IS A CREW, OPERATOR OR NOT (founder, Aug 13: "I'd like to assign
+    // and choose a helper, and not have to assign an operator if I don't want
+    // to"). This read `.not('assigned_to','is',null)`, so a helper-only job was
+    // skipped by the only function in the codebase that writes `dispatched_at`
+    // — leaving it permanently undispatched, and therefore invisible in the
+    // helper's My Jobs, while the board showed it as "assigned". A bell
+    // announcing a job they could not open.
+    .or('assigned_to.not.is.null,helper_assigned_to.not.is.null')
     .lte('scheduled_date', targetDate)
     .or(`scheduled_date.eq.${targetDate},end_date.gte.${targetDate}`)
     .in('status', ['scheduled', 'assigned', 'in_progress'])

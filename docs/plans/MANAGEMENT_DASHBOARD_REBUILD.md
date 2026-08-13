@@ -997,3 +997,108 @@ breaks at once. Do not flip the source of truth in one commit.
 A quick-add is a placeholder that reserves a slot. Opening it should continue
 into the full schedule form, pre-filled with what little it has, and saving
 should upgrade it in place — same job, same number, no duplicate.
+
+---
+
+# Batch 20 — Aug 13. Photos nobody else can see, and the ticket-printing hub.
+
+*Founder: "analyse these and add them to files with directions on how to resolve
+those issues, so once we start working on them we can tackle them right away."*
+So each item below carries a first move, not just a description.
+
+## M34 — 🔴 Only the founder can see job photos. David and Amanda cannot.
+
+> "For some reason I can open jobs and view images and pictures, but David,
+> project managers and Amanda cannot. And for some reason it opens in Supabase —
+> it should open internally."
+
+**Almost certainly the same shape as the work_items bug fixed Aug 12**, and the
+first move is the same: DO NOT assume, impersonate and measure.
+
+    begin;
+    select set_config('request.jwt.claims','{"sub":"<david|amanda uuid>","role":"authenticated"}', true);
+    set local role authenticated;
+    select count(*) from job_photos;            -- or whichever table backs photos
+    select count(*) from storage.objects where bucket_id = '<job-photos bucket>';
+    rollback;
+
+The founder is `operations_manager`/`super_admin`; Amanda is `admin`; David is
+`supervisor`. If the count differs from his, it is an RLS grant that names too
+few roles — fix by widening the SELECT policy with
+`current_user_has_role(...)` + a tenant check, never `user_metadata`, and verify
+by re-impersonating (see `20260812_work_items_select_ops_manager.sql` as the
+template).
+
+Second half: **"it should open internally."** Photos link straight to a storage
+URL, which is the same class as the dead completion-PDF links — a storage URL is
+not a UI, and on a private bucket it will not even open. Serve through a signed
+URL minted at click time, exactly like `lib/completion-pdf-path.ts` +
+`/api/admin/jobs/[id]/documents` now do.
+
+## M35 — 🔴 A maintenance request's photo is invisible to the founder
+
+> "When David tries to submit a maintenance request, I can see he uploaded an
+> image, but I cannot see the image."
+
+Note the direction is REVERSED from M34 — here the uploader can see it and the
+founder cannot. That asymmetry is the clue: check whether the row stores a raw
+storage path vs a full URL, and whether the reader resolves it. Bucket is
+`maintenance-photos` (3 objects, private). First moves:
+1. Read the row — is the column a path, a public URL, or a signed URL that has
+   since expired? (Expired signed URLs look exactly like "broken image".)
+2. Impersonate both accounts against `storage.objects` for that bucket.
+3. Whatever it turns out to be, the fix ends in the same place as M34: a signed
+   URL minted at read time, rendered in-app.
+
+## M36 — In-app photo viewer (zoom, pan, PDF)
+
+> "When I click on the image I could zoom in, zoom out and really get more
+> details on the pictures." Plus: **PDFs currently crash** the photo flow.
+
+Direction: one viewer component used everywhere photos appear (job photos,
+maintenance, scope photos). Signed URL in, zoom/pan, next/previous, and a PDF
+branch. Reproduce the PDF crash FIRST — it is the only item here that can lose
+someone's upload, and the stack trace will say whether it is the uploader
+(rejecting a non-image mime) or the renderer (an `<img>` pointed at a PDF).
+
+## M37 — ⭐ OPERATOR DAILY TICKETS — one page to print them all
+
+> "Instead of having to go to each individual ticket to print out work
+> performed, I'd like a space dedicated in the software that says Operator Daily
+> Tickets, where I can view operators, see where they have been, their hours,
+> and print tickets for all operators for that week if I wanted to — or just a
+> specific date, or a specific operator. That way I can print out what I need so
+> much faster than looking and clicking through active jobs and completed jobs.
+> And in that same card and page we can have shop tickets, and I can print out
+> all shop tickets at once instead of clicking one by one. The goal is to print
+> these tickets faster and see where everyone was, to be able to bill and track
+> hours accordingly."
+
+The single highest-leverage item on the whole list: it is how the office bills.
+
+**Pivot the data by PERSON × DAY instead of by job.** Everything needed already
+exists and must be REUSED, not rewritten:
+  • `lib/job-clock-attribution.ts` — which job a person's clock card belongs to
+    (and, once M19/M23/M29 land, how a split day divides).
+  • `lib/work-ticket.ts` `buildTicketDays()` — already groups by day then by
+    operator, and already prefers timecard hours.
+  • `/dashboard/admin/jobs/[id]/work-ticket?mode=day|week&date=` — the printable
+    sheet already exists; this page selects WHICH ones to print.
+
+Build order:
+  a. **The view**: filter by date / week / operator; a row per operator per day
+     showing where they were, their hours, and whether a ticket was filed.
+     Reuse the M29 "assigned + clocked in but no ticket" rendering — the same
+     gap the office is chasing when they print.
+  b. **Print one**, from that row.
+  c. **Print many** — every operator for a week, or every shop ticket at once.
+     ⚠️ Bulk printing is where this gets hard: one print view rendering N
+     tickets with a page break between them, not N browser tabs. Design that
+     before building (a), because it constrains how the ticket renders.
+  d. **Shop tickets** in the same place — `helper_work_logs.is_shop_ticket`
+     already exists, and M18's shop-time work will feed it.
+
+Blocked-ish: the hours are only trustworthy once M19 (split days), M23 (work
+dated when typed) and M29 (missing day) land. Billing off today's numbers would
+bill the wrong hours — build the page, but land those first or state plainly on
+screen which figures are derived.
