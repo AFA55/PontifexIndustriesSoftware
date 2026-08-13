@@ -1102,3 +1102,109 @@ Blocked-ish: the hours are only trustworthy once M19 (split days), M23 (work
 dated when typed) and M29 (missing day) land. Billing off today's numbers would
 bill the wrong hours — build the page, but land those first or state plainly on
 screen which figures are derived.
+
+---
+
+# Batch 21 — Aug 13 late. Adam's 403, David's unreachable button, dark mode, and the notepad.
+
+## M38 — ✅ FIXED: the office got 403 on jobs they own
+
+> "Adam wasn't able to click on J. Davis or open it up, and that's his own
+> project, so he should most definitely be able to open it up."
+
+Screenshot: **"Failed to load job details. HTTP 403"**, signed in as Adam Ingalls.
+
+The job-detail PAGE admits `admin, super_admin, operations_manager, salesman,
+supervisor` — but all four endpoints it calls (`summary`, `live-status`,
+`progress-by-day`, `documents`) used `requireAdmin`, which is only the first
+three. Adam is a `salesman`, David a `supervisor`: the UI said yes, the API said
+no, and it reads as the app being broken rather than as a permission.
+
+Fixed: those four are READ-ONLY, so they now use `requireSalesStaff` — exactly
+the roles the page admits. **Third time this exact shape has bitten** (work_items
+RLS, the approve button, this). ⚠️ RULE: when a page's role list and its
+endpoint's guard disagree, the page is the spec. Audit the rest of
+`/api/admin/**` GETs against the pages that call them.
+
+## M39 — 🔴 David cannot reach the Continue button on his phone
+
+> "David tried to click the button to continue the review form and it does not
+> let him proceed because that button is hard to reach. I know all phones are
+> different, but we must have a way… or have a proper layout so he can actually
+> touch the button."
+
+Screenshot: the visit-report form on an Android; **"Continue →" is behind the
+system nav bar** at the bottom.
+
+Cause is the same family as the Dynamic Island work on Aug 11: a fixed bottom
+bar with no bottom safe-area inset. Android gesture/nav bars vary by device, so
+a fixed pixel offset will always be wrong on some phone.
+
+Fix: `padding-bottom: max(1rem, env(safe-area-inset-bottom))` on that action
+bar — `.pb-safe` already exists in globals.css — and make sure the scroll
+container reserves the bar's height so the last field is not hidden under it.
+Then verify at 375×812 AND on a short viewport, not just a tall one.
+Same audit applies to every fixed bottom action bar (work-performed already has
+`pb-safe`; the visit-report flow evidently does not).
+
+## M40 — Dark mode: white boxes you cannot read
+
+> "In schedule form in dark mode one part shows up white even though it's dark
+> mode and it's hard to see. Same goes for the questions the schedule form asks
+> toward the end for Friday or Saturday work — it's white and can't be seen."
+
+Screenshot confirms: the equipment "Add" input renders white-on-white inside the
+dark form. Two known spots (equipment add, the Friday/Saturday work questions),
+but treat it as a sweep: find inputs/containers with a hardcoded light
+background and no `dark:` variant. `docs/reference/UI_CATALOG.md` is where the
+correct pattern should be recorded once fixed.
+
+## M41 — Duration-based scheduling (the founder's own restatement of M32)
+
+> "Right now we choose start and end date of projects. Moving forward I would
+> just like to choose the start date, then the job timeframe — input the number
+> of days we think the project will take — so it can automatically change the
+> dates. And then be smart and not put on the schedule weekends, or Friday, if
+> they didn't click that they work on those days."
+
+Same as M32 (Doug's version); recorded again because he asked for it twice,
+which is the signal it is real. The schedule form already asks about
+Friday/Saturday/Sunday work — that answer becomes the input to the calendar
+walk, not just a note. See M32 for the ⚠️ about `end_date` still being
+authoritative in a dozen read paths: derive it, keep writing it.
+
+## M42 — From the notepad photo ("Pontifex – Improvements")
+
+**Ticket fill-out**
+  a. A **bold line item for Contractor Signature and Utility Waiver** on the
+     ticket — or a SEPARATE printout accompanying the ticket for the customer to
+     sign. (Ties to M20: the waiver is the document that keeps going unsigned.)
+  b. Add a **grinding / scarifying** work option.
+  c. Let a job be marked **both inside AND outside** — today it is one or the
+     other.
+  d. A **"Will Call"** section on the schedule form. (The board already has a
+     Will Call folder — check what feeds it before adding a second flag.)
+
+**Errors**
+  e. Error when clicking **Active Jobs** — likely the same 403 family as M38;
+     re-test after this push before investigating further.
+  f. Error when clicking to **view the customer signature** on job completion.
+  g. **Completion photos do not load** — M34/M35 family (storage URL, not a UI).
+
+**Money**
+  h. **Edit the money total after a ticket is created.** Feeds M16 (the quote)
+     and the parked invoicing work.
+
+**Access / mornings**
+  i. Adam needs to **print his jobs (or all jobs) and mark them completed**, and
+     to cover "when Andres isn't here" — the same standing theme as M26/M38.
+  j. **Schedule job tickets to go out at 7am** automatically. There is already a
+     dispatch cron (`auto-dispatch`) — check its schedule and whether it sends
+     the ticket, before building a second sender.
+
+## M43 — "Deleted User" holds a live job on the schedule board
+
+Visible in the board screenshot: a **Deleted User** row owning DEMO-2026-000002.
+Deactivated profiles still hold assignments. Decide the rule (reassign on
+deactivation, or surface as Unassigned) and make the board stop presenting a
+deleted person as a crew slot.

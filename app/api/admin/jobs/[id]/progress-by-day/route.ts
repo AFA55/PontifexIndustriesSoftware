@@ -39,7 +39,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
 import { attributableTimecards } from '@/lib/job-clock-attribution';
 
@@ -47,7 +47,14 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    // READ-ONLY, so the guard matches who the PAGE already admits.
+    // The job-detail page lets salesman + supervisor in, but every endpoint it
+    // calls used requireAdmin (admin | super_admin | operations_manager) — so
+    // Adam Ingalls (salesman, and the project manager on the job) opened his
+    // own J. Davis job and got "Failed to load job details. HTTP 403". The UI
+    // said yes and the API said no, which reads as the app being broken rather
+    // than as a permission. Same shape as the approve-button bug.
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
