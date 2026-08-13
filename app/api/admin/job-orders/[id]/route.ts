@@ -165,6 +165,56 @@ export async function PATCH(
       updateFields.foreman_phone = updates.contact_phone; // keep legacy column in sync (matches create route)
     }
 
+    // ── MOVING A JOB TO A NEW DATE ─────────────────────────────────────────
+    // Two things must happen that were not happening, both found on
+    // JOB-2026-160762 (Parkk, 214 Industrial Park Drive) on Aug 13.
+    //
+    // 1. THE SPAN MOVES WITH THE START, OR THE JOB DISAPPEARS.
+    //    That job ran Aug 10–12. Its start was pushed to Aug 13 and `end_date`
+    //    was left on Aug 12 — ending the day BEFORE it began. Every board query
+    //    asks "starts on or before D and ends on or after D", which an inverted
+    //    span can never satisfy, so the job vanished from the schedule board on
+    //    EVERY date while still showing in Active Jobs as scheduled. Nothing
+    //    errored; it was simply gone. Two more jobs are in that state today.
+    //
+    //    So when the start moves and the caller did not say where the end goes,
+    //    shift the end by the same number of days and keep the duration.
+    //
+    // 2. THE CREW COMES OFF (founder, Aug 13: "it looks like it assigned Keon
+    //    right away to it — I want it to show in unassigned for next time").
+    //    Whoever was free on Monday is not necessarily free on Thursday, and a
+    //    silently-carried operator means nobody re-checks. Same principle as
+    //    per-day assignment: being on a job one day does not put you on it the
+    //    next. A caller that explicitly sets `assigned_to` in the same request
+    //    is obeyed — this only clears a crew nobody restated.
+    const movingStart =
+      'scheduled_date' in updateFields &&
+      updateFields.scheduled_date &&
+      updateFields.scheduled_date !== oldJobOrder.scheduled_date;
+
+    if (movingStart) {
+      const oldStart = oldJobOrder.scheduled_date as string | null;
+      const oldEnd = (oldJobOrder.end_date as string | null) || oldStart;
+
+      if (!('end_date' in updateFields) && oldStart && oldEnd) {
+        const dayMs = 24 * 60 * 60 * 1000;
+        const spanDays = Math.round(
+          (new Date(`${oldEnd}T00:00:00`).getTime() - new Date(`${oldStart}T00:00:00`).getTime()) / dayMs
+        );
+        if (spanDays > 0) {
+          const newEnd = new Date(`${updateFields.scheduled_date}T00:00:00`);
+          newEnd.setDate(newEnd.getDate() + spanDays);
+          updateFields.end_date = `${newEnd.getFullYear()}-${String(newEnd.getMonth() + 1).padStart(2, '0')}-${String(newEnd.getDate()).padStart(2, '0')}`;
+        } else {
+          // Single-day job: the end follows the start exactly.
+          updateFields.end_date = updateFields.scheduled_date;
+        }
+      }
+
+      if (!('assigned_to' in updateFields)) updateFields.assigned_to = null;
+      if (!('helper_assigned_to' in updateFields)) updateFields.helper_assigned_to = null;
+    }
+
     // Update job order (scoped to tenant)
     let updateQuery = supabaseAdmin
       .from('job_orders')
@@ -189,12 +239,19 @@ export async function PATCH(
       if (dateChanged && jobOrder.scheduled_date) {
         const windowStart = jobOrder.scheduled_date;
         const windowEnd = jobOrder.end_date || jobOrder.scheduled_date;
-        const { error: ledgerCleanupError } = await supabaseAdmin
+        let cleanup = supabaseAdmin
           .from('job_daily_assignments')
           .delete()
           .eq('job_order_id', id)
-          .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
-          .or(`assignment_date.lt.${windowStart},assignment_date.gt.${windowEnd}`);
+          .or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+        // When the START moved we also dropped the crew above, so EVERY ledger
+        // row describes the old schedule — including any that happens to fall
+        // inside the new window, which would quietly put the old operator back
+        // on the job the founder just asked to see unassigned. Clear them all.
+        if (!movingStart) {
+          cleanup = cleanup.or(`assignment_date.lt.${windowStart},assignment_date.gt.${windowEnd}`);
+        }
+        const { error: ledgerCleanupError } = await cleanup;
         if (ledgerCleanupError) {
           // Non-fatal: the sequence gate also filters stale rows by window.
           console.error('Failed to clean stale per-day assignments after date move:', ledgerCleanupError);
