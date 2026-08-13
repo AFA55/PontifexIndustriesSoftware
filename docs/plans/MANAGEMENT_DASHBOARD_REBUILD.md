@@ -722,3 +722,96 @@ ticket. It is handed to a crew at the start of a job.
 - JOB-2026-499921 (Gleeson) — founder: "same day done job" → Aug 21, single day.
 - JOB-2026-815303 (Pinnacle, starts Aug 26 ends Aug 7) — STILL INVERTED and
   invisible. on_hold, so not urgent, but it needs a duration from the founder.
+
+---
+
+# Batch 18 — Aug 13 PM.
+
+## M22 — ✅ DONE: admin could not see completed jobs
+
+> "Our admin cannot see completed jobs. Allow him to see completed jobs as well
+> so he could print tickets for operators that have already finished."
+
+Not a permission problem — Amanda (admin) could read all 13 completed jobs at
+the database level. The page itself filtered on
+`.not('completion_signed_at','is',null)`, so **8 of 13 completed jobs were
+invisible**. A crew that finishes via "skip signature — submit for supervisor
+approval" never gets that stamp, so the job completed normally and then vanished
+from the one page the office uses to pull a finished ticket.
+
+Now lists every completed job and SHOWS the signature state instead of hiding
+the job over it ("Not signed" / "No signature — contact off site"). Date falls
+back signed-at → work-completed-at → scheduled date, so an unsigned job stops
+rendering `Invalid Date`.
+
+## M23 — 🔴 The printed ticket dates work to the day it was TYPED, not worked
+
+> "I printed off Dante's ticket for Southern Basements, which he completed this
+> past Monday and Tuesday, and the ticket says he did it the 12th, which was
+> yesterday. Even if he filled out the ticket on the 12th, the day he was there
+> was the 11th. The ticket we print needs to say that accordingly."
+
+**Diagnosed. The ticket is innocent.** `resolveWorkItemDate` already prefers the
+daily log over `created_at`, and it did exactly that here. The problem is one
+level down:
+
+    daily_job_logs  →  the job's ONLY log has log_date = 2026-08-12
+    work_items      →  day_number 1, operator Dante, created 2026-08-12 11:04
+    timecards       →  Dante worked Aug 11, 7:00 AM – 6:08 PM (10.64 hrs)
+                       and Aug 12, 6:59 AM – (still open), 0.00 hrs
+
+The log was CREATED on the 12th and took "today" as its date. The ticket then
+faithfully printed the day the paperwork was filed. Same family as Keon's
+0.06-hour job (M19): **submission time is being used as work time.**
+
+Two candidate fixes, and the founder should pick:
+  **A. Ask at entry.** Day Complete asks "what day was this work performed?",
+     defaulting to today. One tap on the normal path; correct on the late path.
+  **B. Infer from the clock card.** If the operator had no clocked hours on the
+     log's date but did on the preceding day, date the work to the clocked day.
+     No extra tap, but it is a guess, and guessing is what produced this.
+
+Recommend **A**, with the office able to correct a log's date after the fact
+(needed regardless — nothing can fix the existing rows without it). B can ride
+along as the DEFAULT the question is pre-filled with.
+
+⚠️ Whatever lands must also fix the EXISTING logs, or every ticket printed for
+past work stays wrong.
+
+## M24 — Dispatch to a helper WITHOUT an operator, and to more than one
+
+> "I would like to assign jobs to helpers and then give me the option to either
+> assign them as operator or helper… Some helpers just need to know where the
+> address is and get out there. I want to dispatch a ticket to them, but I can't
+> right now unless I assign them as the operator, even though they don't have to
+> fill an operator ticket. So I'd like to be able to assign and choose a helper,
+> and not have to assign an operator if I don't want to. And since I assigned
+> them as a helper, they just fill out the helper ticket. And I want to be able
+> to assign more than one helper — a button that says ADD HELPERS."
+
+Three distinct pieces:
+  a. **Assign a helper with no operator.** Today the board's assign flow is
+     operator-first; a helper-only job must be possible, and the job must
+     dispatch and appear on that helper's schedule.
+  b. **Choose the SEAT when assigning.** Operator or helper, explicitly — this
+     is the 1g "which ticket do they fill?" question arriving from the office
+     side instead of the operator side. The seat decides the ticket: operator →
+     operator ticket, helper → helper ticket. `lib/rbac.ts canBeCrewMember()`
+     and the slot-based visibility work (Aug 11) already support a person in
+     either seat; this is the assign UI catching up.
+  c. **More than one helper.** `job_orders` holds ONE `helper_assigned_to`, but
+     `job_crew` is already a many-row table with a `role` — that is the seam.
+     ⚠️ Read how job_crew is consumed before adding a column; the plural crew is
+     already half-built and a second mechanism would fracture it.
+
+## M25 — Rescheduling leaves the job "in progress"
+
+Noticed Aug 13 while building the waiver chase. JOB-2026-160762 was moved to
+today and still carried `status = in_progress` and an Aug 10 `in_route_at`. The
+waiver cron had to grow a "span must cover today" guard to avoid chasing a crew
+off a three-day-old stamp.
+
+Founder: *"Pending — just like you're on pending."* So a rescheduled job should
+drop back to a pre-work state and clear the run stamps (`in_route_at`,
+`arrived_at_jobsite_at`, `work_started_at`) for the new day. Anything already
+logged stays — history is not rewritten, only the live flags.

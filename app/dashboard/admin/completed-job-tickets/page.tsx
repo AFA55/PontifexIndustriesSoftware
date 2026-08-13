@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
+import { parseYMDLocal } from '@/lib/dates';
 import {
   FileText,
   Star,
@@ -30,6 +31,7 @@ interface CompletedJob {
   description: string;
   assigned_to: string;
   scheduled_date: string;
+  work_completed_at: string | null;
   completion_signed_at: string;
   completion_signer_name: string;
   contact_not_on_site: boolean;
@@ -71,12 +73,23 @@ export default function CompletedJobTicketsPage() {
 
   const loadCompletedJobs = async () => {
     try {
+      // EVERY completed job, signed or not (founder, Aug 13: "our admin cannot
+      // see completed jobs — allow him to see completed jobs as well so he can
+      // print tickets for operators that have already finished their jobs").
+      //
+      // This page used to require `completion_signed_at`, which hid 8 of the 13
+      // completed jobs in production. A crew that finishes via "skip signature —
+      // submit for supervisor approval" never gets that stamp, so the job
+      // completed normally and then vanished from the one page the office uses
+      // to pull a finished ticket. Whether a customer signed is worth SHOWING,
+      // never worth hiding the job over.
       const { data, error } = await supabase
         .from('job_orders')
         .select('*')
         .eq('status', 'completed')
-        .not('completion_signed_at', 'is', null)
-        .order('completion_signed_at', { ascending: false });
+        .order('completion_signed_at', { ascending: false, nullsFirst: false })
+        .order('work_completed_at', { ascending: false, nullsFirst: false })
+        .order('scheduled_date', { ascending: false });
 
       if (error && error.message) {
         console.error('Error loading completed jobs:', error);
@@ -90,6 +103,16 @@ export default function CompletedJobTicketsPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  /** Signed date, else when the work finished, else the scheduled day. */
+  const formatCompletedOn = (job: CompletedJob): string => {
+    const iso = job.completion_signed_at || job.work_completed_at;
+    if (iso) return new Date(iso).toLocaleDateString();
+    // scheduled_date is a bare YYYY-MM-DD — parse LOCAL, never new Date(str),
+    // which reads it as UTC and renders the previous day (see CLAUDE.md).
+    if (job.scheduled_date) return parseYMDLocal(job.scheduled_date).toLocaleDateString();
+    return '—';
   };
 
   const filteredJobs = jobs.filter((job) => {
@@ -285,13 +308,18 @@ export default function CompletedJobTicketsPage() {
                       )}
                       <span className="flex items-center gap-1">
                         <Calendar className="w-3 h-3" />
-                        {new Date(job.completion_signed_at).toLocaleDateString()}
+                        {/* An unsigned job has no signed-at date — fall back to
+                            when the work actually finished rather than printing
+                            "Invalid Date", which is what new Date(null) gives. */}
+                        {formatCompletedOn(job)}
                       </span>
                       <span className="flex items-center gap-1">
                         <User className="w-3 h-3" />
-                        {job.contact_not_on_site
-                          ? 'No signature'
-                          : job.completion_signer_name || 'N/A'}
+                        {job.completion_signed_at
+                          ? job.completion_signer_name || 'Signed'
+                          : job.contact_not_on_site
+                            ? 'No signature — contact off site'
+                            : 'Not signed'}
                       </span>
                     </div>
                     {job.customer_feedback_comments && (
