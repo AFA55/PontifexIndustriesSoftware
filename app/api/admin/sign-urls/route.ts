@@ -10,13 +10,18 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { signStoredUrl } from '@/lib/storage-url-server';
 
 export async function POST(request: NextRequest) {
   try {
     // Admin-only — it can mint signed URLs for contracts/completion PDFs.
-    const auth = await requireAdmin(request);
+    // READ-ONLY, widened to match the page that calls it.
+    // Its OWN docstring already said requireScheduleBoardAccess — the code said
+    // requireAdmin. A salesman opening Completed Jobs got 403 here, the client
+    // fell back to raw /object/public/ URLs, and those 404 on private buckets:
+    // every photo, completion PDF, signature and contract rendered broken.
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const body = await request.json().catch(() => ({}));

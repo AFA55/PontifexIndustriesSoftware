@@ -118,8 +118,15 @@ export async function GET(
     // a PostgREST .or() string — values stored in the DB could contain PostgREST
     // filter syntax and manipulate which rows are returned (query injection).
     // Instead, run two separate parameterised queries and merge in TypeScript.
+    // NO `total_cost`. It is in OFFICE_ONLY_FIELDS — the app already refuses to
+    // send it to its own OPERATORS — and this endpoint is UNAUTHENTICATED, so
+    // it was shipping the price of up to 20 jobs to any holder of a portal link.
+    // Nothing rendered it, which is why it survived: it was visible only in
+    // DevTools or a saved HAR. Removed at the QUERY here (unlike the job-detail
+    // route, nothing downstream needs it), so it cannot be reintroduced by a
+    // careless spread later.
     const jobSelectColumns =
-      'id, job_number, project_name, scheduled_date, status, address, location, customer_signature, customer_signed_at, total_cost, completed_at:work_completed_at';
+      'id, job_number, project_name, scheduled_date, status, address, location, customer_signature, customer_signed_at, completed_at:work_completed_at';
 
     let jobHistory: Record<string, any>[] = [];
 

@@ -200,8 +200,50 @@ export async function GET(
     return NextResponse.json({
       success: true,
       data: {
+        // ── WHAT THE CUSTOMER IS ALLOWED TO RECEIVE ──────────────────────
+        // This was `...jobRow`, which shipped the ENTIRE selected row to an
+        // UNAUTHENTICATED browser: total_cost, drive_distance_miles (both in
+        // OFFICE_ONLY_FIELDS — the app already refuses to send those to its own
+        // OPERATORS), scope_details (internal quoting scope), total_hours_worked,
+        // and the tenant/user UUIDs.
+        //
+        // None of it rendered on screen, which is exactly why it survived: it
+        // was only visible in DevTools, View Source, or a saved HAR. The founder
+        // signs this page in front of clients.
+        //
+        // A WHITELIST, not a blacklist. The select above must keep fetching
+        // jobsite_latitude/longitude and drive_distance_miles because the
+        // arrival estimate is computed from them server-side — so filtering by
+        // removing columns from the query is not an option, and a blacklist
+        // would silently leak the next column somebody adds.
+        //
+        // Every field below is one the portal page actually renders
+        // (app/portal/[token]/job/[jobId]/page.tsx), plus the completion
+        // signature the customer themselves gave.
         job: {
-          ...jobRow,
+          id: jobRow.id,
+          job_number: jobRow.job_number,
+          project_name: jobRow.project_name,
+          customer_name: jobRow.customer_name,
+          job_type: jobRow.job_type,
+          address: jobRow.address,
+          location: jobRow.location,
+          description: jobRow.description,
+          scheduled_date: jobRow.scheduled_date,
+          end_date: jobRow.end_date,
+          arrival_time: jobRow.arrival_time,
+          status: jobRow.status,
+          // Progress timeline the customer watches.
+          in_route_at: jobRow.in_route_at,
+          arrived_at_jobsite_at: jobRow.arrived_at_jobsite_at,
+          work_started_at: jobRow.work_started_at,
+          work_completed_at: jobRow.work_completed_at,
+          // Their own sign-off.
+          customer_signature: jobRow.customer_signature,
+          customer_signed_at: jobRow.customer_signed_at,
+          customer_signature_method: jobRow.customer_signature_method,
+          completion_signer_name: jobRow.completion_signer_name,
+          completion_signed_at: jobRow.completion_signed_at,
           completion_pdf_url: signedCompletionPdf,
           operator_name: operatorName,
         },

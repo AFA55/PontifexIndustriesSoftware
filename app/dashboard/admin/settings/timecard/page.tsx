@@ -9,6 +9,7 @@ import {
   Gauge, Calendar, ToggleLeft, ToggleRight
 } from 'lucide-react';
 import { getCurrentUser } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 import { NumberInput } from '@/components/ui/NumberInput';
 
 interface TimecardSettings {
@@ -155,7 +156,14 @@ export default function TimecardSettingsPage() {
     // Load settings from API, fall back to localStorage
     const loadSettings = async () => {
       try {
-        const res = await fetch('/api/admin/timecard-settings');
+        // NO BEARER TOKEN was sent here, so this 401'd for EVERYONE — including
+        // Amanda and the founder — and the page silently fell back to
+        // localStorage, making saved settings look per-browser. requireAuth
+        // reads the bearer token, never cookies (CLAUDE.md).
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch('/api/admin/timecard-settings', {
+          headers: session ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
         if (res.ok) {
           const json = await res.json();
           if (json.success && json.data) {
@@ -207,9 +215,15 @@ export default function TimecardSettingsPage() {
     setSaving(true);
     try {
       // Save to API
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch('/api/admin/timecard-settings', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          // Same omission as the GET — Save 401'd for every role, so timecard
+          // settings could never be persisted by anyone.
+          ...(session ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           auto_deduct_break: settings.autoDeductBreaks,
           break_duration_minutes: settings.breakDuration,
