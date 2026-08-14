@@ -513,3 +513,41 @@ describe('footage rollups', () => {
     expect(items).toHaveLength(2);
   });
 });
+
+describe('resolveWorkItemDate — work_date is the row\'s own fact', () => {
+  const logs = [
+    { id: 'log-a', log_date: '2026-08-05', day_number: 1, operator_id: 'dante' },
+    { id: 'log-b', log_date: '2026-08-06', day_number: 2, operator_id: 'dante' },
+  ] as any;
+
+  it('uses work_date over every inference below it', () => {
+    expect(
+      resolveWorkItemDate(
+        // daily_log_id, day_number and created_at all point at OTHER days.
+        {
+          id: 'w1', work_date: '2026-08-12', daily_log_id: 'log-a',
+          day_number: 1, operator_id: 'dante', created_at: '2026-08-06T18:00:00Z',
+        } as any,
+        logs
+      )
+    ).toBe('2026-08-12');
+  });
+
+  it('still falls back to the linked log for rows written before the column existed', () => {
+    expect(
+      resolveWorkItemDate(
+        { id: 'w2', daily_log_id: 'log-b', operator_id: 'dante' } as any,
+        logs
+      )
+    ).toBe('2026-08-06');
+  });
+
+  it('ignores an empty work_date rather than dating the row to nothing', () => {
+    expect(
+      resolveWorkItemDate(
+        { id: 'w3', work_date: null, daily_log_id: 'log-a', operator_id: 'dante' } as any,
+        logs
+      )
+    ).toBe('2026-08-05');
+  });
+});

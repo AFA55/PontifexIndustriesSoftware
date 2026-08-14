@@ -92,7 +92,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         supabaseAdmin
           .from('work_items')
           .select(
-            `id, operator_id, daily_log_id, day_number, work_type, quantity, notes, details_json,
+            `id, operator_id, daily_log_id, day_number, work_date, work_type, quantity, notes, details_json,
              core_quantity, core_size, core_depth_inches, linear_feet_cut, cut_depth_inches,
              accessibility_rating, accessibility_description, created_at`
           )

@@ -146,6 +146,8 @@ export interface TicketWorkItem extends WorkItemLike {
   id: string;
   operator_id?: string | null;
   daily_log_id?: string | null;
+  /** The day the work was done, stamped at write time. Beats every inference below. */
+  work_date?: string | null;
   created_at?: string | null;
   accessibility_rating?: number | null;
   accessibility_description?: string | null;
@@ -174,6 +176,12 @@ export function resolveWorkItemDate(
   item: TicketWorkItem,
   logs: TicketDailyLog[]
 ): string | null {
+  // The row's own date, stamped when it was written. Everything below this is
+  // inference that existed only because work_items had no date of their own —
+  // kept for rows written before the column existed, and for the ones the
+  // backfill could only place approximately.
+  if (item.work_date) return item.work_date;
+
   if (item.daily_log_id) {
     const byId = logs.find((l) => l.id === item.daily_log_id);
     if (byId?.log_date) return byId.log_date;
