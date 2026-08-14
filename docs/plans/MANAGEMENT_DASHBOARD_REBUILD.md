@@ -1299,3 +1299,76 @@ Design before building — the trap here is a sixth notes table:
      note shows author + timestamp.
   e. Surface as a **Messages** card on the job, and feed the printed ticket's
      Notes block from the same place so the sheet and the screen agree.
+
+---
+
+# Batch 23 — Aug 13 night. Demo walkthrough, contracts, helper tickets, review privacy.
+
+## M48 — Contracts signed by the customer cannot be viewed by the PMs
+
+> "Another issue that Adam and the other project managers had is that when they
+> try to view the contract that was signed, they cannot view it. We need to be
+> able to view all those contracts."
+
+Third instance of the same family (M34 photos, M35 maintenance image, and the
+completion PDFs already fixed). The `contracts` bucket holds 2 objects and is
+PRIVATE. First moves, in this order:
+  1. Does the row store a path, a public URL against a private bucket, or an
+     expired signed URL? (A public-style URL on a private bucket returns HTTP
+     400 — that was exactly the completion-PDF bug.)
+  2. Impersonate Adam (`salesman`) and David (`supervisor`) against whatever
+     table holds contracts AND against `storage.objects`.
+  3. Fix ends the same way regardless: a signed URL minted at click time, served
+     through `/api/admin/jobs/[id]/documents` alongside the waiver and the
+     completion sign-off, so there is ONE place contracts live.
+
+## M49 — Helper tickets are buried at the bottom of Active Jobs
+
+> "I still want to be able to see the tickets that the helper submits. Right now
+> they're in the bottom section of active jobs. I still want to see the work
+> that they said they performed."
+
+Not missing — misplaced. `helper_work_logs` renders below everything else, so a
+helper's account of the day reads as an afterthought. Fold it into the per-day
+view alongside the operator's work (the work ticket already does this via
+`buildTicketDays()` — the SCREEN should match the SHEET), and make sure it
+appears in M37's Operator Daily Tickets too, since a helper's day is billable.
+
+## M50 — Review visibility: averages for helpers, detail for supervisors
+
+> "Let's make it so they can't see what everyone is saying about them. We'll
+> just have an average helper review rating and average supervisor rating. The
+> supervisor one I could have the points and the reason why they got that,
+> because the supervisor is there to tell them what they're doing wrong and what
+> they're doing right — so you can show that one. But the helper reviews stay a
+> bit more private, to not start squabbles or fights within the team."
+
+Two different documents, deliberately:
+  • **Peer / helper reviews → AGGREGATE ONLY.** The person sees their average
+    and nothing else: no comments, no per-reviewer scores, no way to infer who
+    said what. ⚠️ An average over a SMALL n leaks the individual — with two
+    reviewers, one score plus the average reveals the other. Suppress the
+    number below a threshold (n < 3) rather than showing a de-anonymising
+    average.
+  • **Supervisor reviews → FULL DETAIL, attributed.** Coaching only works if you
+    know what you did and who said it.
+  This is a permission/shape decision in the ratings read path, not new tables:
+  `rating_submissions` and `job_helper_reviews` already exist.
+
+## M51 — The demo walkthrough (for the founder's presentation)
+
+Demo ticket **DEMO-2026-000002** reset Aug 13 to a clean state:
+runs Aug 13→14 · status `assigned` · site contact **470-658-6313** (the
+founder's own phone) · `require_waiver_signature = true` · waiver unsigned ·
+`in_route_at` null, so the first In Route tap fires the whole customer sequence.
+Work items, daily logs, helper logs, signature requests and the waiver
+`reminder_log` rows were all cleared so the escalation can replay from the top.
+
+**Logins:** `zztest.operator@pontifexqa.com` / `zztest.helper@pontifexqa.com`,
+password `DemoTest2026!`, company code `PATRIOT`.
+
+⚠️ TIMING, because it matters for a live demo: the operator chase is driven by a
+cron that runs every 15 minutes and only fires once the crew is DUE on site —
+In Route + 30 minutes. A presentation cannot wait for that. Trigger the run by
+hand with the CRON_SECRET against
+`/api/cron/waiver-signature-reminders` to show the reminder on demand.
