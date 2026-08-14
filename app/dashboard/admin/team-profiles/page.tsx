@@ -37,6 +37,9 @@ interface TeamMember {
   next_review_date?: string | null;
   nickname?: string | null;
   truck_number?: string | null;
+  /** Management-only. Null for everyone until somebody sets it — which is why
+   *  every labor-cost figure on the platform currently reads $0. */
+  hourly_rate?: number | null;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -663,6 +666,8 @@ interface EditInfoForm {
   emergency_contact_relationship: string;
   next_review_date: string;
   truck_number: string;
+  /** Management-only. Kept as a string so an emptied field can clear the rate. */
+  hourly_rate: string;
 }
 
 function seedEditInfoForm(member: TeamMember): EditInfoForm {
@@ -677,6 +682,10 @@ function seedEditInfoForm(member: TeamMember): EditInfoForm {
     emergency_contact_relationship: (member as any).emergency_contact_relationship ?? '',
     next_review_date: member.next_review_date ?? '',
     truck_number: member.truck_number ?? '',
+    hourly_rate:
+      member.hourly_rate === null || member.hourly_rate === undefined
+        ? ''
+        : String(member.hourly_rate),
   };
 }
 
@@ -729,6 +738,14 @@ function EditInfoTab({
       (Object.keys(form) as Array<keyof EditInfoForm>).forEach(k => {
         if (form[k] === initial[k]) return;
         if (k === 'next_review_date' && !canEditAdminFields) return; // guard
+        if (k === 'hourly_rate') {
+          // Somebody's pay — management only, and an emptied box CLEARS it
+          // rather than saving an empty string the API would reject.
+          if (!canEditAdminFields) return;
+          const v = form.hourly_rate.trim().replace(/^\$/, '');
+          payload.hourly_rate = v === '' ? null : Number(v);
+          return;
+        }
         if (k === 'email') {
           // Email is the login identity — management-only, never nulled, validated + normalized.
           if (!canEditAdminFields) return; // guard: non-management cannot change email
@@ -894,6 +911,34 @@ function EditInfoTab({
                 onChange={e => set('next_review_date', e.target.value)}
                 className={inputCls}
               />
+            </div>
+          )}
+          {/* PAY. Every labor-cost figure on the platform reads $0 today because
+              nobody has an hourly rate — 0 of 35. This is the box that turns
+              those zeros into numbers. Management only; it is somebody's wage. */}
+          {canEditAdminFields && (
+            <div>
+              <label className={labelCls} htmlFor="ei-rate">Hourly Rate</label>
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-slate-500">
+                  $
+                </span>
+                <input
+                  id="ei-rate"
+                  type="number"
+                  inputMode="decimal"
+                  min="0"
+                  max="1000"
+                  step="0.25"
+                  value={form.hourly_rate}
+                  onChange={e => set('hourly_rate', e.target.value)}
+                  className={`${inputCls} pl-7`}
+                  placeholder="0.00"
+                />
+              </div>
+              <p className="mt-1 text-[11px] text-gray-500 dark:text-slate-400">
+                Feeds labor cost on jobs and P&amp;L. Leave blank if you&apos;d rather not set it yet.
+              </p>
             </div>
           )}
         </div>

@@ -183,7 +183,11 @@ export async function PATCH(
       'date_of_birth', 'profile_picture_url', 'truck_number',
       'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
     ];
-    const adminOnlyFields = ['hire_date', 'next_review_date', 'role', 'active'];
+    // `hourly_rate` is management-only and is what turns every labor-cost figure
+    // on the platform from "$0" into a number — P&L, job cost, the crew grid.
+    // Zero of 35 people have one set, which is why those screens read zero
+    // everywhere. It is admin-side because it is somebody's pay.
+    const adminOnlyFields = ['hire_date', 'next_review_date', 'role', 'active', 'hourly_rate'];
     const allowedFields = isAdmin
       ? [...selfOnlyFields, ...adminOnlyFields]
       : selfOnlyFields;
@@ -192,6 +196,25 @@ export async function PATCH(
     for (const field of allowedFields) {
       if (body[field] !== undefined) {
         updateData[field] = body[field];
+      }
+    }
+
+    // Pay is money: accept a positive number or an explicit clear, nothing else.
+    // A silently-coerced NaN here would wipe a wage and read as "the rate never
+    // saved" — and every labor-cost figure downstream multiplies by it.
+    if ('hourly_rate' in updateData) {
+      const raw = updateData.hourly_rate;
+      if (raw === null || raw === '') {
+        updateData.hourly_rate = null;
+      } else {
+        const rate = Number(raw);
+        if (!Number.isFinite(rate) || rate < 0 || rate > 1000) {
+          return NextResponse.json(
+            { error: 'Enter an hourly rate between 0 and 1000, or leave it blank.' },
+            { status: 400 }
+          );
+        }
+        updateData.hourly_rate = Math.round(rate * 100) / 100;
       }
     }
 

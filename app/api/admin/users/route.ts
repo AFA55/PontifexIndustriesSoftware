@@ -65,7 +65,12 @@ export async function GET(request: NextRequest) {
     // Build query
     let query = supabaseAdmin
       .from('profiles')
-      .select('id, full_name, role, email, active, phone_number, phone, profile_picture_url, created_at, date_of_birth, hire_date, next_review_date, nickname')
+      // `hourly_rate` and `truck_number` were missing, so the Team Profiles edit
+      // form seeded them blank every time — a saved rate looked like it had not
+      // saved the moment you reopened the page. Safe to return here: this route
+      // is already gated to admin / super_admin / operations_manager above, and
+      // is tenant-scoped below.
+      .select('id, full_name, role, email, active, phone_number, phone, profile_picture_url, created_at, date_of_birth, hire_date, next_review_date, nickname, truck_number, hourly_rate')
       .eq('active', true)
       .is('deleted_at', null) // never show removed users
       .order('full_name');
