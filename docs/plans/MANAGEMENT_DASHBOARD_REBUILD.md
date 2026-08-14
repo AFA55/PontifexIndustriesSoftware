@@ -1208,3 +1208,94 @@ Visible in the board screenshot: a **Deleted User** row owning DEMO-2026-000002.
 Deactivated profiles still hold assignments. Decide the rule (reassign on
 deactivation, or surface as Unassigned) and make the board stop presenting a
 deleted person as a crew slot.
+
+---
+
+# Batch 22 — Aug 13 night. Notes that go nowhere, reports nobody can read, payroll.
+
+## M44 — 🔴 The project manager's notes are written and then lost
+
+> "Additional notes can only be seen on the schedule page. The additional notes
+> left on the schedule form for the ticket cannot be seen anywhere else. The
+> additional notes are important for us to see when we print tickets — we can't
+> see additional notes. And when I click on Active Jobs I also want to see the
+> additional notes, to see all the notes left by the project managers."
+
+**Traced Aug 13 — the plumbing is intact, so do NOT start by rewiring it:**
+
+    schedule form   sends  additional_notes
+    create route    stores additional_info          (app/api/admin/schedule-form/route.ts:176)
+    summary API     returns additional_notes ← additional_info  (summary/route.ts:611)
+    printed ticket  renders {job.additional_notes}  (print page, Notes section)
+
+So the field survives the round trip and the print sheet already has a Notes
+section. First moves, in order:
+  1. Put a note on a real job and PRINT it. If it appears, the complaint is
+     about jobs created BEFORE some fix, or about a different notes field —
+     find which one he means before touching code.
+  2. Check the EDIT path: the form loads `j.additional_notes` (page.tsx:1171).
+     If the job loader returns `additional_info` instead, re-saving a job
+     silently WIPES the note. That is the most likely real bug here and it is
+     destructive — check it first.
+  3. Active Jobs (the job-detail page) has no additional-notes render at all —
+     that half is simply missing and should be added.
+
+## M45 — Reports are invisible to the people who need them
+
+> "For reports, right now admin cannot see reports, and the project manager
+> cannot see reports on their jobs. I would like there to be, on the reports
+> page, where a project manager can also see the reports left by a supervisor."
+
+Almost certainly the SAME shape as M38 (Adam's 403) — a page whose role list and
+whose endpoint guard disagree. **Check the guard before assuming anything else:**
+grep the visit-report/report endpoints for `requireAdmin` / `requireSuperAdmin`
+and compare against the roles the page admits. If they differ, the page is the
+spec (see the rule recorded in M38).
+
+Second half is a real feature, not a permission: a PM should see the reports on
+THEIR jobs — scope by `project_manager_id` on the job, not by who wrote the
+report.
+
+## M46 — Payroll runs SATURDAY → FRIDAY
+
+> "Payroll runs Saturday through Friday. That's just so you keep it in the back
+> of your head, or keep it in the file, so they understand later on we'll be
+> working on trying to integrate payroll into our software some way."
+
+Not a task yet — a CONSTRAINT to design against, recorded so it is not
+discovered late:
+  • Any week bucketing (the work ticket's week mode, M37's weekly print, hours
+    roll-ups) should offer a Sat–Fri week, not assume Mon–Sun. `timecards` already
+    has a `week_start` column — find out what writes it and whether it agrees.
+  • Payroll integration will need the hours to be right first: M19 (split days),
+    M23 (work dated when typed), M29 (missing day). Payroll built on today's
+    numbers would pay the wrong hours.
+
+## M47 — One place for notes, and operator notes that actually reach the operator
+
+> "There's different places that notes are. They're all not synced together.
+> There should be a place where in the jobs we can have internal notes and
+> operator notes. The operator notes will send notifications to the operator
+> based on the job. It could be a different card that says Messages, and they
+> click on Messages and it'll say what project manager left what notes."
+
+Today notes live in at least five places: `job_orders.additional_info` (schedule
+form), `job_notes` (the notes API), `daily_job_logs.notes` and
+`work_items.notes` (the crew's), `helper_work_logs.work_description`, and the
+customer thread (`CustomerCommentsPanel`). Nobody can see them together.
+
+Design before building — the trap here is a sixth notes table:
+  a. **Inventory what exists** and decide which is the canonical store. `job_notes`
+     already has an API and is the most likely home; the others are records of
+     work and should be READ into the view, not moved.
+  b. **Two audiences, one thread.** INTERNAL (office only) and OPERATOR
+     (visible to the crew). The audience is a property of the note, not a
+     separate table.
+  c. **An operator note NOTIFIES.** Reuse `sendNotification` with the
+     `job_dispatched`/general category and a link to the job. ⚠️ Device
+     coverage again — several crew have no push token and SMS off, so a note
+     that "sent" may reach nobody. Surface the delivery result.
+  d. **Attribution is the point**: "what project manager left what notes" — every
+     note shows author + timestamp.
+  e. Surface as a **Messages** card on the job, and feed the printed ticket's
+     Notes block from the same place so the sheet and the screen agree.
