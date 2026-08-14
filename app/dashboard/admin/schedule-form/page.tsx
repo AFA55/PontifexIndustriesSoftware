@@ -2000,6 +2000,13 @@ export default function ScheduleFormPage() {
             // the whole all-or-nothing update.
             scheduled_date: payload.scheduled_date || null,
             end_date: payload.end_date,
+            // The edit branch hand-builds its own PATCH body rather than
+            // reusing `payload`, so a field added to `payload` alone reaches the
+            // CREATE path only. Without this line the Will Call toggle rendered,
+            // loaded the current value, accepted the flip, saved successfully —
+            // and changed nothing. Silent, and the kind of thing you only catch
+            // by following the second code path.
+            is_will_call: payload.is_will_call,
             // Difficulty / notes / cost
             difficulty_rating: payload.difficulty_rating,
             additional_notes: payload.additional_notes,  // → additional_info
@@ -4215,6 +4222,53 @@ export default function ScheduleFormPage() {
                 </div>
               )}
             </SectionCard>
+            {/* ── WILL CALL ──────────────────────────────────────────────────
+                Founder, Aug 13: "Will call is there in case we CAN schedule a
+                job, but if they wanna push further, we have the will calls
+                available… if a job pushes off or someone cancels, we could
+                click on Will Calls and see the jobs that want to move up if the
+                space becomes available."
+
+                So it is a WAITING LIST FOR AN EARLIER SLOT, not a parking lot
+                for unscheduled work — which is why the copy below says "move it
+                up" rather than "schedule later". The job still keeps its date;
+                will-call only marks it as willing to come forward. */}
+            <div>
+              <button
+                type="button"
+                onClick={() => updateForm({ is_will_call: !form.is_will_call })}
+                aria-pressed={form.is_will_call}
+                className={`w-full text-left rounded-2xl p-4 border-2 transition-all min-h-[44px] ${
+                  form.is_will_call
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10'
+                    : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                      form.is_will_call ? 'bg-amber-500' : 'bg-slate-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                        form.is_will_call ? 'left-[22px]' : 'left-0.5'
+                      }`}
+                    />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      Add to Will Call
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-white/60 mt-0.5">
+                      The customer would take an earlier slot if one opens up. When a
+                      job pushes off or cancels, the office checks Will Call to see
+                      who wants to move up.
+                    </p>
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         );
 
@@ -4638,53 +4692,6 @@ export default function ScheduleFormPage() {
               />
             </div>
 
-            {/* ── WILL CALL ──────────────────────────────────────────────────
-                Founder, Aug 13: "Will call is there in case we CAN schedule a
-                job, but if they wanna push further, we have the will calls
-                available… if a job pushes off or someone cancels, we could
-                click on Will Calls and see the jobs that want to move up if the
-                space becomes available."
-
-                So it is a WAITING LIST FOR AN EARLIER SLOT, not a parking lot
-                for unscheduled work — which is why the copy below says "move it
-                up" rather than "schedule later". The job still keeps its date;
-                will-call only marks it as willing to come forward. */}
-            <div>
-              <button
-                type="button"
-                onClick={() => updateForm({ is_will_call: !form.is_will_call })}
-                aria-pressed={form.is_will_call}
-                className={`w-full text-left rounded-2xl p-4 border-2 transition-all min-h-[44px] ${
-                  form.is_will_call
-                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10'
-                    : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`mt-0.5 flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${
-                      form.is_will_call ? 'bg-amber-500' : 'bg-slate-300 dark:bg-white/20'
-                    }`}
-                  >
-                    <span
-                      className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
-                        form.is_will_call ? 'left-[22px]' : 'left-0.5'
-                      }`}
-                    />
-                  </span>
-                  <div className="min-w-0">
-                    <p className="font-bold text-slate-900 dark:text-white">
-                      Add to Will Call
-                    </p>
-                    <p className="text-sm text-slate-500 dark:text-white/60 mt-0.5">
-                      The customer would take an earlier slot if one opens up. When a
-                      job pushes off or cancels, the office checks Will Call to see
-                      who wants to move up.
-                    </p>
-                  </div>
-                </div>
-              </button>
-            </div>
           </div>
         );
 

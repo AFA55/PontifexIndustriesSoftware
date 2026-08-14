@@ -60,6 +60,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const { id: jobId } = await context.params;
     const tenantId = auth.tenantId;
 
+    // TENANT GATE. Unlike its three siblings this route never proved the job
+    // belongs to the caller's tenant — it went straight to the child tables,
+    // none of which filter on tenant_id. Anyone holding a job UUID could read
+    // another tenant's dates, hours, notes and crew names. Not introduced when
+    // this route was widened from 3 roles to 5, but widening the audience is
+    // exactly the moment to close it.
+    {
+      let gate = supabaseAdmin.from('job_orders').select('id').eq('id', jobId);
+      if (tenantId) gate = gate.eq('tenant_id', tenantId);
+      const { data: allowed } = await gate.maybeSingle();
+      if (!allowed) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+    }
+
     // 1+2. Scope targets and the operator work logged against them, derived
     // from work_items. This replaced a read of `job_progress_entries`, a table
     // nothing in the codebase writes — see lib/job-progress.ts.

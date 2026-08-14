@@ -127,7 +127,13 @@ export async function GET(request: NextRequest) {
       // for unmarked conduit onto the customer.
       const { data: profs } = await supabaseAdmin
         .from('profiles')
-        .select(PROFILE_PHONE_SELECT)
+        // `id` is NOT in PROFILE_PHONE_SELECT (it is just 'phone_number, phone'), so
+        // without it every row came back with `p.id === undefined`, the Map held one
+        // entry keyed undefined, and every lookup returned null — leaving SMS exactly
+        // as unreachable as before the fix that was supposed to enable it. Every other
+        // caller of this constant prefixes `id`; this one did not, and the `(p: any)`
+        // cast is why the compiler stayed quiet.
+        .select(`id, ${PROFILE_PHONE_SELECT}`)
         .in('id', recipients);
       const phoneById = new Map<string, string | null>(
         (profs ?? []).map((p: any) => [p.id, readProfilePhone(p)])

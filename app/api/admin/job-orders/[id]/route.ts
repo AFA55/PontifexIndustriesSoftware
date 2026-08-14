@@ -139,6 +139,22 @@ export async function PATCH(
       );
     }
 
+    // The salesman gate above constrains what the payload may set the status
+    // TO. It could not constrain what the job IS, because the job had not been
+    // read yet — so a salesman could PATCH an in_progress or completed job back
+    // to 'scheduled'. Worse, moving the start also clears the crew, so that one
+    // call would have silently unassigned the operator and helper from a job
+    // being worked in the field. Now that the row is in hand, check it.
+    const PUSHABLE_FROM = new Set(['pending_approval', 'scheduled', 'assigned']);
+    if (canPushJobs && !canEditJobs && !PUSHABLE_FROM.has(String(oldJobOrder.status))) {
+      return NextResponse.json(
+        {
+          error: `This job is already ${oldJobOrder.status?.replace(/_/g, ' ')} — it can no longer be scheduled from here.`,
+        },
+        { status: 403 }
+      );
+    }
+
     // Build update object - only include fields that were actually sent
     const updateFields: Record<string, any> = {
       updated_at: new Date().toISOString()
@@ -264,8 +280,18 @@ export async function PATCH(
     // rather than trusted, whatever the caller sent and whichever path it came
     // from. Preserve the job's ORIGINAL duration when we know it; otherwise
     // collapse to a single day.
-    const finalStart = (updateFields.scheduled_date ?? oldJobOrder.scheduled_date) as string | null;
-    const finalEnd = (updateFields.end_date ?? oldJobOrder.end_date) as string | null;
+    // `??` falls through on an explicit null as well as an absent key, and the
+    // schedule form sends `end_date: form.end_date || null`. So clearing End
+    // while moving Start made the corrector read the OLD end, decide the span
+    // was inverted, and write back a multi-day job the admin never asked for:
+    // Aug 10–12 moved to Aug 20 with End cleared became Aug 20–22. Test for the
+    // KEY, not for a value.
+    const finalStart = ('scheduled_date' in updateFields
+      ? updateFields.scheduled_date
+      : oldJobOrder.scheduled_date) as string | null;
+    const finalEnd = ('end_date' in updateFields
+      ? updateFields.end_date
+      : oldJobOrder.end_date) as string | null;
     if (finalStart && finalEnd && finalEnd < finalStart) {
       const dayMs = 24 * 60 * 60 * 1000;
       const prevStart = oldJobOrder.scheduled_date as string | null;
