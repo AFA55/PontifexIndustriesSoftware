@@ -86,16 +86,41 @@ export async function POST(
       );
     }
 
-    // Delete existing work items for this job + day (replace pattern) — ONLY
+    // Replace-on-resubmit, keyed on the DATE rather than the day number — ONLY
     // this submitter's rows. Without the operator filter, one crew member's
     // resubmit wiped every other crew member's items for the day.
+    //
+    // The key changed because `dayNumber` arrives from the CLIENT and the two
+    // write paths derive it differently. The moment they disagreed, this delete
+    // matched nothing and the insert below simply added — which is half of how
+    // Pratt reached 2,800 linear feet on a day that was a fraction of it. A date
+    // is a fact about the work; a day number is a recomputable label, and it
+    // moved when day numbers became calendar positions.
     const effectiveDay = dayNumber || 1;
+
+    // The day this work belongs to. Trust the operator's own local date when it
+    // is well-formed — that is what `workDate` has always carried — and fall
+    // back to the TENANT's calendar, never the server's. Vercel runs UTC, so a
+    // 7pm Eastern submission would otherwise book to tomorrow.
+    let tenantTz = 'America/New_York';
+    try {
+      const { data: tzRow } = await supabaseAdmin
+        .from('tenants')
+        .select('timezone')
+        .eq('id', job.tenant_id ?? callerTenantId)
+        .maybeSingle();
+      if (tzRow?.timezone) tenantTz = tzRow.timezone;
+    } catch { /* default tz, same as the daily-log route */ }
+    const effectiveWorkDate =
+      typeof workDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(workDate)
+        ? workDate
+        : new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
     await supabaseAdmin
       .from('work_items')
       .delete()
       .eq('job_order_id', jobId)
-      .eq('day_number', effectiveDay)
-      .eq('operator_id', auth.userId);
+      .eq('operator_id', auth.userId)
+      .eq('work_date', effectiveWorkDate);
 
     // Per-submission difficulty → the 1–5 accessibility columns (same label
     // map the daily-log route uses). Applied to every row of this submission.
@@ -118,6 +143,8 @@ export async function POST(
         quantity: item.quantity || 1,
         notes: item.notes || null,
         day_number: effectiveDay,
+        // The row's own identity. day_number above is a display label.
+        work_date: effectiveWorkDate,
         details_json: null,
         accessibility_rating: submissionRating,
         accessibility_description: submissionDifficultyNote,
@@ -388,10 +415,37 @@ export async function GET(
 
     const { id: jobId } = await params;
 
-    const { data: items, error } = await supabaseAdmin
+    // ── THE BUG THIS FILTER EXISTS TO KILL (founder P0, Aug 14) ─────────────
+    //
+    // This handler returned EVERY work item on the job — every day, every
+    // operator — and the day-complete screen hydrated all of them into "what I
+    // did today", then submitted them. On a one-day job that is invisible. On a
+    // multi-day job, day 2 resubmits day 1, day 3 resubmits days 1 and 2, and
+    // the row count compounds:
+    //
+    //     Pratt JOB-2026-895358 — day 1: 200 LF · day 2: 1,000 · day 3: 2,800
+    //     Collins JOB-2026-124747 — day 1: 106 LF · day 2: 322 (106 three times)
+    //     Parkk JOB-2026-424813 — day 9: 535 across 7 rows, real day was ~139
+    //
+    // Those are billing quantities. It was also a cross-operator leak: one
+    // operator's day-complete resubmitted a crewmate's items under their name.
+    //
+    // Callers now say WHICH day they want, and whose. Unscoped reads still work
+    // — the admin ticket legitimately wants the whole job — but the operator
+    // screens must scope, and the ones that matter now do.
+    const url = new URL(request.url);
+    const date = url.searchParams.get('date');
+    const mine = url.searchParams.get('mine') === '1';
+
+    let query = supabaseAdmin
       .from('work_items')
       .select('*')
-      .eq('job_order_id', jobId)
+      .eq('job_order_id', jobId);
+
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) query = query.eq('work_date', date);
+    if (mine) query = query.eq('operator_id', auth.userId);
+
+    const { data: items, error } = await query
       .order('day_number', { ascending: true })
       .order('created_at', { ascending: true });
 

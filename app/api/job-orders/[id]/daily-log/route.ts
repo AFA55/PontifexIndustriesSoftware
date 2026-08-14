@@ -392,6 +392,8 @@ export async function POST(
         // reads silently drop these rows.
         tenant_id: job.tenant_id ?? tenantId ?? null,
         day_number: dayNum,
+        // The row's own identity, and the key the replace above uses.
+        work_date: effectiveDate,
         // The log row this work belongs to. THE identity of "this operator's
         // work on this job on this date" — stable across resubmits because the
         // log is upserted on (job_order_id, operator_id, log_date). day_number
@@ -426,14 +428,19 @@ export async function POST(
       //
       // day_number is still cleared alongside it to sweep up rows written
       // before daily_log_id was stamped.
+      // Keyed on the DATE now, which is the same key the work-performed route
+      // uses — so the two write paths can no longer disagree about which rows
+      // this submission replaces. They previously derived day_number
+      // differently, and every disagreement meant the delete matched nothing
+      // and the insert simply added on top.
       const replaceQuery = supabaseAdmin
         .from('work_items')
         .delete()
         .eq('job_order_id', jobId)
         .eq('operator_id', user.id);
       const { error: replaceError } = dailyLog?.id
-        ? await replaceQuery.or(`daily_log_id.eq.${dailyLog.id},day_number.eq.${dayNum}`)
-        : await replaceQuery.eq('day_number', dayNum);
+        ? await replaceQuery.or(`daily_log_id.eq.${dailyLog.id},work_date.eq.${effectiveDate}`)
+        : await replaceQuery.eq('work_date', effectiveDate);
       if (replaceError) {
         console.error('Error clearing prior work items:', replaceError);
         return NextResponse.json(

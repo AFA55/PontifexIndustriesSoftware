@@ -162,9 +162,22 @@ export default function DayCompletePage() {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const res = await fetch(`/api/job-orders/${jobId}/work-items`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
+        // SCOPED TO TODAY, AND TO ME (founder P0, Aug 14).
+        //
+        // This used to ask for the job's work items with no filter at all, get
+        // back EVERY day and EVERY operator, load the lot into "what I did
+        // today", and submit it. One-day jobs never showed it. Multi-day jobs
+        // compounded: day 2 resubmitted day 1, day 3 resubmitted 1 and 2, and
+        // Pratt reached 2,800 linear feet on day 3 against a real day a
+        // fraction of that. Those are the numbers an invoice is built from.
+        //
+        // `mine=1` matters as much as the date: without it one operator's
+        // day-complete resubmitted a crewmate's work under their own name.
+        const today = toLocalYMD();
+        const res = await fetch(
+          `/api/job-orders/${jobId}/work-items?date=${today}&mine=1`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
         if (res.ok) {
           const json = await res.json();
           const rows: any[] = json.data || json.items || [];
