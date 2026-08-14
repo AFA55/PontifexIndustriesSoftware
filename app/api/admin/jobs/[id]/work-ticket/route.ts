@@ -207,6 +207,20 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .is('deleted_at', null)
     );
 
+    // WHO LED EACH DAY. The office reassigns leads mid-job, so the job-level
+    // `assigned_to` is not enough to decide whose measurements the sheet
+    // prints. The per-day crew ledger is the office's own record of it.
+    const { data: dayLeadRows } = await supabaseAdmin
+      .from('job_daily_assignments')
+      .select('assignment_date, operator_id')
+      .eq('job_order_id', jobId)
+      .not('operator_id', 'is', null);
+    const leadByDate = new Map<string, string>(
+      ((dayLeadRows as Array<{ assignment_date: string; operator_id: string }>) ?? [])
+        .filter((r) => r.assignment_date && r.operator_id)
+        .map((r) => [r.assignment_date, r.operator_id])
+    );
+
     // ── 5. Range + grouping ────────────────────────────────────────────────
     const worked = datesWorked(timecards, logs, workItems, helperLogs);
     const today = toLocalYMD();
@@ -226,6 +240,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       }),
       names,
       fallbackOperatorId: job.assigned_to ?? null,
+      // The printed sheet carries the LEAD's measurements only — see the note
+      // on `quantitiesFrom`. Everyone else keeps their name and hours.
+      quantitiesFrom: 'lead',
+      leadByDate,
     });
 
     // ── 6. Standby / subsistence inside the printed range ──────────────────

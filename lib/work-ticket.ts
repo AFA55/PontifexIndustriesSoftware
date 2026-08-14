@@ -334,6 +334,13 @@ export interface TicketPersonDay {
   log_note: string | null;
   /** helper_work_logs.work_description for helpers (internal — office use). */
   helper_note: string | null;
+  /**
+   * This person DID submit measurements, and the printed sheet is deliberately
+   * not showing them because the lead measured the whole scope. Without this
+   * the sheet prints ruled blank lines under their name, which reads as "they
+   * filed nothing" — the opposite of the truth.
+   */
+  measurements_by_lead?: boolean;
 }
 
 export interface TicketDay {
@@ -355,6 +362,32 @@ export interface BuildTicketDaysInput {
   names: Map<string, string | null>;
   /** Fallback owner for work_items with a null operator_id (usually the lead). */
   fallbackOperatorId?: string | null;
+  /**
+   * WHOSE MEASUREMENTS GO ON THE PRINTED TICKET (founder, Aug 14).
+   *
+   * 'lead'     — only the day's lead. Everyone else keeps their name, role and
+   *              hours on the sheet, but contributes no quantities.
+   * 'everyone' — every crew member's own entries, summed. The screen view.
+   *
+   * WHY. On a crew day the lead walks the job at the end and measures the
+   * WHOLE scope — that is the number. The other operators also log what they
+   * personally cut, which is genuinely useful on screen but is the same footage
+   * counted a second time. Pratt at 474 Oconee Business Pkwy, Westminster:
+   * Conrade (lead) logged 700 + 400 and Devin logged 200 + 300 + 400, and the
+   * ticket printed 3,200 LF. Only Conrade's figures describe the job.
+   *
+   * "I don't need to see what the helper input for these tickets, just who they
+   * are with. It's nice to see online what they did, but when I'm printing
+   * tickets I want to see what the operator says — they're in charge of the
+   * entire scope."
+   */
+  quantitiesFrom?: 'lead' | 'everyone';
+  /**
+   * date (YYYY-MM-DD) → the user_id leading that day, from the per-day crew
+   * ledger. The office reassigns leads mid-job, so a job-level lead is not
+   * enough. Falls back to whoever `roles` marks 'lead'.
+   */
+  leadByDate?: Map<string, string>;
 }
 
 const UNASSIGNED = '__unassigned__';
@@ -462,6 +495,43 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     const logged = normalizeLoggedWork(log.work_performed);
     if (p.work_items.length === 0) p.logged_work = logged;
     else p.work_items = enrichFromLoggedWork(p.work_items, logged);
+  }
+
+  // 6. LEAD-ONLY MEASUREMENTS (print mode).
+  //
+  //    The lead measures the whole scope at the end of the day; everyone else's
+  //    entries describe the same footage a second time. So on the printed sheet
+  //    only the lead's quantities survive — every other person keeps their name,
+  //    role, times and hours, because who was there matters, and loses only the
+  //    numbers.
+  //
+  //    The fallback is the important half: if the lead filed nothing that day,
+  //    the crew's entries stand. Blanking them would print a worked day as no
+  //    work at all, which is a worse lie than the double count. Real case on
+  //    this very job — 11 Aug, only Devin filed.
+  if ((input.quantitiesFrom ?? 'lead') === 'lead') {
+    for (const [date, people] of byDate) {
+      const leadId =
+        input.leadByDate?.get(date) ??
+        Array.from(people.keys()).find((id) => input.roles.get(id) === 'lead');
+      if (!leadId) continue;
+
+      const lead = people.get(leadId);
+      const leadHasWork =
+        !!lead && (lead.work_items.length > 0 || lead.logged_work.length > 0);
+      if (!leadHasWork) continue;
+
+      for (const [userId, person] of people) {
+        if (userId === leadId) continue;
+        // Only flag people who actually had something — someone who genuinely
+        // filed nothing still gets ruled lines to write on.
+        if (person.work_items.length > 0 || person.logged_work.length > 0) {
+          person.measurements_by_lead = true;
+        }
+        person.work_items = [];
+        person.logged_work = [];
+      }
+    }
   }
 
   return Array.from(byDate.keys())

@@ -551,3 +551,104 @@ describe('resolveWorkItemDate — work_date is the row\'s own fact', () => {
     ).toBe('2026-08-05');
   });
 });
+
+describe('buildTicketDays — the printed sheet carries the LEAD\'s measurements', () => {
+  const range = { from: '2026-08-10', to: '2026-08-16' } as any;
+  const roles = new Map<string, any>([['conrade', 'lead'], ['devin', 'operator']]);
+  const names = new Map<string, string | null>([
+    ['conrade', 'Conrade Richardson'],
+    ['devin', 'Devin scroggs'],
+  ]);
+  const item = (id: string, op: string, date: string, qty: number) =>
+    ({ id, operator_id: op, work_date: date, work_type: 'SLAB SAW', quantity: qty } as any);
+
+  const base = { range, timecards: [], logs: [], helperLogs: [], roles, names } as any;
+
+  it('drops the co-operator\'s footage — Westminster printed 3,200 LF for 1,100', () => {
+    const days = buildTicketDays({
+      ...base,
+      workItems: [
+        item('a', 'conrade', '2026-08-12', 700),
+        item('b', 'devin', '2026-08-12', 300),
+        item('c', 'conrade', '2026-08-13', 400),
+        item('d', 'devin', '2026-08-13', 400),
+      ],
+    });
+    const printed = days.flatMap((d) => d.people).flatMap((p) => p.work_items);
+    expect(printed.map((i: any) => i.id).sort()).toEqual(['a', 'c']);
+    expect(printed.reduce((s, i: any) => s + Number(i.quantity), 0)).toBe(1100);
+  });
+
+  it('still lists the co-operator by name — you need to know who was there', () => {
+    const days = buildTicketDays({
+      ...base,
+      workItems: [item('a', 'conrade', '2026-08-12', 700), item('b', 'devin', '2026-08-12', 300)],
+    });
+    const people = days[0].people.map((p) => p.name).sort();
+    expect(people).toEqual(['Conrade Richardson', 'Devin scroggs']);
+  });
+
+  it('KEEPS the crew\'s work on a day the lead filed nothing — 11 Aug, only Devin', () => {
+    const days = buildTicketDays({ ...base, workItems: [item('x', 'devin', '2026-08-11', 200)] });
+    const printed = days.flatMap((d) => d.people).flatMap((p) => p.work_items);
+    expect(printed.map((i: any) => i.id)).toEqual(['x']);
+  });
+
+  it('honours a per-day lead change over the job-level lead', () => {
+    const days = buildTicketDays({
+      ...base,
+      leadByDate: new Map([['2026-08-12', 'devin']]),
+      workItems: [
+        item('a', 'conrade', '2026-08-12', 700),
+        item('b', 'devin', '2026-08-12', 300),
+      ],
+    });
+    const printed = days.flatMap((d) => d.people).flatMap((p) => p.work_items);
+    expect(printed.map((i: any) => i.id)).toEqual(['b']);
+  });
+
+  it('quantitiesFrom "everyone" keeps both — the on-screen view is unchanged', () => {
+    const days = buildTicketDays({
+      ...base,
+      quantitiesFrom: 'everyone',
+      workItems: [
+        item('a', 'conrade', '2026-08-12', 700),
+        item('b', 'devin', '2026-08-12', 300),
+      ],
+    });
+    const printed = days.flatMap((d) => d.people).flatMap((p) => p.work_items);
+    expect(printed.map((i: any) => i.id).sort()).toEqual(['a', 'b']);
+  });
+});
+
+describe('buildTicketDays — a suppressed crew member is not "filed nothing"', () => {
+  const range = { from: '2026-08-10', to: '2026-08-16' } as any;
+  const roles = new Map<string, any>([['conrade', 'lead'], ['devin', 'operator']]);
+  const names = new Map<string, string | null>([['conrade', 'Conrade'], ['devin', 'Devin']]);
+  const item = (id: string, op: string, date: string, qty: number) =>
+    ({ id, operator_id: op, work_date: date, work_type: 'SLAB SAW', quantity: qty } as any);
+  const base = { range, timecards: [], logs: [], helperLogs: [], roles, names } as any;
+
+  it('flags the co-operator whose figures were suppressed', () => {
+    const days = buildTicketDays({
+      ...base,
+      workItems: [item('a', 'conrade', '2026-08-12', 700), item('b', 'devin', '2026-08-12', 300)],
+    });
+    const devin = days[0].people.find((p) => p.user_id === 'devin')!;
+    expect(devin.measurements_by_lead).toBe(true);
+    expect(devin.work_items).toEqual([]);
+  });
+
+  it('does NOT flag someone who genuinely submitted nothing — they get ruled lines', () => {
+    const days = buildTicketDays({
+      ...base,
+      timecards: [
+        { id: 't1', user_id: 'devin', date: '2026-08-12', clock_in_time: '2026-08-12T11:00:00Z',
+          clock_out_time: '2026-08-12T21:00:00Z', net_hours: 9 } as any,
+      ],
+      workItems: [item('a', 'conrade', '2026-08-12', 700)],
+    });
+    const devin = days[0].people.find((p) => p.user_id === 'devin')!;
+    expect(devin.measurements_by_lead).toBeUndefined();
+  });
+});

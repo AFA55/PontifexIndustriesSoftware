@@ -298,6 +298,15 @@ function PersonBlock({
             <WorkLine key={(item as { id?: string }).id || `w${i}`} item={item} showNote={false} />
           ))}
         </ul>
+      ) : person.measurements_by_lead ? (
+        // They DID submit; the sheet is deliberately not repeating it. The lead
+        // measures the whole scope at the end of the day, so printing a second
+        // crew member's figures counts the same footage twice — Westminster
+        // printed 3,200 LF for 1,100. Ruled lines here would say "filed
+        // nothing", which is the opposite of the truth, so say what happened.
+        <div style={{ margin: '2px 0 0 14px', fontSize: 9.5, fontStyle: 'italic' }}>
+          Assisted — measurements recorded by the lead
+        </div>
       ) : (
         // Nothing was submitted digitally for this person on this day — leave the
         // crew two ruled lines, exactly like the paper ticket.
