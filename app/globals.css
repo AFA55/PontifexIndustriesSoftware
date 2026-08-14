@@ -457,6 +457,18 @@ select {
 .safe-area-pb {
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+/* Bottom action bars: the inset PLUS a real gap.
+ *
+ * `pb-safe` on its own resolves to 0 wherever there is no inset — Android, and
+ * an iPhone in landscape — and because it lands after `p-4` in the cascade it
+ * OVERRIDES that padding rather than adding to it. So the Back/Continue row on
+ * a fixed bottom bar ends up flush against the bottom edge of the screen, which
+ * on a phone means half the tap target is off the comfortable reach zone and
+ * the gesture bar swallows the press. Mirrors `pt-safe-3`, which already solved
+ * the same problem at the top of the screen. */
+.pb-safe-4 {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+}
 .pl-safe {
   padding-left: env(safe-area-inset-left, 0px);
 }

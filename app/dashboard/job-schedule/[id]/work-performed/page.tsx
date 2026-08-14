@@ -3045,7 +3045,7 @@ export default function WorkPerformed() {
             you are filling in a work type, the only action is to save that work
             type. */}
         {selectedItems.length > 0 && !dayAlreadySubmitted && !coOpSubmitted && !showQuantityModal && (
-          <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-safe z-50">
+          <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-safe-4 z-50">
             <div className="container mx-auto max-w-lg">
               {/* Co-operator: submit YOUR work — the lead runs day-complete. */}
               {isCoOperator && (

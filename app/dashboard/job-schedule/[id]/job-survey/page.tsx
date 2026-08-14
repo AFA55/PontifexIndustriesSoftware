@@ -774,7 +774,7 @@ export default function JobSurveyPage() {
       </div>
 
       {/* Fixed Submit Button */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-6 z-50">
+      <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#0b0618]/95 backdrop-blur-lg border-t border-gray-200 dark:border-white/10 p-4 pb-safe-4 z-50">
         <div className="container mx-auto max-w-lg flex gap-3">
           <button
             onClick={() => router.push(`/dashboard/job-schedule/${jobId}/work-performed`)}
