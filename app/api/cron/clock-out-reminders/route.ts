@@ -45,6 +45,7 @@ import {
   type CompletionCandidate,
   type ReminderJob,
 } from '@/lib/clock-out-reminder';
+import { parseHHMM, nowMinutesInTz, middayReminderDue } from '@/lib/reminder-timing';
 
 // How long before the tenant's auto-clockout time to warn still-clocked-in workers.
 const PRE_AUTOCLOCKOUT_WARN_MINUTES = 30;
@@ -152,9 +153,13 @@ export async function GET(request: NextRequest) {
       const userIds = Array.from(new Set(openCards.map((t) => t.user_id)));
       const { data: profiles } = await supabaseAdmin
         .from('profiles')
-        .select(`id, ${PROFILE_PHONE_SELECT}, role, full_name`)
+        .select(`id, ${PROFILE_PHONE_SELECT}, role, full_name, clock_out_reminder_time`)
         .in('id', userIds);
-      type ProfileRow = { id: string; phone: string | null; phone_number: string | null; role: string | null; full_name: string | null };
+      type ProfileRow = {
+        id: string; phone: string | null; phone_number: string | null;
+        role: string | null; full_name: string | null;
+        clock_out_reminder_time: string | null;
+      };
       const phoneMap = new Map<string, string | null>(
         (profiles || []).map((p: ProfileRow) => [p.id, readProfilePhone(p)])
       );
@@ -164,8 +169,36 @@ export async function GET(request: NextRequest) {
       const nameMap = new Map<string, string | null>(
         (profiles || []).map((p: ProfileRow) => [p.id, p.full_name])
       );
+      // PERSONAL WALL-CLOCK REMINDER (founder, Aug 14 — for David at 6:30pm).
+      // The three thresholds above are measured from clock-in, which suits a
+      // crew whose day length varies. This one is a fixed hour, because the
+      // failure it prevents is forgetting at the end of the day rather than
+      // working a long one. Stored per profile, so it is given to a person, not
+      // baked into a role or a name.
+      const personalOutMap = new Map<string, number | null>(
+        (profiles || []).map((p: ProfileRow) => [
+          p.id,
+          p.clock_out_reminder_time ? parseHHMM(p.clock_out_reminder_time.slice(0, 5)) : null,
+        ])
+      );
+      const nowMinTz = nowMinutesInTz(tz);
 
       for (const tc of openCards) {
+        const personalMin = personalOutMap.get(tc.user_id);
+        if (personalMin != null && middayReminderDue(nowMinTz, personalMin)) {
+          const res = await sendReminderOnce(`clock_out_personal:${tc.date}`, {
+            userId: tc.user_id,
+            tenantId: tenant.id,
+            category: 'clock_in_reminder',
+            inAppType: 'reminder',
+            title: 'Time to clock out',
+            message: `It's ${fmt12h(personalMin)} and you're still on the clock. Clock out if your day is done.`,
+            actionUrl: '/dashboard/timecard',
+            smsPhone: phoneMap.get(tc.user_id) ?? null,
+          });
+          if (res) remindersSent++;
+        }
+
         // Pre-auto-clockout warning (day/shop cards only — night shifts keep the
         // noon close). Fires once per shift via reminder_log dedup.
         if (inWarnWindow && !tc.is_night_shift && autoMinutes != null) {
