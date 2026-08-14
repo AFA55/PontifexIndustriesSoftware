@@ -166,7 +166,10 @@ export default function CreateJobOrderPage() {
       if (result.success) {
         setShowSuccess(true);
         setTimeout(() => {
-          router.push('/dashboard/admin/job-orders');
+          // `/dashboard/admin/job-orders` does not exist — creating a job
+          // succeeded and then dropped the user on a 404, which reads as "the
+          // job didn't save". Active Jobs is where the new job actually shows.
+          router.push('/dashboard/admin/active-jobs');
         }, 2000);
       } else {
         alert(result.error || 'Failed to create job order');

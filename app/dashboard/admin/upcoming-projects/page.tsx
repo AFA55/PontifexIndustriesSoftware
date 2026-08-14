@@ -1,5 +1,17 @@
 'use client';
 
+/**
+ * ⚠️ SAMPLE DATA ONLY — DO NOT DEMO THIS PAGE, DO NOT LINK IT.
+ *
+ * This screen makes ZERO database calls. Every project, date and figure below
+ * is hardcoded and invented. It is not reachable from any card in lib/rbac.ts
+ * or from the admin dashboard — only by typing the URL — and it must stay that
+ * way until it is wired to real data.
+ *
+ * Shown to a prospect it would be a fabricated record presented as a product.
+ * Either connect it to job_orders or delete it. Logged in BACKLOG.md.
+ */
+
 export const dynamic = 'force-dynamic';
 
 import { useState, useEffect } from 'react';

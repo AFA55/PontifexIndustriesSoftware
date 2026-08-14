@@ -15,6 +15,7 @@ import {
   waiverAcknowledgments,
   waiverIntro,
 } from '@/lib/legal/utility-waiver';
+import { completionIntro, completionSections } from '@/lib/legal/completion-acknowledgment';
 
 type RequestType = 'utility_waiver' | 'completion' | 'custom';
 type PageState = 'loading' | 'form' | 'survey' | 'success' | 'error';
@@ -611,13 +612,27 @@ export default function PublicSignPage() {
               <h2 className="text-lg font-bold text-slate-900">Work Completion Acknowledgment</h2>
             </div>
 
+            {/* This block used to read "This is where the work completion
+                agreement will go. [Editable via Form Builder]" — shown to real
+                customers, on a real signature form. A signature collected under
+                placeholder text is worth nothing, and it tells the person
+                signing how much care went into what they are putting their name
+                to. Wording now lives in lib/legal/completion-acknowledgment.ts
+                so this page and the PDF copy can never drift apart. */}
             <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-4">
               <p className="text-sm text-emerald-800 leading-relaxed">
-                This is where the work completion agreement will go. [Editable via Form Builder]
+                {completionIntro(data?.tenant_name)}
               </p>
-              <p className="text-xs text-emerald-600 mt-2">
-                Please confirm that the work has been completed to your satisfaction.
-              </p>
+              <dl className="mt-3 space-y-3">
+                {completionSections({ companyName: data?.tenant_name }).map((s) => (
+                  <div key={s.heading}>
+                    <dt className="text-xs font-bold uppercase tracking-wide text-emerald-900">
+                      {s.heading}
+                    </dt>
+                    <dd className="text-sm text-emerald-800 leading-relaxed mt-0.5">{s.body}</dd>
+                  </div>
+                ))}
+              </dl>
             </div>
 
             {data?.job?.description && (
