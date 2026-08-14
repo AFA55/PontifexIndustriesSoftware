@@ -765,8 +765,15 @@ function LoginPageInner() {
             ) : 'Sign In'}
           </motion.button>
 
-          {/* Native app only: Face ID / Touch ID sign-in (appears once credentials are saved). */}
-          {faceIdReady && (
+          {/* Native app only: Face ID / Touch ID sign-in (appears once credentials
+              are saved). The comment already said "native app only" and the
+              AUTO-PROMPT was correctly isNativeApp()-gated — but the BUTTON was
+              not, so it rendered in a desktop browser and did nothing when
+              clicked: no error, no navigation. This is the first screen of the
+              demo, and a dead button on it is the worst possible first
+              impression. Web users have the browser's own password manager,
+              which is why the custom web passkey flow was removed in June. */}
+          {faceIdReady && isNativeApp() && (
             <motion.button
               type="button"
               onClick={handleFaceIdLogin}

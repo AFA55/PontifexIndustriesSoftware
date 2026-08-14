@@ -904,9 +904,14 @@ export default function CompletedJobsArchivePage() {
                           <span className="font-semibold">Multi-day job</span>
                           <span className="text-brand dark:text-brand">•</span>
                           <span>
-                            {new Date(selectedJobDetails.firstLogDate).toLocaleDateString()}
+                            {/* `new Date('2026-08-05')` parses as UTC MIDNIGHT and
+                                renders as Aug 4 in every US timezone — the exact
+                                pattern CLAUDE.md forbids. Collins Custom Builds
+                                has logs on Aug 5–6 and this printed "8/4 → 8/5"
+                                while the same card said Scheduled Aug 5. */}
+                            {parseYMDLocal(selectedJobDetails.firstLogDate).toLocaleDateString()}
                             {selectedJobDetails.lastLogDate && selectedJobDetails.lastLogDate !== selectedJobDetails.firstLogDate
-                              ? ` → ${new Date(selectedJobDetails.lastLogDate).toLocaleDateString()}`
+                              ? ` → ${parseYMDLocal(selectedJobDetails.lastLogDate).toLocaleDateString()}`
                               : ''}
                           </span>
                         </div>

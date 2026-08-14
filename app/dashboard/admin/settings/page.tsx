@@ -710,7 +710,7 @@ export default function SettingsPage() {
                   />
 
                   {/* Visual preview */}
-                  <div className="bg-gray-50 dark:bg-white/3 rounded-xl p-4 border border-gray-200 dark:border-white/10">
+                  <div className="bg-gray-50 dark:bg-white/[0.03] rounded-xl p-4 border border-gray-200 dark:border-white/10">
                     <div className="text-[10px] font-bold text-gray-400 dark:text-white/40 uppercase mb-2">Preview — Schedule Rows</div>
                     <div className="space-y-1">
                       {Array.from({ length: Math.min(settings.max_slots, 12) }, (_, i) => (

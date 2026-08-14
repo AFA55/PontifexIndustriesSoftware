@@ -784,7 +784,7 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
 
 function SectionCard({ children, className = '' }: { children: React.ReactNode; className?: string }) {
   return (
-    <div className={`bg-slate-50/80 dark:bg-white/3 border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 sm:p-6 space-y-4 ${className}`}>
+    <div className={`bg-slate-50/80 dark:bg-white/[0.03] border border-slate-200/60 dark:border-white/10 rounded-2xl p-5 sm:p-6 space-y-4 ${className}`}>
       {children}
     </div>
   );
@@ -3763,14 +3763,14 @@ export default function ScheduleFormPage() {
                 );
               })
             ) : (
-              <div className="bg-slate-50 dark:bg-white/3 border border-slate-200 dark:border-white/10 rounded-2xl p-6 text-center">
+              <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-2xl p-6 text-center">
                 <p className="text-sm text-slate-500 dark:text-white/40">Select service types in Step 3 to see recommended equipment</p>
               </div>
             )}
 
             {/* ── Custom & Rental Equipment ─── */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-slate-50 dark:bg-white/3 border border-slate-200 dark:border-white/10 rounded-2xl p-4 sm:p-5">
+              <div className="bg-slate-50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 rounded-2xl p-4 sm:p-5">
                 <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3">Add Custom Equipment</h3>
                 <div className="flex gap-2">
                   <InputField
@@ -5099,7 +5099,7 @@ export default function ScheduleFormPage() {
           </div>
 
           {/* ── Navigation ─────────────────────────────── */}
-          <div className="px-6 sm:px-8 lg:px-10 py-5 sm:py-6 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-white/3 flex items-center justify-between">
+          <div className="px-6 sm:px-8 lg:px-10 py-5 sm:py-6 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between">
             <button
               onClick={goPrev}
               disabled={currentStep === 1}
@@ -5239,7 +5239,7 @@ export default function ScheduleFormPage() {
             </div>
 
             {/* Date Navigation */}
-            <div className="px-6 py-3 bg-slate-50 dark:bg-white/3 border-b border-slate-200 dark:border-white/10 flex items-center justify-between flex-shrink-0">
+            <div className="px-6 py-3 bg-slate-50 dark:bg-white/[0.03] border-b border-slate-200 dark:border-white/10 flex items-center justify-between flex-shrink-0">
               <button
                 onClick={() => {
                   const d = new Date(schedulePreviewDate);
@@ -5334,7 +5334,7 @@ export default function ScheduleFormPage() {
                         else if (noQualifiedFree) tone = 'border-red-300 dark:border-red-400/30 bg-red-50/70 dark:bg-red-500/10';
                         else if (hasRequiredSkill && d.qualified_free_count === 1) tone = 'border-amber-300 dark:border-amber-400/30 bg-amber-50/70 dark:bg-amber-500/10';
                         else if (tightCapacity) tone = 'border-amber-300 dark:border-amber-400/30 bg-amber-50/60 dark:bg-amber-500/8';
-                        else if (isWeekend) tone = 'border-slate-200 dark:border-white/8 bg-slate-50/60 dark:bg-white/3';
+                        else if (isWeekend) tone = 'border-slate-200 dark:border-white/8 bg-slate-50/60 dark:bg-white/[0.03]';
                         else if (isToday && !isSelected) tone = 'border-blue-300 dark:border-blue-400/30 bg-blue-50/40 dark:bg-blue-500/8';
 
                         return (
@@ -5601,7 +5601,7 @@ export default function ScheduleFormPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 bg-slate-50 dark:bg-white/3 border-t border-slate-200 dark:border-white/10 flex items-center justify-between flex-shrink-0 gap-3">
+            <div className="px-6 py-4 bg-slate-50 dark:bg-white/[0.03] border-t border-slate-200 dark:border-white/10 flex items-center justify-between flex-shrink-0 gap-3">
               <p className="text-xs text-slate-400 dark:text-white/30 hidden sm:block">Click a day to inspect capacity & skill coverage</p>
               {(() => {
                 const selected = schedulePreviewSelectedDay

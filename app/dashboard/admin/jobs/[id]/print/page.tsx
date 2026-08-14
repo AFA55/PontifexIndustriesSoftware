@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, use } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useBranding } from '@/lib/branding-context';
 
 // ─── Types (subset of /api/admin/jobs/[id]/summary `data`) ─────────────────────
 
@@ -111,6 +112,7 @@ function formatTime(time: string | null) {
 
 export default function PrintJobTicketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id: jobId } = use(params);
+  const { branding } = useBranding();
 
   const [job, setJob] = useState<PrintJob | null>(null);
   const [scope, setScope] = useState<PrintScopeItem[]>([]);
@@ -199,7 +201,15 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
         {/* Header */}
         <div className="border-b-2 border-black pb-3 mb-4">
           <div className="flex items-start justify-between gap-6">
-            <h1 className="text-2xl font-bold tracking-wide">PATRIOT CONCRETE CUTTING</h1>
+            {/* WHITE-LABEL. This was the literal string "PATRIOT CONCRETE
+                CUTTING", so every tenant's printed job order would have said
+                Patriot — a direct breach of the CLAUDE.md non-negotiable that no
+                Patriot-specific branding is hardcoded, and awkward in a pitch
+                that mentions multi-tenancy. The work ticket already does this
+                correctly; this sheet had been missed. */}
+            <h1 className="text-2xl font-bold tracking-wide uppercase">
+              {branding.company_name || 'Job Ticket'}
+            </h1>
             {/* Founder, Aug 13: "it needs to have the job number ID — I wanna
                 hand out the ticket just so we know what ticket goes with what
                 work-performed ticket, and I just need to have that more

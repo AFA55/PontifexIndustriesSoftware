@@ -1498,7 +1498,17 @@ export default function DayCompletePage() {
                       if (item.unit) parts.push(item.unit);
                       if (item.depth) parts.push(`${item.depth}" depth`);
                       const qtyStr = parts.join(' ');
-                      const desc = [item.description, item.notes].filter(Boolean).join(' — ');
+                      // ⚠️ `item.notes` is the operator's INTERNAL quick note —
+                      // prep, access, delays, who held them up. This block is the
+                      // sheet the CUSTOMER reads and signs, and the entry form
+                      // promises the operator "Office only … never appear on the
+                      // signed completion sheet". It appeared here anyway.
+                      //
+                      // CompletionSignOffPDF has two guard layers and a comment
+                      // saying notes "must never appear here"; the ON-SCREEN sheet
+                      // had none, so the PDF was clean and the screen the customer
+                      // actually looks at was not. Measurements only.
+                      const desc = item.description || '';
                       return (
                         <li key={idx} className="flex items-start gap-2 text-sm">
                           <span className="text-emerald-500 dark:text-emerald-400 font-bold mt-0.5">•</span>

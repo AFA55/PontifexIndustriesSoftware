@@ -581,7 +581,7 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
       </div>
 
       {expanded && (
-        <div className="border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/3 p-5">
+        <div className="border-t border-gray-100 dark:border-white/10 bg-gray-50 dark:bg-white/[0.03] p-5">
           <div className="flex items-center justify-between mb-3">
             <h4 className="text-sm font-bold text-gray-700 dark:text-white/80 flex items-center gap-2">
               <Users className="w-4 h-4 text-brand" />
@@ -853,7 +853,7 @@ export default function FacilitiesPage() {
           /* Facilities Tab */
           <div className="space-y-3 pb-8">
             {filteredFacilities.length === 0 ? (
-              <div className="bg-white dark:bg-white/3 rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
+              <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
                 <Building2 className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
                 <p className="text-gray-500 dark:text-white/40 text-sm">
                   {search ? 'No facilities match your search' : 'No facilities yet. Add your first facility to get started.'}
@@ -878,7 +878,7 @@ export default function FacilitiesPage() {
           /* Badging Overview Tab */
           <div className="space-y-4 pb-8">
             {filteredBadgeGroups.length === 0 ? (
-              <div className="bg-white dark:bg-white/3 rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
+              <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-white/10 p-12 text-center">
                 <BadgeCheck className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-white/20" />
                 <p className="text-gray-500 dark:text-white/40 text-sm">
                   {search ? 'No badges match your search' : 'No badges issued yet.'}

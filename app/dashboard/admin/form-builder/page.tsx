@@ -446,7 +446,7 @@ export default function FormBuilderPage() {
               </div>
 
               {fields.length === 0 ? (
-                <div className="text-center py-10 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl dark:bg-white/3">
+                <div className="text-center py-10 border-2 border-dashed border-gray-200 dark:border-white/10 rounded-xl dark:bg-white/[0.03]">
                   <FileText className="w-10 h-10 text-gray-300 dark:text-white/20 mx-auto mb-2" />
                   <p className="text-sm text-gray-500 dark:text-white/40">No fields yet</p>
                   <p className="text-xs text-gray-400 dark:text-white/30">Click &quot;Add Field&quot; to start building</p>
@@ -586,7 +586,7 @@ export default function FormBuilderPage() {
                       </select>
                     )}
                     {field.type === 'signature' && (
-                      <div className="border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center bg-gray-50 dark:border-white/10 dark:bg-white/3">
+                      <div className="border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center bg-gray-50 dark:border-white/10 dark:bg-white/[0.03]">
                         <PenTool className="w-5 h-5 text-gray-300 dark:text-white/20 mr-2" />
                         <span className="text-sm text-gray-400 dark:text-white/30">Signature pad</span>
                       </div>
@@ -599,7 +599,7 @@ export default function FormBuilderPage() {
                     <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">
                       Signature <span className="text-red-500">*</span>
                     </label>
-                    <div className="border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center bg-gray-50 dark:border-white/10 dark:bg-white/3">
+                    <div className="border-2 border-dashed border-gray-300 rounded-xl h-24 flex items-center justify-center bg-gray-50 dark:border-white/10 dark:bg-white/[0.03]">
                       <PenTool className="w-5 h-5 text-gray-300 dark:text-white/20 mr-2" />
                       <span className="text-sm text-gray-400 dark:text-white/30">Signature pad (auto-added)</span>
                     </div>

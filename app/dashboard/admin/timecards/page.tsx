@@ -843,7 +843,7 @@ export default function AdminTimecardsPage() {
             disabled={weekOffset >= 0}
             className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg transition-all text-sm font-medium border shadow-sm ${
               weekOffset >= 0
-                ? 'bg-gray-50 dark:bg-white/3 text-gray-300 dark:text-white/20 border-gray-100 dark:border-white/5 cursor-not-allowed'
+                ? 'bg-gray-50 dark:bg-white/[0.03] text-gray-300 dark:text-white/20 border-gray-100 dark:border-white/5 cursor-not-allowed'
                 : 'bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/10 text-gray-700 dark:text-white/80 border-gray-200 dark:border-white/10'
             }`}
           >
