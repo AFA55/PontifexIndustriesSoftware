@@ -148,6 +148,11 @@ export async function POST(request: NextRequest) {
       scheduled_date: body.scheduled_date,
       end_date: body.end_date || null,
       arrival_time: body.arrival_time || null,
+      // WILL CALL — the customer would take an earlier slot if one opens.
+      // The column and the board's Will Call folder already existed; the form
+      // had no field to set it, so the folder had shown "0 jobs" since it was
+      // built. Explicit boolean so an absent key means false, not null.
+      is_will_call: body.is_will_call === true,
       scheduling_flexibility: body.scheduling_flexibility || {},
 
       // ── Step 2 additions ───────────────────────────────────

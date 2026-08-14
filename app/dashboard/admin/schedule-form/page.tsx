@@ -521,6 +521,7 @@ interface FormData {
   special_arrival_time: string;
   arrival_time: string;
   can_work_fridays: boolean;
+  is_will_call: boolean;
   can_work_weekends: boolean;
   outside_hours: boolean;
   outside_hours_details: string;
@@ -630,6 +631,7 @@ const initialFormData: FormData = {
    */
   arrival_time: '07:00',
   can_work_fridays: true,
+  is_will_call: false,
   can_work_weekends: false,
   outside_hours: false,
   outside_hours_details: '',
@@ -1159,6 +1161,7 @@ export default function ScheduleFormPage() {
             end_date: j.end_date || '',
             // Scheduling flexibility
             can_work_fridays: typeof sched.can_work_fridays === 'boolean' ? sched.can_work_fridays : (f as any).can_work_fridays,
+            is_will_call: typeof j.is_will_call === 'boolean' ? j.is_will_call : (f as any).is_will_call,
             can_work_weekends: typeof sched.can_work_weekends === 'boolean' ? sched.can_work_weekends : (f as any).can_work_weekends,
             outside_hours: typeof sched.outside_hours === 'boolean' ? sched.outside_hours : (f as any).outside_hours,
             outside_hours_details: sched.outside_hours_details || '',
@@ -1888,6 +1891,12 @@ export default function ScheduleFormPage() {
         // Step 5
         scheduled_date: form.start_date,
         end_date: form.end_date || null,
+        // WILL CALL (founder, Aug 13). The board has had a Will Call folder all
+        // along, and it even tells the user "Salesmen can mark jobs as will-call
+        // when submitting the schedule form" — but the form had NO such field,
+        // so `is_will_call` was never set by anyone and the folder could never
+        // fill. It has shown "0 jobs" since it was built.
+        is_will_call: form.is_will_call,
         arrival_time: form.arrival_time || form.special_arrival_time || null,
         scheduling_flexibility: {
           special_arrival: form.special_arrival,
@@ -4627,6 +4636,54 @@ export default function ScheduleFormPage() {
                 value={form.additional_notes}
                 onChange={e => updateForm({ additional_notes: e.target.value })}
               />
+            </div>
+
+            {/* ── WILL CALL ──────────────────────────────────────────────────
+                Founder, Aug 13: "Will call is there in case we CAN schedule a
+                job, but if they wanna push further, we have the will calls
+                available… if a job pushes off or someone cancels, we could
+                click on Will Calls and see the jobs that want to move up if the
+                space becomes available."
+
+                So it is a WAITING LIST FOR AN EARLIER SLOT, not a parking lot
+                for unscheduled work — which is why the copy below says "move it
+                up" rather than "schedule later". The job still keeps its date;
+                will-call only marks it as willing to come forward. */}
+            <div>
+              <button
+                type="button"
+                onClick={() => updateForm({ is_will_call: !form.is_will_call })}
+                aria-pressed={form.is_will_call}
+                className={`w-full text-left rounded-2xl p-4 border-2 transition-all min-h-[44px] ${
+                  form.is_will_call
+                    ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10'
+                    : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5 hover:border-slate-300 dark:hover:border-white/20'
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  <span
+                    className={`mt-0.5 flex-shrink-0 w-11 h-6 rounded-full transition-colors relative ${
+                      form.is_will_call ? 'bg-amber-500' : 'bg-slate-300 dark:bg-white/20'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${
+                        form.is_will_call ? 'left-[22px]' : 'left-0.5'
+                      }`}
+                    />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-bold text-slate-900 dark:text-white">
+                      Add to Will Call
+                    </p>
+                    <p className="text-sm text-slate-500 dark:text-white/60 mt-0.5">
+                      The customer would take an earlier slot if one opens up. When a
+                      job pushes off or cancels, the office checks Will Call to see
+                      who wants to move up.
+                    </p>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
         );
