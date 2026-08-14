@@ -4,6 +4,31 @@
 > Priorities: **P0** = broken in prod / blocking · **P1** = this week · **P2** = soon · **P3** = someday.
 > When work completes: check it off, move to "Recently shipped" (keep ~2 sessions), then delete.
 
+## 🆕 AUG 14 — founder batch (demo day)
+
+### ✅ Shipped this session
+- [x] **A day number was a tap count, not a calendar position.** Dante was at AM King Wed 8/12 and Thu 8/13; the ticket showed one day, labelled Day 1, dated Thursday. `set_daily_log_day_number()` computed `MAX(day_number)+1`, so it counted how many times somebody had pressed "day complete" on that job — Dante didn't press it Wednesday night, so Wednesday produced no row and Thursday's press became Day 1. Same root cause as Aiden's missing Aug 4 on Parkk (9.89 h on the clock, no ticket). Now the ordinal of the date among days the job can PROVE a crew was on it: a filed log, **or** the office placed a named crew **and** that person clocked in. The clock is what separates a fact from a guess — Aiden is on the board for Sat 8/8 and Sun 8/9 with no timecard for either; counting the placement alone would have moved his Monday from Day 4 to Day 7 and printed two weekend days he never worked onto a customer's ticket.
+- [x] **Wednesday's ten hours were thrown away by the attribution rule.** The card had no job link, and that morning Dante had also closed out the *previous* job from the truck — five minutes of Southern Basements paperwork outvoted a ten-hour day at AM King. The office's own placement for a date now outranks whatever paperwork got filed that morning. The date universe was wrong too: both callers passed only dates that HAVE logs, so a day worked and never filed could not be found however the rule read.
+- [x] **Three places wrote `total_days_worked` behind the trigger's back**, including a blind `+1` on a stale read (how AM King reached 2 off one log row). The status route recomputed it from filed logs only, which would have quietly erased Wednesday again on the next status change.
+- [x] **A duplicate now lands on one day.** Duplicating carried the original's `end_date`; the Parkk job at 520 Logistics Dr runs Aug 3 → Sep 3, and an unstaffed multi-day job shows in Unassigned on every day it spans — three copies became three Parkk rows every day until September.
+- [x] **"Mark complete (office)" exists at last.** The API and its unit-tested rules have been there since early August with **nothing in the app calling them** — a finished feature with no button.
+- [x] **Missing-ticket chase** — new cron, ~7:15 tenant-local. The first live sweep found **seven** unsubmitted tickets in one week across Keontre, Zack, Micah and Dante.
+- [x] **7:05 clock-in** (settings: anchor 07:30 → 07:00) and **6:30pm clock-out for David** (new per-person `profiles.clock_out_reminder_time`, not hardcoded to a name or role).
+- [x] **Reminder texts were never billed.** `meterSms` returns early without a `tenantId` and `sendNotification` passed only `{to, message}` — so every reminder SMS this platform has sent was invisible to messaging-margin billing.
+
+### 🔴 P0 — next, before anything else
+- [ ] **Work items are written TWICE on a multi-day job, doubling billed quantities.** Two write paths disagree on the day number. Billing integrity; found by the operator QA pass, still open.
+
+### 🟠 P1 — from today's batch, not yet built
+- [ ] **A daily log is stamped with the day it was SUBMITTED, not the day worked.** Dante's Southern Basements closeout carries `log_date` 8/12 with `route_started_at`/`work_started_at` from 8/10 and `hours_worked` 0.09 — a five-minute paperwork tap filed as a work day on the wrong date. The late-completion backfill (`work_date`) exists but only engages when the job has no prior logs. The honest fix is to date a log from its own `work_started_at` when one is present.
+- [ ] **Helper reviews: aggregate only, and suppress the average below n = 3** *(founder approved Aug 14)*. Detailed reviews stay supervisor-only. Nobody gets scored off a single bad day.
+- [ ] **Outbound message log** (existing P1, now sharper): `meterSms` still discards `jobId` and stores no recipient or body, so "what exactly did we text that customer?" remains unanswerable even with today's metering fix.
+- [ ] **Crew Grid reports busy operators as free** — multi-day jobs bucketed only on their start date (`crew-grid/route.ts:64,66-67,95`); also not dark-mode aware (293 elements).
+- [ ] **David sees ZERO rows in twelve tables** — `supervisor` is missing from every office-read RLS policy.
+- [ ] **Schedule-board reorder and notify are `requireSuperAdmin`** — they refuse Amanda and any operations manager.
+- [ ] **One job shows three different hour totals across three screens.**
+- [ ] Two email test suites fail to RUN under jsdom (`TextEncoder is not defined`) — pre-existing, hides real coverage.
+
 ## 🗺️ AUG 5 PLAN — ticket system to "solid enough to run 8 jobs/day"
 
 Sequenced by **risk removed per hour**, not by request order. Money and records
