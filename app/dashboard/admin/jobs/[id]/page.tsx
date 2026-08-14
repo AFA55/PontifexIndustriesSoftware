@@ -48,6 +48,7 @@ import {
 import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import SendOptInRequestButton from '@/components/SendOptInRequestButton';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
+import OfficeCloseJob from '@/components/OfficeCloseJob';
 import WorkItemsSummary, { type WorkItemRow } from '@/components/WorkItemsSummary';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -2995,6 +2996,19 @@ export default function AdminJobDetailPage({
                   </span>
                   <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white/30 group-hover:text-slate-500 dark:group-hover:text-white/60" />
                 </Link>
+                {/* Close a job the crew finished but nobody closed in the app —
+                    the PMs' print-only tickets, which no operator is ever
+                    assigned to. The API has existed since early August with no
+                    button attached to it. */}
+                <OfficeCloseJob
+                  jobId={jobId}
+                  jobNumber={job.job_number}
+                  customerName={job.customer_name}
+                  officeCompletedAt={(job as any).office_completed_at ?? null}
+                  officeCompletedReason={(job as any).office_completion_reason ?? null}
+                  operatorCompletedAt={(job as any).completion_signed_at ?? null}
+                  onChanged={() => fetchJob()}
+                />
               </div>
             </div>
           </div>

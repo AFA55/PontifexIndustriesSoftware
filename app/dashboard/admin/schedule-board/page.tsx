@@ -1735,16 +1735,20 @@ export default function ScheduleBoardPage() {
       // The copy starts on the day you're LOOKING at, not the original's start
       // date — you duplicate from the board on the day you're sending the second
       // crew, and a copy that lands on a past day is invisible where you need it.
-      // The span is carried only when it still makes sense (prod has rows whose
-      // end_date is BEFORE their scheduled_date).
+      //
+      // AND IT ENDS THERE TOO (founder, Aug 14). This used to carry the
+      // original's end_date whenever the span wasn't inverted. The Parkk job at
+      // 520 Logistics Dr runs Aug 3 → Sep 3, so every copy inherited a month —
+      // and an unstaffed multi-day job appears in Unassigned on every day it
+      // spans. Three copies made for three particular days became three Parkk
+      // rows sitting in Unassigned every day until September: "if I double a
+      // job I must do it manually for that day, not have it consistently
+      // there." A span is now an explicit choice, made in the Edit panel, on
+      // the one job that actually needs it.
       const startDate = selectedDate || job.scheduled_date;
-      const keepEnd = job.end_date && startDate && job.end_date >= startDate;
       const res = await apiFetch(`/api/admin/job-orders/${job.id}/duplicate`, {
         method: 'POST',
-        body: JSON.stringify({
-          scheduled_date: startDate,
-          ...(keepEnd ? { end_date: job.end_date } : {}),
-        }),
+        body: JSON.stringify({ scheduled_date: startDate, end_date: startDate }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.success) {

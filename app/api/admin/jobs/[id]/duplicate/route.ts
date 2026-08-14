@@ -67,6 +67,10 @@ export async function POST(request: NextRequest, context: RouteContext) {
   // ── 3. Resolve parent: if original is itself a copy, link to its root ────
   const parentId: string = original.parent_job_id ?? original.id;
 
+  // The one day this copy is for. Falls back to the original's START date —
+  // never its end date, and never a span (see the insert below).
+  const duplicateDate: string | null = scheduled_date || original.scheduled_date || null;
+
   // ── 4. Insert duplicate ──────────────────────────────────────────────────
   const { data: newJob, error: insertErr } = await insertJobOrderCopy(
     supabaseAdmin as any,
@@ -82,8 +86,20 @@ export async function POST(request: NextRequest, context: RouteContext) {
       job_type: original.job_type,
       status: 'scheduled',
       priority: original.priority,
-      scheduled_date: scheduled_date || original.scheduled_date,
-      end_date: original.end_date,
+      // A DUPLICATE IS ONE DAY (founder, Aug 14).
+      //
+      // These two lines used to copy the original's span, and the original
+      // Parkk job at 520 Logistics Dr runs Aug 3 → Sep 3. So each duplicate
+      // inherited a month, and a multi-day job with no crew shows in Unassigned
+      // on EVERY day it spans: three copies made for three specific days became
+      // three Parkk rows sitting in Unassigned every day until September.
+      //
+      // "If I double a job I must do it manually for that day, not have it
+      // consistently there." A copy lands on the chosen day and stops. Making
+      // it span again is an explicit edit — one the office does deliberately,
+      // on the one job that needs it.
+      scheduled_date: duplicateDate,
+      end_date: duplicateDate,
       estimated_hours: original.estimated_hours,
       assigned_to,
       helper_assigned_to: null,
@@ -102,7 +118,9 @@ export async function POST(request: NextRequest, context: RouteContext) {
       foreman_phone: original.foreman_phone,
       site_contact_phone: original.site_contact_phone,
       po_number: original.po_number,
-      is_multi_day: original.is_multi_day,
+      // Single day by construction — see scheduled_date above. Copying the
+      // original's flag is what put the duplicate on every date in its span.
+      is_multi_day: false,
       require_waiver_signature: original.require_waiver_signature,
       parent_job_id: parentId,
       created_by: auth.userId,

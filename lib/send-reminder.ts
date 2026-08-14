@@ -130,7 +130,18 @@ export async function sendNotification(opts: ReminderOptions): Promise<DeliveryR
   // 3. SMS — if enabled and a phone is available
   if (prefs.sms_enabled && opts.smsPhone) {
     try {
-      const sms = await sendSMSAny({ to: opts.smsPhone, message: `${opts.title}: ${opts.message}` });
+      // tenantId/source are what make the send BILLABLE — meterSms returns
+      // early without a tenantId, so every reminder text ever sent through
+      // here (clock-in, waiver chase, work-performed, missing ticket) was
+      // invisible to messaging-margin billing AND to any question of the form
+      // "did that text actually go out?". Both were unanswerable from the data.
+      const sms = await sendSMSAny({
+        to: opts.smsPhone,
+        message: `${opts.title}: ${opts.message}`,
+        tenantId: opts.tenantId ?? undefined,
+        source: `reminder:${opts.category}`,
+        jobId: opts.jobOrderId,
+      });
       result.sms = sms.success;
     } catch (e) {
       console.warn('[reminder] sms failed:', e);
