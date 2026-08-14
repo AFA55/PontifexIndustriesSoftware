@@ -451,13 +451,17 @@ export async function POST(
     }
 
     if (continueNextDay) {
-      // Increment total_days_worked and mark as multi-day; reset timestamps for next day
-      const nextDayCount = (job.total_days_worked || 0) + 1;
+      // total_days_worked is NOT written here. It is derived by
+      // trigger_update_total_days_worked from job_workday_evidence — the days
+      // this job can PROVE a crew was on it. This line used to blind-increment
+      // whatever it had read at the top of the request, which is how AM King
+      // reached total_days_worked = 2 off a single log row: the triggers set it
+      // to 1, then this added 1 to a stale read, and a one-day job printed as
+      // two. Reset the timestamps for tomorrow; leave the counting alone.
       const { error: updateError } = await supabaseAdmin
         .from('job_orders')
         .update({
           is_multi_day: true,
-          total_days_worked: nextDayCount,
           status: 'scheduled', // Reset to scheduled for next day
           route_started_at: null, // Clear timestamps for next day
           work_started_at: null,
@@ -534,7 +538,9 @@ export async function POST(
                 status: 'completed',
                 work_completed_at: now,
                 total_hours_worked: Number(totalHours.toFixed(2)),
-                total_days_worked: totalDays,
+                // total_days_worked stays trigger-owned (see above) — writing
+                // a locally-counted value here would overwrite the derived one
+                // moments after the trigger set it.
                 is_multi_day: totalDays > 1,
                 completion_signer_name: signerName,
               })

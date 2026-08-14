@@ -15,11 +15,13 @@
  *     crew-hours of which 18.36 were simultaneously counted on two other jobs.
  *
  * So the rule lives here, once, and both callers use it. A card counts against
- * a job in exactly two cases, both provable:
+ * a job in exactly three cases, all provable:
  *
  *   1. the card is explicitly linked to that job (`job_order_id` matches), or
- *   2. the card has NO link at all AND that person touched only this one job
- *      that day — so every hour on it can only have gone here.
+ *   2. the card has NO link and the office placed that person on this job — and
+ *      only this job — that day (`job_daily_assignments`), or
+ *   3. the card has NO link, the office placed nobody, AND that person touched
+ *      only this one job that day — so every hour can only have gone here.
  *
  * A card linked to a DIFFERENT job is skipped outright: those hours are already
  * that job's. Anything else is genuinely unknowable, and the day is reported as
@@ -29,6 +31,19 @@
  * "Touched" is read from `daily_job_logs` AND `helper_work_logs` together —
  * helpers file only the latter, and leaving them out is how the double-counting
  * got through the first review.
+ *
+ * WHY THE ASSIGNMENT OUTRANKS THE LOG (founder, Aug 14). Dante was at AM King
+ * Wednesday and Thursday. The ticket printed Thursday only. His Wednesday card
+ * carried 10.37 hours and no job link, and rule 3 threw it away — because that
+ * morning he had also closed out the PREVIOUS job, Southern Basements, from the
+ * truck. Five minutes of paperwork for Monday's job outvoted a ten-hour day.
+ * The office's own placement for that date is the better evidence, so it is
+ * consulted first; the filed log is the fallback, not the arbiter.
+ *
+ * The date universe is widened here too, deliberately. Both callers used to
+ * pass only the dates that HAVE logs, so a day the crew worked and never filed
+ * a ticket for could not be found no matter how the rule read — the hours were
+ * excluded by the question, not by the answer.
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
@@ -68,9 +83,30 @@ export async function attributableTimecards(
     .order('clock_in_time', { ascending: true });
 
   const cards: any[] = (linked as any[]) ?? [];
+
+  // WIDEN THE QUESTION FIRST. The caller only knows the days that produced a
+  // log; a day worked and never filed is exactly the day we are looking for.
+  // The office's per-day crew ledger supplies it.
+  const { data: ownAssignments } = await supabaseAdmin
+    .from('job_daily_assignments')
+    .select('assignment_date, operator_id, helper_id')
+    .eq('job_order_id', jobId);
+
+  const userSet = new Set(userIds);
+  const dateSet = new Set(dates);
+  for (const a of (ownAssignments as any[]) ?? []) {
+    // Empty skeleton rows hold a date open on the board — nobody was placed.
+    if (!a.operator_id && !a.helper_id) continue;
+    if (a.assignment_date) dateSet.add(a.assignment_date);
+    if (a.operator_id) userSet.add(a.operator_id);
+    if (a.helper_id) userSet.add(a.helper_id);
+  }
+  userIds = Array.from(userSet);
+  dates = Array.from(dateSet);
+
   if (userIds.length === 0 || dates.length === 0) return { cards, splitDates };
 
-  const [{ data: byCrew }, { data: opLogs }, { data: helpLogs }] = await Promise.all([
+  const [{ data: byCrew }, { data: opLogs }, { data: helpLogs }, { data: allAssignments }] = await Promise.all([
     supabaseAdmin
       .from('timecards')
       .select(select)
@@ -87,6 +123,12 @@ export async function attributableTimecards(
       .select('helper_id, log_date, job_order_id')
       .in('helper_id', userIds)
       .in('log_date', dates),
+    // Every job these people were placed on across these days — needed to tell
+    // "the office put them here" from "the office put them in two places".
+    supabaseAdmin
+      .from('job_daily_assignments')
+      .select('assignment_date, operator_id, helper_id, job_order_id')
+      .in('assignment_date', dates),
   ]);
 
   // person|date → the set of jobs they filed work on that day.
@@ -101,16 +143,43 @@ export async function attributableTimecards(
   for (const r of (opLogs as any[]) ?? []) note(r.operator_id, r.log_date, r.job_order_id);
   for (const r of (helpLogs as any[]) ?? []) note(r.helper_id, r.log_date, r.job_order_id);
 
+  // person|date → the set of jobs the OFFICE placed them on that day.
+  const placed = new Map<string, Set<string>>();
+  const place = (uid: string | null | undefined, d: string, jid: string) => {
+    if (!uid) return;
+    const k = `${uid}|${d}`;
+    const s = placed.get(k) ?? new Set<string>();
+    s.add(jid);
+    placed.set(k, s);
+  };
+  for (const a of (allAssignments as any[]) ?? []) {
+    if (!a.assignment_date || !a.job_order_id) continue;
+    place(a.operator_id, a.assignment_date, a.job_order_id);
+    place(a.helper_id, a.assignment_date, a.job_order_id);
+  }
+
   const seen = new Set(cards.map((c) => c.id));
   for (const t of ((byCrew as any[]) ?? [])) {
     if (seen.has(t.id)) continue;
     // Already another job's hours.
     if (t.job_order_id && t.job_order_id !== jobId) continue;
     if (!t.job_order_id) {
-      const jobsThatDay = touched.get(`${t.user_id}|${t.date}`);
-      if (!jobsThatDay || jobsThatDay.size !== 1 || !jobsThatDay.has(jobId)) {
-        if (jobsThatDay && jobsThatDay.size > 1) splitDates.add(t.date);
-        continue;
+      const key = `${t.user_id}|${t.date}`;
+      const placedThatDay = placed.get(key);
+      if (placedThatDay && placedThatDay.size > 0) {
+        // The office said where this person was. That outranks whatever
+        // paperwork they happened to file from the truck that morning.
+        if (placedThatDay.size > 1) {
+          if (placedThatDay.has(jobId)) splitDates.add(t.date);
+          continue;
+        }
+        if (!placedThatDay.has(jobId)) continue;
+      } else {
+        const jobsThatDay = touched.get(key);
+        if (!jobsThatDay || jobsThatDay.size !== 1 || !jobsThatDay.has(jobId)) {
+          if (jobsThatDay && jobsThatDay.size > 1) splitDates.add(t.date);
+          continue;
+        }
       }
     }
     seen.add(t.id);

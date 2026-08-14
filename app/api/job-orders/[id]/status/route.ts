@@ -429,7 +429,11 @@ async function updateJobStatus(
           // stress test, Jul 12). Matches the DB trigger's own definition.
           const distinctDays = new Set(logsAgg.map((l: any) => String(l.log_date))).size;
           updateData.total_hours_worked = Number(totalHours.toFixed(2));
-          updateData.total_days_worked = distinctDays;
+          // total_days_worked is NOT set from filed logs any more. A day the
+          // crew worked and never filed a ticket for is invisible here, and
+          // writing this value would erase the day the trigger counted from the
+          // crew ledger — Dante's Wednesday at AM King, undone on the next
+          // status change. trigger_update_total_days_worked owns the number.
           updateData.is_multi_day = distinctDays > 1;
         }
       } catch (aggErr) {
