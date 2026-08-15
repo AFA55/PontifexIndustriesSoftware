@@ -185,32 +185,32 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
     }
   };
 
-  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all placeholder-gray-400';
-  const labelClass = 'block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider';
-  const sectionClass = 'border border-gray-200 rounded-xl p-4 space-y-3 bg-gray-50';
+  const inputClass = 'w-full px-3 py-2.5 text-gray-900 dark:text-white bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all placeholder-gray-400 dark:placeholder-white/30 dark:[color-scheme:dark]';
+  const labelClass = 'block text-xs font-bold text-gray-500 dark:text-white/50 mb-1.5 uppercase tracking-wider';
+  const sectionClass = 'border border-gray-200 dark:border-white/10 rounded-xl p-4 space-y-3 bg-gray-50 dark:bg-white/[0.03]';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm">
       {/* Hidden container required by PlacesService */}
       <div ref={placesServiceContainerRef} style={{ display: 'none' }} />
 
-      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-xl">
+      <div className="bg-white dark:bg-gradient-to-br dark:from-[#180c2c] dark:to-[#0e0720] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10 sticky top-0 bg-white dark:bg-[#180c2c] z-10 rounded-t-2xl">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
               <Building2 className="w-4 h-4 text-white" />
             </div>
             {isEdit ? 'Edit Customer' : 'New Customer'}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-500 dark:text-white/60" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 rounded-xl text-sm text-red-700 dark:text-red-300">
               {error}
             </div>
           )}
@@ -219,7 +219,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
               <Building2 className="w-4 h-4 text-brand" />
-              <h3 className="text-sm font-bold text-gray-900">Company Information</h3>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Company Information</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="sm:col-span-2">
@@ -249,9 +249,9 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           {/* Primary Contact Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <User className="w-4 h-4 text-blue-600" />
-              <h3 className="text-sm font-bold text-gray-900">Main Contact</h3>
-              <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Primary point of contact</span>
+              <User className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Main Contact</h3>
+              <span className="text-[10px] text-gray-500 dark:text-white/60 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-full">Primary point of contact</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -270,11 +270,11 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           </div>
 
           {/* Billing Contact Section */}
-          <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-4 space-y-3">
+          <div className="border border-emerald-200 dark:border-emerald-400/30 bg-emerald-50 dark:bg-emerald-500/10 rounded-xl p-4 space-y-3">
             <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="w-4 h-4 text-emerald-600" />
-              <h3 className="text-sm font-bold text-gray-900">Billing Contact</h3>
-              <span className="text-[10px] text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">For invoices & payments</span>
+              <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Billing Contact</h3>
+              <span className="text-[10px] text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-500/20 px-2 py-0.5 rounded-full">For invoices & payments</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -296,7 +296,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
               <CreditCard className="w-4 h-4 text-brand" />
-              <h3 className="text-sm font-bold text-gray-900">Payment &amp; Billing</h3>
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Payment &amp; Billing</h3>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
@@ -331,25 +331,25 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
 
           {/* Additional Contacts Section */}
           {showAdditionalContacts && (
-            <div className="border border-indigo-200 bg-indigo-50 rounded-xl p-4 space-y-3">
+            <div className="border border-indigo-200 dark:border-indigo-400/30 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-indigo-600" />
-                  <h3 className="text-sm font-bold text-gray-900">Additional Contacts</h3>
-                  <span className="text-[10px] text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">Optional</span>
+                  <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <h3 className="text-sm font-bold text-gray-900 dark:text-white">Additional Contacts</h3>
+                  <span className="text-[10px] text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-500/20 px-2 py-0.5 rounded-full">Optional</span>
                 </div>
               </div>
 
               {additionalContacts.length > 0 && (
                 <div className="space-y-3">
                   {additionalContacts.map((contact, idx) => (
-                    <div key={idx} className="bg-white border border-indigo-200 rounded-xl p-3 space-y-2">
+                    <div key={idx} className="bg-white dark:bg-white/5 border border-indigo-200 dark:border-indigo-400/30 rounded-xl p-3 space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Contact {idx + 1}</span>
+                        <span className="text-xs font-bold text-gray-500 dark:text-white/50 uppercase tracking-wider">Contact {idx + 1}</span>
                         <button
                           type="button"
                           onClick={() => removeContact(idx)}
-                          className="p-1 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+                          className="p-1 rounded-lg hover:bg-red-50 dark:hover:bg-red-500/20 text-gray-400 dark:text-white/50 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                           aria-label="Remove contact"
                         >
                           <X className="w-4 h-4" />
@@ -381,9 +381,9 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
                         <label className={labelClass}>Contact Type</label>
                         <div className="flex gap-2 flex-wrap">
                           {[
-                            { value: 'on_site', label: 'On-Site Contact', activeClass: 'bg-amber-100 border-amber-400 text-amber-700', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-amber-400' },
-                            { value: 'billing', label: 'Billing Contact', activeClass: 'bg-emerald-100 border-emerald-400 text-emerald-700', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-emerald-400' },
-                            { value: 'other', label: 'Other', activeClass: 'bg-gray-200 border-gray-500 text-gray-700', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-gray-500' },
+                            { value: 'on_site', label: 'On-Site Contact', activeClass: 'bg-amber-100 border-amber-400 text-amber-700 dark:bg-amber-500/15 dark:border-amber-400/50 dark:text-amber-300', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-amber-400 dark:bg-white/5 dark:border-white/15 dark:text-white/70 dark:hover:border-amber-400/50' },
+                            { value: 'billing', label: 'Billing Contact', activeClass: 'bg-emerald-100 border-emerald-400 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-400/50 dark:text-emerald-300', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-emerald-400 dark:bg-white/5 dark:border-white/15 dark:text-white/70 dark:hover:border-emerald-400/50' },
+                            { value: 'other', label: 'Other', activeClass: 'bg-gray-200 border-gray-500 text-gray-700 dark:bg-white/20 dark:border-white/30 dark:text-white', inactiveClass: 'bg-white border-gray-300 text-gray-600 hover:border-gray-500 dark:bg-white/5 dark:border-white/15 dark:text-white/70 dark:hover:border-white/30' },
                           ].map(opt => (
                             <button
                               key={opt.value}
@@ -404,7 +404,7 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
               <button
                 type="button"
                 onClick={addContact}
-                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-indigo-300 rounded-xl text-sm font-bold text-indigo-600 hover:bg-indigo-100 hover:border-indigo-400 transition-all"
+                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-indigo-300 dark:border-indigo-400/40 rounded-xl text-sm font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 hover:border-indigo-400 dark:hover:border-indigo-400/60 transition-all"
               >
                 <Plus className="w-4 h-4" />
                 {additionalContacts.length === 0 ? 'Add a Contact' : 'Add Another Contact'}
@@ -415,10 +415,10 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           {/* Address Section */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <MapPin className="w-4 h-4 text-red-500" />
-              <h3 className="text-sm font-bold text-gray-900">Address</h3>
+              <MapPin className="w-4 h-4 text-red-500 dark:text-red-400" />
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Address</h3>
               {isLoaded && (
-                <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">Autocomplete enabled</span>
+                <span className="text-[10px] text-gray-500 dark:text-white/60 bg-gray-100 dark:bg-white/10 px-2 py-0.5 rounded-full">Autocomplete enabled</span>
               )}
             </div>
             <div className="relative">
@@ -434,18 +434,18 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
                 autoComplete="off"
               />
               {showSuggestions && addressSuggestions.length > 0 && (
-                <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+                <div className="absolute z-50 left-0 right-0 mt-1 bg-white dark:bg-[#180c2c] border border-gray-200 dark:border-white/10 rounded-xl shadow-xl overflow-hidden">
                   {addressSuggestions.map(prediction => (
                     <button
                       key={prediction.place_id}
                       type="button"
-                      className="w-full px-4 py-2.5 text-left text-sm text-gray-900 hover:bg-gray-50 transition-colors flex items-start gap-2 border-b border-gray-100 last:border-0"
+                      className="w-full px-4 py-2.5 text-left text-sm text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-white/10 transition-colors flex items-start gap-2 border-b border-gray-100 dark:border-white/10 last:border-0"
                       onMouseDown={() => handleSelectSuggestion(prediction)}
                     >
-                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 shrink-0" />
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 dark:text-white/40 mt-0.5 shrink-0" />
                       <span>
                         <span className="font-medium">{prediction.structured_formatting.main_text}</span>
-                        <span className="text-gray-500 text-xs block">{prediction.structured_formatting.secondary_text}</span>
+                        <span className="text-gray-500 dark:text-white/50 text-xs block">{prediction.structured_formatting.secondary_text}</span>
                       </span>
                     </button>
                   ))}
@@ -471,8 +471,8 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           {/* Notes */}
           <div className={sectionClass}>
             <div className="flex items-center gap-2 mb-1">
-              <FileText className="w-4 h-4 text-gray-500" />
-              <h3 className="text-sm font-bold text-gray-900">Internal Notes</h3>
+              <FileText className="w-4 h-4 text-gray-500 dark:text-white/50" />
+              <h3 className="text-sm font-bold text-gray-900 dark:text-white">Internal Notes</h3>
             </div>
             <textarea
               className={inputClass + ' min-h-[80px] resize-y'}
@@ -483,8 +483,8 @@ export default function CustomerForm({ customer, onSubmit, onClose, showAddition
           </div>
 
           {/* Submit */}
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200">
-            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-200 dark:border-white/10">
+            <button type="button" onClick={onClose} className="px-5 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 dark:text-white/60 dark:hover:text-white transition-colors">
               Cancel
             </button>
             <button

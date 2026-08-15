@@ -537,7 +537,7 @@ function FacilityRow({ facility, onEdit, onDelete, onAddBadge }: {
   return (
     <div className="bg-white dark:bg-white/5 rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
       <div
-        className="p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/8 transition-colors"
+        className="p-5 cursor-pointer hover:bg-gray-50 dark:hover:bg-white/[0.08] transition-colors"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-start justify-between">

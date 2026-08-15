@@ -28,13 +28,13 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const TYPE_COLORS: Record<string, string> = {
-  general_contractor: 'bg-indigo-100 text-indigo-700',
-  subcontractor: 'bg-blue-100 text-blue-700',
-  direct_client: 'bg-cyan-100 text-cyan-700',
-  government: 'bg-yellow-100 text-yellow-700',
-  property_manager: 'bg-orange-100 text-orange-700',
-  homeowner: 'bg-green-100 text-green-700',
-  other: 'bg-gray-100 text-gray-600',
+  general_contractor: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-300',
+  subcontractor: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  direct_client: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300',
+  government: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-500/15 dark:text-yellow-300',
+  property_manager: 'bg-orange-100 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300',
+  homeowner: 'bg-green-100 text-green-700 dark:bg-green-500/15 dark:text-green-300',
+  other: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-white/70',
 };
 
 function formatTerms(terms: number | string | null | undefined): string | null {
@@ -58,7 +58,7 @@ export default function CustomerCard({ customer, onClick }: CustomerCardProps) {
   return (
     <button
       onClick={onClick}
-      className="w-full bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/8 border border-gray-200 dark:border-white/10 hover:border-brand/30 dark:hover:border-brand/40 rounded-xl p-5 transition-all text-left group relative shadow-sm"
+      className="w-full bg-white dark:bg-white/5 hover:bg-gray-50 dark:hover:bg-white/[0.08] border border-gray-200 dark:border-white/10 hover:border-brand/30 dark:hover:border-brand/40 rounded-xl p-5 transition-all text-left group relative shadow-sm"
     >
       {/* Inactive indicator */}
       {customer.is_active === false && (
@@ -93,7 +93,7 @@ export default function CustomerCard({ customer, onClick }: CustomerCardProps) {
 
       <div className="flex items-center gap-2 mt-4 flex-wrap">
         {customer.customer_type && (
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[customer.customer_type] || 'bg-gray-100 text-gray-600'} dark:bg-white/10 dark:text-white/70`}>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${TYPE_COLORS[customer.customer_type] || 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-white/70'}`}>
             {TYPE_LABELS[customer.customer_type] || customer.customer_type}
           </span>
         )}

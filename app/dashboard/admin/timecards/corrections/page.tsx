@@ -506,7 +506,7 @@ export default function TimecardCorrectionsPage() {
                 className={`relative flex-1 min-w-[72px] px-3 py-2 rounded-lg text-sm font-semibold transition-all min-h-[40px] ${
                   active
                     ? 'text-white shadow-sm'
-                    : 'text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80 hover:bg-gray-50 dark:hover:bg-white/8'
+                    : 'text-gray-500 dark:text-white/50 hover:text-gray-700 dark:hover:text-white/80 hover:bg-gray-50 dark:hover:bg-white/[0.08]'
                 }`}
               >
                 {label}

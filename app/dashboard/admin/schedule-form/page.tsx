@@ -765,7 +765,7 @@ function Toggle({ checked, onChange, label, icon: Icon }: { checked: boolean; on
       className={`flex items-center gap-4 w-full text-left p-4 rounded-xl border transition-all duration-200 ${
         checked
           ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-400/30 shadow-sm'
-          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-white/8'
+          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-white/[0.08]'
       }`}
     >
       <div className={`relative w-12 h-7 rounded-full transition-all duration-200 flex-shrink-0 ${checked ? 'bg-blue-600 shadow-inner' : 'bg-slate-300 dark:bg-white/20'}`}>
@@ -796,7 +796,7 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
 
   return (
     <div className={`flex items-center gap-4 p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 ${
-      checked ? `${c.bg} ${c.border} shadow-sm` : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
+      checked ? `${c.bg} ${c.border} shadow-sm` : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/[0.08]'
     }`}>
       <button
         type="button"
@@ -4809,7 +4809,7 @@ export default function ScheduleFormPage() {
                             : colorClass === 'amber'
                               ? 'bg-amber-500 text-white shadow-lg shadow-amber-200 scale-110'
                               : 'bg-red-600 text-white shadow-lg shadow-red-200 scale-110'
-                          : 'bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-white/8'
+                          : 'bg-white dark:bg-white/5 border-2 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50 dark:hover:bg-white/[0.08]'
                       }`}
                     >
                       {n}
@@ -4955,7 +4955,7 @@ export default function ScheduleFormPage() {
                       className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all duration-200 ${
                         form.high_work_access === 'lift_provided'
                           ? 'bg-emerald-50 dark:bg-emerald-500/10 border-emerald-300 dark:border-emerald-400/30 shadow-sm'
-                          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
+                          : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/[0.08]'
                       }`}
                     >
                       <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
@@ -4980,7 +4980,7 @@ export default function ScheduleFormPage() {
                         className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all duration-200 ${
                           form.high_work_access === 'we_provide'
                             ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-300 dark:border-blue-400/30 shadow-sm'
-                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
+                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/[0.08]'
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
@@ -5006,7 +5006,7 @@ export default function ScheduleFormPage() {
                         className={`flex items-center gap-3 w-full p-4 rounded-xl border-2 transition-all duration-200 ${
                           form.high_work_access === 'ladder'
                             ? 'bg-amber-50 dark:bg-amber-500/10 border-amber-300 dark:border-amber-400/30 shadow-sm'
-                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/8'
+                            : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/[0.08]'
                         }`}
                       >
                         <div className={`w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ${
@@ -5492,7 +5492,7 @@ export default function ScheduleFormPage() {
                         else if (noQualifiedFree) tone = 'border-red-300 dark:border-red-400/30 bg-red-50/70 dark:bg-red-500/10';
                         else if (hasRequiredSkill && d.qualified_free_count === 1) tone = 'border-amber-300 dark:border-amber-400/30 bg-amber-50/70 dark:bg-amber-500/10';
                         else if (tightCapacity) tone = 'border-amber-300 dark:border-amber-400/30 bg-amber-50/60 dark:bg-amber-500/8';
-                        else if (isWeekend) tone = 'border-slate-200 dark:border-white/8 bg-slate-50/60 dark:bg-white/[0.03]';
+                        else if (isWeekend) tone = 'border-slate-200 dark:border-white/[0.08] bg-slate-50/60 dark:bg-white/[0.03]';
                         else if (isToday && !isSelected) tone = 'border-blue-300 dark:border-blue-400/30 bg-blue-50/40 dark:bg-blue-500/8';
 
                         return (

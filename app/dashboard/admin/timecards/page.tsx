@@ -1031,7 +1031,7 @@ export default function AdminTimecardsPage() {
                         : key === 'no_entries'
                           ? 'bg-red-600 text-white shadow-sm'
                           : 'bg-brand text-white shadow-sm'
-                    : 'text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 hover:bg-gray-50 dark:hover:bg-white/8'
+                    : 'text-gray-500 dark:text-white/40 hover:text-gray-700 dark:hover:text-white/70 hover:bg-gray-50 dark:hover:bg-white/[0.08]'
                 }`}
               >
                 {label}

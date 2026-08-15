@@ -545,7 +545,7 @@ export default function LateEntriesPage() {
           ) : (
             <div className="bg-white dark:bg-white/[0.03] rounded-2xl border border-gray-200 dark:border-white/10 overflow-hidden">
               {/* Table header — hidden on very small screens, shown sm+ */}
-              <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-white/8 bg-gray-50 dark:bg-white/[0.02]">
+              <div className="hidden sm:grid grid-cols-[1fr_auto_auto_auto_auto] gap-3 px-4 py-2.5 border-b border-gray-100 dark:border-white/[0.08] bg-gray-50 dark:bg-white/[0.02]">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-white/40">Operator</span>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-white/40">Date</span>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-white/40">Scheduled</span>
@@ -553,7 +553,7 @@ export default function LateEntriesPage() {
                 <span className="text-[11px] font-bold uppercase tracking-wider text-gray-400 dark:text-white/40">Late</span>
               </div>
 
-              <div className="divide-y divide-gray-100 dark:divide-white/8">
+              <div className="divide-y divide-gray-100 dark:divide-white/[0.08]">
                 {lateEntries.map((entry) => (
                   <div
                     key={entry.id}

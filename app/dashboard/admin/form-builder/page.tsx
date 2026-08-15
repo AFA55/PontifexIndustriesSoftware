@@ -326,7 +326,7 @@ export default function FormBuilderPage() {
                       className={`w-full text-left px-4 py-3 rounded-xl border transition-all text-sm ${
                         selectedTemplate?.id === t.id
                           ? 'bg-brand/10 border-brand/30 text-brand-dark dark:bg-brand/15 dark:border-brand/30 dark:text-brand'
-                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/8'
+                          : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50 dark:bg-white/5 dark:border-white/10 dark:text-white/80 dark:hover:bg-white/[0.08]'
                       }`}
                     >
                       <p className="font-semibold truncate">{t.name}</p>

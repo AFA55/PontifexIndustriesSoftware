@@ -33,22 +33,22 @@ const CONTACT_TYPES = [
     value: 'general',
     label: 'General',
     icon: Users,
-    activeClass: 'bg-gray-700 border-gray-700 text-white',
-    inactiveClass: 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700',
+    activeClass: 'bg-gray-700 border-gray-700 text-white dark:bg-white/20 dark:border-white/30 dark:text-white',
+    inactiveClass: 'border-gray-200 text-gray-500 hover:border-gray-400 hover:text-gray-700 dark:border-white/10 dark:text-white/50 dark:hover:border-white/30 dark:hover:text-white/80',
   },
   {
     value: 'on_site',
     label: 'On-Site Contact',
     icon: MapPin,
-    activeClass: 'bg-amber-100 border-amber-400 text-amber-700',
-    inactiveClass: 'border-gray-200 text-gray-500 hover:border-amber-400 hover:text-amber-600',
+    activeClass: 'bg-amber-100 border-amber-400 text-amber-700 dark:bg-amber-500/15 dark:border-amber-400/50 dark:text-amber-300',
+    inactiveClass: 'border-gray-200 text-gray-500 hover:border-amber-400 hover:text-amber-600 dark:border-white/10 dark:text-white/50 dark:hover:border-amber-400/50 dark:hover:text-amber-300',
   },
   {
     value: 'billing',
     label: 'Billing Contact',
     icon: DollarSign,
-    activeClass: 'bg-emerald-100 border-emerald-400 text-emerald-700',
-    inactiveClass: 'border-gray-200 text-gray-500 hover:border-emerald-400 hover:text-emerald-600',
+    activeClass: 'bg-emerald-100 border-emerald-400 text-emerald-700 dark:bg-emerald-500/15 dark:border-emerald-400/50 dark:text-emerald-300',
+    inactiveClass: 'border-gray-200 text-gray-500 hover:border-emerald-400 hover:text-emerald-600 dark:border-white/10 dark:text-white/50 dark:hover:border-emerald-400/50 dark:hover:text-emerald-300',
   },
 ];
 
@@ -87,25 +87,25 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
     }
   };
 
-  const inputClass = 'w-full px-3 py-2.5 text-gray-900 bg-white border border-gray-300 rounded-lg text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all placeholder-gray-400';
-  const labelClass = 'block text-xs font-bold text-gray-500 mb-1.5 uppercase tracking-wider';
+  const inputClass = 'w-full px-3 py-2.5 text-gray-900 dark:text-white bg-white dark:bg-white/5 border border-gray-300 dark:border-white/10 rounded-lg text-sm focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none transition-all placeholder-gray-400 dark:placeholder-white/30 dark:[color-scheme:dark]';
+  const labelClass = 'block text-xs font-bold text-gray-500 dark:text-white/50 mb-1.5 uppercase tracking-wider';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm">
-      <div className="bg-white border border-gray-200 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm">
+      <div className="bg-white dark:bg-gradient-to-br dark:from-[#180c2c] dark:to-[#0e0720] border border-gray-200 dark:border-white/10 rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-xl">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200 dark:border-white/10">
+          <h2 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
             <User className="w-5 h-5 text-brand" />
             {isEdit ? 'Edit Contact' : 'Add Contact'}
           </h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors">
+            <X className="w-5 h-5 text-gray-500 dark:text-white/60" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+            <div className="p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/30 rounded-xl text-sm text-red-700 dark:text-red-300">
               {error}
             </div>
           )}
@@ -158,12 +158,12 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
 
           <div className="flex items-center gap-6">
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.is_primary} onChange={e => update('is_primary', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
-              <span className="text-sm text-gray-700">Primary Contact</span>
+              <input type="checkbox" checked={form.is_primary} onChange={e => update('is_primary', e.target.checked)} className="w-4 h-4 rounded border-gray-300 dark:border-white/20 dark:bg-white/10 text-brand focus:ring-brand" />
+              <span className="text-sm text-gray-700 dark:text-white/80">Primary Contact</span>
             </label>
             <label className="flex items-center gap-2 cursor-pointer">
-              <input type="checkbox" checked={form.is_billing_contact} onChange={e => update('is_billing_contact', e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-brand focus:ring-brand" />
-              <span className="text-sm text-gray-700">Billing Contact</span>
+              <input type="checkbox" checked={form.is_billing_contact} onChange={e => update('is_billing_contact', e.target.checked)} className="w-4 h-4 rounded border-gray-300 dark:border-white/20 dark:bg-white/10 text-brand focus:ring-brand" />
+              <span className="text-sm text-gray-700 dark:text-white/80">Billing Contact</span>
             </label>
           </div>
 
@@ -173,7 +173,7 @@ export default function ContactForm({ contact, onSubmit, onClose }: ContactFormP
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 transition-colors">
+            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 dark:text-white/60 dark:hover:text-white transition-colors">
               Cancel
             </button>
             <button
