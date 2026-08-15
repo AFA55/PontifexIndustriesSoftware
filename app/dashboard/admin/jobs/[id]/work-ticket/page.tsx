@@ -31,7 +31,7 @@ export const dynamic = 'force-dynamic';
 import { useCallback, useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { Printer, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { authedFetch, isSessionExpired } from '@/lib/authed-fetch';
 import { useBranding } from '@/lib/branding-context';
 import { workItemDetailLine, workItemQuickNote, type WorkItemLike } from '@/lib/work-items-format';
 import { formatDay, formatTime, parseYMDLocal, toLocalYMD } from '@/lib/dates';
@@ -410,6 +410,8 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  // Distinguished from a plain error: a dead session needs a login, not a retry.
+  const [expired, setExpired] = useState(false);
 
   // Read initial state off the URL (?mode=week&date=YYYY-MM-DD&notes=1). Done in
   // an effect rather than useSearchParams so the page needs no Suspense island.
@@ -425,13 +427,15 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setExpired(false);
     try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token || '';
       const qs = new URLSearchParams({ mode });
       if (anchor) qs.set('date', anchor);
-      const res = await fetch(`/api/admin/jobs/${jobId}/work-ticket?${qs.toString()}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      // authedFetch, not fetch: this page is opened in a NEW TAB from the job
+      // view, and a print tab that mounts with a stale or unreadable token used
+      // to print one red line — "Unauthorized. Invalid or expired session." —
+      // with no way forward. It now refreshes and retries once before giving up.
+      const res = await authedFetch(`/api/admin/jobs/${jobId}/work-ticket?${qs.toString()}`, {
         cache: 'no-store',
       });
       const json = await res.json();
@@ -443,8 +447,13 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
       // The API resolves the default anchor (today, else the last day worked) —
       // adopt it so the picker and the URL agree with what is on the page.
       if (!anchor && json.data?.anchor_date) setAnchor(json.data.anchor_date);
-    } catch {
-      setError('Could not load the ticket.');
+    } catch (e) {
+      if (isSessionExpired(e)) {
+        setExpired(true);
+        setError('Your session has expired.');
+      } else {
+        setError('Could not load the ticket.');
+      }
     } finally {
       setLoading(false);
     }
@@ -635,7 +644,71 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {loading && <p style={{ padding: 24, fontSize: 13 }}>Loading ticket…</p>}
-      {error && !loading && <p style={{ padding: 24, fontSize: 13, color: '#b91c1c' }}>{error}</p>}
+
+      {/* A ticket that won't load is someone in the office unable to print.
+          Say which of the two problems it is, and give them the button that
+          fixes it — the old version printed a red sentence and stopped. */}
+      {error && !loading && (
+        <div
+          className="no-print"
+          style={{
+            margin: 24,
+            padding: 20,
+            maxWidth: 560,
+            borderRadius: 12,
+            border: '1px solid #FCD34D',
+            background: '#FFFBEB',
+            color: '#78350F',
+          }}
+        >
+          <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 6 }}>
+            {expired ? 'Your session expired' : "This ticket didn't load"}
+          </p>
+          <p style={{ fontSize: 13, lineHeight: 1.5, marginBottom: 14 }}>
+            {expired
+              ? 'You were signed out in this tab, so the ticket could not be fetched. Signing in again will bring it straight back — nothing has been lost.'
+              : error}
+          </p>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={() => void load()}
+              style={{
+                minHeight: 44,
+                padding: '0 18px',
+                borderRadius: 8,
+                border: 'none',
+                background: accent,
+                color: '#fff',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Try again
+            </button>
+            {expired && (
+              <Link
+                href="/login"
+                style={{
+                  minHeight: 44,
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '0 18px',
+                  borderRadius: 8,
+                  border: '1px solid #D97706',
+                  color: '#92400E',
+                  fontSize: 14,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+              >
+                Sign in again
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* ── The ticket ───────────────────────────────────────────────────── */}
       {data && !loading && (

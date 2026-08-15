@@ -57,7 +57,14 @@ async function resolveAuth(request: NextRequest): Promise<
   | { ok: false; response: NextResponse }
 > {
   const authHeader = request.headers.get('authorization');
-  const token = authHeader?.replace('Bearer ', '');
+  // Case- and whitespace-tolerant. The old `replace('Bearer ', '')` matched one
+  // exact literal, so `bearer <jwt>` or a double space left the prefix INSIDE
+  // the token — which GoTrue rejects as malformed. That is a live candidate for
+  // the "token is malformed" 401 the founder hit while printing a work ticket
+  // on Aug 15, so the parse is widened and the diagnostic below records whether
+  // a prefix was actually found.
+  const hadBearerPrefix = /^\s*bearer\s+/i.test(authHeader ?? '');
+  const token = authHeader?.replace(/^\s*bearer\s+/i, '').trim();
 
   if (!token) {
     return {
@@ -68,9 +75,48 @@ async function resolveAuth(request: NextRequest): Promise<
 
   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
   if (authError || !user) {
+    // WHY WE LOG THE TOKEN'S SHAPE (founder, Aug 15 — "I tried to print the work
+    // ticket and it said error… this is what the PMs and admin were telling me").
+    //
+    // This branch had been flattening EVERY auth failure into one sentence, so
+    // the office reported "invalid or expired session" while the Supabase auth
+    // log said something completely different for that same second:
+    //   GET /user 403 "token is malformed: token contains an invalid number of
+    //   segments" — i.e. not expired at all, the bearer wasn't a JWT.
+    //
+    // Never the token itself, and never a fragment of it — a bearer token is a
+    // live credential and logs are not a safe place for one. Length and segment
+    // count are enough to tell "expired" from "garbage" from "truncated", which
+    // is the distinction that cost us the diagnosis.
+    const segments = token.split('.').length;
+    console.warn(
+      '[auth] rejected bearer token',
+      JSON.stringify({
+        reason: authError?.message ?? 'no user returned',
+        token_length: token.length,
+        token_segments: segments,
+        well_formed_jwt: segments === 3,
+        // A missing prefix means the client sent the raw token (or something
+        // else entirely) with no "Bearer " at all — worth telling apart from a
+        // token that was simply stale.
+        had_bearer_prefix: hadBearerPrefix,
+        path: new URL(request.url).pathname,
+      })
+    );
+    // Distinguish the two for the CLIENT too, so a page can tell a session that
+    // needs refreshing from one that was never valid.
+    const malformed = segments !== 3;
     return {
       ok: false,
-      response: NextResponse.json({ error: 'Unauthorized. Invalid or expired session.' }, { status: 401 }),
+      response: NextResponse.json(
+        {
+          error: malformed
+            ? 'Unauthorized. Your sign-in token was not readable — please sign in again.'
+            : 'Unauthorized. Invalid or expired session.',
+          code: malformed ? 'malformed_token' : 'invalid_session',
+        },
+        { status: 401 }
+      ),
     };
   }
 

@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useState, use } from 'react';
-import { supabase } from '@/lib/supabase';
+import { authedFetch, isSessionExpired } from '@/lib/authed-fetch';
 import { useBranding } from '@/lib/branding-context';
 
 // ─── Types (subset of /api/admin/jobs/[id]/summary `data`) ─────────────────────
@@ -122,11 +122,9 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
   useEffect(() => {
     (async () => {
       try {
-        const { data: sessionData } = await supabase.auth.getSession();
-        const token = sessionData.session?.access_token || '';
-        const res = await fetch(`/api/admin/jobs/${jobId}/summary`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        // Opened in a new tab from the job view — same session-recovery reason
+        // as the work ticket. See lib/authed-fetch.ts.
+        const res = await authedFetch(`/api/admin/jobs/${jobId}/summary`);
         if (!res.ok) {
           setError('Could not load job ticket.');
           return;
@@ -135,8 +133,12 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
         const data = json.data;
         setJob(data?.job ?? null);
         setScope(Array.isArray(data?.scope?.items) ? data.scope.items : []);
-      } catch {
-        setError('Could not load job ticket.');
+      } catch (e) {
+        setError(
+          isSessionExpired(e)
+            ? 'Your session expired in this tab. Sign in again and re-open the job order — nothing has been lost.'
+            : 'Could not load job ticket.'
+        );
       } finally {
         setLoading(false);
       }
