@@ -237,6 +237,17 @@ export function workItemDetailLine(item: WorkItemLike): string {
     return s;
   }
 
+  // Work types with no specialised builder (GRINDING, HAULING, STANDBY TIME,
+  // INSTALL BOLLARD(S) …) store only a UNIT. Without it the ticket printed a
+  // bare number — "GRINDING ×400" — and 400 of what was anyone's guess. The
+  // unit IS the measurement for these rows, so it belongs here rather than
+  // being re-derived at each of the four call sites that render a work item.
+  if (d && typeof d.unit === 'string' && d.unit.trim() && !d.holes && !d.cuts && !d.areas) {
+    const unit = d.unit.trim();
+    const qty = n(item.quantity);
+    return qty > 0 ? `${round2(qty)} ${unit}` : unit;
+  }
+
   // Fallback: flat back-compat columns (first-hole flattening, LF totals).
   const parts: string[] = [];
   if (n(item.core_quantity) > 0) {
