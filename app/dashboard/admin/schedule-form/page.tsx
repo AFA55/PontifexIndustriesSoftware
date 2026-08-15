@@ -5142,6 +5142,23 @@ export default function ScheduleFormPage() {
             )}
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            {/* VIEW DRAFTS. Drafts already auto-save on every change — but the
+                picker only appeared once, on page load, and dismissing it was a
+                one-way door. So a half-finished job was still on disk with no
+                way back to it: "sometimes they may start a job but not finish,
+                it must save their progress and be able to reopen old drafts"
+                (founder, Aug 15). The saving was never the missing half; the
+                door back was. */}
+            {savedDrafts.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowDraftPicker(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 dark:bg-amber-500/10 hover:bg-amber-100 dark:hover:bg-amber-500/20 border border-amber-200 dark:border-amber-400/30 text-amber-700 dark:text-amber-300 rounded-lg transition-all text-xs font-bold whitespace-nowrap flex-shrink-0"
+              >
+                <FileText size={14} />
+                View Drafts ({savedDrafts.length})
+              </button>
+            )}
             <Link href="/dashboard/admin/schedule-form-history"
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 text-slate-500 dark:text-white/60 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 rounded-lg transition-all text-xs font-semibold">
               <FileText size={14} />
