@@ -644,6 +644,25 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                 ) : null}
               </div>
               <div className="flex items-center gap-1.5">
+                {/* A WAY OUT OF THE MODAL TO THE FULL RECORD (founder, Aug 15).
+                    The board's panel is a summary — the whole job, its days, its
+                    hours and its documents live on the list pages, and there was
+                    no route from one to the other. Completed jobs go to the
+                    completed ticket, everything else to Active Jobs. */}
+                <a
+                  href={
+                    job.status === 'completed'
+                      ? `/dashboard/admin/completed-job-tickets/${job.id}`
+                      : `/dashboard/admin/jobs/${job.id}`
+                  }
+                  className="flex items-center gap-1.5 px-3 py-2 bg-white/20 hover:bg-white/30 rounded-xl text-sm font-bold transition-colors"
+                  title={job.status === 'completed' ? 'Open the completed ticket' : 'Open the full job record'}
+                >
+                  <FileText className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {job.status === 'completed' ? 'View Completed' : 'View Job'}
+                  </span>
+                </a>
                 <button
                   onClick={handlePrintDispatch}
                   disabled={printingPdf}
