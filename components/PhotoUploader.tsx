@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Camera, X, Loader2, ImageIcon, MapPin } from 'lucide-react';
+import { Camera, X, Loader2, ImageIcon, MapPin, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toDisplayUrls, needsSigning } from '@/lib/storage-url';
 
@@ -325,13 +325,32 @@ export default function PhotoUploader({
         <div className="flex flex-wrap gap-2">
           {photos.map((url, i) => (
             <div key={i} className={`relative group ${compact ? 'w-16 h-16' : 'w-20 h-20'} rounded-xl overflow-hidden border-2 ${lightMode ? 'border-slate-200 bg-slate-50' : 'border-slate-600 bg-slate-900'}`}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {displayPhotos[i] && (
-                <img
-                  src={displayPhotos[i]}
-                  alt={`Upload ${i + 1}`}
-                  className="w-full h-full object-cover"
-                />
+              {/* A PDF in an <img> draws nothing, so the office saw an empty
+                  tile immediately after a successful upload and could not tell
+                  whether the file had attached. Documents get a labelled tile
+                  in the picker too, not just in the viewer. */}
+              {attachmentKind(url) !== 'image' ? (
+                <a
+                  href={displayPhotos[i] || url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={attachmentName(url)}
+                  className="flex h-full w-full flex-col items-center justify-center gap-0.5"
+                >
+                  <FileText className={`${compact ? 'h-5 w-5' : 'h-6 w-6'} text-rose-500`} />
+                  <span className={`text-[8px] font-bold uppercase tracking-wide ${lightMode ? 'text-slate-600' : 'text-slate-300'}`}>
+                    {attachmentKind(url) === 'pdf' ? 'PDF' : 'File'}
+                  </span>
+                </a>
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                displayPhotos[i] && (
+                  <img
+                    src={displayPhotos[i]}
+                    alt={`Upload ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                )
               )}
               <button
                 type="button"
@@ -420,6 +439,41 @@ export default function PhotoUploader({
 /**
  * Read-only photo viewer (for operator job detail pages)
  */
+/**
+ * Is this attachment a DOCUMENT rather than an image?
+ *
+ * THE BUG (founder, Aug 15): "I added a photo in PDF form to Javi's ticket and
+ * I couldn't see it." The upload worked — the URL is on the job — but every
+ * attachment was rendered inside an <img>, and a PDF in an img tag draws
+ * nothing. The operator got a blank grey square where his site drawing should
+ * be, with no way to know a file was even there.
+ *
+ * Extension is read from the PATH ONLY: signed Supabase URLs carry a `?token=`
+ * query string, so matching against the whole URL misses.
+ */
+const DOC_EXTENSIONS = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv', '.txt', '.heic'];
+function attachmentKind(url: string): 'image' | 'pdf' | 'file' {
+  let path = url;
+  try {
+    path = new URL(url, 'https://x.invalid').pathname;
+  } catch {
+    path = url.split('?')[0];
+  }
+  const lower = path.toLowerCase();
+  if (lower.endsWith('.pdf')) return 'pdf';
+  return DOC_EXTENSIONS.some((e) => lower.endsWith(e)) ? 'file' : 'image';
+}
+
+/** The file's own name, for the tile label — better than "Document 2". */
+function attachmentName(url: string): string {
+  try {
+    const last = new URL(url, 'https://x.invalid').pathname.split('/').pop() || '';
+    return decodeURIComponent(last) || 'Attachment';
+  } catch {
+    return 'Attachment';
+  }
+}
+
 export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; label?: string }) {
   const displayPhotos = useSignedPhotos(photos ?? []);
   if (!photos || photos.length === 0) return null;
@@ -431,24 +485,52 @@ export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; la
         <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</p>
       </div>
       <div className="flex flex-wrap gap-2">
-        {photos.map((url, i) => (
-          <a
-            key={i}
-            href={displayPhotos[i] || url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 hover:border-blue-400 transition-colors"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            {displayPhotos[i] && (
-              <img
-                src={displayPhotos[i]}
-                alt={`${label} ${i + 1}`}
-                className="w-full h-full object-cover"
-              />
-            )}
-          </a>
-        ))}
+        {photos.map((url, i) => {
+          const href = displayPhotos[i] || url;
+          const kind = attachmentKind(url);
+
+          // A document gets a tile that says what it is and opens on tap. An
+          // <img> here is why these were invisible.
+          if (kind !== 'image') {
+            return (
+              <a
+                key={i}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={attachmentName(url)}
+                className="flex w-24 h-24 flex-col items-center justify-center gap-1 rounded-xl border-2 border-slate-200 bg-slate-50 p-1.5 text-center transition-colors hover:border-blue-400 dark:border-white/15 dark:bg-white/[0.03] dark:hover:border-blue-400"
+              >
+                <FileText className="h-7 w-7 text-rose-500" />
+                <span className="text-[9px] font-bold uppercase tracking-wide text-slate-600 dark:text-white/70">
+                  {kind === 'pdf' ? 'PDF' : 'File'}
+                </span>
+                <span className="line-clamp-1 w-full text-[8px] text-slate-400 dark:text-white/45">
+                  Tap to open
+                </span>
+              </a>
+            );
+          }
+
+          return (
+            <a
+              key={i}
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 hover:border-blue-400 transition-colors"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {displayPhotos[i] && (
+                <img
+                  src={displayPhotos[i]}
+                  alt={`${label} ${i + 1}`}
+                  className="w-full h-full object-cover"
+                />
+              )}
+            </a>
+          );
+        })}
       </div>
     </div>
   );

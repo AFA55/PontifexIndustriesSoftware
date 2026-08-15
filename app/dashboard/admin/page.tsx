@@ -118,6 +118,14 @@ interface DashboardData {
   team_status: TeamMember[];
   recent_activity: ActivityItem[];
   operational_alerts?: OperationalAlerts;
+  /**
+   * The scope the SERVER actually used. Labels read from this, not from the
+   * local toggle — the two diverged and the dashboard told an operations
+   * manager the company had no work today when it meant he personally had
+   * none. If the server ever refuses a scope again, the copy follows it
+   * instead of lying about it.
+   */
+  scope?: 'personal' | 'team';
 }
 
 interface SalesCommissionRow {
@@ -414,6 +422,11 @@ export default function AdminDashboard() {
       setScope(isSenior ? 'team' : 'personal');
     }
   }, [user]);
+
+  // The scope the DATA came back in. Every label below reads this, never the
+  // local toggle: those two diverged, and the dashboard confidently printed
+  // "No jobs scheduled for today" over a day with eight jobs on it.
+  const shownScope: 'personal' | 'team' = dashData?.scope ?? scope;
 
   const handleScopeChange = (s: 'personal' | 'team') => {
     setScope(s);
@@ -871,7 +884,7 @@ export default function AdminDashboard() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-2">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-            {scope === 'personal' ? 'Your Dashboard' : 'Team Dashboard'}
+            {shownScope === 'personal' ? 'Your Dashboard' : 'Team Dashboard'}
           </h1>
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
             {scope === 'personal'
@@ -1118,7 +1131,7 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-gray-400 dark:text-slate-500" />
                 <h2 className="text-sm font-semibold text-gray-900 dark:text-white">
-                  {scope === 'personal' ? 'Your Schedule Today' : "Today's Schedule"}
+                  {shownScope === 'personal' ? 'Your Schedule Today' : "Today's Schedule"}
                 </h2>
                 <span className="text-xs text-gray-400 dark:text-slate-500">{today}</span>
               </div>
@@ -1153,7 +1166,7 @@ export default function AdminDashboard() {
                 <div className="py-12 text-center">
                   <Calendar className="w-10 h-10 text-gray-200 dark:text-slate-700 mx-auto mb-3" />
                   <p className="text-sm text-gray-500 dark:text-slate-400 mb-3">
-                    {scope === 'personal'
+                    {shownScope === 'personal'
                       ? 'You have no jobs scheduled today'
                       : 'No jobs scheduled for today'}
                   </p>
@@ -1310,7 +1323,7 @@ export default function AdminDashboard() {
                 </div>
               ) : (
                 <>
-                  {dashData.team_status.slice(0, scope === 'personal' ? 1 : 8).map((member) => (
+                  {dashData.team_status.slice(0, shownScope === 'personal' ? 1 : 8).map((member) => (
                     <div key={member.id} className="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-colors">
                       <span
                         className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
@@ -1327,7 +1340,7 @@ export default function AdminDashboard() {
                       </span>
                     </div>
                   ))}
-                  {scope === 'team' && dashData.team_status.length > 8 && (
+                  {shownScope === 'team' && dashData.team_status.length > 8 && (
                     <p className="text-xs text-gray-400 dark:text-slate-500 text-center py-2">
                       +{dashData.team_status.length - 8} more
                     </p>

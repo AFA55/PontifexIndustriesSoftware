@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { HardHat, ChevronRight } from 'lucide-react';
 import { getCardPermission } from '@/lib/rbac';
+import { supabase } from '@/lib/supabase';
 
 /**
  * "Open Operator View" — the door from the management side to the crew side.
@@ -25,9 +27,42 @@ import { getCardPermission } from '@/lib/rbac';
  * role list here.
  */
 export default function OperatorViewCard({ role }: { role: string | undefined }) {
+  // HOW MANY TICKETS ARE WAITING FOR THEM RIGHT NOW (founder, Aug 15: a button
+  // "for him to switch to operator view WHEN HE GETS ASSIGNED TICKETS to
+  // perform GPR"). The door already existed; what it never did was tell you
+  // there was anything behind it, so a supervisor with a job waiting had to
+  // guess and go look. Same endpoint the crew's own My Jobs screen uses, so the
+  // count and the list can never disagree.
+  const [ticketCount, setTicketCount] = useState<number | null>(null);
+  const visible = !!role && getCardPermission(null, 'operator_view', role) !== 'none';
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch(
+          '/api/job-orders?include_helper_jobs=true&includeCompleted=false&as=operator',
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
+        if (!res.ok || cancelled) return;
+        const json = await res.json();
+        const jobs: unknown[] = json?.data ?? json?.jobs ?? [];
+        if (!cancelled && Array.isArray(jobs)) setTicketCount(jobs.length);
+      } catch {
+        // A count is a nicety — the door still opens without it.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [visible]);
+
   // null user-permissions → falls through to the role preset, which is what we
   // want: this card follows lib/rbac.ts rather than a hardcoded role list.
-  if (!role || getCardPermission(null, 'operator_view', role) === 'none') return null;
+  if (!visible) return null;
+
+  const hasTickets = (ticketCount ?? 0) > 0;
 
   return (
     <Link
@@ -38,9 +73,18 @@ export default function OperatorViewCard({ role }: { role: string | undefined })
         <HardHat className="h-5 w-5 text-white" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-bold text-gray-900 dark:text-white">Open Operator View</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-bold text-gray-900 dark:text-white">Open Operator View</p>
+          {hasTickets && (
+            <span className="rounded-full bg-sky-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">
+              {ticketCount} ticket{ticketCount === 1 ? '' : 's'} waiting
+            </span>
+          )}
+        </div>
         <p className="mt-0.5 text-xs text-gray-600 dark:text-white/60">
-          Run your own jobs — view and submit tickets like the crew. You can switch back anytime.
+          {hasTickets
+            ? `You've been dispatched ${ticketCount === 1 ? 'a job' : 'jobs'} of your own — open ${ticketCount === 1 ? 'it' : 'them'} here and submit like the crew. Switch back anytime.`
+            : 'Run your own jobs — view and submit tickets like the crew. You can switch back anytime.'}
         </p>
       </div>
       <ChevronRight className="h-4 w-4 flex-shrink-0 text-sky-400 transition-colors group-hover:text-sky-600" />

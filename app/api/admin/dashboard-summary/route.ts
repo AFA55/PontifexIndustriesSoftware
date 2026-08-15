@@ -694,17 +694,39 @@ export async function GET(request: NextRequest) {
   const rawScope = params.get('scope') ?? 'team';
   const rawUserId = params.get('userId') ?? null;
 
-  // Roles that are NOT super_admin are always forced into personal scope
+  // ── WHO MAY SEE THE WHOLE COMPANY'S DAY ──────────────────────────────────
+  //
+  // THE BUG (founder, Sat Aug 15): his dashboard read "Jobs Today: 0" and
+  // "No jobs scheduled for today" while eight jobs ran and Javier's ticket had
+  // just been dispatched. Nothing was wrong with the query — the tile was
+  // showing HIS OWN jobs while wearing the team-wide labels.
+  //
+  // The client (app/dashboard/admin/page.tsx) defaults super_admin AND
+  // operations_manager to team scope, shows the Team toggle as selected, and
+  // renders team copy: "Today's Schedule", "No jobs scheduled for today". This
+  // route allowed team scope to super_admin ONLY and silently forced everyone
+  // else to personal. He is an operations_manager. So the page said "the
+  // company has nothing on today" when it meant "you personally have nothing
+  // on today" — the most consequential sentence on the dashboard, and it was
+  // false.
+  //
+  // The platform's signature defect once more: the page offers something the
+  // backend quietly refuses, and the user is told a story instead of an error.
+  //
+  // Management may choose their own scope. Viewing ANOTHER named person's
+  // personal dashboard stays super_admin-only below — that is a privacy
+  // control and is deliberately not widened here.
+  const MAY_CHOOSE_SCOPE = ['super_admin', 'operations_manager', 'admin'];
   const isSuperAdmin = role === 'super_admin';
 
   let scope: 'personal' | 'team';
   let targetUserId: string;
 
-  if (isSuperAdmin) {
-    // super_admin may choose scope; defaults to team
+  if (MAY_CHOOSE_SCOPE.includes(role)) {
+    // Defaults to team; the client sends ?scope=personal when the toggle is set.
     scope = rawScope === 'personal' ? 'personal' : 'team';
 
-    if (scope === 'personal' && rawUserId) {
+    if (scope === 'personal' && rawUserId && isSuperAdmin) {
       // Verify the requested userId belongs to the same tenant before allowing it
       const { data: targetProfile } = await supabaseAdmin
         .from('profiles')
@@ -724,7 +746,9 @@ export async function GET(request: NextRequest) {
       targetUserId = authUserId;
     }
   } else {
-    // All other admin roles: force personal, always use own userId
+    // Salesman, supervisor, shop roles: their dashboard is their own work.
+    // The client must not offer them a Team toggle it cannot honour — if that
+    // ever changes, this is the line that has to change with it.
     scope = 'personal';
     targetUserId = authUserId;
   }
