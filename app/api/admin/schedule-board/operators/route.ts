@@ -47,6 +47,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { displayName as displayPersonName } from '@/lib/person-name';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
@@ -67,7 +68,7 @@ export async function GET(request: NextRequest) {
     // One read — both lists are drawn from it.
     const { data: crew, error: crewError } = await supabaseAdmin
       .from('profiles')
-      .select('id, full_name, email, role, avatar_url')
+      .select('id, full_name, nickname, email, role, avatar_url')
       .eq('tenant_id', tenantId)
       .eq('active', true)
       .in('role', OPERATOR_SLOT_ROLES)
@@ -109,15 +110,25 @@ export async function GET(request: NextRequest) {
       nameCounts.set(n, (nameCounts.get(n) ?? 0) + 1);
     }
 
-    const displayName = (p: { full_name: string | null; email: string | null }) => {
+    // NICKNAMES (founder, Aug 15): "Conrade Richardson — his nickname is Nate.
+    // Right now I'm having difficulty finding his name every time because I have
+    // to look for Conrade Richardson." The nickname is what the whole company
+    // says out loud; the real name is what payroll and the customer's ticket
+    // use. Both, in one string, so a picker can be searched by either.
+    const buildName = (p: { full_name: string | null; nickname: string | null; email: string | null }) => {
       const base = (p.full_name || 'Unknown').trim();
-      if ((nameCounts.get(base) ?? 0) <= 1) return base;
-      return p.email ? `${base} (${p.email})` : base;
+      const withNick = displayPersonName({ full_name: base, nickname: p.nickname });
+      if ((nameCounts.get(base) ?? 0) <= 1) return withNick;
+      // Still ambiguous — two people really do share a name (the founder keeps a
+      // business and a personal account), so the email is what tells them apart.
+      return p.email ? `${withNick} (${p.email})` : withNick;
     };
 
-    const toEntry = (p: { id: string; full_name: string | null; email: string | null; role: string | null; avatar_url: string | null }) => ({
+    const toEntry = (p: { id: string; full_name: string | null; nickname: string | null; email: string | null; role: string | null; avatar_url: string | null }) => ({
       id: p.id,
-      name: displayName(p),
+      name: buildName(p),
+      /** Both names, so a search box can match either without re-fetching. */
+      searchText: [p.full_name ?? '', p.nickname ?? '', p.email ?? ''].join(' ').toLowerCase(),
       avatarUrl: p.avatar_url || null,
       role: p.role || 'operator',
       /** Set when this person's day job is something other than operating.

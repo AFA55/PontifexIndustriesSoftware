@@ -15,10 +15,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Users, Plus, X, Loader2, Crown, Wrench, HardHat, ArrowUp } from 'lucide-react';
+import { Users, Plus, X, Loader2, Crown, Wrench, HardHat, ArrowUp, Search } from 'lucide-react';
 
 interface CrewMember { user_id: string; role: string; full_name: string | null }
-interface OperatorOpt { id: string; name: string }
+interface OperatorOpt { id: string; name: string; searchText?: string }
 type CrewRole = 'operator' | 'helper';
 
 async function token() {
@@ -214,6 +214,18 @@ export default function JobCrewPanel({
       ? operators
       : [...operators, ...helpers.filter((h) => !operators.some((o) => o.id === h.id))];
   const available = candidatePool.filter((o) => o.id !== leadId && !crewIds.has(o.id));
+
+  // SEARCH, because a <select> of the whole crew is a scroll (founder, Aug 15).
+  // Matches on either name — the endpoint sends `searchText` carrying the real
+  // name AND the nickname, so typing "nate" finds Conrade Richardson. Every
+  // term must match, so "con rich" narrows instead of widening.
+  const [crewQuery, setCrewQuery] = useState('');
+  const filteredAvailable = available.filter((o) => {
+    const q = crewQuery.trim().toLowerCase();
+    if (!q) return true;
+    const haystack = (o.searchText || o.name).toLowerCase();
+    return q.split(/\s+/).every((term) => haystack.includes(term));
+  });
   const crewOperators = crew.filter((c) => c.role === 'operator');
   const crewHelpers = crew.filter((c) => c.role !== 'operator');
 
@@ -326,22 +338,39 @@ export default function JobCrewPanel({
               ))}
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Plus className="w-4 h-4 text-slate-400" />
-            <select
-              defaultValue=""
-              disabled={busy || promoting}
-              autoFocus={autoOpenAdd}
-              onChange={(e) => { addMember(e.target.value); e.target.value = ''; }}
-              className="flex-1 min-h-[44px] px-2.5 py-2 rounded-lg border border-slate-300 dark:border-white/20 bg-white dark:bg-white/5 text-sm text-slate-900 dark:text-white focus:ring-2 focus:ring-indigo-400 focus:outline-none disabled:opacity-50"
-            >
-              <option value="" disabled>
-                {addRole === 'operator' ? 'Add another operator…' : 'Add a helper…'}
-              </option>
-              {available.map((o) => (
-                <option key={o.id} value={o.id}>{o.name}</option>
-              ))}
-            </select>
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={crewQuery}
+                onChange={(e) => setCrewQuery(e.target.value)}
+                autoFocus={autoOpenAdd}
+                placeholder={addRole === 'operator' ? 'Search operators — name or nickname' : 'Search helpers — name or nickname'}
+                className="w-full min-h-[44px] rounded-lg border border-slate-300 bg-white pl-9 pr-3 py-2 text-base text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:border-white/20 dark:bg-white/5 dark:text-white dark:placeholder:text-white/30"
+              />
+            </div>
+
+            {filteredAvailable.length === 0 ? (
+              <p className="px-1 text-xs text-slate-400 dark:text-white/40">
+                Nobody matches &ldquo;{crewQuery.trim()}&rdquo;. Try a first name, or the name they go by.
+              </p>
+            ) : (
+              <div className="max-h-52 overflow-y-auto rounded-lg border border-slate-200 dark:border-white/10 divide-y divide-slate-100 dark:divide-white/5">
+                {filteredAvailable.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    disabled={busy || promoting}
+                    onClick={() => { addMember(o.id); setCrewQuery(''); }}
+                    className="flex w-full min-h-[44px] items-center gap-2 px-3 py-2 text-left text-sm text-slate-800 transition-colors hover:bg-indigo-50 disabled:opacity-50 dark:text-white dark:hover:bg-white/10"
+                  >
+                    <Plus className="h-4 w-4 flex-shrink-0 text-indigo-500" />
+                    <span className="truncate">{o.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {busy && <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />}
           </div>
         </div>
