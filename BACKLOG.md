@@ -27,6 +27,18 @@
 
 ### 🆕 AUG 15 PM — founder testing batch (filed, not built)
 
+- [ ] **💡 "This Week's Highlights" — an internal feed that showcases good work.** Founder's own idea, Aug 15, explicitly NOT a priority: *"lets add a place where we can showcase the work of operators when they do a good job — we can have a 'this week's highlights', incorporate features, and make it like a little feed within our company. I think this would be a good idea… no need to work on it right now, not priority, but definitely something I think would be a great add."*
+
+  Worth capturing properly because the raw material already exists and is currently thrown away. Every day the platform collects things that are quietly evidence of good work: a clean completion signature, a job finished under the estimated hours, a genuinely descriptive daily ticket, photos of a tidy site, a customer survey score, a supervisor site-visit rating, a week with no missed tickets. Today all of that is filed and never surfaced — the crew only ever hears from the software when it wants something (clock in, you missed a ticket, get the waiver signed). A feed inverts that.
+
+  Design notes for when it comes up:
+  - **Nominations should be mostly automatic**, with a human able to pin or write one. If it depends on someone remembering to post, it dies in three weeks — every internal feed that fails, fails this way.
+  - **Never rank people against each other.** A leaderboard turns into a stick, and this is meant to be the one screen that is not one. Same instinct as the founder's own decision on helper reviews: aggregate only, suppressed below n=3, so nobody is scored off a single bad day.
+  - Operator-visible, since the point is that the crew sees it — which means it must be scrubbed of anything internal: costs, margins, other people's pay, Quick Notes.
+  - A photo feed of real jobs is also the best marketing asset this company will ever have — with a deliberate, separate step before anything leaves the building.
+
+
+
 - [ ] **Nicknames beside real names, everywhere.** Conrade Richardson goes by **Nate**, and the founder has to hunt for "Conrade Richardson" every time he looks at a timecard. `profiles.nickname` already exists and is already editable in Team Profiles → Edit Info; almost nothing renders it. Show it next to the real name wherever a person is listed — timecards first, then the schedule board, crew pickers, tickets. Keep the role/title label; that part is fine. A shared display helper (`displayName(profile)`) so one rule covers every surface, rather than 30 call sites each deciding.
 - [ ] **Request Time Off is untested end to end and must notify management.** Verify the request reaches an admin as a real notification, that the notification LINKS to the approval screen, and that approving/denying writes back and tells the requester.
 - [ ] **🔴 NOTIFICATIONS — deep analysis, not a patch.** Two separate complaints: (a) the **count is wrong** — opening the bell shows more than are actually unread, and previously-seen ones come back; (b) notifications are **dead ends** — "if it sends a notification, send them someplace to resolve what the notification is about, don't just notify them but not be able to edit it." Audit the whole path: what writes `notifications`, what marks read, whether the badge counts the same set the panel renders, and whether every `notification_type` carries an `action_url` that lands somewhere you can actually act. Expect the badge/panel to be counting two different queries.
