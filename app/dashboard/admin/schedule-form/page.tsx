@@ -3384,6 +3384,12 @@ export default function ScheduleFormPage() {
                             { value: 'dingo', label: 'Dingo' },
                             { value: 'sherpa', label: 'Sherpa' },
                             { value: 'mini_excavator', label: 'Mini Excavator' },
+                            // "For equipment for removal, just also add the option
+                            // to put hand removal" (founder, Aug 15). Carrying it
+                            // out by hand is a real method with a real cost in
+                            // labour — it just isn't a machine, and the list had
+                            // no way to say so.
+                            { value: 'hand_removal', label: 'Hand Removal' },
                           ].map(equip => {
                             const isSelected = form.removal_equipment.includes(equip.value);
                             return (

@@ -21,7 +21,6 @@ const s = StyleSheet.create({
     borderBottom: '2 solid #1E293B',
   },
   companyName: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 2 },
   jobNumberBox: { borderWidth: 1.5, borderColor: '#1E293B', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
   jobNumberText: { fontSize: 14, fontWeight: 'bold', color: '#1E293B', letterSpacing: 0.5 },
   multiDayTag: { fontSize: 7.5, fontWeight: 'bold', color: '#7C3AED' },
@@ -288,25 +287,29 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
             EMPLOYEES REMOVED. Third time asked: a sheet printed Monday must not
             assert who is on the job Thursday. Who actually worked it is on the
             WORK ticket, taken from the clock cards. */}
+        {/* Company on the left, the ticket's identity stacked on the right:
+            JOB TICKET, the printed date under it, then the job number
+            (founder, Aug 15). One place to look for what this sheet is and
+            which job it belongs to. */}
         <View style={s.headerRow}>
           <View style={{ flex: 1 }}>
             <Text style={s.companyName}>{(branding?.company_name || 'PATRIOT CONCRETE CUTTING').toUpperCase()}</Text>
-            <View style={s.titleRow}>
-              <Text style={s.jobTicketTitle}>JOB TICKET</Text>
-              <View style={s.jobNumberBox}>
-                <Text style={s.jobNumberText}>{job.job_number}</Text>
-              </View>
-              {job.is_multi_day && (
-                <Text style={s.multiDayTag}>
-                  MULTI-DAY · DAY {(job.total_days_worked || 0) + 1}
-                </Text>
-              )}
-            </View>
             <Text style={s.companyAddress}>{branding?.company_address || 'P.O Box 504, Piedmont, SC 29673'}</Text>
             <Text style={s.companyPhone}>{branding?.company_phone || 'Phone: 864-299-0330  |  Fax: 864-299-1532'}</Text>
           </View>
           <View style={s.headerRight}>
-            <Text style={{ fontSize: 7, color: '#64748B' }}>Printed: {today}</Text>
+            <Text style={s.jobTicketTitle}>JOB TICKET</Text>
+            <Text style={{ fontSize: 7.5, color: '#64748B', marginTop: 1, marginBottom: 3 }}>
+              Printed: {today}
+            </Text>
+            <View style={s.jobNumberBox}>
+              <Text style={s.jobNumberText}>{job.job_number}</Text>
+            </View>
+            {job.is_multi_day && (
+              <Text style={{ ...s.multiDayTag, marginTop: 3 }}>
+                MULTI-DAY · DAY {(job.total_days_worked || 0) + 1}
+              </Text>
+            )}
           </View>
         </View>
 
