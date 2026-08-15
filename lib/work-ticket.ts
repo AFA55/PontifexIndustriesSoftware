@@ -633,6 +633,64 @@ export function sumFootage(items: WorkItemLike[]): { linearFeet: number; cores: 
   return { linearFeet: round2(linearFeet), cores };
 }
 
+/**
+ * TOTAL WORK PERFORMED, by work type, across the whole printed range.
+ *
+ * WHY THIS EXISTS (founder, Aug 15). The project managers and admin write the
+ * invoice BY HAND from this sheet — the system does not decide what to bill and
+ * is not trying to. So the sheet's only job is to state, accurately and in one
+ * place, what was done.
+ *
+ * The per-day blocks alone could not do that. His example: an operator misses a
+ * day, then on the following day enters the running total for both — and the
+ * sheet showed that work under one date, so a reader scanning day by day saw
+ * "one day of work" on a two-day job and had to reconstruct the rest. The
+ * per-day view answers "what happened when"; it cannot answer "what did we do
+ * in total", because that depends on which day somebody happened to type it.
+ *
+ * So the total is computed once over everything printed, independently of how
+ * it was split across days. Both views stay on the sheet — the days for the
+ * story, this for the number that gets invoiced. Hours are deliberately NOT
+ * mixed in here; they have their own section, because a figure that is
+ * sometimes footage and sometimes time is the confusion this removes.
+ */
+export interface WorkTypeTotal {
+  workType: string;
+  quantity: number;
+  /** 'LF' | 'holes' | null — null prints unlabelled rather than inventing one. */
+  unit: string | null;
+}
+
+export function totalsByWorkType(items: WorkItemLike[]): WorkTypeTotal[] {
+  const byType = new Map<string, WorkTypeTotal>();
+
+  for (const item of items) {
+    const raw = String(item.work_type || '').trim();
+    if (!raw) continue;
+    // Case-insensitive so "Wall Saw" and "WALL SAW" are one line, not two.
+    const key = raw.toUpperCase();
+
+    // Prefer the measured value over a bare quantity: a sawing row carries its
+    // linear feet in details, and a coring row its hole count, and those are
+    // the numbers the office bills from.
+    const lf = workItemLinearFeet(item);
+    const cores = workItemCores(item);
+    const unit = workTypeUnit(raw);
+    const qty = lf > 0 ? lf : cores > 0 ? cores : num(item.quantity);
+    if (qty <= 0) continue;
+
+    const existing = byType.get(key);
+    if (existing) {
+      existing.quantity = round2(existing.quantity + qty);
+    } else {
+      byType.set(key, { workType: key, quantity: round2(qty), unit });
+    }
+  }
+
+  // Biggest first — the line the office is looking for is usually the big one.
+  return Array.from(byType.values()).sort((a, b) => b.quantity - a.quantity);
+}
+
 /** Every work item (structured + normalized log entries) printed in the range. */
 export function allPrintedWork(days: TicketDay[]): WorkItemLike[] {
   const out: WorkItemLike[] = [];

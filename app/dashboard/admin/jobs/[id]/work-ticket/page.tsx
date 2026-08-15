@@ -39,6 +39,7 @@ import {
   CREW_ROLE_LABEL,
   allPrintedWork,
   sumFootage,
+  totalsByWorkType,
   ticketWorkDetail,
   workTypeUnit,
   type TicketDay,
@@ -471,6 +472,8 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   const accent = branding.primary_color || '#DC2626';
   const days = data?.days || [];
   const footage = useMemo(() => sumFootage(allPrintedWork(days)), [days]);
+  // Totalled across the whole printed range, not per day — see the section below.
+  const workTotals = useMemo(() => totalsByWorkType(allPrintedWork(days)), [days]);
 
   const companyLine =
     [branding.company_address, [branding.company_city, branding.company_state, branding.company_zip]
@@ -864,6 +867,39 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
           )}
 
           {/* ── Day blocks (the paper's Date / Job Hours / Lunch / Total grid) ── */}
+          {/* ── TOTAL WORK PERFORMED ────────────────────────────────────────
+              One place that says what was done on this job, added up across
+              every day, independent of which day it was typed on.
+
+              WHY (founder, Aug 15): the office writes the invoice BY HAND from
+              this sheet — the system does not decide what to bill. The per-day
+              blocks above answer "what happened when", but they could not answer
+              "what did we do in total": an operator who misses a day and enters
+              the running total the next day puts all of it under one date, and a
+              reader scanning day by day sees one day of work on a two-day job.
+
+              Hours are deliberately NOT in this box. They are in Job Hours
+              below, because a column that is sometimes footage and sometimes
+              time is exactly the confusion this removes. */}
+          {workTotals.length > 0 && (
+            <>
+              <SectionBar accent={accent}>Total Work Performed</SectionBar>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8 }}>
+                <tbody>
+                  {workTotals.map((t) => (
+                    <tr key={t.workType}>
+                      <td style={{ ...cell, fontWeight: 700 }}>{t.workType}</td>
+                      <td style={{ ...cell, textAlign: 'right', fontWeight: 800, width: 140 }}>
+                        {t.quantity.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                        {t.unit ? ` ${t.unit}` : ''}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
           <SectionBar accent={accent}>Job Hours</SectionBar>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
             <thead>

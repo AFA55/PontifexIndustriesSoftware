@@ -1,6 +1,7 @@
 import { workItemDetailLine } from './work-items-format';
 import {
   allPrintedWork,
+  totalsByWorkType,
   buildTicketDays,
   enrichFromLoggedWork,
   isShopCard,
@@ -650,5 +651,73 @@ describe('buildTicketDays — a suppressed crew member is not "filed nothing"', 
     });
     const devin = days[0].people.find((p) => p.user_id === 'devin')!;
     expect(devin.measurements_by_lead).toBeUndefined();
+  });
+});
+
+describe('totalsByWorkType — the number the office invoices from', () => {
+  const item = (type: string, over: any = {}) =>
+    ({ id: Math.random().toString(36), work_type: type, ...over } as any);
+
+  it("THE CASE: a missed day entered as a running total the next day still totals right", () => {
+    // Operator files nothing Monday, then on Tuesday enters 250 LF covering both.
+    // Per-day blocks show one date; the TOTAL is what gets billed.
+    const totals = totalsByWorkType([item('SLAB SAW', { quantity: 250 })]);
+    expect(totals).toEqual([{ workType: 'SLAB SAW', quantity: 250, unit: 'LF' }]);
+  });
+
+  it('adds the same work type across different days into ONE line', () => {
+    const totals = totalsByWorkType([
+      item('WALL SAW', { quantity: 120 }),
+      item('WALL SAW', { quantity: 38 }),
+    ]);
+    expect(totals).toEqual([{ workType: 'WALL SAW', quantity: 158, unit: 'LF' }]);
+  });
+
+  it('treats "Wall Saw" and "WALL SAW" as one line, not two', () => {
+    const totals = totalsByWorkType([
+      item('Wall Saw', { quantity: 100 }),
+      item('WALL SAW', { quantity: 50 }),
+    ]);
+    expect(totals).toHaveLength(1);
+    expect(totals[0].quantity).toBe(150);
+  });
+
+  it('counts holes for coring and labels them correctly', () => {
+    const totals = totalsByWorkType([
+      item('CORE DRILL', { details_json: { holes: [{ quantity: 4 }, { quantity: 3 }] } }),
+    ]);
+    expect(totals).toEqual([{ workType: 'CORE DRILL', quantity: 7, unit: 'holes' }]);
+  });
+
+  it('keeps saw feet and core holes as SEPARATE lines — never adds unlike units', () => {
+    const totals = totalsByWorkType([
+      item('SLAB SAW', { quantity: 200 }),
+      item('CORE DRILL', { details_json: { holes: [{ quantity: 6 }] } }),
+    ]);
+    expect(totals.map((t) => [t.workType, t.quantity, t.unit])).toEqual([
+      ['SLAB SAW', 200, 'LF'],
+      ['CORE DRILL', 6, 'holes'],
+    ]);
+  });
+
+  it('prints an unrecognised type unlabelled rather than inventing a unit', () => {
+    const totals = totalsByWorkType([item('BREAK & REMOVE', { quantity: 400 })]);
+    expect(totals[0].unit).toBeNull();
+  });
+
+  it('sorts biggest first', () => {
+    const totals = totalsByWorkType([
+      item('HAND SAW', { quantity: 10 }),
+      item('SLAB SAW', { quantity: 900 }),
+    ]);
+    expect(totals[0].workType).toBe('SLAB SAW');
+  });
+
+  it('ignores rows with no work type or no quantity', () => {
+    expect(totalsByWorkType([item(''), item('SLAB SAW', { quantity: 0 })])).toEqual([]);
+  });
+
+  it('is empty for an empty job rather than throwing', () => {
+    expect(totalsByWorkType([])).toEqual([]);
   });
 });
