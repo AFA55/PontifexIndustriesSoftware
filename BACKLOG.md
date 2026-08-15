@@ -1,5 +1,20 @@
 # BACKLOG — single source of truth
 
+> **STATUS Aug 15 2026** — prod live through `3ee41f06`. 42 commits over three days of
+> role-by-role testing. The session's context is in `CLAUDE_HANDOFF.md`; read that first.
+>
+> **Blocked on the founder, not on code:**
+> 1. 15 work_item rows that may be over-billing (list below) — no mechanical way to tell a
+>    real repeat cut from a carry-over artifact, so it needs someone who knows what was cut.
+> 2. The dispatch-model correction — three questions in
+>    `docs/plans/DISPATCH_MODEL_AND_WORK_PERFORMED_TICKETS.md`.
+> 3. The work-performed rebuild (commit `6162d5c2`) — built, guardian-reviewed, **not pushed**;
+>    needs three checks on a real phone.
+>
+> **The pattern that produced eight faults this week:** a page offers something the backend
+> quietly refuses, so the screen shows nothing rather than an error. On any blank screen ask
+> *"is this empty, or was I refused?"* — and verify against the database, not the screen.
+
 > Every bug, feature, and chore lives HERE — not in CLAUDE.md, not in the handoff, not in chat.
 > Priorities: **P0** = broken in prod / blocking · **P1** = this week · **P2** = soon · **P3** = someday.
 > When work completes: check it off, move to "Recently shipped" (keep ~2 sessions), then delete.

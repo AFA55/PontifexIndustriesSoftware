@@ -1,6 +1,100 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Aug 9, 2026 (Opus 5) | **Branch:** `main` | **Prod:** ✅ LIVE through `17f34b06`. **2 commits UNPUSHED (`2bcb7d18`, `a86fb2f1`) — one of them fixes a bug that is live right now.**
+**Last updated:** Aug 15, 2026 (Opus 5) | **Branch:** `main` | **Prod:** ✅ LIVE through `3ee41f06`. Everything is pushed EXCEPT the work-performed rebuild (see below).
+
+---
+
+## 📌 Aug 13–15 — the founder tested every screen, role by role. 42 commits.
+
+**READ THIS FIRST IF YOU ARE NEW TO THE SESSION.**
+
+### The one pattern behind almost everything
+
+> **A page offers something, and the backend quietly refuses it — so the screen shows nothing, or something plausible and wrong, instead of an error.**
+
+It produced **eight** separate production faults this week. When the founder reports "it's empty" or "it shows the wrong thing", check this first:
+
+| Where | Page said | Backend did |
+|---|---|---|
+| Dispatch modal | listed 3 jobs to push | 2 were dispatched 5 days earlier; would send 1 |
+| Dashboard | "No jobs scheduled for today" | showed HIS jobs under team-wide wording |
+| Active Jobs (supervisor) | a card on his dashboard | scoped to `created_by`; David has created 0 jobs |
+| Timecards (supervisor) | page rendered | every route `requireAdmin`; silent 403s forever |
+| RLS | supervisor had cards | 95 policies named ops_manager, omitted supervisor |
+| Day numbering | "Day 1 = Thursday" | counted taps, not calendar days |
+| Ticket hours | 0.00 on a worked day | card had no job link, rule discarded it |
+| Jobs Today | "FULL 11/10" | multi-day spans counted on a Saturday nobody works |
+
+**The habit that catches it:** on any blank screen ask *"is this empty, or was I refused?"* — and verify against the DATABASE, not the screen.
+
+### The second pattern: the board works PER DAY, the code kept reading the JOB
+
+`job_daily_assignments` is the per-day crew ledger. Dispatch, day numbering and the printed ticket's hours all now read it. Anything that reads `job_orders.assigned_to` alone for a *specific day* is probably wrong.
+
+---
+
+## 🔴 OPEN — needs the founder, not code
+
+1. **15 work_item rows may be over-billing.** A later day repeats an earlier day's exact figure. No clean mechanical discriminator exists (9 of 18 carry full `details_json`, same as real work), so guessing at billing figures is not repair. Full list in `BACKLOG.md`. Backup: `_work_items_backup_20260814`.
+2. **The dispatch-model correction.** "The schedule board is a dispatching tool" — a duplicated card is another CREW on one job, not another job. The Parkk job at 520 Logistics Dr is ONE job stored as FOUR chained rows carrying 19 work items and 17 logs between them. Plan + migration outline: `docs/plans/DISPATCH_MODEL_AND_WORK_PERFORMED_TICKETS.md`. **Needs three answers** before the migration runs (own printed sheet? own arrival time? one card or one per crew?).
+3. **The work-performed rebuild is BUILT, REVIEWED and NOT PUSHED.** Commit `6162d5c2`. A guardian review found and fixed two silent billing bugs. Three things need a human on a real phone: draft restore mid-entry, back-navigation after submitting (must replace, not duplicate), and recommended tiles on a real Patriot job.
+4. **The PM dashboard + card customisation shipped UNVERIFIED IN A BROWSER** (`3ee41f06`). Ask: should Saturday's Active list be empty, or labelled "running, not worked today"? Current behaviour is the label.
+
+---
+
+## ✅ Shipped Aug 13–15 (all live)
+
+**Billing / tickets**
+- **P0 — day-complete resubmitted every previous day as today's work.** `GET /work-items` had NO filter; the screen loaded every day and every operator and submitted it. Pratt: 200 LF → 1,000 → 2,800. Fixed with `work_items.work_date`; replace key is now (job, operator, date).
+- **A day number is a calendar position, not a tap count.** Skip a "day complete" and the day was GONE. Now derived from proof: a filed log, OR a named crew placement AND that person clocked in.
+- **The printed ticket carries the LEAD's measurements only.** Westminster printed 3,200 LF for 1,100.
+- Linear-feet entry destroyed the number at entry (computed only when length AND width were present).
+
+**Payroll**
+- **The pay week is Saturday→Friday. The code only knew Monday.** `week_start_day` existed and was read by nothing. `lib/job-workdays.ts` + `lib/payroll-week.ts`.
+- Hourly rate editable in Team Profiles (0 of 35 set — that's why labor cost reads $0).
+- Mileage $0.85/mi.
+
+**Dispatch / schedule**
+- A job crewed only on the board would not dispatch at all.
+- A helper added AFTER dispatch was never told and could not be pushed.
+- **A span does not skip weekends** — `lib/job-workdays.ts`.
+- Long jobs carry `duration_working_days`; end date is derived. Pratt + Parkk = 35 days → Oct 2.
+- Duplicates land on ONE day instead of inheriting a month-long span.
+
+**Access**
+- Supervisor RLS on 13 tables; `requireTimecardViewer`; Active Jobs unscoped for supervisors.
+- Dashboard scope: management may choose team; labels follow the SERVER's scope.
+
+**Customer-facing**
+- The completion signature page showed **placeholder legal text** to real customers.
+- Operator Quick Notes were leaking onto the customer's signing screen.
+- PDFs attached to a job were invisible (rendered in an `<img>`).
+
+**UI**
+- Customer page had ZERO dark-mode styles; 14 more `white/3`/`white/8` classes that generate NO CSS.
+- Searchable crew picker with nicknames (`lib/person-name.ts`).
+
+---
+
+## 🧪 Demo accounts + test tickets
+
+Password `PontifexDemo2026!`, company code `PATRIOT`. See `docs/plans/DEMO_TESTING_ACCOUNTS.md`.
+`demo.operator@` · `demo.helper@` · `demo.supervisor@` · `demo.pm@` — all `@pontifexqa.com`.
+Test jobs are prefixed `TEST-2026-0001` (cleanup SQL in that doc).
+
+---
+
+## 📚 Where things are written down
+
+- `docs/plans/SYSTEM_MAP.md` — every screen, what it calls, ranked weak joins, Monday checklist
+- `docs/plans/DISPATCH_MODEL_AND_WORK_PERFORMED_TICKETS.md` — the model correction + wireframes
+- `docs/plans/OFFICE_PAPERWORK_AND_SITE_CONDITIONS.md` — the print page + day-one site conditions
+- `docs/plans/PLATFORM_WALKTHROUGH_DECK.md` — the platform as a narrative
+- `docs/plans/DEMO_TESTING_ACCOUNTS.md` — accounts, tickets, cleanup
+- `BACKLOG.md` — everything filed but not built
+
+---
 
 > ## 📌 Aug 9 (Opus 5) — one office role ≠ one job. Helpers, supervisors and ops managers can all run jobs now.
 >
