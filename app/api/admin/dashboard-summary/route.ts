@@ -18,6 +18,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { jobRunsOn } from '@/lib/job-workdays';
 import { tenantToday } from '@/lib/tenant-timezone';
 import { parseYMDLocal } from '@/lib/dates';
 
@@ -81,7 +82,8 @@ async function getJobsToday(
         is_will_call,
         scheduled_date,
         end_date,
-        scheduled_end_date
+        scheduled_end_date,
+        scheduling_flexibility
       `)
       .eq('tenant_id', tenantId)
       // A job counts for TODAY if today falls inside its span — NOT if it
@@ -114,7 +116,11 @@ async function getJobsToday(
       query = query.or(`assigned_to.eq.${opts.targetUserId},helper_assigned_to.eq.${opts.targetUserId}`);
     }
 
-    const { data: jobs, error } = await query;
+    const { data: jobsRaw, error } = await query;
+
+    // Same weekend rule the board uses — see lib/job-workdays.ts. Without it the
+    // tile counted multi-day jobs on days their own settings say nobody works.
+    const jobs = ((jobsRaw as any[]) ?? []).filter((j) => jobRunsOn(j, today));
 
     if (error) {
       console.error('[dashboard-summary] jobs_today query error:', error.message);

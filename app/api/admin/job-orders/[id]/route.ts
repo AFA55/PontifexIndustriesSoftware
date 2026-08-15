@@ -164,6 +164,9 @@ export async function PATCH(
       'arrival_time', 'shop_arrival_time', 'location', 'address',
       'customer_name', 'foreman_name', 'foreman_phone', 'equipment_needed',
       'description', 'assigned_to', 'helper_assigned_to', 'scheduled_date', 'end_date',
+      // Working-day duration — the fact end_date is derived FROM. Without it on
+      // this list a long job's length silently reverted on every edit.
+      'duration_working_days',
       'estimated_hours', 'estimated_cost', 'operator_name', 'status', 'priority',
       'is_will_call', 'difficulty_rating',
       'ppe_required', 'additional_safety_requirements',

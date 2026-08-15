@@ -147,6 +147,8 @@ export async function POST(request: NextRequest) {
       // ── Step 5: Scheduling Details ──────────────────────────
       scheduled_date: body.scheduled_date,
       end_date: body.end_date || null,
+      // The durable fact behind end_date — see lib/job-workdays.ts.
+      duration_working_days: body.duration_working_days ?? null,
       arrival_time: body.arrival_time || null,
       // WILL CALL — the customer would take an earlier slot if one opens.
       // The column and the board's Will Call folder already existed; the form

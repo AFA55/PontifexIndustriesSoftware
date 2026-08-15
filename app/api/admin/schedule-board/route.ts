@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { jobRunsOn } from '@/lib/job-workdays';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 
@@ -60,12 +61,26 @@ export async function GET(request: NextRequest) {
       query = query.lte('scheduled_date', today).or(`end_date.is.null,end_date.gte.${today}`);
     }
 
-    const { data: jobs, error } = await query;
+    const { data: jobsRaw, error } = await query;
 
     if (error) {
       console.error('Error fetching schedule board:', error);
       return NextResponse.json({ error: 'Failed to fetch schedule data' }, { status: 500 });
     }
+
+    // A SPAN DOES NOT SKIP WEEKENDS. The date filter above is pure arithmetic —
+    // start <= day <= end — so a Monday-to-Friday job sat on the board on
+    // Saturday and Sunday, was counted in Jobs Today, and ate a capacity slot on
+    // days nobody works. On Saturday Aug 15 that read "FULL 11/10" with three
+    // crews out, and the office uses that number to decide whether it can take
+    // another call.
+    //
+    // Every one of those jobs already carried
+    // `scheduling_flexibility.can_work_weekends = false`, set on the schedule
+    // form. Nothing had ever read it. See lib/job-workdays.ts.
+    const jobs = date
+      ? ((jobsRaw as any[]) ?? []).filter((j) => jobRunsOn(j, date))
+      : ((jobsRaw as any[]) ?? []);
 
     // 1b. Overlay per-day assignments when viewing a single date
     // This ensures multi-day jobs show the operator assigned to THAT specific day,

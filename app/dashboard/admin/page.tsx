@@ -1018,8 +1018,38 @@ export default function AdminDashboard() {
             <p className="text-4xl font-bold text-gray-900 dark:text-white">{openItemsTotal}</p>
           )}
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">
-            {scope === 'personal' ? 'Your Open Items' : 'Open Items'}
+            {shownScope === 'personal' ? 'Your Open Items' : 'Open Items'}
           </p>
+          {/* WHAT the open items ARE. The tile showed a number and nothing else
+              — "it just said Open Items but I can't see what it is" (founder,
+              Aug 15). A count with no breakdown cannot be acted on; you have to
+              go hunting for which of three things it means. Each line is a link
+              to the screen that clears it. */}
+          {!dashLoading && dashData && openItemsTotal > 0 && (
+            <div className="mt-3 space-y-1 border-t border-gray-100 dark:border-white/10 pt-2">
+              {dashData.open_items.pending_timecards > 0 && (
+                <Link href="/dashboard/admin/timecards"
+                  className="flex items-center justify-between text-xs text-gray-600 dark:text-white/60 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                  <span>Pending timecards</span>
+                  <span className="font-bold">{dashData.open_items.pending_timecards}</span>
+                </Link>
+              )}
+              {shownScope !== 'personal' && dashData.open_items.unassigned_jobs > 0 && (
+                <Link href="/dashboard/admin/schedule-board"
+                  className="flex items-center justify-between text-xs text-gray-600 dark:text-white/60 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                  <span>Unassigned jobs</span>
+                  <span className="font-bold">{dashData.open_items.unassigned_jobs}</span>
+                </Link>
+              )}
+              {dashData.open_items.overdue_invoices > 0 && (
+                <Link href="/dashboard/admin/billing"
+                  className="flex items-center justify-between text-xs text-gray-600 dark:text-white/60 hover:text-amber-600 dark:hover:text-amber-400 transition-colors">
+                  <span>Overdue invoices</span>
+                  <span className="font-bold">{dashData.open_items.overdue_invoices}</span>
+                </Link>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Crew Utilization (team) / Pending Timecards (personal) */}

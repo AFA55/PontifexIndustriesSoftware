@@ -8,6 +8,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
+import { endDateForWorkingDays } from '@/lib/job-workdays';
+import { formatDayLong } from '@/lib/dates';
 import { GoogleAddressAutocomplete } from '@/components/ui/GoogleAddressAutocomplete';
 import DriveTimeFromShop from '@/components/DriveTimeFromShop';
 import {
@@ -560,6 +562,8 @@ interface FormData {
   // Step 5
   start_date: string;
   end_date: string;
+  /** Working days the job needs. end_date is derived from it. */
+  duration_working_days: string;
   special_arrival: boolean;
   special_arrival_time: string;
   arrival_time: string;
@@ -657,6 +661,7 @@ const initialFormData: FormData = {
   additional_safety_requirements: [],
   start_date: '',
   end_date: '',
+  duration_working_days: '',
   special_arrival: false,
   special_arrival_time: '',
   /**
@@ -1202,6 +1207,7 @@ export default function ScheduleFormPage() {
             scope_photo_urls: j.scope_photo_urls || [],
             start_date: j.scheduled_date || '',
             end_date: j.end_date || '',
+            duration_working_days: j.duration_working_days ? String(j.duration_working_days) : '',
             // Scheduling flexibility
             can_work_fridays: typeof sched.can_work_fridays === 'boolean' ? sched.can_work_fridays : (f as any).can_work_fridays,
             is_will_call: typeof j.is_will_call === 'boolean' ? j.is_will_call : (f as any).is_will_call,
@@ -1934,6 +1940,7 @@ export default function ScheduleFormPage() {
         // Step 5
         scheduled_date: form.start_date,
         end_date: form.end_date || null,
+        duration_working_days: form.duration_working_days ? parseInt(form.duration_working_days, 10) : null,
         // WILL CALL (founder, Aug 13). The board has had a Will Call folder all
         // along, and it even tells the user "Salesmen can mark jobs as will-call
         // when submitting the schedule form" — but the form had NO such field,
@@ -2043,6 +2050,10 @@ export default function ScheduleFormPage() {
             // the whole all-or-nothing update.
             scheduled_date: payload.scheduled_date || null,
             end_date: payload.end_date,
+            // Same second-code-path trap the Will Call toggle fell into: the edit
+            // branch hand-builds its own PATCH body, so a field added to
+            // `payload` alone never reaches an EDIT.
+            duration_working_days: payload.duration_working_days,
             // The edit branch hand-builds its own PATCH body rather than
             // reusing `payload`, so a field added to `payload` alone reaches the
             // CREATE path only. Without this line the Will Call toggle rendered,
@@ -4267,13 +4278,51 @@ export default function ScheduleFormPage() {
                 />
               </div>
               <div>
-                <Label>End Date</Label>
-                <CalendarPicker
-                  value={form.end_date}
-                  onChange={(date) => updateForm({ end_date: date })}
-                  minDate={form.start_date || new Date().toISOString().split('T')[0]}
+                {/* HOW MANY DAYS, NOT WHICH DAY IT ENDS (founder, Aug 15).
+                    A typed end date is a prediction and it goes stale the moment
+                    a day is lost to weather or a crew is pulled. Pratt's said
+                    Aug 17 on a job with about thirty days left in it, and that
+                    is exactly why it fell off next week's board — the board asks
+                    "is today inside the span", and the span had already ended.
+
+                    The office knows the durable fact: "about seven weeks". The
+                    end date is worked out from that and the job's OWN working
+                    days, so a Mon–Fri job counts five days a week and lands on
+                    a day the crew is actually there. */}
+                <Label>How many working days?</Label>
+                <InputField
                   icon={Calendar}
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 3"
+                  value={form.duration_working_days}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                    const raw = e.target.value;
+                    const days = parseInt(raw, 10);
+                    if (!raw) {
+                      updateForm({ duration_working_days: '', end_date: form.start_date || '' });
+                      return;
+                    }
+                    if (!Number.isFinite(days) || days < 1) return;
+                    const end = form.start_date
+                      ? endDateForWorkingDays(
+                          { scheduling_flexibility: {
+                              can_work_weekends: form.can_work_weekends,
+                              can_work_fridays: form.can_work_fridays,
+                            } },
+                          form.start_date,
+                          days
+                        )
+                      : '';
+                    updateForm({ duration_working_days: raw, end_date: end });
+                  }}
                 />
+                {form.end_date && form.duration_working_days && (
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-white/50">
+                    Finishes <span className="font-semibold text-slate-700 dark:text-white/80">{formatDayLong(form.end_date)}</span>
+                    {!form.can_work_weekends && ' — weekends skipped'}
+                  </p>
+                )}
               </div>
             </div>
 
