@@ -20,7 +20,11 @@ const s = StyleSheet.create({
     paddingBottom: 6,
     borderBottom: '2 solid #1E293B',
   },
-  companyName: { fontSize: 14, fontWeight: 'bold', color: '#1E293B' },
+  companyName: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2, marginBottom: 2 },
+  jobNumberBox: { borderWidth: 1.5, borderColor: '#1E293B', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
+  jobNumberText: { fontSize: 14, fontWeight: 'bold', color: '#1E293B', letterSpacing: 0.5 },
+  multiDayTag: { fontSize: 7.5, fontWeight: 'bold', color: '#7C3AED' },
   companyAddress: { fontSize: 7, color: '#475569', marginTop: 1 },
   companyPhone: { fontSize: 7, color: '#475569' },
   headerCenter: { alignItems: 'center', justifyContent: 'center' },
@@ -36,21 +40,21 @@ const s = StyleSheet.create({
   // Section card
   section: { border: '0.75 solid #CBD5E1', borderRadius: 3, marginBottom: 5, overflow: 'hidden' },
   sectionHeader: { backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 3, borderBottom: '0.75 solid #CBD5E1' },
-  sectionTitle: { fontSize: 7.5, fontWeight: 'bold', color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 },
+  sectionTitle: { fontSize: 9, fontWeight: 'bold', color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 },
   sectionBody: { padding: 5 },
 
   // Field rows
   fieldRow: { flexDirection: 'row', marginBottom: 2.5, alignItems: 'flex-start' },
-  fieldLabel: { fontSize: 7, fontWeight: 'bold', color: '#64748B', width: 72, textTransform: 'uppercase' },
-  fieldValue: { fontSize: 8, color: '#1E293B', flex: 1 },
+  fieldLabel: { fontSize: 8.5, fontWeight: 'bold', color: '#64748B', width: 82, textTransform: 'uppercase' },
+  fieldValue: { fontSize: 9.5, color: '#1E293B', flex: 1 },
   fieldValueBold: { fontSize: 8, fontWeight: 'bold', color: '#1E293B', flex: 1 },
 
   // Checkbox row for conditions
-  checkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  checkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2.5 },
   checkBox: { width: 8, height: 8, border: '0.75 solid #94A3B8', borderRadius: 1, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
   checkBoxFilled: { width: 8, height: 8, border: '0.75 solid #1E293B', borderRadius: 1, marginRight: 4, backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center' },
   checkMark: { fontSize: 6, color: '#FFFFFF', fontWeight: 'bold' },
-  checkLabel: { fontSize: 7, color: '#334155', flex: 1 },
+  checkLabel: { fontSize: 8.5, color: '#334155', flex: 1 },
   checkDetail: { fontSize: 6.5, color: '#64748B', marginLeft: 2 },
 
   // Scope table
@@ -145,26 +149,12 @@ function formatDate(d?: string) {
 }
 
 // ── Component ───────────────────────────────────────────────
-function getDifficultyLabel(rating: number): string {
-  if (rating >= 9) return 'Highly Complex';
-  if (rating >= 7) return 'Challenging';
-  if (rating >= 4) return 'Moderate';
-  if (rating >= 1) return 'Routine';
-  return '';
-}
 
-function getDifficultyColor(rating: number): string {
-  if (rating >= 9) return '#DC2626'; // red
-  if (rating >= 7) return '#EA580C'; // orange
-  if (rating >= 4) return '#D97706'; // amber
-  return '#16A34A'; // green
-}
 
 export default function DispatchTicketPDF({ job, branding }: { job: DispatchTicketData; branding?: PDFBranding }) {
   const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
   const conditions = job.jobsite_conditions || {};
   const compliance = job.site_compliance || {};
-  const difficulty = job.job_difficulty_rating || job.difficulty_rating || 0;
 
   // Condition checklist items
   const conditionItems: { label: string; key: string; detailKey?: string; detailSuffix?: string }[] = [
@@ -289,25 +279,34 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
       <Page size="LETTER" orientation="landscape" style={s.page}>
 
         {/* ═══ HEADER ═══ */}
+        {/* The company block and the title sit together on the left, with the
+            JOB NUMBER beside the title — "put the job number right next to JOB
+            TICKET, just so it's easy to see when we're sifting through it for
+            the admin" (founder, Aug 15). Sifting a stack of paper is the actual
+            use, so the number has to be findable at the top edge.
+
+            EMPLOYEES REMOVED. Third time asked: a sheet printed Monday must not
+            assert who is on the job Thursday. Who actually worked it is on the
+            WORK ticket, taken from the clock cards. */}
         <View style={s.headerRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={s.companyName}>{(branding?.company_name || 'PATRIOT CONCRETE CUTTING').toUpperCase()}</Text>
+            <View style={s.titleRow}>
+              <Text style={s.jobTicketTitle}>JOB TICKET</Text>
+              <View style={s.jobNumberBox}>
+                <Text style={s.jobNumberText}>{job.job_number}</Text>
+              </View>
+              {job.is_multi_day && (
+                <Text style={s.multiDayTag}>
+                  MULTI-DAY · DAY {(job.total_days_worked || 0) + 1}
+                </Text>
+              )}
+            </View>
             <Text style={s.companyAddress}>{branding?.company_address || 'P.O Box 504, Piedmont, SC 29673'}</Text>
             <Text style={s.companyPhone}>{branding?.company_phone || 'Phone: 864-299-0330  |  Fax: 864-299-1532'}</Text>
           </View>
-          <View style={s.headerCenter}>
-            <Text style={s.jobTicketTitle}>JOB TICKET</Text>
-            <Text style={{ fontSize: 7, color: '#64748B', marginTop: 1 }}>Printed: {today}</Text>
-          </View>
           <View style={s.headerRight}>
-            <Text style={s.employeesLabel}>Employees:</Text>
-            <Text style={s.employeeLine}>{job.operator_name || '________________________'}</Text>
-            <Text style={s.employeeLine}>{job.helper_name || '________________________'}</Text>
-            {job.is_multi_day && (
-              <Text style={{ fontSize: 7, color: '#7C3AED', fontWeight: 'bold', marginTop: 2 }}>
-                MULTI-DAY - Day {(job.total_days_worked || 0) + 1}
-              </Text>
-            )}
+            <Text style={{ fontSize: 7, color: '#64748B' }}>Printed: {today}</Text>
           </View>
         </View>
 
@@ -383,18 +382,13 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                   <Text style={s.fieldLabel}>Job Type</Text>
                   <Text style={s.fieldValue}>{job.job_type || '—'}</Text>
                 </View>
-                {difficulty > 0 && (
-                  <View style={{ ...s.fieldRow, marginTop: 3 }}>
-                    <Text style={s.fieldLabel}>Difficulty</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                      <View style={{ backgroundColor: getDifficultyColor(difficulty), borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2 }}>
-                        <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#FFFFFF' }}>
-                          {difficulty}/10 — {getDifficultyLabel(difficulty)}
-                        </Text>
-                      </View>
-                    </View>
-                  </View>
-                )}
+                {/* DIFFICULTY REMOVED (founder, asked repeatedly — Aug 12 and
+                    again Aug 15). It is an INTERNAL scheduling signal: it drives
+                    operator skill-matching and capacity planning. It is not
+                    something to hand a crew, and it is certainly not something
+                    to hand a customer who happens to see the sheet. It still
+                    shows on the schedule board and the approval modal, where
+                    the office actually uses it. */}
               </View>
             </View>
 
@@ -469,27 +463,48 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                 <Text style={s.sectionTitle}>{"Equipment Req'd"}</Text>
               </View>
               <View style={s.sectionBody}>
-                {equipmentItems.map((item) => {
-                  const checked = isEquipmentChecked(item.label);
-                  return (
-                    <View key={item.label} style={s.checkRow}>
-                      <View style={checked ? s.checkBoxFilled : s.checkBox}>
-                        {checked && <Text style={s.checkMark}>X</Text>}
-                      </View>
-                      <Text style={s.checkLabel}>{item.label}</Text>
+                {/* ONLY THE EQUIPMENT THIS JOB ACTUALLY NEEDS (founder, Aug 15:
+                    "let's just not show the whole list of all equipment — let's
+                    just show the equipment that the admin says we need. Let's
+                    stop showing everything and not doing it.")
+
+                    Thirteen rows printed on every ticket with one or two ticked.
+                    A crew scanning a sheet at 7am reads twelve empty boxes
+                    before finding the two that matter, and a list that is
+                    mostly noise stops being read at all.
+
+                    The ticked rows still print — they carry the standard
+                    wording ("Core Rig(s)/Type") the office writes against by
+                    hand. Everything unticked is gone. When NOTHING is ticked
+                    the SPECIFIED list below is the whole answer. */}
+                {equipmentItems.filter((item) => isEquipmentChecked(item.label)).map((item) => (
+                  <View key={item.label} style={s.checkRow}>
+                    <View style={s.checkBoxFilled}>
+                      <Text style={s.checkMark}>X</Text>
                     </View>
-                  );
-                })}
+                    <Text style={s.checkLabel}>{item.label}</Text>
+                  </View>
+                ))}
+
+                {/* Nothing matched the standard wording and nothing was
+                    specified — say so, rather than printing an empty panel that
+                    reads like a rendering failure. */}
+                {!equipmentItems.some((item) => isEquipmentChecked(item.label)) &&
+                  !(job.equipment_needed && job.equipment_needed.length > 0) && (
+                    <Text style={{ fontSize: 8, color: '#94A3B8', fontStyle: 'italic' }}>
+                      No equipment specified
+                    </Text>
+                  )}
 
                 {/* List any equipment that doesn't match the standard checklist */}
                 {job.equipment_needed && job.equipment_needed.length > 0 && (
                   <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
-                    <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#64748B', marginBottom: 2 }}>SPECIFIED:</Text>
+                    <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#64748B', marginBottom: 2 }}>SPECIFIED:</Text>
                     {asArray<any>(job.equipment_needed).map((eq, i) => {
                       const isRental = !!(job.equipment_rental_flags?.[eq]);
                       return (
                         <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
-                          <Text style={{ fontSize: 7.5, color: '#1E293B' }}>• {eq}</Text>
+                          <Text style={{ fontSize: 9, color: '#1E293B' }}>• {eq}</Text>
                           {isRental && (
                             <View style={{ backgroundColor: '#FEE2E2', borderRadius: 2, paddingHorizontal: 3, paddingVertical: 1, marginLeft: 3, borderWidth: 0.5, borderColor: '#DC2626' }}>
                               <Text style={{ fontSize: 6, fontWeight: 'bold', color: '#DC2626' }}>RENTAL</Text>

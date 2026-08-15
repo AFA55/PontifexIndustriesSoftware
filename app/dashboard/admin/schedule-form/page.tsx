@@ -2878,8 +2878,19 @@ export default function ScheduleFormPage() {
                           const resolveOvercut = (c: CutRow): boolean =>
                             typeof c.overcut_allowed === 'boolean' ? c.overcut_allowed : form.overcutting_allowed;
 
+                          // LINEAR MODE MEANS ONE NUMBER: the linear feet being
+                          // cut. It used to ask Length x Width and run the AREA
+                          // calculator here — which is what the Areas + Thickness
+                          // mode is for — and if you typed a LENGTH and no width
+                          // it fell through to `linear_feet`, which nothing was
+                          // writing, and your figure silently became ZERO. That
+                          // is the "I submitted the footage and the ticket shows
+                          // nothing" report. The typed number wins now.
                           const computedLfs = cuts.map((c) => {
-                            // Prefer the calculator when length+width are present
+                            const typed = parseFloat(c.linear_feet || '') || 0;
+                            if (typed > 0) return typed;
+                            // Legacy rows captured before this field existed still
+                            // carry length x width; keep reading them.
                             if (c.length && c.width) {
                               const r = computeSawingAreaLinearFt({
                                 length: c.length,
@@ -2891,8 +2902,8 @@ export default function ScheduleFormPage() {
                               });
                               return r ? r.totalLF : 0;
                             }
-                            // Legacy fallback: read linear_feet directly
-                            return parseFloat(c.linear_feet || '0') || 0;
+                            // A length on its own is still a length.
+                            return parseFloat(c.length || '0') || 0;
                           });
                           const grandTotalLF = computedLfs.reduce((s, n) => s + n, 0);
 
@@ -2900,30 +2911,36 @@ export default function ScheduleFormPage() {
                             <div className="space-y-3">
                               {cuts.map((cut, idx) => {
                                 const lf = computedLfs[idx];
-                                const overcut = resolveOvercut(cut);
                                 return (
                                 <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {/* Field labels (first row only) */}
                                   {idx === 0 && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1.5">
-                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Length</label>
-                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Width</label>
+                                    <div className="grid grid-cols-2 gap-2 mb-1.5">
+                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Linear Feet</label>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Cut Depth</label>
-                                      <label className="hidden sm:block text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">&nbsp;</label>
                                     </div>
                                   )}
 
-                                  {/* Length × Width × Depth row */}
+                                  {/* LINEAR FEET + CUT DEPTH. Nothing else.
+                                      "When they input linear feet, you don't
+                                      need to know the width. You just need to
+                                      know total linear feet... you don't need to
+                                      know cross cuts, none of that" (founder,
+                                      Aug 15). Length x Width and the cross-cut
+                                      calculator belong to Areas + Thickness, and
+                                      having them here made the two modes ask the
+                                      same questions in different words. */}
                                   <div className="flex items-center gap-2">
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 flex-1">
+                                    <div className="grid grid-cols-2 gap-2 flex-1">
                                       <div className="relative">
                                         <input
                                           type="number"
+                                          inputMode="decimal"
                                           placeholder="0"
-                                          value={cut.length}
+                                          value={cut.linear_feet ?? ''}
                                           onChange={e => {
                                             const updated = [...cuts];
-                                            updated[idx] = { ...updated[idx], length: e.target.value };
+                                            updated[idx] = { ...updated[idx], linear_feet: e.target.value };
                                             updateCuts(updated);
                                           }}
                                           className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
@@ -2931,20 +2948,6 @@ export default function ScheduleFormPage() {
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
                                       <div className="relative">
-                                        <input
-                                          type="number"
-                                          placeholder="0"
-                                          value={cut.width}
-                                          onChange={e => {
-                                            const updated = [...cuts];
-                                            updated[idx] = { ...updated[idx], width: e.target.value };
-                                            updateCuts(updated);
-                                          }}
-                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-                                        />
-                                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">ft</span>
-                                      </div>
-                                      <div className="relative col-span-2 sm:col-span-1">
                                         <input
                                           type="text"
                                           inputMode="decimal"
@@ -2971,59 +2974,16 @@ export default function ScheduleFormPage() {
                                     )}
                                   </div>
 
-                                  {/* Calculator inputs: cross-cuts + overcut */}
-                                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                    <div className="relative">
-                                      <input
-                                        type="number"
-                                        placeholder="Cross-cut every X ft (length-wise)"
-                                        value={cut.cross_cut_lengthwise_ft || ''}
-                                        onChange={e => {
-                                          const updated = [...cuts];
-                                          updated[idx] = { ...updated[idx], cross_cut_lengthwise_ft: e.target.value };
-                                          updateCuts(updated);
-                                        }}
-                                        className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-700 dark:text-white/80 placeholder:text-slate-400 dark:placeholder:text-white/25 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-                                      />
-                                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 dark:text-white/30">ft</span>
-                                    </div>
-                                    <div className="relative">
-                                      <input
-                                        type="number"
-                                        placeholder="Cross-cut every Y ft (width-wise)"
-                                        value={cut.cross_cut_widthwise_ft || ''}
-                                        onChange={e => {
-                                          const updated = [...cuts];
-                                          updated[idx] = { ...updated[idx], cross_cut_widthwise_ft: e.target.value };
-                                          updateCuts(updated);
-                                        }}
-                                        className="w-full px-3 py-2 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-lg text-sm text-slate-700 dark:text-white/80 placeholder:text-slate-400 dark:placeholder:text-white/25 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
-                                      />
-                                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-medium text-slate-400 dark:text-white/30">ft</span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        const updated = [...cuts];
-                                        updated[idx] = { ...updated[idx], overcut_allowed: !overcut };
-                                        updateCuts(updated);
-                                      }}
-                                      className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold border transition-all ${
-                                        overcut
-                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-400/30'
-                                          : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-400/30'
-                                      }`}
-                                      title="Toggle whether the saw can overcut past the corner"
-                                    >
-                                      {overcut ? '✓ Overcut allowed' : '✗ No overcut'}
-                                    </button>
-                                  </div>
+                                  {/* Cross-cut and overcut inputs removed from this
+                                      mode — they are how you turn an AREA into
+                                      linear feet, which is what Areas + Thickness
+                                      does. In linear mode the operator already
+                                      knows the number. */}
 
                                   {/* Per-row total (when computable) */}
                                   {lf > 0 && (
                                     <div className="mt-2 inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-sky-50 border border-sky-200 text-xs font-semibold text-sky-700 dark:bg-sky-500/15 dark:text-sky-300 dark:border-sky-400/30">
                                       <span>Total: <span className="font-bold">{lf.toLocaleString(undefined, { maximumFractionDigits: 1 })} linear ft</span></span>
-                                      {!overcut && <span className="text-[10px] opacity-70">· perimeter ×2</span>}
                                     </div>
                                   )}
                                 </div>
