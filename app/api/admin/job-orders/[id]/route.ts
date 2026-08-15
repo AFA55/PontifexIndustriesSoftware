@@ -418,30 +418,23 @@ export async function PATCH(
           console.log('Audit trail logged:', Object.keys(changes));
         }
 
-        // Auto-create a change_log note in job_notes for the schedule board
-        const changeDescriptions = Object.entries(changes).map(([field, { old: oldVal, new: newVal }]) => {
-          const label = field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-          return `${label}: "${oldVal || '(empty)'}" → "${newVal || '(empty)'}"`;
-        });
-
-        const { error: noteError } = await supabaseAdmin
-          .from('job_notes')
-          .insert({
-            job_order_id: id,
-            author_id: user.id,
-            author_name: profile.full_name || user.email || 'System',
-            content: changeDescriptions.join('\n'),
-            note_type: 'change_log',
-            metadata: { changes },
-          });
-
-        if (noteError) {
-          if (isTableNotFoundError(noteError)) {
-            console.log('Change log note skipped: job_notes table not available yet');
-          } else {
-            console.error('Error creating change_log note:', noteError);
-          }
-        }
+        // CHANGE-LOG NOTES ARE NO LONGER WRITTEN (founder, Aug 15).
+        //
+        // Every edit used to drop a `change_log` row into `job_notes`. Two
+        // problems, one visible and one not:
+        //
+        //   • VISIBLE: the notes badge counted every row in job_notes while the
+        //     panel showed only human ones. Simpsonville read "2" over "No notes
+        //     yet" — the two were a status flip and a door code being added.
+        //     A badge that disagrees with the thing it counts trains people to
+        //     ignore badges.
+        //   • The founder weighed the audit trail and decided against it:
+        //     "would just add more storage for us than anything." The Changes
+        //     button that surfaced it had no onClick and never opened anything,
+        //     so nobody was reading these.
+        //
+        // The real audit trail (`job_history`, written just above) is untouched
+        // — that is the one with a purpose.
 
         // Notify the newly-assigned operator across their enabled channels
         // (in-app bell + push + email, per their notification_preferences) —

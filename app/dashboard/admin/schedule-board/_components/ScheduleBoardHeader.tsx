@@ -87,12 +87,11 @@ export default function ScheduleBoardHeader({
               <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallCount}</span>
             </button>
 
-            <button className="relative h-9 px-3 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-blue-700 text-sm font-semibold transition-all flex items-center gap-1.5">
-              <FileText className="w-4 h-4" /> <span className="whitespace-nowrap">Changes</span>
-              {changeRequestCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-blue-500 text-white text-xs font-bold rounded-full flex items-center justify-center">{changeRequestCount}</span>
-              )}
-            </button>
+            {/* CHANGES button removed (founder, Aug 15). It had no onClick — it
+                counted change requests and did nothing when pressed. He weighed
+                the audit trail and decided against it: "would just add more
+                storage for us than anything". The change_log writer is off too,
+                so the count it fed no longer accumulates. */}
 
             {canEdit && (
               <>
@@ -121,17 +120,9 @@ export default function ScheduleBoardHeader({
                 >
                   <Plus className="w-4 h-4" /> <span className="whitespace-nowrap">Quick Add</span>
                 </button>
-                {onScanTicket && (
-                  <button
-                    onClick={onScanTicket}
-                    disabled={scanningTicket}
-                    className="h-9 px-3 bg-gradient-to-r from-slate-600 to-slate-800 hover:from-slate-700 hover:to-slate-900 text-white rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 shadow-sm hover:shadow-md disabled:opacity-60"
-                    title="Photograph a paper ticket — fields prefill into Quick Add for review"
-                  >
-                    {scanningTicket ? <Loader2 className="w-4 h-4 animate-spin" /> : <ScanLine className="w-4 h-4" />}
-                    <span className="whitespace-nowrap">{scanningTicket ? 'Reading…' : 'Scan Ticket'}</span>
-                  </button>
-                )}
+                {/* SCAN TICKET removed (founder, Aug 15): tested and it did not
+                    work, and Quick Add followed by Edit Scope already covers the
+                    same ground — add the job fast, fill in the detail after. */}
                 <button
                   onClick={onUpdateSchedule}
                   disabled={updatingSchedule}
@@ -153,12 +144,9 @@ export default function ScheduleBoardHeader({
                     <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-yellow-400 text-yellow-900 text-xs font-bold rounded-full flex items-center justify-center">{dispatchTotal}</span>
                   )}
                 </button>
-                <button
-                  onClick={onOpenDailyCode}
-                  className="h-9 px-3 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-500/15 dark:hover:bg-indigo-500/25 border border-indigo-200 dark:border-indigo-400/30 rounded-lg text-indigo-700 dark:text-indigo-300 text-sm font-semibold transition-all flex items-center gap-1.5"
-                >
-                  <KeyRound className="w-4 h-4" /> <span className="whitespace-nowrap">Daily Code</span>
-                </button>
+                {/* DAILY CODE removed (founder, Aug 15) — clock-in has been
+                    GPS-only since June, so the daily PIN it issued is no longer
+                    part of any flow. */}
               </>
             )}
           </div>
