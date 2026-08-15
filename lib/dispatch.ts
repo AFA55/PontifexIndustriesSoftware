@@ -110,7 +110,14 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
   // sequence gate in /api/job-orders/[id]/status).
   // The ledger query is scoped by the tenant-scoped job ids (legacy JDA rows
   // can carry tenant_id NULL, so an .eq tenant filter could miss them).
-  const reassignedAlreadyDispatched: typeof jobs = [];
+  // Crew changes on an ALREADY-DISPATCHED job. The dispatch latch is one-time,
+  // so it already fired for whoever was on the job before — the person who just
+  // got added has to be told separately, or they never learn they have a job.
+  const reassignedAlreadyDispatched: Array<{
+    job: (typeof jobs)[number];
+    notifyOperator: boolean;
+    notifyHelper: boolean;
+  }> = [];
   try {
     const { data: todaysLedger } = await supabaseAdmin
       .from('job_daily_assignments')
@@ -147,8 +154,20 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
       // operator gets an explicit assignment-changed notification instead.
       if (operatorDiffers) job.assigned_to = row.operator_id;
       if (helperDiffers) job.helper_assigned_to = row.helper_id ?? null;
-      if (operatorDiffers && job.dispatched_at !== null) {
-        reassignedAlreadyDispatched.push(job);
+      if (job.dispatched_at !== null && (operatorDiffers || helperDiffers)) {
+        // HELPERS COUNT (founder, Aug 15): "I added a helper to Demo Operator
+        // and it didn't let me push, it says nothing to push — but I made a
+        // change and it needs to update their schedules." Only operator swaps
+        // were tracked here, so a helper added after dispatch was silently
+        // never told. A helper who does not know they have a job is the same
+        // problem as an operator who does not, and it is the more likely one:
+        // crews get topped up far more often than they get swapped.
+        reassignedAlreadyDispatched.push({
+          job,
+          notifyOperator: !!operatorDiffers,
+          // Only a real person — clearing a helper slot notifies nobody.
+          notifyHelper: !!(helperDiffers && row.helper_id),
+        });
       }
     }
   } catch (e) {
@@ -211,8 +230,9 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
     if (j.helper_assigned_to) allUserIds.add(j.helper_assigned_to);
     for (const c of crewByJob.get(j.id) || []) allUserIds.add(c.user_id);
   });
-  reassignedAlreadyDispatched.forEach((j) => {
-    if (j.assigned_to) allUserIds.add(j.assigned_to);
+  reassignedAlreadyDispatched.forEach(({ job, notifyOperator, notifyHelper }) => {
+    if (notifyOperator && job.assigned_to) allUserIds.add(job.assigned_to);
+    if (notifyHelper && job.helper_assigned_to) allUserIds.add(job.helper_assigned_to);
   });
   const { data: profiles } = allUserIds.size
     ? await supabaseAdmin.from('profiles').select('id, full_name, phone_number').in('id', Array.from(allUserIds))
@@ -298,26 +318,35 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
   // Incoming operators on ALREADY-dispatched jobs (per-day reassignment took
   // effect this morning): the one-time dispatch latch fired for the previous
   // operator, so explicitly notify + text the new one. Fire-and-forget.
-  for (const job of reassignedAlreadyDispatched) {
-    if (!job.assigned_to) continue;
-    smsPromises.push(
-      sendNotification({
-        userId: job.assigned_to,
-        tenantId,
-        category: 'job_dispatched',
-        title: 'New job assigned 📋',
-        message: `${job.job_number} for ${job.customer_name || 'a customer'} is yours today (${formattedDate}).`,
-        inAppType: 'job_order',
-        jobOrderId: job.id,
-        actionUrl: '/dashboard/my-jobs',
-      }).catch((e) => console.error('dispatch reassignment notify failed:', e))
-    );
-    if (phoneMap.has(job.assigned_to)) {
+  for (const { job, notifyOperator, notifyHelper } of reassignedAlreadyDispatched) {
+    const targets: Array<{ userId: string | null; role: 'operator' | 'helper' }> = [];
+    if (notifyOperator && job.assigned_to) targets.push({ userId: job.assigned_to, role: 'operator' });
+    if (notifyHelper && job.helper_assigned_to) targets.push({ userId: job.helper_assigned_to, role: 'helper' });
+
+    for (const { userId, role } of targets) {
+      if (!userId) continue;
       smsPromises.push(
-        sendSMS({ to: phoneMap.get(job.assigned_to)!, message: buildMsg(job, 'operator'), jobId: job.id }).catch((e) =>
-          console.error('dispatch SMS failed:', e)
-        )
+        sendNotification({
+          userId,
+          tenantId,
+          category: 'job_dispatched',
+          title: role === 'helper' ? "You're on a crew today 📋" : 'New job assigned 📋',
+          message:
+            role === 'helper'
+              ? `You've been added to ${job.job_number} for ${job.customer_name || 'a customer'} today (${formattedDate}).`
+              : `${job.job_number} for ${job.customer_name || 'a customer'} is yours today (${formattedDate}).`,
+          inAppType: 'job_order',
+          jobOrderId: job.id,
+          actionUrl: '/dashboard/my-jobs',
+        }).catch((e) => console.error('dispatch reassignment notify failed:', e))
       );
+      if (phoneMap.has(userId)) {
+        smsPromises.push(
+          sendSMS({ to: phoneMap.get(userId)!, message: buildMsg(job, role), jobId: job.id }).catch((e) =>
+            console.error('dispatch SMS failed:', e)
+          )
+        );
+      }
     }
   }
   Promise.allSettled(smsPromises).catch(() => {});

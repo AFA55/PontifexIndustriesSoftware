@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
     );
 
     const COLS =
-      'id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to, dispatched_at';
+      'id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to, helper_assigned_to, dispatched_at';
     const ACTIVE = ['scheduled', 'assigned', 'in_route', 'in_progress'];
 
     const [{ data: slotJobs, error }, { data: ledgerJobs }] = await Promise.all([
@@ -167,7 +167,28 @@ export async function GET(request: NextRequest) {
     // It also disposes of the worry I had about excluding spanning jobs: AM
     // King went out on Aug 12, its first day, so it would still have reached
     // Dante on the 13th. A multi-day job is dispatched once, on day one.
-    const jobList = allActive.filter((j) => !j.dispatched_at);
+    // A CREW CHANGE ON AN ALREADY-DISPATCHED JOB IS STILL SOMETHING TO PUSH
+    // (founder, Aug 15): "I added a helper to Demo Operator and it didn't let me
+    // push — it says nothing to push, but I made a change and it needs to update
+    // their schedules."
+    //
+    // Filtering to undispatched jobs was right for the complaint it fixed —
+    // Pratt was listed on Saturday having gone out five days earlier — but it
+    // took the crew-change case with it. The person who was just ADDED has never
+    // been told anything: the dispatch latch fired before they were on the job.
+    //
+    // "Changed" = today's ledger names someone the job-level slot does not.
+    // That is the same comparison lib/dispatch.ts makes before it notifies, so
+    // the modal and the push cannot disagree about what is pending.
+    const crewChanged = (j: any) => {
+      const row = ledgerRows.find((r) => r.job_order_id === j.id);
+      if (!row) return false;
+      const opDiffers = !!row.operator_id && row.operator_id !== j.assigned_to;
+      const helperDiffers = (row.helper_id ?? null) !== (j.helper_assigned_to ?? null);
+      return opDiffers || helperDiffers;
+    };
+
+    const jobList = allActive.filter((j) => !j.dispatched_at || crewChanged(j));
     const alreadyDispatched = allActive.length - jobList.length;
     const total = jobList.length;
 
