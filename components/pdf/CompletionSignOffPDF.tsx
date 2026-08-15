@@ -348,26 +348,58 @@ export default function CompletionSignOffPDF({ data }: { data: CompletionPDFData
           <View style={s.sectionHeader}>
             <Text style={s.sectionTitle}>Customer Signature</Text>
           </View>
-          <View style={s.signatureRow}>
-            {/* Signature image */}
-            <View style={s.sigBox}>
-              <Text style={s.sigLabel}>Signature</Text>
-              {data.signature_data_url ? (
-                <Image style={s.sigImage} src={data.signature_data_url} />
-              ) : (
-                <View style={s.sigImageEmpty} />
-              )}
-            </View>
-            {/* Name / date */}
-            <View style={s.sigBox}>
-              <Text style={s.sigLabel}>Accepted By</Text>
-              <Text style={s.sigName}>{data.signer_name || '(Signature on file)'}</Text>
-              <Text style={s.sigDate}>Signed: {signedAtFormatted}</Text>
-              <Text style={[s.sigDate, { marginTop: 6, color: '#475569' }]}>
-                By signing this document electronically, the signer agrees that this electronic signature is the legal equivalent of their manual signature.
-              </Text>
-            </View>
-          </View>
+          {/* A DOCUMENT MUST NOT CLAIM A SIGNATURE IT DOES NOT HAVE.
+              (founder, Aug 15: "it says it was signed but I can't see a
+              signature".) BWC 929434 carries `completion_signed_at` with no
+              signature image and no signer name — the job was closed out
+              without one ever being captured — and this printed an empty box
+              beside the words "(Signature on file)", which reads as "we have
+              it, just not here". That is the one sentence on the sheet that has
+              to be true: it is the customer's acceptance, and it is what gets
+              attached to an invoice.
+
+              When there is nothing, the sheet now says there is nothing, and
+              leaves a ruled line for a wet signature. */}
+          {(() => {
+            const hasSignature = !!data.signature_data_url;
+            const hasName = !!data.signer_name;
+            const captured = hasSignature || hasName;
+            return (
+              <View style={s.signatureRow}>
+                <View style={s.sigBox}>
+                  <Text style={s.sigLabel}>Signature</Text>
+                  {hasSignature ? (
+                    <Image style={s.sigImage} src={data.signature_data_url!} />
+                  ) : (
+                    <View style={s.sigImageEmpty} />
+                  )}
+                </View>
+                <View style={s.sigBox}>
+                  <Text style={s.sigLabel}>Accepted By</Text>
+                  {captured ? (
+                    <>
+                      <Text style={s.sigName}>{data.signer_name || '—'}</Text>
+                      <Text style={s.sigDate}>Signed: {signedAtFormatted}</Text>
+                      <Text style={[s.sigDate, { marginTop: 6, color: '#475569' }]}>
+                        By signing this document electronically, the signer agrees that this
+                        electronic signature is the legal equivalent of their manual signature.
+                      </Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={[s.sigName, { color: '#B45309' }]}>Not captured</Text>
+                      <Text style={s.sigDate}>
+                        Job closed {signedAtFormatted} without a customer signature.
+                      </Text>
+                      <Text style={[s.sigDate, { marginTop: 6, color: '#475569' }]}>
+                        Sign here if accepting in person: ______________________________
+                      </Text>
+                    </>
+                  )}
+                </View>
+              </View>
+            );
+          })()}
         </View>
 
         {/* ── Footer ─────────────────────────────────────────────────────────── */}

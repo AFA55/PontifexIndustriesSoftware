@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Camera, X, Loader2, ImageIcon, MapPin, FileText } from 'lucide-react';
+import { Camera, X, Loader2, ImageIcon, MapPin, FileText, ZoomIn, ZoomOut, Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toDisplayUrls, needsSigning } from '@/lib/storage-url';
 
@@ -474,8 +474,62 @@ function attachmentName(url: string): string {
   }
 }
 
+/**
+ * IMAGES OPEN IN THE APP, NOT ON SUPABASE (founder, Aug 15: "why when I click
+ * on an image does it say supabase — why can't I open it within my software and
+ * zoom in there, and not have it take me anywhere else").
+ *
+ * Every photo was an `<a target="_blank">` to the storage URL, so tapping one
+ * threw you out of the platform onto a raw bucket domain with the browser's own
+ * viewer, no zoom worth using, and no way back except the back button. On a
+ * phone, in the field, that is a dead end.
+ *
+ * A lightbox instead: tap to open, pinch or press +/- to zoom, drag to pan,
+ * arrows to move between photos on the same job, Escape to close. Download is
+ * still there for anyone who genuinely wants the file. Documents (PDFs) keep
+ * opening in a new tab — the browser's PDF viewer IS the right tool for those,
+ * and re-implementing one would be worse than the problem.
+ */
 export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; label?: string }) {
   const displayPhotos = useSignedPhotos(photos ?? []);
+  const [lightboxAt, setLightboxAt] = useState<number | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const dragFrom = useRef<{ x: number; y: number } | null>(null);
+
+  // Only IMAGES take part in the lightbox; a PDF in it would be a blank frame.
+  const imageIndexes = (photos ?? [])
+    .map((u, i) => (attachmentKind(u) === 'image' ? i : -1))
+    .filter((i) => i >= 0);
+
+  const openAt = (i: number) => { setLightboxAt(i); setZoom(1); setPan({ x: 0, y: 0 }); };
+  const step = (dir: 1 | -1) => {
+    if (lightboxAt === null || imageIndexes.length < 2) return;
+    const pos = imageIndexes.indexOf(lightboxAt);
+    const next = imageIndexes[(pos + dir + imageIndexes.length) % imageIndexes.length];
+    openAt(next);
+  };
+
+  useEffect(() => {
+    if (lightboxAt === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxAt(null);
+      if (e.key === 'ArrowRight') step(1);
+      if (e.key === 'ArrowLeft') step(-1);
+      if (e.key === '+' || e.key === '=') setZoom((z) => Math.min(6, z + 0.5));
+      if (e.key === '-') setZoom((z) => Math.max(1, z - 0.5));
+    };
+    window.addEventListener('keydown', onKey);
+    // Don't let the page behind scroll while the lightbox is up.
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lightboxAt, imageIndexes.length]);
+
   if (!photos || photos.length === 0) return null;
 
   return (
@@ -513,12 +567,12 @@ export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; la
           }
 
           return (
-            <a
+            <button
               key={i}
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 hover:border-blue-400 transition-colors"
+              type="button"
+              onClick={() => openAt(i)}
+              aria-label={`Open ${label} ${i + 1}`}
+              className="block w-24 h-24 rounded-xl overflow-hidden border-2 border-slate-200 bg-slate-50 transition-colors hover:border-blue-400 dark:border-white/15 dark:bg-white/[0.03]"
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               {displayPhotos[i] && (
@@ -528,10 +582,95 @@ export function PhotoViewer({ photos, label = 'Photos' }: { photos: string[]; la
                   className="w-full h-full object-cover"
                 />
               )}
-            </a>
+            </button>
           );
         })}
       </div>
+
+      {lightboxAt !== null && displayPhotos[lightboxAt] && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col bg-black/95"
+          role="dialog"
+          aria-label={`${label} viewer`}
+          onClick={() => setLightboxAt(null)}
+        >
+          <div
+            className="flex items-center justify-between gap-2 p-3 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="text-sm font-semibold">
+              {label}
+              {imageIndexes.length > 1 && ` · ${imageIndexes.indexOf(lightboxAt) + 1} of ${imageIndexes.length}`}
+            </span>
+            <div className="flex items-center gap-1">
+              <button type="button" onClick={() => setZoom((z) => Math.max(1, z - 0.5))}
+                aria-label="Zoom out"
+                className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/15">
+                <ZoomOut className="h-5 w-5" />
+              </button>
+              <span className="w-12 text-center text-xs tabular-nums">{Math.round(zoom * 100)}%</span>
+              <button type="button" onClick={() => setZoom((z) => Math.min(6, z + 0.5))}
+                aria-label="Zoom in"
+                className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/15">
+                <ZoomIn className="h-5 w-5" />
+              </button>
+              <a href={displayPhotos[lightboxAt]} target="_blank" rel="noopener noreferrer"
+                aria-label="Download"
+                className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/15">
+                <Download className="h-5 w-5" />
+              </a>
+              <button type="button" onClick={() => setLightboxAt(null)} aria-label="Close"
+                className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/15">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          <div
+            className="relative flex flex-1 items-center justify-center overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              if (zoom <= 1) return;
+              dragFrom.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
+            }}
+            onPointerMove={(e) => {
+              if (!dragFrom.current) return;
+              setPan({ x: e.clientX - dragFrom.current.x, y: e.clientY - dragFrom.current.y });
+            }}
+            onPointerUp={() => { dragFrom.current = null; }}
+            onPointerLeave={() => { dragFrom.current = null; }}
+          >
+            {imageIndexes.length > 1 && (
+              <button type="button" onClick={() => step(-1)} aria-label="Previous"
+                className="absolute left-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70">
+                <ChevronLeft className="h-6 w-6" />
+              </button>
+            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={displayPhotos[lightboxAt]}
+              alt={`${label} ${lightboxAt + 1}`}
+              draggable={false}
+              onDoubleClick={() => { setZoom((z) => (z > 1 ? 1 : 2)); setPan({ x: 0, y: 0 }); }}
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                cursor: zoom > 1 ? 'grab' : 'zoom-in',
+                touchAction: 'none',
+              }}
+              className="max-h-full max-w-full select-none object-contain transition-transform duration-100"
+            />
+            {imageIndexes.length > 1 && (
+              <button type="button" onClick={() => step(1)} aria-label="Next"
+                className="absolute right-2 z-10 flex h-12 w-12 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70">
+                <ChevronRight className="h-6 w-6" />
+              </button>
+            )}
+          </div>
+          <p className="pb-3 text-center text-xs text-white/50">
+            Double-tap to zoom · drag to move · Esc to close
+          </p>
+        </div>
+      )}
     </div>
   );
 }
