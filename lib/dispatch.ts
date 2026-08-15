@@ -29,9 +29,47 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
   // Single-day jobs match ONLY their exact date; multi-day jobs match inside
   // their range. (Not `end_date.is.null` in the span arm — that made stale
   // never-finished single-day jobs "active" forever.)
-  const { data: jobs, error: fetchError } = await supabaseAdmin
+  // ── WHO THE BOARD PLACED TODAY, BEFORE ANYTHING ELSE ─────────────────────
+  //
+  // THE BUG (founder, Saturday Aug 15): Javier's Simpsonville job would not
+  // dispatch, and the modal showed him three OTHER jobs instead. The job was
+  // crewed entirely through the per-day board — `assigned_to` and
+  // `helper_assigned_to` were both null, with a ledger row naming him as lead
+  // for the 15th. The filter below requires a job-level slot, so the job was
+  // excluded from the fetch, and the per-day lead SYNC further down never saw
+  // it either: that sync only corrects jobs already IN this result set. The
+  // ledger was consulted only for jobs that did not need it.
+  //
+  // So the ledger is read FIRST and its jobs are unioned in. Same defect family
+  // as the day numbering and the ticket hours: the board works per day, and the
+  // code behind it kept reading the job level.
+  const { data: ledgerToday } = await supabaseAdmin
+    .from('job_daily_assignments')
+    .select('job_order_id')
+    .eq('assignment_date', targetDate)
+    .or('operator_id.not.is.null,helper_id.not.is.null');
+  const ledgerJobIds = [
+    ...new Set(((ledgerToday as Array<{ job_order_id: string }>) ?? [])
+      .map((r) => r.job_order_id)
+      .filter(Boolean)),
+  ];
+
+  const JOB_COLUMNS =
+    'id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date, end_date, dispatched_at';
+
+  const { data: ledgerJobs } = ledgerJobIds.length
+    ? await supabaseAdmin
+        .from('job_orders')
+        .select(JOB_COLUMNS)
+        .eq('tenant_id', tenantId)
+        .in('id', ledgerJobIds)
+        .in('status', ['scheduled', 'assigned', 'in_progress'])
+        .is('deleted_at', null)
+    : { data: [] as any[] };
+
+  const { data: slotJobs, error: fetchError } = await supabaseAdmin
     .from('job_orders')
-    .select('id, job_number, customer_name, location, job_type, assigned_to, helper_assigned_to, arrival_time, scheduled_date, end_date, dispatched_at')
+    .select(JOB_COLUMNS)
     .eq('tenant_id', tenantId)
     // A CREW IS A CREW, OPERATOR OR NOT (founder, Aug 13: "I'd like to assign
     // and choose a helper, and not have to assign an operator if I don't want
@@ -47,7 +85,16 @@ export async function dispatchJobsForTenant(tenantId: string, targetDate: string
     .is('deleted_at', null);
 
   if (fetchError) throw new Error(`dispatch fetch failed: ${fetchError.message}`);
-  if (!jobs || jobs.length === 0) {
+
+  // Union, deduped by id. A ledger-crewed job needs no job-level slot to reach
+  // the dispatch loop — the SYNC below then writes today's lead into
+  // assigned_to, which is what makes the ticket openable in My Jobs.
+  const byId = new Map<string, any>();
+  for (const j of ((slotJobs as any[]) ?? [])) byId.set(j.id, j);
+  for (const j of ((ledgerJobs as any[]) ?? [])) if (!byId.has(j.id)) byId.set(j.id, j);
+  const jobs = Array.from(byId.values());
+
+  if (jobs.length === 0) {
     return { dispatched_count: 0, already_dispatched_count: 0, total_jobs: 0, notification_count: 0, sms_attempted: 0 };
   }
 

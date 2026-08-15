@@ -94,24 +94,72 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const { data: jobs, error } = await supabaseAdmin
-      .from('job_orders')
-      .select('id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to')
-      .eq('tenant_id', auth.tenantId)
-      .not('assigned_to', 'is', null)
-      .is('deleted_at', null)
-      .lte('scheduled_date', targetDate)
-      .or(`scheduled_date.eq.${targetDate},end_date.gte.${targetDate}`)
-      .in('status', ['scheduled', 'assigned', 'in_route', 'in_progress']);
+    // THE MODAL MUST LIST WHAT DISPATCH WILL ACTUALLY SEND (founder, Sat Aug 15:
+    // "when I click dispatch it doesn't even show the job that is on there, it
+    // shows a different job"). This required a job-level `assigned_to`, so
+    // Javier's Simpsonville job — crewed entirely through the per-day board,
+    // both job-level slots null — was invisible, while three multi-day jobs
+    // spanning Saturday with nobody placed on it were listed instead.
+    //
+    // Mirrors lib/dispatch.ts: the per-day ledger is read first and unioned in,
+    // so the count on the button and the jobs in the modal are the same set the
+    // POST will dispatch.
+    const { data: ledgerToday } = await supabaseAdmin
+      .from('job_daily_assignments')
+      .select('job_order_id, operator_id, helper_id')
+      .eq('assignment_date', targetDate)
+      .or('operator_id.not.is.null,helper_id.not.is.null');
+    const ledgerRows = (ledgerToday as Array<{
+      job_order_id: string; operator_id: string | null; helper_id: string | null;
+    }>) ?? [];
+    const ledgerJobIds = [...new Set(ledgerRows.map((r) => r.job_order_id).filter(Boolean))];
+    const dayLeadByJob = new Map(
+      ledgerRows.filter((r) => r.operator_id).map((r) => [r.job_order_id, r.operator_id as string])
+    );
+
+    const COLS = 'id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to';
+    const ACTIVE = ['scheduled', 'assigned', 'in_route', 'in_progress'];
+
+    const [{ data: slotJobs, error }, { data: ledgerJobs }] = await Promise.all([
+      supabaseAdmin
+        .from('job_orders')
+        .select(COLS)
+        .eq('tenant_id', auth.tenantId)
+        .not('assigned_to', 'is', null)
+        .is('deleted_at', null)
+        .lte('scheduled_date', targetDate)
+        .or(`scheduled_date.eq.${targetDate},end_date.gte.${targetDate}`)
+        .in('status', ACTIVE),
+      ledgerJobIds.length
+        ? supabaseAdmin
+            .from('job_orders')
+            .select(COLS)
+            .eq('tenant_id', auth.tenantId)
+            .in('id', ledgerJobIds)
+            .is('deleted_at', null)
+            .in('status', ACTIVE)
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
 
     if (error) {
       return NextResponse.json({ error: 'Failed to check dispatch status.' }, { status: 500 });
     }
 
-    const jobList = jobs || [];
+    const byId = new Map<string, any>();
+    for (const j of ((slotJobs as any[]) ?? [])) byId.set(j.id, j);
+    for (const j of ((ledgerJobs as any[]) ?? [])) if (!byId.has(j.id)) byId.set(j.id, j);
+    const jobList = Array.from(byId.values());
     const total = jobList.length;
 
-    const opIds = [...new Set(jobList.map((j: any) => j.assigned_to).filter(Boolean))];
+    // Today's lead wins over the job-level slot for the NAME shown — that is
+    // who the ticket is going to.
+    const opIds = [
+      ...new Set(
+        jobList
+          .map((j: any) => dayLeadByJob.get(j.id) ?? j.assigned_to)
+          .filter(Boolean)
+      ),
+    ];
     const { data: ops } = opIds.length
       ? await supabaseAdmin.from('profiles').select('id, full_name').in('id', opIds)
       : { data: [] as { id: string; full_name: string }[] };
@@ -167,7 +215,9 @@ export async function GET(request: NextRequest) {
         scheduled_date: j.scheduled_date,
         end_date: j.end_date,
         arrival_time: j.arrival_time,
-        operator_name: opName.get(j.assigned_to) ?? 'Unassigned',
+        // The person the ticket is actually going to today — the day's ledger
+        // lead first, the job-level slot only as a fallback.
+        operator_name: opName.get(dayLeadByJob.get(j.id) ?? j.assigned_to) ?? 'Unassigned',
       })),
     });
   } catch (error) {
