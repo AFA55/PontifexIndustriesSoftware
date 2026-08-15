@@ -500,7 +500,10 @@ interface FormData {
   scope_details: Record<string, Record<string, string>>;
   scope_input_modes: Record<string, 'linear' | 'areas'>;
   removal_needed: boolean;
-  removal_method: 'dumpster_on_site' | 'our_dump_truck' | '';
+  /** `cut_only` is a stated decision that nothing is being hauled — see the
+   *  Cut Only button. It is deliberately a METHOD rather than a separate flag,
+   *  so every reader that already prints the removal method prints this too. */
+  removal_method: 'dumpster_on_site' | 'our_dump_truck' | 'cut_only' | '';
   removal_equipment: string[];
   scope_photo_urls: string[];
   // Step 4
@@ -2658,32 +2661,13 @@ export default function ScheduleFormPage() {
                         </span>
                       </div>
 
-                      {/* Flexible input mode toggle */}
+                      {/* The mode toggle is gone: both sections are on screen and
+                          both are saved. Use either, or both — the linear feet
+                          add up at the bottom. */}
                       {isFlexible && config.altFields && (
-                        <div className="flex gap-2 mb-4">
-                          <button
-                            type="button"
-                            onClick={() => updateForm({ scope_input_modes: { ...form.scope_input_modes, [code]: 'linear' } })}
-                            className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                              currentMode === 'linear'
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/15 hover:text-slate-600 dark:hover:text-white/70'
-                            }`}
-                          >
-                            Linear Ft + Cut Depth
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => updateForm({ scope_input_modes: { ...form.scope_input_modes, [code]: 'areas' } })}
-                            className={`flex-1 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                              currentMode === 'areas'
-                                ? 'bg-blue-600 text-white shadow-md'
-                                : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/15 hover:text-slate-600 dark:hover:text-white/70'
-                            }`}
-                          >
-                            {config.altLabel || 'Areas + Thickness'}
-                          </button>
-                        </div>
+                        <p className="mb-4 text-xs text-slate-500 dark:text-white/45">
+                          Enter linear cuts, areas, or both — the totals combine.
+                        </p>
                       )}
 
                       {/* Field inputs */}
@@ -2851,8 +2835,23 @@ export default function ScheduleFormPage() {
                             </div>
                           );
                         })()
-                      ) : config.hasDynamicCuts && (!isFlexible || currentMode === 'linear') ? (
-                        // ── Dynamic Cuts Builder (sawing linear mode, with calculator) ──
+                      ) : config.hasDynamicCuts || config.hasDynamicAreas ? (
+                        // ── BOTH BUILDERS, TOGETHER ────────────────────────────
+                        // A job is not one shape or the other. "Allow to add and
+                        // save multiple inputs of BOTH linear ft cut and areas,
+                        // and combine the two to produce total linear ft"
+                        // (founder, Aug 15). The mode toggle made them exclusive,
+                        // so a job with 250 LF of trenching AND a 10x10 pad to
+                        // drop had to be entered as a lie in one of the two
+                        // shapes. Each section keeps its own rows and its own
+                        // running total; the linear feet add up at the bottom.
+                        <>
+                        {config.hasDynamicCuts && (
+                        <div className="mb-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/35">
+                          Linear cuts
+                        </div>
+                        )}
+                        {config.hasDynamicCuts && (
                         (() => {
                           type CutRow = {
                             length: string;
@@ -3008,8 +3007,13 @@ export default function ScheduleFormPage() {
                             </div>
                           );
                         })()
-                      ) : config.hasDynamicAreas && (isFlexible ? currentMode === 'areas' : true) ? (
-                        // ── Dynamic Areas Builder (L × W × Thickness × Qty) ──
+                        )}
+                        {config.hasDynamicAreas && (
+                        <div className="mt-5 mb-1.5 text-[11px] font-bold uppercase tracking-widest text-slate-400 dark:text-white/35">
+                          Areas
+                        </div>
+                        )}
+                        {config.hasDynamicAreas && (
                         (() => {
                           // Sawing-specific calculator only for floor/handheld saws
                           const isSawingScope = code === 'DFS' || code === 'EFS' || code === 'HHS/PS';
@@ -3286,6 +3290,62 @@ export default function ScheduleFormPage() {
                             </div>
                           );
                         })()
+                        )}
+                        {/* The number that matters: both sections, added up. */}
+                        {config.hasDynamicCuts && config.hasDynamicAreas && (() => {
+                          const cutsRaw = form.scope_details[code]?.cuts;
+                          const areasRaw = form.scope_details[code]?.areas;
+                          let linearLF = 0;
+                          let areaLF = 0;
+                          try {
+                            const cuts = cutsRaw ? JSON.parse(cutsRaw) : [];
+                            for (const c of cuts) {
+                              const typed = parseFloat(c?.linear_feet || '') || 0;
+                              if (typed > 0) { linearLF += typed; continue; }
+                              if (c?.length && c?.width) {
+                                const r = computeSawingAreaLinearFt({
+                                  length: c.length, width: c.width, qty: '1',
+                                  cross_cut_lengthwise_ft: c.cross_cut_lengthwise_ft,
+                                  cross_cut_widthwise_ft: c.cross_cut_widthwise_ft,
+                                  overcut_allowed: typeof c.overcut_allowed === 'boolean' ? c.overcut_allowed : form.overcutting_allowed,
+                                });
+                                linearLF += r ? r.totalLF : 0;
+                              } else {
+                                linearLF += parseFloat(c?.length || '0') || 0;
+                              }
+                            }
+                          } catch { /* malformed draft — show what we can */ }
+                          try {
+                            const areas = areasRaw ? JSON.parse(areasRaw) : [];
+                            for (const a of areas) {
+                              const r = computeSawingAreaLinearFt({
+                                length: a?.length, width: a?.width, qty: a?.qty || '1',
+                                cross_cut_lengthwise_ft: a?.cross_cut_lengthwise_ft,
+                                cross_cut_widthwise_ft: a?.cross_cut_widthwise_ft,
+                                overcut_allowed: typeof a?.overcut_allowed === 'boolean' ? a.overcut_allowed : form.overcutting_allowed,
+                              });
+                              areaLF += r ? r.totalLF : 0;
+                            }
+                          } catch { /* malformed draft */ }
+                          const combined = linearLF + areaLF;
+                          if (combined <= 0 || linearLF <= 0 || areaLF <= 0) return null;
+                          return (
+                            <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 rounded-xl bg-sky-50 dark:bg-sky-500/10 border-2 border-sky-200 dark:border-sky-400/30">
+                              <span className="text-[11px] font-bold uppercase tracking-widest text-sky-700 dark:text-sky-300">
+                                Combined total
+                              </span>
+                              <span className="text-lg font-bold text-sky-900 dark:text-sky-100">
+                                {combined.toLocaleString(undefined, { maximumFractionDigits: 1 })} linear ft
+                              </span>
+                              <span className="text-xs text-sky-700/70 dark:text-sky-300/60">
+                                {linearLF.toLocaleString(undefined, { maximumFractionDigits: 1 })} from cuts
+                                {' + '}
+                                {areaLF.toLocaleString(undefined, { maximumFractionDigits: 1 })} from areas
+                              </span>
+                            </div>
+                          );
+                        })()}
+                        </>
                       ) : activeFields.length > 0 ? (
                         // ── Standard field inputs (GPR, Demo, etc.) ──
                         <div className={activeFields.some(f => f.fullWidth) ? 'space-y-3' : 'grid grid-cols-2 sm:grid-cols-3 gap-4'}>
@@ -3334,18 +3394,45 @@ export default function ScheduleFormPage() {
                         <p className="text-xs text-slate-400 dark:text-white/40">Are we removing material from the site?</p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => updateForm({ removal_needed: !form.removal_needed, removal_method: '', removal_equipment: [] })}
-                      className={`relative w-14 h-7 rounded-full transition-all duration-200 ${
-                        form.removal_needed ? 'bg-red-500' : 'bg-slate-300'
-                      }`}
-                    >
-                      <span className={`absolute top-0.5 left-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-200 ${
-                        form.removal_needed ? 'translate-x-7' : 'translate-x-0'
-                      }`} />
-                    </button>
+                    {/* CUT ONLY IS AN ANSWER, NOT AN ABSENCE (founder, Aug 15:
+                        "add a button of Cut Only on top of removal, to also have
+                        that information in there").
+
+                        A toggle left in the off position cannot be told apart
+                        from a question nobody reached — and the crew reads that
+                        difference as "did the office decide we are not hauling,
+                        or did they just not say?". Two buttons make it a stated
+                        decision that prints on the ticket. */}
+                    <div className="flex gap-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => updateForm({ removal_needed: false, removal_method: 'cut_only', removal_equipment: [] })}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-h-[44px] ${
+                          !form.removal_needed && form.removal_method === 'cut_only'
+                            ? 'bg-slate-800 text-white shadow-md dark:bg-white dark:text-slate-900'
+                            : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/15'
+                        }`}
+                      >
+                        Cut Only
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => updateForm({ removal_needed: true, removal_method: '', removal_equipment: [] })}
+                        className={`px-4 py-2.5 rounded-xl text-sm font-bold transition-all min-h-[44px] ${
+                          form.removal_needed
+                            ? 'bg-red-500 text-white shadow-md'
+                            : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/15'
+                        }`}
+                      >
+                        We&apos;re Removing
+                      </button>
+                    </div>
                   </div>
+                  {!form.removal_needed && form.removal_method === 'cut_only' && (
+                    <p className="mt-3 text-xs font-semibold text-slate-500 dark:text-white/50">
+                      Cut only — material stays on site. This prints on the ticket.
+                    </p>
+                  )}
                   {form.removal_needed && (
                     <div className="mt-4 space-y-4">
                       {/* Removal Method */}
