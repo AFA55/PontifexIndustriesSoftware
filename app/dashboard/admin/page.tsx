@@ -26,8 +26,6 @@ import {
   MapPin,
   User as UserIcon,
   Tag,
-  HandCoins,
-  Eye,
   Timer,
   CalendarClock,
 } from 'lucide-react';
@@ -35,7 +33,6 @@ import { supabase } from '@/lib/supabase';
 import { getCurrentUser, type User } from '@/lib/auth';
 import { ADMIN_DASHBOARD_ROLES, COMMAND_CENTER_ROLES, PLATFORM_TENANT_ID } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
-import CommissionsCard from '@/components/CommissionsCard';
 import CommandCenterLaunch from '@/components/command-center/CommandCenterLaunch';
 
 // Heavy demo-only walkthrough — only renders when showWalkthrough && isDemoAdmin
@@ -50,6 +47,10 @@ const ShopManagerDashboard = nextDynamic(() => import('./_components/ShopManager
 const ShopHelpDashboard = nextDynamic(() => import('./_components/ShopHelpDashboard'), { ssr: false, loading: () => null });
 // Admin (back-office / operations) dashboard — no sales/commission, no job creation
 const AdminOpsDashboard = nextDynamic(() => import('./_components/AdminDashboard'), { ssr: false, loading: () => null });
+// Project Manager dashboard (internal role `salesman`). Owns its own layout AND
+// the SalesDashboardData shape — one definition, no drift with the fetch here.
+const PmDashboard = nextDynamic(() => import('./_components/PmDashboard'), { ssr: false, loading: () => null });
+import type { SalesDashboardData } from './_components/PmDashboard';
 
 // ─── API response types ───────────────────────────────────────────────────────
 
@@ -128,34 +129,6 @@ interface DashboardData {
   scope?: 'personal' | 'team';
 }
 
-interface SalesCommissionRow {
-  job_id: string;
-  job_number: string;
-  job_status: string;
-  customer_name: string;
-  scheduled_date: string;
-  total_quoted: number;
-  total_invoiced: number;
-  total_paid: number;
-  commission_rate: number;
-  commission_pending: number;
-  commission_earned: number;
-}
-
-interface SalesDashboardData {
-  user: { id: string; full_name: string; role: string; commission_rate_default: number };
-  quoted: { mtd: number; ytd: number; last_month: number; trend_pct: number };
-  jobs: { active_count: number; completed_count_mtd: number; total_count_mtd: number };
-  commissions: {
-    pending: number;
-    earned_mtd: number;
-    earned_ytd: number;
-    earned_last_month: number;
-    trend_pct: number;
-    breakdown: SalesCommissionRow[];
-  };
-}
-
 interface ActiveJob {
   id: string;
   job_number: string;
@@ -195,23 +168,10 @@ function formatTime(timeStr: string | null): string {
   return `${h12}:${m} ${period}`;
 }
 
-const STATUS_STYLES: Record<string, { pill: string; label: string }> = {
-  scheduled:  { pill: 'bg-blue-100 text-blue-700',   label: 'Scheduled'  },
-  in_route:   { pill: 'bg-amber-100 text-amber-700',  label: 'En Route'   },
-  on_site:    { pill: 'bg-green-100 text-green-700',  label: 'On Site'    },
-  in_progress:{ pill: 'bg-green-100 text-green-700',  label: 'In Progress'},
-  completed:  { pill: 'bg-emerald-100 text-emerald-700', label: 'Completed'},
-  cancelled:  { pill: 'bg-red-100 text-red-700',      label: 'Cancelled'  },
-};
-
-function StatusPill({ status }: { status: string }) {
-  const s = STATUS_STYLES[status] ?? { pill: 'bg-gray-100 text-gray-600', label: status };
-  return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${s.pill}`}>
-      {s.label}
-    </span>
-  );
-}
+// (The plain STATUS_STYLES / StatusPill pair lived here for the old inline
+// Project Manager branch. That branch moved to _components/PmDashboard, which
+// carries its own pill styles; RICH_STATUS_STYLES below still serves the
+// schedule widget on this page.)
 
 function ActivityIcon({ type }: { type: string }) {
   const base = 'w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0';
@@ -687,190 +647,23 @@ export default function AdminDashboard() {
     );
   }
 
-  // ── Salesman render branch (separate layout) ──────────────────────────────
-  if (isSalesman) {
-    const sd = salesData;
-    const trendUp = (sd?.quoted.trend_pct ?? 0) >= 0;
-    const expectedCommission =
-      (sd?.commissions.pending ?? 0) + (sd?.commissions.earned_mtd ?? 0);
-
+  // ── Project Manager render branch (internal role `salesman`) ──────────────
+  // The layout lives in _components/PmDashboard so it can call
+  // useDashboardCards — a hook cannot sit behind this early return.
+  if (isSalesman && user) {
     return (
-      <div className="p-6 space-y-6 bg-gray-50 dark:bg-slate-900 min-h-full">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-2 flex-wrap gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-              Sales Dashboard
-            </h1>
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-              {today} · Hi {user?.name?.split(' ')[0] ?? 'there'}
-            </p>
-          </div>
-          <Link
-            href="/dashboard/admin/schedule-form"
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand hover:bg-brand-dark text-white text-sm font-semibold rounded-lg transition-colors"
-          >
-            <Plus className="w-4 h-4" />
-            New Quote
-          </Link>
-        </div>
-
-        {/* KPI tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* 1. My Active Jobs */}
-          <Link
-            href="/dashboard/admin/active-jobs"
-            className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6 hover:shadow-md transition-shadow group"
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-brand/10 dark:bg-brand/20 rounded-full flex items-center justify-center">
-                <Briefcase className="w-5 h-5 text-brand dark:text-brand" />
-              </div>
-              <ChevronRight className="w-4 h-4 text-gray-300 dark:text-slate-600 group-hover:text-brand transition-colors" />
-            </div>
-            {salesLoading ? (
-              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-12 mb-2" />
-            ) : (
-              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
-                {sd?.jobs.active_count ?? 0}
-              </p>
-            )}
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">My Active Jobs</p>
-            <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
-              Quote and ship more
-            </p>
-          </Link>
-
-          {/* 2. Quoted MTD */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-sky-100 dark:bg-sky-900/40 rounded-full flex items-center justify-center">
-                <FileText className="w-5 h-5 text-sky-600 dark:text-sky-400" />
-              </div>
-              {!salesLoading && sd && (
-                <span
-                  className={`flex items-center gap-0.5 text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    trendUp
-                      ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                      : 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400'
-                  }`}
-                >
-                  {trendUp ? (
-                    <TrendingUp className="w-3 h-3" />
-                  ) : (
-                    <TrendingDown className="w-3 h-3" />
-                  )}
-                  {Math.abs(sd.quoted.trend_pct ?? 0)}%
-                </span>
-              )}
-            </div>
-            {salesLoading ? (
-              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
-            ) : (
-              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
-                {formatCurrency(sd?.quoted.mtd ?? 0)}
-              </p>
-            )}
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Quoted MTD</p>
-            <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
-              vs {formatCurrency(sd?.quoted.last_month ?? 0)} last month
-            </p>
-          </div>
-
-          {/* 3. Expected Commission (emerald) — forward-looking, replaces Pending + Earned tiles */}
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-emerald-100 dark:border-emerald-900/40 p-6 ring-1 ring-emerald-100 dark:ring-emerald-900/30">
-            <div className="flex items-start justify-between mb-4">
-              <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/40 rounded-full flex items-center justify-center">
-                <HandCoins className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
-            {salesLoading ? (
-              <div className="animate-pulse bg-gray-200 dark:bg-slate-700 rounded h-8 w-24 mb-2" />
-            ) : (
-              <p className="text-4xl font-bold text-gray-900 dark:text-white tabular-nums">
-                {formatCurrency(expectedCommission)}
-              </p>
-            )}
-            <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">Expected Commission</p>
-            <p className="text-[11px] text-gray-400 dark:text-slate-500 mt-0.5">
-              If all current invoices get paid
-            </p>
-          </div>
-        </div>
-
-        {/* Scoping hint */}
-        <div className="flex items-center gap-1.5 -mt-2 text-xs text-slate-500 dark:text-white/50">
-          <Eye className="w-3.5 h-3.5" />
-          <span>Showing your jobs only</span>
-        </div>
-
-        {/* Commissions card */}
-        {salesLoading ? (
-          <div className="rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-6">
-            <div className="animate-pulse space-y-3">
-              <div className="h-6 w-40 bg-slate-200 dark:bg-slate-700 rounded" />
-              <div className="grid grid-cols-3 gap-2">
-                <div className="h-16 bg-slate-100 dark:bg-slate-700/60 rounded-xl" />
-                <div className="h-16 bg-slate-100 dark:bg-slate-700/60 rounded-xl" />
-                <div className="h-16 bg-slate-100 dark:bg-slate-700/60 rounded-xl" />
-              </div>
-              <div className="h-32 bg-slate-50 dark:bg-slate-700/40 rounded" />
-            </div>
-          </div>
-        ) : (
-          <CommissionsCard
-            pending={sd?.commissions.pending ?? 0}
-            earnedMtd={sd?.commissions.earned_mtd ?? 0}
-            earnedYtd={sd?.commissions.earned_ytd ?? 0}
-            breakdown={sd?.commissions.breakdown ?? []}
-            defaultRate={sd?.user.commission_rate_default ?? 0}
-            onUpdateDefaultRate={handleUpdateDefaultRate}
-          />
-        )}
-
-        {/* Quick actions */}
-        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-slate-700 p-4">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">Quick Actions</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <Link
-              href="/dashboard/admin/schedule-form"
-              className="flex flex-col items-center gap-2 p-4 bg-brand/10 dark:bg-brand/20 hover:bg-brand/20 dark:hover:bg-brand/30 rounded-xl border border-brand/30 dark:border-brand/40 text-brand dark:text-brand transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              <span className="text-xs font-semibold">New Quote</span>
-            </Link>
-            <Link
-              href="/dashboard/admin/active-jobs"
-              className="flex flex-col items-center gap-2 p-4 bg-sky-50 dark:bg-sky-900/20 hover:bg-sky-100 dark:hover:bg-sky-900/40 rounded-xl border border-sky-200 dark:border-sky-800/50 text-sky-700 dark:text-sky-400 transition-colors"
-            >
-              <Briefcase className="w-5 h-5" />
-              <span className="text-xs font-semibold">Active Jobs</span>
-            </Link>
-            <Link
-              href="/dashboard/admin/billing"
-              className="flex flex-col items-center gap-2 p-4 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-xl border border-amber-200 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 transition-colors"
-            >
-              <CreditCard className="w-5 h-5" />
-              <span className="text-xs font-semibold">Billing</span>
-            </Link>
-            <Link
-              href="/dashboard/admin/completed-jobs"
-              className="flex flex-col items-center gap-2 p-4 bg-emerald-50 dark:bg-emerald-900/20 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 rounded-xl border border-emerald-200 dark:border-emerald-800/50 text-emerald-700 dark:text-emerald-400 transition-colors"
-            >
-              <CheckCircle2 className="w-5 h-5" />
-              <span className="text-xs font-semibold">Completed</span>
-            </Link>
-          </div>
-        </div>
-
-        {/* ── Command Center launch (salesman is an office/management role) ── */}
-        <CommandCenterLaunch />
-
-        {/* Onboarding hook still respects salesman path */}
-        {showWalkthrough && isDemoAdmin && user && (
-          <AdminOnboardingTour userId={user.id} onComplete={markWalkthroughComplete} />
-        )}
-      </div>
+      <PmDashboard
+        user={user}
+        salesData={salesData}
+        salesLoading={salesLoading}
+        today={today}
+        onUpdateDefaultRate={handleUpdateDefaultRate}
+        onboarding={
+          showWalkthrough && isDemoAdmin ? (
+            <AdminOnboardingTour userId={user.id} onComplete={markWalkthroughComplete} />
+          ) : null
+        }
+      />
     );
   }
 

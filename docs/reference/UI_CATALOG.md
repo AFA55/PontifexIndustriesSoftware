@@ -172,6 +172,25 @@ Icon-left, `rounded-xl`, `min-h` ≥44px, light bg with `dark:` variant, focus r
 flex items-center justify-between gap-3 rounded-xl border border-gray-100 dark:border-white/10 px-4 py-3
 ```
 
+### Customisable dashboard  ·  canonical: `app/dashboard/admin/_components/DashboardCustomiser.tsx`
+Per-USER "remove a block / add a card" for any dashboard. Logic (and the permission
+intersection) is in `lib/dashboard-cards.ts`; persistence is
+`profiles.dashboard_hidden_cards` / `dashboard_added_cards` via
+`PUT /api/my-profile/dashboard-cards`.
+```tsx
+const cards = useDashboardCards(user.role);
+<CustomiseButton state={cards} />              {/* header toggle — never removable */}
+<CustomisePanel state={cards} sections={SECTIONS} />  {/* restore + add, ABOVE the content */}
+<Removable state={cards} sections={SECTIONS} id="my_jobs">…</Removable>
+<AddedFeatureCards state={cards} />
+```
+**Two rules, both load-bearing:** (1) preference NEVER widens access — always intersect
+with `getCardPermission`, and filter the *permitted* list by what was requested, never the
+other way round; (2) the restore path sits above the content and the toggle is not itself a
+card, so a user who hides everything can still recover.
+Edit affordance: `outline outline-2 outline-dashed outline-offset-4 outline-brand/40` on the
+block + a 44px-hit-area × at `absolute -top-3 -right-3 w-11 h-11` wrapping a `w-8 h-8` red circle.
+
 ---
 
 ## Maintenance
