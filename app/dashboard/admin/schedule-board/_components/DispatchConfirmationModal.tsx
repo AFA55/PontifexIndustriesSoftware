@@ -122,12 +122,31 @@ export default function DispatchConfirmationModal({
                   </div>
                 )}
 
+                {/* Jobs already sent are no longer listed above — pushing again
+                    does nothing for them, and listing them made the modal
+                    promise three tickets when it would send one. Say where they
+                    went rather than dropping them silently. */}
+                {(dispatchInfo.dispatched ?? 0) > 0 && (
+                  <p className="text-xs text-gray-500 dark:text-white/50 text-center">
+                    {dispatchInfo.dispatched} more {dispatchInfo.dispatched === 1 ? 'job runs' : 'jobs run'} through
+                    today and {dispatchInfo.dispatched === 1 ? 'was' : 'were'} already dispatched — the crew has {dispatchInfo.dispatched === 1 ? 'it' : 'them'}.
+                  </p>
+                )}
+
                 {dispatchInfo.total === 0 ? (
                   <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-white/10 rounded-xl">
                     <AlertCircle className="w-6 h-6 text-gray-400 dark:text-white/50 flex-shrink-0" />
                     <div>
-                      <p className="text-sm font-bold text-gray-700 dark:text-white/70">No assigned jobs for this date</p>
-                      <p className="text-xs text-gray-500 dark:text-white/60">Assign operators to jobs on the board first.</p>
+                      <p className="text-sm font-bold text-gray-700 dark:text-white/70">
+                        {(dispatchInfo.dispatched ?? 0) > 0
+                          ? 'Every ticket for this date is already out'
+                          : 'No assigned jobs for this date'}
+                      </p>
+                      <p className="text-xs text-gray-500 dark:text-white/60">
+                        {(dispatchInfo.dispatched ?? 0) > 0
+                          ? 'Nothing left to push.'
+                          : 'Assign operators to jobs on the board first.'}
+                      </p>
                     </div>
                   </div>
                 ) : (

@@ -117,7 +117,8 @@ export async function GET(request: NextRequest) {
       ledgerRows.filter((r) => r.operator_id).map((r) => [r.job_order_id, r.operator_id as string])
     );
 
-    const COLS = 'id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to';
+    const COLS =
+      'id, job_number, customer_name, scheduled_date, end_date, arrival_time, assigned_to, dispatched_at';
     const ACTIVE = ['scheduled', 'assigned', 'in_route', 'in_progress'];
 
     const [{ data: slotJobs, error }, { data: ledgerJobs }] = await Promise.all([
@@ -148,7 +149,26 @@ export async function GET(request: NextRequest) {
     const byId = new Map<string, any>();
     for (const j of ((slotJobs as any[]) ?? [])) byId.set(j.id, j);
     for (const j of ((ledgerJobs as any[]) ?? [])) if (!byId.has(j.id)) byId.set(j.id, j);
-    const jobList = Array.from(byId.values());
+    const allActive = Array.from(byId.values());
+
+    // ── ONLY LIST WHAT PUSHING WILL ACTUALLY SEND (founder, Sat Aug 15) ──────
+    //
+    // "It still shows Pratt tickets that aren't scheduled for Saturday."
+    //
+    // Pratt (Aug 10-17) and Parkk 160762 (Aug 13-15) both span Saturday, so
+    // they were listed — but both were DISPATCHED ON AUG 10 and `dispatched_at`
+    // is written once, NULL → now, and never cleared. Pushing again does
+    // nothing for them: lib/dispatch.ts skips any job that already has the
+    // stamp, precisely so a crew is not texted the same ticket twice. The modal
+    // was promising to dispatch three jobs when it would dispatch one.
+    //
+    // This is a FACT, not a policy — it needs no rule about weekends or about
+    // whether a crew was placed. A dispatched job is done being dispatched.
+    // It also disposes of the worry I had about excluding spanning jobs: AM
+    // King went out on Aug 12, its first day, so it would still have reached
+    // Dante on the 13th. A multi-day job is dispatched once, on day one.
+    const jobList = allActive.filter((j) => !j.dispatched_at);
+    const alreadyDispatched = allActive.length - jobList.length;
     const total = jobList.length;
 
     // Today's lead wins over the job-level slot for the NAME shown — that is
@@ -205,7 +225,9 @@ export async function GET(request: NextRequest) {
       success: true,
       date: targetDate,
       total,
-      dispatched: 0,
+      // These were hardcoded 0 / total, so the modal could never tell the
+      // office that a job had already gone out. Real numbers now.
+      dispatched: alreadyDispatched,
       undispatched: total,
       ar_warnings: arWarnings,
       jobs: jobList.map((j: any) => ({
