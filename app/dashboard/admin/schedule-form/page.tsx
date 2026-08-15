@@ -114,6 +114,15 @@ interface ScopeConfig {
   hasDynamicHoles?: boolean; // Core drilling: dynamic qty + bit size + depth rows
   hasDynamicCuts?: boolean;  // Sawing linear mode: dynamic LF + depth + # cuts rows
   hasDynamicAreas?: boolean; // Sawing areas mode: dynamic L×W×thickness×qty rows
+  /**
+   * The area only needs LENGTH and WIDTH — no thickness.
+   *
+   * A wire saw PULLS through the cut, so the two measurements that describe the
+   * job are the two the wire travels; depth is not a thing you set (founder,
+   * Aug 15). GPR scans a surface, so it has no thickness either — and asking
+   * for one invites a number that means nothing downstream.
+   */
+  areaLengthWidthOnly?: boolean;
 }
 const SCOPE_FIELDS: Record<string, ScopeConfig> = {
   'ECD': {
@@ -171,12 +180,20 @@ const SCOPE_FIELDS: Record<string, ScopeConfig> = {
   'WireSaw': {
     label: 'Wire Sawing Details',
     hasDynamicCuts: true,
+    hasDynamicAreas: true,
+    areaLengthWidthOnly: true,
     fields: [],
   },
   'GPR': {
     label: 'GPR Scanning Details',
+    // "Allow them to add multiple areas, and instead of square ft, length and
+    // width" (founder, Aug 15). One square-foot box forced whoever filled it in
+    // to do the multiplication in their head across several rooms and write
+    // down the answer — so the office got a total with no way to see what it
+    // was made of, and the crew got no idea which areas to scan.
+    hasDynamicAreas: true,
+    areaLengthWidthOnly: true,
     fields: [
-      { key: 'area_sqft', label: 'Area', placeholder: '0', type: 'number', suffix: 'sq ft' },
       { key: 'num_scans', label: 'Number of Scans', placeholder: '0', type: 'number' },
     ],
   },
@@ -190,6 +207,29 @@ const SCOPE_FIELDS: Record<string, ScopeConfig> = {
     label: 'Brokk Details',
     hasDynamicAreas: true,
     fields: [],
+  },
+  // "When they click Other, let them set the NAME of the type of work being
+  // performed, and then what they will be doing as a description" (founder,
+  // Aug 15). Other was a tile that led nowhere: it recorded that the job was
+  // something unusual without recording WHAT, so the crew arrived knowing only
+  // that the office could not classify it.
+  'Other': {
+    label: 'Other Work Details',
+    fields: [
+      {
+        key: 'work_type_name',
+        label: 'Type of work',
+        placeholder: 'e.g. Curb cutting, Bollard removal, Slab jacking',
+        type: 'text',
+      },
+      {
+        key: 'description',
+        label: 'What will be done',
+        placeholder: 'Describe the work, the measurements, and anything the crew needs to know…',
+        type: 'textarea',
+        fullWidth: true,
+      },
+    ],
   },
 };
 
@@ -2675,11 +2715,21 @@ export default function ScheduleFormPage() {
                         // ── Dynamic Holes Builder (core drilling) ──
                         (() => {
                           const holesRaw = form.scope_details[code]?.holes;
-                          const holes: { qty: string; bit_size: string; depth: string }[] = holesRaw
+                          // WHERE each group of holes goes, not where the JOB
+                          // goes. "There can be some holes in wall, some holes in
+                          // floor — not all in one place, and we need to be able
+                          // to differentiate that" (founder, Aug 15). One
+                          // location for the whole scope forced the office to
+                          // pick the one that was most true and leave the crew
+                          // to find the rest out on site, which changes what
+                          // they bring: a wall core needs an anchor and often a
+                          // lift, a floor core does not.
+                          type HoleRow = { qty: string; bit_size: string; depth: string; location?: string };
+                          const holes: HoleRow[] = holesRaw
                             ? (() => { try { return JSON.parse(holesRaw); } catch { return [{ qty: '', bit_size: '', depth: '' }]; } })()
                             : [{ qty: '', bit_size: '', depth: '' }];
 
-                          const updateHoles = (newHoles: { qty: string; bit_size: string; depth: string }[]) => {
+                          const updateHoles = (newHoles: HoleRow[]) => {
                             updateScopeDetail(code, 'holes', JSON.stringify(newHoles));
                           };
 
@@ -2751,6 +2801,35 @@ export default function ScheduleFormPage() {
                                       </button>
                                     )}
                                   </div>
+
+                                  {/* Where THESE holes go. */}
+                                  <div className="mt-2 grid grid-cols-3 gap-2">
+                                    {([
+                                      { value: 'elevated_slab', label: 'Elevated Slab' },
+                                      { value: 'slab_on_grade', label: 'Slab on Grade' },
+                                      { value: 'on_wall', label: 'On Wall' },
+                                    ] as const).map(opt => {
+                                      const selected = hole.location === opt.value;
+                                      return (
+                                        <button
+                                          key={opt.value}
+                                          type="button"
+                                          onClick={() => {
+                                            const updated = [...holes];
+                                            updated[idx] = { ...updated[idx], location: selected ? '' : opt.value };
+                                            updateHoles(updated);
+                                          }}
+                                          className={`px-2 py-2 rounded-lg text-xs font-semibold border transition-all min-h-[40px] ${
+                                            selected
+                                              ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                                              : 'bg-white dark:bg-white/5 text-slate-500 dark:text-white/50 border-slate-200 dark:border-white/10 hover:border-blue-300 hover:text-blue-600'
+                                          }`}
+                                        >
+                                          {opt.label}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               ))}
 
@@ -2775,35 +2854,14 @@ export default function ScheduleFormPage() {
                                 </div>
                               )}
 
-                              {/* Work Location */}
+                              {/* The scope-level Work Location picker is gone —
+                                  each group of holes now carries its own (see
+                                  the row buttons above). The lift/ladder
+                                  question still matters, and now fires when ANY
+                                  group is on a wall rather than when the whole
+                                  scope was labelled one. */}
                               <div className="pt-3 border-t border-slate-100 dark:border-white/10">
-                                <p className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2">Work Location</p>
-                                <div className="grid grid-cols-3 gap-2">
-                                  {([
-                                    { value: 'elevated_slab', label: 'Elevated Slab' },
-                                    { value: 'slab_on_grade', label: 'Slab on Grade' },
-                                    { value: 'on_wall', label: 'On Wall' },
-                                  ] as const).map(opt => {
-                                    const selected = form.scope_details[code]?.work_location === opt.value;
-                                    return (
-                                      <button
-                                        key={opt.value}
-                                        type="button"
-                                        onClick={() => updateScopeDetail(code, 'work_location', selected ? '' : opt.value)}
-                                        className={`px-3 py-2.5 rounded-xl text-sm font-semibold border transition-all ${
-                                          selected
-                                            ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                                            : 'bg-white dark:bg-white/5 text-slate-600 dark:text-white/60 border-slate-200 dark:border-white/10 hover:border-blue-300 hover:text-blue-600'
-                                        }`}
-                                      >
-                                        {opt.label}
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-
-                                {/* On Wall follow-up */}
-                                {form.scope_details[code]?.work_location === 'on_wall' && (
+                                {holes.some(h => h.location === 'on_wall') && (
                                   <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-500/30 rounded-xl">
                                     <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 mb-2">
                                       Is a lift or ladder onsite?
@@ -3065,15 +3123,17 @@ export default function ScheduleFormPage() {
                               {areas.map((area, idx) => (
                                 <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {idx === 0 && (
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-1.5">
+                                    <div className={`grid grid-cols-2 ${config.areaLengthWidthOnly ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-2 sm:gap-3 mb-1.5`}>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Length</label>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Width</label>
-                                      <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Thickness</label>
+                                      {!config.areaLengthWidthOnly && (
+                                        <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Thickness</label>
+                                      )}
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Qty</label>
                                     </div>
                                   )}
                                   <div className="flex items-center gap-2">
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 flex-1">
+                                    <div className={`grid grid-cols-2 ${config.areaLengthWidthOnly ? 'sm:grid-cols-3' : 'sm:grid-cols-4'} gap-2 sm:gap-3 flex-1`}>
                                       <div className="relative">
                                         <input
                                           type="number"
@@ -3102,6 +3162,11 @@ export default function ScheduleFormPage() {
                                         />
                                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">ft</span>
                                       </div>
+                                      {/* A wire saw pulls through the cut and GPR
+                                          scans a surface — neither has a
+                                          thickness to set, and asking for one
+                                          invites a number that means nothing. */}
+                                      {!config.areaLengthWidthOnly && (
                                       <div className="relative">
                                         <input
                                           type="text"
@@ -3117,6 +3182,7 @@ export default function ScheduleFormPage() {
                                         />
                                         <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
+                                      )}
                                       <input
                                         type="number"
                                         placeholder="1"
@@ -3291,6 +3357,28 @@ export default function ScheduleFormPage() {
                           );
                         })()
                         )}
+                        {/* Scopes that have BOTH a builder and ordinary fields —
+                            GPR keeps its scan count under the areas it applies
+                            to. Without this the builder branch swallowed them. */}
+                        {activeFields.length > 0 && (
+                          <div className="mt-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            {activeFields.map(field => (
+                              <div key={field.key} className={field.fullWidth ? 'col-span-full' : ''}>
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-1.5 block">
+                                  {field.label}
+                                </label>
+                                <input
+                                  type={field.type === 'number' ? 'number' : 'text'}
+                                  placeholder={field.placeholder}
+                                  value={form.scope_details[code]?.[field.key] || ''}
+                                  onChange={e => updateScopeDetail(code, field.key, e.target.value)}
+                                  className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-base font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
                         {/* The number that matters: both sections, added up. */}
                         {config.hasDynamicCuts && config.hasDynamicAreas && (() => {
                           const cutsRaw = form.scope_details[code]?.cuts;
