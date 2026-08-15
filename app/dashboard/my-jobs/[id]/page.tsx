@@ -1461,8 +1461,24 @@ export default function JobDetailPage() {
         {/* Waiver status — signed / sent-but-unsigned / not sent, with a
             resend button. Replaces the old pair of static banners, which could
             only offer in-person signing and never told the crew whether the
-            site contact had been asked at all. */}
-        <WaiverBanner jobId={job.id} readOnly={isCompleted} />
+            site contact had been asked at all.
+
+            NOT SHOWN UNTIL THEY ARE ON THE WAY (founder, Aug 15). It used to sit
+            above Start In Route, while the crew was still ticking off equipment
+            in the yard: "there's really no need for them to sign it because
+            they're not even en route yet." An alarm that fires before anything
+            can be done about it teaches people to scroll past alarms. Once In
+            Route is pressed the waiver goes out on its own, and this appears
+            beside the site-contact details — the moment it becomes actionable,
+            next to the person who has to sign it.
+
+            Gated on `inRouteReached` alone, NOT the equipment checklist: a
+            helper never runs that checklist, and gating on it would hide the
+            waiver from them permanently. A completed job still shows it, so the
+            record stays visible on a finished ticket. */}
+        {(inRouteReached || isCompleted) && (
+          <WaiverBanner jobId={job.id} readOnly={isCompleted} />
+        )}
 
         {/* Co-operator action — full input, but the LEAD drives status. No
             Start Route / Job Not Ready; go straight to jobsite + work log. */}
