@@ -168,6 +168,56 @@ export async function requireAdmin(request: NextRequest): Promise<AuthResult> {
 }
 
 /**
+ * READ-ONLY timecard access: the admin set PLUS supervisor.
+ *
+ * THE BUG (Aug 15 sweep): the timecards page admits five roles via
+ * lib/auth.ts `isAdmin()`, and every timecard route is `requireAdmin`, which is
+ * three. The supervisor's own dashboard has a Timecards button on it. So David
+ * clicked through, the page rendered, every request 403'd, and the screen sat
+ * blank forever with no error — the platform's signature defect, where the page
+ * admits a role the backend refuses.
+ *
+ * lib/rbac.ts grants supervisor `timecards: 'view'`, so viewing is the intent.
+ * VIEW ONLY: approve, edit, delete and no-show stay on `requireAdmin`, because
+ * his preset says view and someone who oversees the crew should not also be
+ * able to approve their own crew's hours.
+ *
+ * Salesman is deliberately NOT here — they have no timecards card at all, and
+ * `isAdmin()` admitting them to that page was simply wrong.
+ */
+export const TIMECARD_VIEWER_ROLES: string[] = [...ADMIN_ROLES, 'supervisor'];
+
+export async function requireTimecardViewer(request: NextRequest): Promise<AuthResult> {
+  const r = await resolveAuth(request);
+  if (!r.ok) return { authorized: false, response: r.response };
+
+  if (!TIMECARD_VIEWER_ROLES.includes(r.role)) {
+    return {
+      authorized: false,
+      response: NextResponse.json({ error: 'Forbidden. Timecard access required.' }, { status: 403 }),
+    };
+  }
+
+  if (r.role !== 'super_admin' && !r.tenantId) {
+    return {
+      authorized: false,
+      response: NextResponse.json(
+        { error: 'Forbidden. Tenant not set for this user.' },
+        { status: 403 }
+      ),
+    };
+  }
+
+  return {
+    authorized: true,
+    userId: r.userId,
+    userEmail: r.userEmail,
+    role: r.role,
+    tenantId: r.tenantId,
+  };
+}
+
+/**
  * Require super_admin role. Returns a nullable tenantId — super_admins have no
  * home tenant; routes using this guard should consult `resolveTenantScope`
  * (with an explicit `?tenantId=` query) when scoping reads/writes.

@@ -10,6 +10,8 @@ import {
   formatDayLong,
   dayName,
   mondayOf,
+  weekStartOf,
+  isWeekStartDay,
   weekDatesFrom,
   weekDatesMonSun,
   isWeekend,
@@ -212,5 +214,63 @@ describe('startOfDayUTC — start of the OPERATOR day, not of UTC', () => {
     expect(new Date(start).getTime()).toBeLessThan(new Date(end).getTime());
     // Just under 24 hours apart (23:59:59, not 24:00:00).
     expect(new Date(end).getTime() - new Date(start).getTime()).toBe(86399000);
+  });
+});
+
+describe('weekStartOf — the pay week does not have to start on Monday', () => {
+  // Aug 2026: Sat 15, Sun 16, Mon 17, Fri 21.
+  it("puts Javier's Saturday at the START of a new pay week, not the end of the old one", () => {
+    expect(weekStartOf('2026-08-15', 'saturday')).toBe('2026-08-15');
+    // The Monday rule buried it at the tail of the week that began Aug 10.
+    expect(weekStartOf('2026-08-15', 'monday')).toBe('2026-08-10');
+  });
+
+  it('keeps Sat→Fri together: Sunday through Friday belong to the Saturday before', () => {
+    for (const d of ['2026-08-15', '2026-08-16', '2026-08-17', '2026-08-20', '2026-08-21']) {
+      expect(weekStartOf(d, 'saturday')).toBe('2026-08-15');
+    }
+    // ...and the next Saturday opens the next week.
+    expect(weekStartOf('2026-08-22', 'saturday')).toBe('2026-08-22');
+  });
+
+  it('is identity when the date already IS the start day', () => {
+    expect(weekStartOf('2026-08-17', 'monday')).toBe('2026-08-17');
+    expect(weekStartOf('2026-08-16', 'sunday')).toBe('2026-08-16');
+  });
+
+  it('handles every start day without drifting a week', () => {
+    const ref = '2026-08-19'; // a Wednesday
+    expect(weekStartOf(ref, 'sunday')).toBe('2026-08-16');
+    expect(weekStartOf(ref, 'monday')).toBe('2026-08-17');
+    expect(weekStartOf(ref, 'wednesday')).toBe('2026-08-19');
+    expect(weekStartOf(ref, 'thursday')).toBe('2026-08-13');
+    expect(weekStartOf(ref, 'saturday')).toBe('2026-08-15');
+  });
+
+  it('crosses a month boundary correctly', () => {
+    expect(weekStartOf('2026-09-01', 'saturday')).toBe('2026-08-29');
+    expect(weekStartOf('2026-03-02', 'saturday')).toBe('2026-02-28');
+  });
+
+  it('mondayOf still behaves exactly as before', () => {
+    for (const d of ['2026-08-15', '2026-08-16', '2026-08-17', '2026-08-19']) {
+      expect(mondayOf(d)).toBe(weekStartOf(d, 'monday'));
+    }
+    expect(mondayOf('2026-08-16')).toBe('2026-08-10'); // Sunday belongs to the week before
+  });
+
+  it('never returns a date in the future', () => {
+    for (const d of ['2026-08-15', '2026-08-16', '2026-08-19', '2026-08-21']) {
+      for (const s of ['sunday', 'monday', 'saturday'] as const) {
+        expect(weekStartOf(d, s) <= d).toBe(true);
+      }
+    }
+  });
+
+  it('isWeekStartDay guards what comes out of the database', () => {
+    expect(isWeekStartDay('saturday')).toBe(true);
+    expect(isWeekStartDay('Saturday')).toBe(false);
+    expect(isWeekStartDay('')).toBe(false);
+    expect(isWeekStartDay(null)).toBe(false);
   });
 });

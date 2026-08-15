@@ -16,6 +16,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { tenantWeekStartFor } from '@/lib/payroll-week';
 import { signTimecardPhoto } from '@/lib/timecard-photos';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
 import { resolveAvatarUrl } from '@/lib/avatar';
@@ -199,7 +200,9 @@ export async function GET(
     // Use lib/dates so we never UTC-shift the boundary by a day.
     const today = new Date();
     const todayStr = toLocalYMD(today);                 // upper bound (inclusive)
-    const weekStartStr = mondayOf(today);               // current week (Mon-based)
+    // The TENANT's pay week, not Monday — Patriot runs Saturday to Friday, so a
+    // "this week" punctuality figure anchored on Monday counted the wrong days.
+    const weekStartStr = await tenantWeekStartFor(auth.tenantId ?? null, today);
     const monthStartStr = toLocalYMD(
       new Date(today.getFullYear(), today.getMonth(), 1) // 1st of current month, local
     );

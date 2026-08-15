@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { normalizeWeekStart } from '@/lib/payroll-week';
 import { requireAuth } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import TimecardPDF from '@/components/pdf/TimecardPDF';
@@ -19,7 +20,6 @@ import { getTenantPdfBranding, fetchLogoDataUri } from '@/lib/pdf-branding';
 import {
   calculateWeekSummary,
   getWeekDates,
-  getMondayOfWeek,
   buildWeekDayEntries,
 } from '@/lib/timecard-utils';
 import type { TimecardEntry } from '@/lib/timecard-utils';
@@ -34,7 +34,10 @@ export async function GET(request: NextRequest) {
 
     // Parse week start, default to current Monday
     const searchParams = request.nextUrl.searchParams;
-    const weekStart = searchParams.get('weekStart') || getMondayOfWeek();
+    const weekStart = await normalizeWeekStart(
+      auth.tenantId ?? null,
+      searchParams.get('weekStart')
+    );
 
     // Week end (Sunday) — local calendar math via lib/dates (never toISOString)
     const weekEnd = getWeekDates(weekStart)[6];

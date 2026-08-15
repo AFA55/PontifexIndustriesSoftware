@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
+import { getCardPermission } from '@/lib/rbac';
 import {
   ArrowLeft, Clock, CheckCircle, Calendar,
   User as UserIcon, FileText, Download,
@@ -205,7 +206,14 @@ export default function AdminTimecardsPage() {
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) { router.push('/login'); return; }
-    if (!isAdmin()) { router.push('/dashboard'); return; }
+    // Gate on the CARD, not on isAdmin(). isAdmin() is five roles — it let a
+    // salesman onto a page they have no card for and whose every request 403s.
+    // The card permission is the same thing that decides whether the tile is on
+    // their dashboard, so the door and the tile can no longer disagree.
+    if (getCardPermission(null, 'timecards', currentUser.role) === 'none') {
+      router.push('/dashboard');
+      return;
+    }
     setUser(currentUser);
   }, [router]);
 
@@ -308,7 +316,15 @@ export default function AdminTimecardsPage() {
   };
 
   // ── Bulk approve all pending ───────────────────────────────
+  // VIEW vs FULL. The supervisor's preset is `timecards: 'view'` — he can see
+  // the crew's hours, he does not approve them. Showing him buttons that 403
+  // would recreate the exact defect this page was just fixed for: an action
+  // offered and then refused.
+  const canManageTimecards =
+    !!user?.role && getCardPermission(null, 'timecards', user.role) === 'full';
+
   const handleBulkApproveAll = async () => {
+    if (!canManageTimecards) return;
     setBulkApproving(true);
     try {
       const token = await getSessionToken();
@@ -341,6 +357,7 @@ export default function AdminTimecardsPage() {
 
   // ── Bulk approve for single user ───────────────────────────
   const handleApproveUser = async (userId: string) => {
+    if (!canManageTimecards) return;
     try {
       const token = await getSessionToken();
       if (!token) return;
@@ -371,6 +388,7 @@ export default function AdminTimecardsPage() {
   // schedule/availability ledger. Defaults the date to today when today falls
   // inside the displayed week, otherwise the week's Monday.
   const handleNoShow = async (userId: string, fullName: string) => {
+    if (!canManageTimecards) return;
     // Local YYYY-MM-DD for today (NEVER toISOString — that's UTC).
     const now = new Date();
     const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -953,6 +971,7 @@ export default function AdminTimecardsPage() {
           {totals.pendingApprovals > 0 && (
             <button
               onClick={handleBulkApproveAll}
+              hidden={!canManageTimecards}
               disabled={bulkApproving}
               className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-lg shadow-emerald-600/20"
             >
@@ -1274,6 +1293,7 @@ export default function AdminTimecardsPage() {
                             {member.pendingCount > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
+                                hidden={!canManageTimecards}
                                 className="flex items-center gap-1 px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-md text-[11px] font-semibold border border-emerald-200 dark:border-emerald-400/30 transition-all"
                               >
                                 <Shield size={11} />
@@ -1602,6 +1622,7 @@ export default function AdminTimecardsPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => handleReviewCorrection(req.id, 'approve')}
+                        hidden={!canManageTimecards}
                         disabled={reviewingCorrection === req.id}
                         className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-sm shadow-emerald-500/20"
                       >

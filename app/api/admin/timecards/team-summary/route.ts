@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireTimecardViewer } from '@/lib/api-auth';
 import { resolveAvatarUrl } from '@/lib/avatar';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
@@ -61,7 +61,7 @@ interface DayInfo {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireTimecardViewer(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = auth.tenantId;

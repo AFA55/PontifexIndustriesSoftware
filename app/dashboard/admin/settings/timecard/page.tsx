@@ -183,6 +183,7 @@ export default function TimecardSettingsPage() {
               autoClockoutEnabled: d.auto_clockout_enabled ?? prev.autoClockoutEnabled,
               lateGraceMinutes: d.late_grace_minutes ?? prev.lateGraceMinutes,
               subsistenceRate: d.subsistence_rate ?? prev.subsistenceRate,
+              weekStartDay: d.week_start_day ?? prev.weekStartDay,
             }));
           }
         }
@@ -238,6 +239,10 @@ export default function TimecardSettingsPage() {
           auto_clockout_enabled: settings.autoClockoutEnabled,
           late_grace_minutes: settings.lateGraceMinutes,
           subsistence_rate: settings.subsistenceRate,
+          // The day-buttons wrote to local state and localStorage only; the pay
+          // week never reached the server, which is why every week boundary on
+          // the platform stayed Monday.
+          week_start_day: settings.weekStartDay,
         }),
       });
       if (!res.ok) {

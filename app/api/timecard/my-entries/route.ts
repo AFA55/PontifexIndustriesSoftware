@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth, isTableNotFoundError } from '@/lib/api-auth';
-import { calculateWeekSummary, getWeekDates, getMondayOfWeek } from '@/lib/timecard-utils';
+import { calculateWeekSummary, getWeekDates } from '@/lib/timecard-utils';
+import { normalizeWeekStart } from '@/lib/payroll-week';
+import { getTenantId } from '@/lib/get-tenant-id';
 import type { TimecardEntry } from '@/lib/timecard-utils';
 
 export async function GET(request: NextRequest) {
@@ -18,7 +20,12 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const searchParams = request.nextUrl.searchParams;
-    const weekStart = searchParams.get('weekStart') || getMondayOfWeek();
+    // Snapped onto the TENANT's pay week (Patriot: Saturday to Friday), not
+    // Monday. A Saturday used to land at the tail of the previous week.
+    const weekStart = await normalizeWeekStart(
+      await getTenantId(auth.userId),
+      searchParams.get('weekStart')
+    );
 
     // Validate date format
     if (!/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {

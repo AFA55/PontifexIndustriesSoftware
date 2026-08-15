@@ -70,13 +70,49 @@ export function dayNameShort(ymd: string): string {
   return formatDay(ymd, { weekday: 'short' });
 }
 
+/**
+ * A PAY WEEK DOES NOT HAVE TO START ON MONDAY.
+ *
+ * Patriot's payroll runs **Saturday through Friday** (founder, Aug 12). Every
+ * week boundary in this codebase was `mondayOf()` — the timecard views, the
+ * `weekStart` params, the 40-hour overtime bucket, the PDF and the CSV. So a
+ * Saturday's hours were filed at the END of the previous pay week instead of
+ * the START of the new one, and overtime was totalled over the wrong seven
+ * days. `timecard_settings_v2.week_start_day` has existed all along and was
+ * read by nothing.
+ *
+ * Weekend work is rare here, which is why it went unnoticed — but Javier is on
+ * a Saturday job as this is written, so it is live money.
+ */
+export const WEEK_DAY_INDEX = {
+  sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6,
+} as const;
+
+export type WeekStartDay = keyof typeof WEEK_DAY_INDEX;
+
+export function isWeekStartDay(v: unknown): v is WeekStartDay {
+  return typeof v === 'string' && v in WEEK_DAY_INDEX;
+}
+
+/**
+ * The first day (YYYY-MM-DD) of the week containing `ref`, for any week start.
+ * `startDay` defaults to monday so existing callers are unchanged.
+ */
+export function weekStartOf(
+  ref: string | Date = new Date(),
+  startDay: WeekStartDay = 'monday'
+): string {
+  const d = typeof ref === 'string' ? parseYMDLocal(ref) : new Date(ref);
+  const target = WEEK_DAY_INDEX[startDay];
+  // How many days back to the most recent `startDay`, today counting as 0.
+  const back = (d.getDay() - target + 7) % 7;
+  d.setDate(d.getDate() - back);
+  return toLocalYMD(d);
+}
+
 /** The Monday (YYYY-MM-DD) of the week containing `ref` (a Date or bare date string). */
 export function mondayOf(ref: string | Date = new Date()): string {
-  const d = typeof ref === 'string' ? parseYMDLocal(ref) : new Date(ref);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1); // back up to Monday
-  d.setDate(diff);
-  return toLocalYMD(d);
+  return weekStartOf(ref, 'monday');
 }
 
 /** 7 date strings (YYYY-MM-DD) Mon→Sun starting at `weekStart` (a Monday YMD). */

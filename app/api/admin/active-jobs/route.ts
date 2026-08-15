@@ -14,11 +14,24 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
 
     const isFullAdmin = (FULL_ADMIN_ROLES as readonly string[]).includes(auth.role);
+    // ACTIVE JOBS WAS EMPTY FOR THE SUPERVISOR (founder, Aug 15 sweep).
+    //
+    // `created_by` is the right ownership signal for a SALESMAN — they are
+    // never assigned to jobs as an operator, so their own pipeline is what they
+    // created. It is the wrong signal entirely for a supervisor, whose whole
+    // role is overseeing OTHER people's jobs in the field. Measured in prod:
+    // David has created 0 jobs, so his Active Jobs card and list both returned
+    // zero even on days he was dispatched. The salesmen see rows, which is why
+    // it read as "works for sales, broken for the supervisor".
+    //
+    // lib/rbac.ts already grants supervisor `active_jobs: 'view'` — view means
+    // the board, not "mine". This is a GET; nothing here lets him change a job.
+    const isFieldOverseer = auth.role === 'supervisor';
     const mineFlag = request.nextUrl.searchParams.get('mine') === 'true';
     // Non-admins are ALWAYS scoped to their own jobs regardless of the `mine`
     // query flag — the server is the source of truth, not the client.
     // Full admins can opt in to a "my jobs only" view via `?mine=true`.
-    const shouldScope = !isFullAdmin || mineFlag;
+    const shouldScope = (!isFullAdmin && !isFieldOverseer) || mineFlag;
 
     // Base query for active (non-completed, non-cancelled) jobs
     let query = supabaseAdmin

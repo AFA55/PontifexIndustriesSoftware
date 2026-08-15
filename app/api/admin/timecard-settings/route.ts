@@ -94,6 +94,10 @@ function v2ToPage(row: Record<string, unknown>) {
     break_is_paid: row.break_is_paid,
     late_grace_minutes: row.late_grace_minutes,
     subsistence_rate: row.subsistence_rate ?? 0,
+    // THE PAY WEEK. The column existed and neither direction carried it, so the
+    // seven day-buttons on the settings page only ever reached localStorage —
+    // Patriot's Saturday-to-Friday week was invisible to the server.
+    week_start_day: row.week_start_day ?? 'monday',
     // Page fields with no v2 column — keep returning defaults so the UI doesn't break.
     allow_remote: DEFAULT_SETTINGS.allow_remote,
     night_shift_start: DEFAULT_SETTINGS.night_shift_start,
@@ -116,6 +120,7 @@ const PAGE_TO_V2_COLUMN: Record<string, string> = {
   break_is_paid: 'break_is_paid',
   late_grace_minutes: 'late_grace_minutes',
   subsistence_rate: 'subsistence_rate',
+  week_start_day: 'week_start_day',
 };
 
 export async function GET(request: NextRequest) {

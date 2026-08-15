@@ -15,12 +15,12 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { requireTimecardViewer, isTableNotFoundError } from '@/lib/api-auth';
 import { resolveTimecardJobContext, formatJobContextLabel } from '@/lib/timecard-job-context';
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireTimecardViewer(request);
     if (!auth.authorized) return auth.response;
 
     const tenantId = auth.tenantId;
