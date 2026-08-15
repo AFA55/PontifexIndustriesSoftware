@@ -2,7 +2,7 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback, use } from 'react';
+import { useState, useEffect, useCallback, useMemo, use } from 'react';
 import dynamicImport from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -55,6 +55,9 @@ import { supabase } from '@/lib/supabase';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import type { ScopeItem } from '@/components/JobScopePanel';
 import { formatDay } from '@/lib/dates';
+import { waiverRowState } from '@/lib/waiver-nudge';
+import { openWorkDays } from '@/lib/closeout-nudge';
+import JobCloseoutNudge from '@/components/JobCloseoutNudge';
 
 const JobScopePanel = dynamicImport(() => import('@/components/JobScopePanel'), {
   ssr: false,
@@ -525,6 +528,25 @@ export default function AdminJobDetailPage({
 
   // Full operator work submissions, grouped by day (from /summary)
   const [workItemsByDay, setWorkItemsByDay] = useState<WorkItemsDay[]>([]);
+
+  // Days that were worked but never wrapped up — drives the close-out nudge.
+  // `workItemsByDay` carries no date, only the day NUMBER, so openWorkDays
+  // matches these against the logs on that number; the logs supply the dates.
+  // The API recomputes this from the database before it sends anything, so a
+  // stale page cannot cause a reminder that isn't warranted.
+  const openCloseoutDays = useMemo(
+    () =>
+      openWorkDays(
+        workItemsByDay.map((d) => ({ work_date: null, day_number: d.day_number })),
+        dailyLogs.map((l) => ({
+          log_date: l.log_date,
+          day_number: l.day_number,
+          day_completed_at: l.day_completed_at,
+          operator_id: l.operator_id,
+        }))
+      ),
+    [workItemsByDay, dailyLogs]
+  );
 
   // Crew (job_crew beyond lead/helper) + per-member clock-ins (from /summary)
   const [crew, setCrew] = useState<CrewListMember[]>([]);
@@ -1571,6 +1593,15 @@ export default function AdminJobDetailPage({
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* "The PM should have known they haven't completed their job."
+                      Renders itself away when every day is wrapped up. */}
+                  <JobCloseoutNudge
+                    jobId={jobId}
+                    jobStatus={job.status}
+                    userRole={userRole}
+                    openDays={openCloseoutDays}
+                  />
+
                   {/* Multi-day summary bar */}
                   {dailyLogs.length > 1 && (
                     <div className="rounded-xl p-3 bg-slate-50 border border-slate-100 dark:bg-white/5 dark:border-white/10 flex items-center gap-4 flex-wrap">
@@ -2021,7 +2052,10 @@ export default function AdminJobDetailPage({
                 the thing you go looking for. */}
             {['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'].includes(userRole) && (
               <div className="rounded-2xl p-5 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
-                <JobDocuments jobId={jobId} />
+                {/* jobStatus decides whether an unsigned waiver is a live
+                    warning (with the "Remind crew" button) or a closed-out
+                    "Not signed" — founder, Aug 15. */}
+                <JobDocuments jobId={jobId} jobStatus={job.status} userRole={userRole} />
               </div>
             )}
 
@@ -2318,21 +2352,40 @@ export default function AdminJobDetailPage({
                   </dd>
                 </div>
 
-                {job.require_waiver_signature && (
-                  <div>
-                    <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Utility Waiver</dt>
-                    <dd className={`mt-0.5 flex items-center gap-1.5 text-sm font-medium ${job.utility_waiver_signed ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                      {job.utility_waiver_signed ? (
-                        <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
-                      ) : (
-                        <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                      )}
-                      {job.utility_waiver_signed
-                        ? `Signed by ${job.utility_waiver_signer_name || 'unknown'}${job.utility_waiver_signed_at ? ` at ${new Date(job.utility_waiver_signed_at).toLocaleString()}` : ''}`
-                        : 'Not yet signed'}
-                    </dd>
-                  </div>
-                )}
+                {/* Mirrors the Signed Documents row: on a CLOSED job an unsigned
+                    waiver is a neutral "Not signed", because an alarm that
+                    cannot be acted on only teaches people to ignore alarms. */}
+                {job.require_waiver_signature && (() => {
+                  const waiverState = waiverRowState({
+                    signed: !!job.utility_waiver_signed,
+                    jobStatus: job.status,
+                  });
+                  return (
+                    <div>
+                      <dt className="text-xs font-medium text-slate-400 dark:text-white/45 uppercase tracking-wide">Utility Waiver</dt>
+                      <dd className={`mt-0.5 flex items-center gap-1.5 text-sm font-medium ${
+                        waiverState === 'signed'
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : waiverState === 'not_signed_closed'
+                            ? 'text-slate-500 dark:text-white/55'
+                            : 'text-amber-600 dark:text-amber-400'
+                      }`}>
+                        {waiverState === 'signed' ? (
+                          <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" />
+                        ) : waiverState === 'not_signed_closed' ? (
+                          <FileText className="w-3.5 h-3.5 flex-shrink-0" />
+                        ) : (
+                          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                        )}
+                        {waiverState === 'signed'
+                          ? `Signed by ${job.utility_waiver_signer_name || 'unknown'}${job.utility_waiver_signed_at ? ` at ${new Date(job.utility_waiver_signed_at).toLocaleString()}` : ''}`
+                          : waiverState === 'not_signed_closed'
+                            ? 'Not signed'
+                            : 'Not yet signed'}
+                      </dd>
+                    </div>
+                  );
+                })()}
 
                 {job.description && (
                   <div>
@@ -2931,7 +2984,7 @@ export default function AdminJobDetailPage({
                           </span>
                         </div>
                         <p className="text-slate-600 dark:text-white/70 text-xs leading-relaxed whitespace-pre-line">
-                          {log.work_description || <span className="italic text-slate-400">No description provided.</span>}
+                          {log.work_description || <span className="italic text-slate-400 dark:text-white/40">No description provided.</span>}
                         </p>
                         <p className="text-slate-400 dark:text-white/40 text-[10px] mt-1.5">
                           {log.log_date ? formatDay(log.log_date) : ''}
