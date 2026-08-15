@@ -13,6 +13,7 @@ import { EQUIPMENT_PRESETS } from '@/lib/equipment-map';
 import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 import JobCrewPanel from '@/components/JobCrewPanel';
+import PhotoUploader, { PhotoViewer } from '@/components/PhotoUploader';
 import { formatMaybeDateTime } from '@/lib/dates';
 import { asArray } from '@/lib/job-arrays';
 
@@ -89,6 +90,9 @@ interface JobNote {
   content: string;
   created_at: string;
   author_name: string;
+  /** 'internal' = office only · 'operator' = the crew sees it. */
+  audience?: string | null;
+  photo_urls?: string[] | null;
 }
 
 function getDifficultyInfo(rating: number): { color: string; bg: string; label: string } {
@@ -225,10 +229,13 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
     notes: true,
   });
 
-  // Notes state
+  // Notes state. `noteAudience` is which of the two areas the composer is
+  // currently addressing — it is never inferred, always chosen.
   const [jobNotes, setJobNotes] = useState<JobNote[]>([]);
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
+  const [noteAudience, setNoteAudience] = useState<'internal' | 'operator'>('internal');
+  const [notePhotos, setNotePhotos] = useState<string[]>([]);
 
   // Inline editing state
   const [isEditing, setIsEditing] = useState(false);
@@ -378,14 +385,21 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
   }, [job.id]);
 
   const handleAddNote = async () => {
-    if (!newNote.trim()) return;
+    // A note with only photos is a legitimate thing to send the crew (a site
+    // drawing, a permit), so an empty body is fine as long as SOMETHING is
+    // attached.
+    if (!newNote.trim() && notePhotos.length === 0) return;
     setAddingNote(true);
     try {
       const token = await getToken();
       const res = await fetch(`/api/job-orders/${job.id}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ content: newNote.trim() }),
+        body: JSON.stringify({
+          content: newNote.trim() || (noteAudience === 'operator' ? 'See attached.' : 'Attachment.'),
+          audience: noteAudience,
+          photoUrls: notePhotos,
+        }),
       });
       if (res.ok) {
         const json = await res.json();
@@ -393,6 +407,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
           setJobNotes(prev => [json.data, ...prev]);
         }
         setNewNote('');
+        setNotePhotos([]);
       }
     } catch (err) {
       console.error('Failed to add note:', err);
@@ -1652,7 +1667,16 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                   )}
                 </div>
 
-                {/* Right column — 30% notes sidebar */}
+                {/* Right column — 30% notes sidebar.
+                    TWO AUDIENCES, TWO AREAS. The composer states in words who
+                    is about to read this, and the two feeds are separated by a
+                    labelled divider, not by a shade of grey — someone typing at
+                    speed must not be able to put a price argument in front of a
+                    crew because they misread a tint. The count in the header is
+                    the TOTAL of both areas, which is exactly what the job
+                    card's badge counts (every non-change_log note); a badge
+                    that disagrees with its own panel is the bug that started
+                    this. */}
                 <div className="lg:w-[30%] lg:border-l border-gray-200 dark:border-white/10 p-5 bg-gray-50/50 dark:bg-white/5">
                   <div className="flex items-center gap-2 mb-3">
                     <MessageSquare className="w-4 h-4 text-brand dark:text-brand" />
@@ -1662,47 +1686,155 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     </span>
                   </div>
 
-                  {/* Add note input */}
-                  <div className="flex gap-2 mb-4">
-                    <input
-                      type="text"
-                      value={newNote}
-                      onChange={(e) => setNewNote(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && handleAddNote()}
-                      placeholder="Add a note..."
-                      className="flex-1 px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 focus:border-brand focus:ring-1 focus:ring-brand/30 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 placeholder:text-gray-400 dark:placeholder:text-slate-500"
-                    />
-                    <button
-                      onClick={handleAddNote}
-                      disabled={addingNote || !newNote.trim()}
-                      className="px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {addingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                    </button>
+                  {/* ── Composer ─────────────────────────────────────────── */}
+                  <div className="mb-5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.04] overflow-hidden">
+                    {/* Audience picker — the first decision, not a checkbox
+                        buried under the send button. */}
+                    <div className="grid grid-cols-2">
+                      {([
+                        { key: 'internal' as const, label: 'Internal', sub: 'Office only' },
+                        { key: 'operator' as const, label: 'For the crew', sub: 'Operators see this' },
+                      ]).map((opt) => {
+                        const active = noteAudience === opt.key;
+                        const activeCls = opt.key === 'internal'
+                          ? 'bg-slate-700 text-white'
+                          : 'bg-amber-500 text-white';
+                        return (
+                          <button
+                            key={opt.key}
+                            type="button"
+                            onClick={() => setNoteAudience(opt.key)}
+                            aria-pressed={active}
+                            className={`min-h-[44px] px-2 py-2 text-center transition-colors ${
+                              active
+                                ? activeCls
+                                : 'bg-gray-50 dark:bg-white/[0.06] text-gray-500 dark:text-white/50 hover:bg-gray-100 dark:hover:bg-white/10'
+                            }`}
+                          >
+                            <span className="block text-xs font-bold leading-tight">{opt.label}</span>
+                            <span className={`block text-[10px] leading-tight ${active ? 'text-white/80' : 'text-gray-400 dark:text-white/35'}`}>
+                              {opt.sub}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="p-3 space-y-2">
+                      {/* Says out loud what is about to happen. */}
+                      <p className={`text-[11px] font-semibold leading-snug ${
+                        noteAudience === 'operator'
+                          ? 'text-amber-700 dark:text-amber-300'
+                          : 'text-slate-500 dark:text-white/45'
+                      }`}>
+                        {noteAudience === 'operator'
+                          ? 'The crew on this job will see this note and be notified.'
+                          : 'Office only. The crew will never see this.'}
+                      </p>
+
+                      <textarea
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleAddNote();
+                        }}
+                        rows={3}
+                        placeholder={noteAudience === 'operator'
+                          ? 'e.g. Gate code is 4417. Park on the Elm St side.'
+                          : 'e.g. Customer disputing the Day 2 hours — do not discuss on site.'}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 focus:border-brand focus:ring-1 focus:ring-brand/30 text-sm text-gray-900 dark:text-white bg-white dark:bg-white/5 placeholder:text-gray-400 dark:placeholder:text-slate-500 resize-y"
+                      />
+
+                      <PhotoUploader
+                        bucket="job-photos"
+                        pathPrefix={`job-notes/${job.id}`}
+                        photos={notePhotos}
+                        onPhotosChange={setNotePhotos}
+                        maxPhotos={5}
+                        label="Attach photo / PDF"
+                        compact
+                      />
+
+                      <button
+                        onClick={handleAddNote}
+                        disabled={addingNote || (!newNote.trim() && notePhotos.length === 0)}
+                        className={`w-full min-h-[44px] flex items-center justify-center gap-2 rounded-lg font-bold text-sm text-white transition-colors disabled:opacity-50 ${
+                          noteAudience === 'operator'
+                            ? 'bg-amber-500 hover:bg-amber-600'
+                            : 'bg-slate-700 hover:bg-slate-800'
+                        }`}
+                      >
+                        {addingNote ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {noteAudience === 'operator' ? 'Send to crew' : 'Save internal note'}
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Notes feed */}
-                  <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-                    {jobNotes.length === 0 ? (
-                      <div className="text-center py-6">
-                        <MessageSquare className="w-6 h-6 text-gray-300 dark:text-slate-600 mx-auto mb-1" />
-                        <p className="text-xs text-gray-400 dark:text-slate-500">No notes yet</p>
-                      </div>
-                    ) : (
-                      jobNotes.map((note) => (
-                        <div key={note.id} className="bg-white dark:bg-white/5 rounded-lg border border-gray-200 dark:border-white/10 p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-bold text-brand dark:text-brand">{note.author_name}</span>
-                            <span className="text-[10px] text-gray-400 dark:text-slate-500">
-                              {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              {' '}
-                              {new Date(note.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                  {/* ── The two feeds ────────────────────────────────────── */}
+                  <div className="space-y-5 max-h-[60vh] overflow-y-auto pr-0.5">
+                    {([
+                      {
+                        key: 'operator' as const,
+                        heading: 'For the crew',
+                        blurb: 'Visible to the operators on this job',
+                        empty: 'Nothing sent to the crew yet',
+                        headCls: 'text-amber-700 dark:text-amber-300',
+                        ruleCls: 'bg-amber-300/60 dark:bg-amber-400/30',
+                        cardCls: 'bg-amber-50 dark:bg-amber-500/10 border-amber-200 dark:border-amber-500/25',
+                      },
+                      {
+                        key: 'internal' as const,
+                        heading: 'Internal',
+                        blurb: 'Office only — never shown to the crew',
+                        empty: 'No internal notes yet',
+                        headCls: 'text-slate-600 dark:text-white/60',
+                        ruleCls: 'bg-slate-300/70 dark:bg-white/15',
+                        cardCls: 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10',
+                      },
+                    ]).map((section) => {
+                      const rows = jobNotes.filter((n) =>
+                        section.key === 'operator'
+                          ? n.audience === 'operator'
+                          : n.audience !== 'operator',
+                      );
+                      return (
+                        <div key={section.key}>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className={`text-[11px] font-bold uppercase tracking-wider ${section.headCls}`}>
+                              {section.heading}
                             </span>
+                            <span className={`text-[10px] font-bold ${section.headCls}`}>{rows.length}</span>
+                            <span className={`flex-1 h-px ${section.ruleCls}`} />
                           </div>
-                          <p className="text-xs text-gray-700 dark:text-slate-200">{note.content}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-white/35 mb-2">{section.blurb}</p>
+
+                          {rows.length === 0 ? (
+                            <p className="text-xs text-gray-400 dark:text-slate-500 py-2">{section.empty}</p>
+                          ) : (
+                            <div className="space-y-2">
+                              {rows.map((note) => (
+                                <div key={note.id} className={`rounded-lg border p-3 ${section.cardCls}`}>
+                                  <div className="flex items-center justify-between mb-1 gap-2">
+                                    <span className="text-[10px] font-bold text-brand dark:text-brand truncate">{note.author_name}</span>
+                                    <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0">
+                                      {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                                      {' '}
+                                      {new Date(note.created_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-gray-700 dark:text-slate-200 whitespace-pre-wrap break-words">{note.content}</p>
+                                  {!!note.photo_urls?.length && (
+                                    <div className="mt-2">
+                                      <PhotoViewer photos={note.photo_urls} label="Attached" />
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      ))
-                    )}
+                      );
+                    })}
                   </div>
                 </div>
               </div>

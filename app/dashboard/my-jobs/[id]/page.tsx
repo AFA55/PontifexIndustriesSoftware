@@ -21,6 +21,7 @@ import { viewPdfBlob } from '@/lib/open-pdf';
 import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from '@/lib/equipment-unifier';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import { PhotoViewer } from '@/components/PhotoUploader';
+import OfficeNotes from '../_components/OfficeNotes';
 
 // HelperWorkLog only renders when the user is in the helper slot on this job.
 // Whoever is assigned as `assigned_to` gets the full operator flow regardless of their profile role.
@@ -641,6 +642,14 @@ export default function JobDetailPage() {
       </div>
 
       <div className="container mx-auto px-4 py-5 max-w-lg space-y-4">
+
+        {/* NOTES FROM THE OFFICE — deliberately ABOVE every view variant.
+            This screen has four layouts (in-route, helper, full operator,
+            completed) and a note the office addressed to the crew has to
+            survive all of them; putting it inside one branch is how it would
+            quietly stop appearing the day someone's status changed. Renders
+            nothing when there are no operator-audience notes. */}
+        <OfficeNotes jobId={job.id} />
 
         {/* ── IN-ROUTE SIMPLIFIED VIEW ───────────────────────── */}
         {job.status === 'in_route' && !jobIsHelper && (

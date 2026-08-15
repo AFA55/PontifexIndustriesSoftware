@@ -4,7 +4,21 @@ export interface JobNote {
   author_id: string;
   author_name: string;
   content: string;
-  note_type: 'manual' | 'system' | 'change_log';
+  /**
+   * The note's KIND. Deliberately NOT the audience — see `audience` below and
+   * lib/job-note-audience.ts. Live code reads specific kinds ('amendment' in
+   * work-performed, 'completion'/'done_for_day' at day-complete), so this list
+   * is open-ended.
+   */
+  note_type: string;
+  /**
+   * WHO MAY READ IT. 'internal' = office only; 'operator' = the job's crew.
+   * Anything unrecognised is treated as 'internal' — failing private is the
+   * safety property.
+   */
+  audience: 'internal' | 'operator';
+  /** Attachments (photos / PDFs). Reach the crew only on an operator note. */
+  photo_urls: string[];
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
