@@ -119,3 +119,20 @@ export function waiverChaseStep({ nowMs, inRouteAt, etaMs }: WaiverChaseInput): 
   }
   return null;
 }
+
+/**
+ * The step a MANUAL nudge uses — the office pressing "Remind crew to get it
+ * signed" on the job page.
+ *
+ * Same ladder, same words, so the hand-pressed reminder and the automatic one
+ * are indistinguishable to the operator; the founder asked for the ticket's
+ * wording precisely so none of this reads like a new rule.
+ *
+ * Unlike the cron this NEVER returns null. The cron's null means "too early to
+ * nag on my own" — a correct answer for a clock, and the wrong answer for a
+ * deliberate press by a human who can see the job. A crew that has not left yet
+ * gets the first step, which is exactly the one that says "before you start".
+ */
+export function manualWaiverChaseStep(input: WaiverChaseInput): WaiverChaseStep {
+  return waiverChaseStep(input) ?? STEPS.due;
+}

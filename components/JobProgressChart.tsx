@@ -14,6 +14,8 @@ import {
 } from 'recharts';
 import { supabase } from '@/lib/supabase';
 import { buildProgressChartData } from '@/lib/progress-chart-data';
+import { useTheme } from '@/contexts/ThemeContext';
+import { chartThemeColors } from '@/lib/chart-theme';
 import type { ScopeItem } from './JobScopePanel';
 
 /**
@@ -75,6 +77,10 @@ export default function JobProgressChart({ jobId, scopeItems }: JobProgressChart
   const [entries, setEntries] = useState<ProgressEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Recharts styles its grid/ticks/tooltip inline, so `dark:` classes cannot
+  // reach them — the palette is resolved from the theme instead.
+  const { theme } = useTheme();
+  const chartColors = chartThemeColors(theme);
 
   const fetchProgress = useCallback(async () => {
     try {
@@ -113,54 +119,58 @@ export default function JobProgressChart({ jobId, scopeItems }: JobProgressChart
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-6">
+    <div className="bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-white/10 shadow-sm p-6">
       <div className="flex items-center gap-2 mb-5">
-        <Calendar className="w-5 h-5 text-blue-600" />
-        <h2 className="text-base font-semibold text-gray-900">Progress Chart</h2>
+        <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        <h2 className="text-base font-semibold text-gray-900 dark:text-white">Progress Chart</h2>
       </div>
 
       {loading && (
         <div className="animate-pulse">
-          <div className="h-48 bg-gray-100 rounded-lg" />
+          <div className="h-48 bg-gray-100 dark:bg-white/[0.06] rounded-lg" />
         </div>
       )}
 
       {!loading && error && (
-        <p className="text-sm text-red-600 text-center py-8">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400 text-center py-8">{error}</p>
       )}
 
       {!loading && !error && chartData.length === 0 && (
         <div className="text-center py-10">
-          <Calendar className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">No progress logged yet.</p>
+          <Calendar className="w-10 h-10 text-gray-200 dark:text-white/15 mx-auto mb-3" />
+          <p className="text-sm text-gray-500 dark:text-white/60">No progress logged yet.</p>
         </div>
       )}
 
       {!loading && !error && chartData.length > 0 && (
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+            <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
             <XAxis
               dataKey="date"
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.tick }}
               axisLine={false}
               tickLine={false}
             />
             <YAxis
-              tick={{ fontSize: 11, fill: '#94a3b8' }}
+              tick={{ fontSize: 11, fill: chartColors.tick }}
               axisLine={false}
               tickLine={false}
               width={36}
             />
             <Tooltip
+              cursor={{ fill: chartColors.grid }}
               contentStyle={{
                 borderRadius: '10px',
-                border: '1px solid #e2e8f0',
+                border: `1px solid ${chartColors.tooltipBorder}`,
+                background: chartColors.tooltipBg,
+                color: chartColors.tooltipText,
                 fontSize: 12,
               }}
+              labelStyle={{ color: chartColors.tooltipText }}
             />
             <Legend
-              wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+              wrapperStyle={{ fontSize: 12, paddingTop: 8, color: chartColors.legendText }}
               formatter={(value) => WORK_TYPE_LABELS[value] || value}
             />
             {workTypes.map((wt, idx) => (

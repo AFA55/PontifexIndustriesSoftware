@@ -160,24 +160,24 @@ function renderHoles(holesJson: string) {
   const totalHoles = holes.reduce((sum, h) => sum + (parseInt(h.qty) || 0), 0);
   return (
     <div className="col-span-full space-y-1.5">
-      <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">
+      <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-400 dark:text-white/45 uppercase tracking-wider px-1">
         <span># of Holes</span><span>Bit Size</span><span>Depth</span>
       </div>
       {holes.map((h, i) => (
         <div key={i} className="grid grid-cols-3 gap-2">
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{h.qty || '-'}</span>
+          <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+            <span className="text-base font-bold text-slate-800 dark:text-white">{h.qty || '-'}</span>
           </div>
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{h.bit_size || '-'}<span className="text-xs text-slate-400 ml-0.5">in.</span></span>
+          <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+            <span className="text-base font-bold text-slate-800 dark:text-white">{h.bit_size || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">in.</span></span>
           </div>
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{h.depth || '-'}<span className="text-xs text-slate-400 ml-0.5">in.</span></span>
+          <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+            <span className="text-base font-bold text-slate-800 dark:text-white">{h.depth || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">in.</span></span>
           </div>
         </div>
       ))}
       {totalHoles > 0 && (
-        <p className="text-xs font-semibold text-blue-600 px-1">{totalHoles} total hole{totalHoles !== 1 ? 's' : ''}</p>
+        <p className="text-xs font-semibold text-blue-600 dark:text-blue-300 px-1">{totalHoles} total hole{totalHoles !== 1 ? 's' : ''}</p>
       )}
     </div>
   );
@@ -191,25 +191,25 @@ function renderCuts(cutsJson: string) {
   const totalCuts = cuts.reduce((sum, c) => sum + (parseInt(c.num_cuts) || 0), 0);
   return (
     <div className="col-span-full space-y-1.5">
-      <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1">
+      <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-400 dark:text-white/45 uppercase tracking-wider px-1">
         <span>Linear Feet</span><span>Cut Depth</span><span># of Cuts</span>
       </div>
       {cuts.map((c, i) => (
         <div key={i} className="grid grid-cols-3 gap-2">
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{c.linear_feet || '-'}<span className="text-xs text-slate-400 ml-0.5">ft</span></span>
+          <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+            <span className="text-base font-bold text-slate-800 dark:text-white">{c.linear_feet || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">ft</span></span>
           </div>
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{c.depth || '-'}<span className="text-xs text-slate-400 ml-0.5">in.</span></span>
+          <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+            <span className="text-base font-bold text-slate-800 dark:text-white">{c.depth || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">in.</span></span>
           </div>
-          <div className="bg-white rounded-lg p-2 border border-blue-100 text-center">
-            <span className="text-base font-bold text-slate-800">{c.num_cuts || '-'}</span>
+          <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
+            <span className="text-base font-bold text-slate-800 dark:text-white">{c.num_cuts || '-'}</span>
           </div>
         </div>
       ))}
       <div className="flex gap-3 px-1">
-        {totalLF > 0 && <p className="text-xs font-semibold text-blue-600">{totalLF.toLocaleString()} total LF</p>}
-        {totalCuts > 0 && <p className="text-xs font-semibold text-blue-600">{totalCuts} total cut{totalCuts !== 1 ? 's' : ''}</p>}
+        {totalLF > 0 && <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{totalLF.toLocaleString()} total LF</p>}
+        {totalCuts > 0 && <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{totalCuts} total cut{totalCuts !== 1 ? 's' : ''}</p>}
       </div>
     </div>
   );
@@ -250,7 +250,7 @@ function renderAreas(areasJson: string, fallbackOvercut: boolean) {
 
   return (
     <div className="col-span-full space-y-2">
-      <div className={`grid gap-2 text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-1`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
+      <div className={`grid gap-2 text-[10px] font-semibold text-slate-400 dark:text-white/45 uppercase tracking-wider px-1`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
         <span>Length</span><span>Width</span>{hasThickness && <span>Thickness</span>}{hasQty && <span>Qty</span>}
       </div>
       {areas.map((a, i) => {
@@ -372,22 +372,22 @@ export default function ScopeDetailsDisplay({ scopeDetails, compact = false, fal
             });
 
           return (
-            <div key={code} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-xs">
-              <span className="font-bold text-blue-700">{SERVICE_LABELS[code] || code}</span>
+            <div key={code} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-400/25 rounded-lg text-xs">
+              <span className="font-bold text-blue-700 dark:text-blue-300">{SERVICE_LABELS[code] || code}</span>
               {summaryParts.length > 0 && (
                 <>
-                  <span className="text-blue-500">—</span>
-                  <span className="text-blue-600">{summaryParts.join(' · ')}</span>
+                  <span className="text-blue-500 dark:text-blue-400">—</span>
+                  <span className="text-blue-600 dark:text-blue-300">{summaryParts.join(' · ')}</span>
                 </>
               )}
             </div>
           );
         })}
         {removalData?.needed === 'true' && (
-          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 border border-red-200 rounded-lg text-xs">
-            <span className="font-bold text-red-700">Removal</span>
-            <span className="text-red-500">—</span>
-            <span className="text-red-600">{REMOVAL_METHOD_LABELS[removalData.method] || removalData.method}</span>
+          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-400/25 rounded-lg text-xs">
+            <span className="font-bold text-red-700 dark:text-red-300">Removal</span>
+            <span className="text-red-500 dark:text-red-400">—</span>
+            <span className="text-red-600 dark:text-red-300">{REMOVAL_METHOD_LABELS[removalData.method] || removalData.method}</span>
           </div>
         )}
       </div>
@@ -403,8 +403,8 @@ export default function ScopeDetailsDisplay({ scopeDetails, compact = false, fal
         );
 
         return (
-          <div key={code} className="bg-blue-50/50 border border-blue-100 rounded-xl p-3 sm:p-4">
-            <h4 className="text-xs font-bold text-blue-700 uppercase tracking-wider mb-2">
+          <div key={code} className="bg-blue-50/50 dark:bg-blue-500/[0.08] border border-blue-100 dark:border-blue-400/20 rounded-xl p-3 sm:p-4">
+            <h4 className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase tracking-wider mb-2">
               {SERVICE_LABELS[code] || code}
             </h4>
             <div className="space-y-2">
@@ -417,17 +417,17 @@ export default function ScopeDetailsDisplay({ scopeDetails, compact = false, fal
               {regularFields.length > 0 && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {regularFields.map(([key, val]) => (
-                    <div key={key} className={`bg-white rounded-lg p-2.5 border border-blue-100 ${key === 'description' ? 'col-span-full' : ''}`}>
-                      <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+                    <div key={key} className={`bg-white dark:bg-slate-900/40 rounded-lg p-2.5 border border-blue-100 dark:border-blue-500/20 ${key === 'description' ? 'col-span-full' : ''}`}>
+                      <p className="text-[10px] font-semibold text-slate-400 dark:text-white/45 uppercase tracking-wider">
                         {FIELD_LABELS[key] || key}
                       </p>
                       {key === 'description' ? (
-                        <p className="text-sm text-slate-800 mt-0.5 whitespace-pre-wrap">{val}</p>
+                        <p className="text-sm text-slate-800 dark:text-white mt-0.5 whitespace-pre-wrap">{val}</p>
                       ) : (
-                        <p className="text-lg font-bold text-slate-800 mt-0.5">
+                        <p className="text-lg font-bold text-slate-800 dark:text-white mt-0.5">
                           {val}
                           {FIELD_SUFFIXES[key] && (
-                            <span className="text-xs font-semibold text-slate-400 ml-1">{FIELD_SUFFIXES[key]}</span>
+                            <span className="text-xs font-semibold text-slate-400 dark:text-white/40 ml-1">{FIELD_SUFFIXES[key]}</span>
                           )}
                         </p>
                       )}

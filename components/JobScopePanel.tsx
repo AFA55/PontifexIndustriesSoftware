@@ -129,9 +129,9 @@ async function apiFetch(url: string, opts?: RequestInit) {
 }
 
 function pctColor(pct: number) {
-  if (pct >= 100) return 'text-green-600';
-  if (pct >= 50) return 'text-amber-600';
-  return 'text-red-600';
+  if (pct >= 100) return 'text-green-600 dark:text-green-400';
+  if (pct >= 50) return 'text-amber-600 dark:text-amber-400';
+  return 'text-red-600 dark:text-red-400';
 }
 
 function pctBarColor(pct: number) {
@@ -148,10 +148,10 @@ function ScopeSkeleton() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="space-y-2">
           <div className="flex justify-between">
-            <div className="h-4 bg-gray-200 rounded w-48" />
-            <div className="h-4 bg-gray-200 rounded w-16" />
+            <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-48" />
+            <div className="h-4 bg-gray-200 dark:bg-white/10 rounded w-16" />
           </div>
-          <div className="h-2 bg-gray-200 rounded-full w-full" />
+          <div className="h-2 bg-gray-200 dark:bg-white/10 rounded-full w-full" />
         </div>
       ))}
     </div>
@@ -384,14 +384,14 @@ export default function JobScopePanel({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+    <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-gray-100 dark:border-white/10 p-6">
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-2">
-          <BarChart3 className="w-5 h-5 text-blue-600" />
-          <h2 className="text-base font-semibold text-gray-900">Job Scope &amp; Progress</h2>
+          <BarChart3 className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Job Scope &amp; Progress</h2>
           {jobNumber && (
-            <span className="text-xs text-gray-400 font-mono ml-1">{jobNumber}</span>
+            <span className="text-xs text-gray-400 dark:text-white/45 font-mono ml-1">{jobNumber}</span>
           )}
         </div>
         {!readOnly && (
@@ -413,16 +413,16 @@ export default function JobScopePanel({
 
       {/* Error */}
       {!loading && error && (
-        <p className="text-sm text-red-600 text-center py-4">{error}</p>
+        <p className="text-sm text-red-600 dark:text-red-400 text-center py-4">{error}</p>
       )}
 
       {/* Empty state */}
       {!loading && !error && items.length === 0 && (
         <div className="text-center py-8">
-          <BarChart3 className="w-10 h-10 text-gray-200 mx-auto mb-3" />
-          <p className="text-sm text-gray-500">No scope defined yet.</p>
+          <BarChart3 className="w-10 h-10 text-gray-200 dark:text-white/15 mx-auto mb-3" />
+          <p className="text-sm text-gray-500 dark:text-white/60">No scope defined yet.</p>
           {!readOnly && (
-            <p className="text-sm text-gray-400 mt-1">
+            <p className="text-sm text-gray-400 dark:text-white/45 mt-1">
               Add work items to track progress.
             </p>
           )}
@@ -442,16 +442,16 @@ export default function JobScopePanel({
       {!loading && !error && items.length > 0 && (
         <div className="space-y-5">
           {/* Overall progress bar */}
-          <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+          <div className="bg-blue-50 dark:bg-blue-500/10 rounded-xl p-4 border border-blue-100 dark:border-blue-400/25">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-blue-900">
+              <span className="text-sm font-semibold text-blue-900 dark:text-blue-200">
                 Overall: {overallPct}% Complete
               </span>
-              <span className="text-xs text-blue-700">
+              <span className="text-xs text-blue-700 dark:text-blue-300">
                 {totalCompleted} of {totalTarget} {dominantUnit}
               </span>
             </div>
-            <div className="w-full bg-blue-100 rounded-full h-3">
+            <div className="w-full bg-blue-100 dark:bg-white/10 rounded-full h-3">
               <div
                 className="bg-blue-500 h-3 rounded-full transition-all duration-500"
                 style={{ width: `${overallPct}%` }}
@@ -464,16 +464,16 @@ export default function JobScopePanel({
             {items.map((item) => (
               <div
                 key={item.id}
-                className="group relative rounded-xl border border-gray-100 bg-gray-50/40 p-4 hover:border-gray-200 transition-colors"
+                className="group relative rounded-xl border border-gray-100 dark:border-white/10 bg-gray-50/40 dark:bg-white/[0.03] p-4 hover:border-gray-200 dark:hover:border-white/20 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3 mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="bg-blue-50 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                      <span className="bg-blue-50 dark:bg-blue-500/15 text-blue-700 dark:text-blue-300 text-xs px-2 py-0.5 rounded-full font-medium">
                         {WORK_TYPE_LABELS[item.work_type] || item.work_type}
                       </span>
                       {item.description && (
-                        <span className="text-sm text-gray-700 font-medium truncate">
+                        <span className="text-sm text-gray-700 dark:text-white/85 font-medium truncate">
                           {item.description}
                         </span>
                       )}
@@ -485,14 +485,14 @@ export default function JobScopePanel({
                       // A "% complete" target has no quantity behind it. Say what
                       // we DO know — that the crew logged work against it —
                       // rather than printing a number nobody reported.
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-gray-500 dark:text-white/60">
                         {item.entry_count
                           ? `${item.entry_count} ${item.entry_count === 1 ? 'entry' : 'entries'} logged`
                           : 'Not started'}
                       </span>
                     ) : (
                       <>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-gray-500 dark:text-white/60">
                           {item.completed_quantity} / {item.target_quantity}{' '}
                           {UNIT_LABELS[item.unit] || item.unit}
                         </span>
@@ -509,7 +509,7 @@ export default function JobScopePanel({
                       <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => setEditingItem({ ...item })}
-                          className="p-1.5 rounded-lg hover:bg-blue-100 text-blue-600 transition-colors"
+                          className="p-1.5 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition-colors"
                           title="Edit"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
@@ -517,7 +517,7 @@ export default function JobScopePanel({
                         <button
                           onClick={() => handleDelete(item.id)}
                           disabled={deletingId === item.id}
-                          className="p-1.5 rounded-lg hover:bg-red-100 text-red-500 transition-colors disabled:opacity-50"
+                          className="p-1.5 rounded-lg hover:bg-red-100 dark:hover:bg-red-500/20 text-red-500 dark:text-red-400 transition-colors disabled:opacity-50"
                           title="Delete"
                         >
                           {deletingId === item.id ? (
@@ -534,7 +534,7 @@ export default function JobScopePanel({
                 {/* Per-item progress bar — hidden when there is no percentage
                     to draw, so an underivable target doesn't read as 0% done. */}
                 {item.pct_complete !== null && (
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 dark:bg-white/10 rounded-full h-2">
                     <div
                       className={`h-2 rounded-full transition-all duration-500 ${pctBarColor(item.pct_complete)}`}
                       style={{ width: `${item.pct_complete}%` }}
@@ -813,27 +813,27 @@ export default function JobScopePanel({
 
       {/* ── Edit Work Item Modal ── */}
       {editingItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-md p-6 border border-slate-200 dark:border-white/10">
             <div className="flex items-center justify-between mb-5">
-              <h3 className="text-base font-semibold text-gray-900">Edit Work Item</h3>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-white">Edit Work Item</h3>
               <button
                 onClick={() => setEditingItem(null)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-1.5 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
               >
-                <X className="w-4 h-4 text-gray-500" />
+                <X className="w-4 h-4 text-gray-500 dark:text-white/60" />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Work Type</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Work Type</label>
                 <select
                   value={editingItem.work_type}
                   onChange={(e) =>
                     setEditingItem((prev) => prev ? { ...prev, work_type: e.target.value } : prev)
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/[0.04] text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {WORK_TYPE_OPTIONS.map((o) => (
                     <option key={o.value} value={o.value}>{o.label}</option>
@@ -842,26 +842,26 @@ export default function JobScopePanel({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Description</label>
                 <input
                   type="text"
                   value={editingItem.description || ''}
                   onChange={(e) =>
                     setEditingItem((prev) => prev ? { ...prev, description: e.target.value } : prev)
                   }
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/[0.04] text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-white/35 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Unit</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Unit</label>
                   <select
                     value={editingItem.unit}
                     onChange={(e) =>
                       setEditingItem((prev) => prev ? { ...prev, unit: e.target.value } : prev)
                     }
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/[0.04] text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {UNIT_OPTIONS.map((o) => (
                       <option key={o.value} value={o.value}>{o.label}</option>
@@ -870,7 +870,7 @@ export default function JobScopePanel({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Target Qty</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-white/80 mb-1">Target Qty</label>
                   {/* NumberInput: `Number(e.target.value)` turned an emptied box
                       into 0 and wrote it straight back, and Number('0.') is 0 —
                       so the decimal point was wiped mid-keystroke and "0.5" was
@@ -882,7 +882,7 @@ export default function JobScopePanel({
                     }
                     blankZero
                     min="0"
-                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full rounded-lg border border-gray-300 dark:border-white/15 bg-white dark:bg-white/[0.04] text-slate-900 dark:text-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
               </div>
@@ -899,7 +899,7 @@ export default function JobScopePanel({
               </button>
               <button
                 onClick={() => setEditingItem(null)}
-                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-gray-600 dark:text-white/70 hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors"
               >
                 Cancel
               </button>
