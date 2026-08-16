@@ -44,6 +44,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { gzipSync } from 'node:zlib';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { putObject, backupTargetFromEnv } from '@/lib/s3-put';
+import { alert } from '@/lib/telegram';
 import {
   BACKUP_EXCLUDED_TABLES,
   backupObjectKey,
@@ -93,7 +94,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { data: logRow } = await supabaseAdmin
+  // CHECK THE ERROR. The first version of this destructured only `data`, and
+  // two CHECK constraints written before this cron existed rejected every row
+  // it tried to insert ('offsite_export' and 'partial' were not in the allowed
+  // lists). The insert failed silently every time, the backup then ran and
+  // uploaded 410 objects to R2, and `backup_logs` stayed empty — so the only
+  // record of whether the platform is protected said "never ran".
+  //
+  // A backup you cannot prove ran is not a backup. This must be loud.
+  const { data: logRow, error: logError } = await supabaseAdmin
     .from('backup_logs')
     .insert({
       backup_type: 'offsite_export',
@@ -102,6 +111,20 @@ export async function GET(request: NextRequest) {
     })
     .select('id')
     .single();
+
+  if (logError) {
+    console.error('[backup-export] could not record this run in backup_logs', logError);
+    void alert({
+      level: 'critical',
+      title: 'Backup ran without being recorded',
+      detail:
+        'The off-site export could not write to backup_logs, so there is no durable record ' +
+        `of whether it succeeded. Reason: ${logError.message}`,
+      source: '/api/cron/backup-export',
+    });
+    // Deliberately NOT fatal: an unrecordable backup is still worth taking, and
+    // refusing to run would turn a bookkeeping fault into a data-protection one.
+  }
 
   const stamp = startedAt.toISOString().slice(0, 19).replace(/[:]/g, '');
   const errors: string[] = [];
@@ -200,7 +223,7 @@ export async function GET(request: NextRequest) {
       (errors.length ? ` | ${errors.length} error(s): ${errors.slice(0, 5).join('; ')}` : '');
 
     if (logRow) {
-      await supabaseAdmin
+      const { error: updErr } = await supabaseAdmin
         .from('backup_logs')
         .update({
           status,
@@ -211,6 +234,9 @@ export async function GET(request: NextRequest) {
           notes,
         })
         .eq('id', logRow.id);
+      // Same reasoning as the insert: a run that finished but could not say so
+      // leaves the log claiming it is still 'in_progress' forever.
+      if (updErr) console.error('[backup-export] could not finalise backup_logs row', updErr);
     }
 
     return NextResponse.json({
