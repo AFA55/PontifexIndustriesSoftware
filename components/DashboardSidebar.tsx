@@ -46,6 +46,7 @@ import { getCurrentUser, logout, type User } from '@/lib/auth';
 import { getRoleLabel } from '@/lib/rbac';
 import { useBranding } from '@/lib/branding-context';
 import { supabase } from '@/lib/supabase';
+import { authedFetch } from '@/lib/authed-fetch';
 import { useFeatureFlags, type UserFeatureFlags } from '@/lib/feature-flags';
 import { isNativeApp } from '@/lib/is-native';
 import { isModuleEnabled, type ModuleKey } from '@/lib/features';
@@ -212,44 +213,62 @@ interface BadgeCounts {
   maintenance: number;
 }
 
-function useBadgeCounts(): BadgeCounts {
+/**
+ * Which roles the SERVER will actually answer for each badge. The server is the
+ * authority — these mirror `TIMECARD_VIEWER_ROLES` in lib/api-auth.ts and
+ * `SHOP_ROLES` in the maintenance route. They are here so the sidebar does not
+ * ASK for something it is going to be refused.
+ */
+const BADGE_TIMECARD_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor'];
+const BADGE_MAINTENANCE_ROLES = ['shop_manager', 'admin', 'super_admin', 'operations_manager'];
+
+function useBadgeCounts(role: string | null): BadgeCounts {
   const [counts, setCounts] = useState<BadgeCounts>({ timecards: 0, notifications: 0, maintenance: 0 });
 
   const fetchCounts = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${session.access_token}`,
-      };
+      // ONLY ASK FOR WHAT THIS ROLE CAN HAVE.
+      //
+      // This polled all three endpoints for every signed-in user, once a
+      // minute, and treated the resulting 403s as "expected" — the badge just
+      // stayed 0. It degraded gracefully, so nobody noticed. What it cost:
+      // production logged 50 refused requests in 25 minutes from ONE tester,
+      // and with a full crew on shift that is tens of thousands of billed
+      // serverless invocations a day spent being told no.
+      //
+      // The real damage is to the logs. A permanent background hum of 403s is
+      // how a REAL permission failure becomes invisible — which is exactly the
+      // stability question the founder is asking. Ask only what will be
+      // answered, and a 403 in the log means something again.
+      //
+      // Role is null on the first render while the profile loads; notifications
+      // are open to everyone, so that one still goes out immediately.
+      const canTimecards = !!role && BADGE_TIMECARD_ROLES.includes(role);
+      const canMaintenance = !!role && BADGE_MAINTENANCE_ROLES.includes(role);
 
       const [tcRes, notifRes, maintRes] = await Promise.allSettled([
-        fetch('/api/admin/timecards?pending=true', { headers }),
-        fetch('/api/notifications?unread_only=true', { headers }),
-        fetch('/api/admin/maintenance-requests?status=open', { headers }),
+        canTimecards ? authedFetch('/api/admin/timecards?pending=true') : Promise.resolve(null),
+        authedFetch('/api/notifications?unread_only=true'),
+        canMaintenance ? authedFetch('/api/admin/maintenance-requests?status=open') : Promise.resolve(null),
       ]);
 
       let timecards = 0;
       let notifications = 0;
       let maintenance = 0;
 
-      if (tcRes.status === 'fulfilled' && tcRes.value.ok) {
+      if (tcRes.status === 'fulfilled' && tcRes.value?.ok) {
         const json = await tcRes.value.json();
         timecards = json.total ?? json.count ?? (Array.isArray(json.data) ? json.data.length : 0);
       }
 
-      if (notifRes.status === 'fulfilled' && notifRes.value.ok) {
+      if (notifRes.status === 'fulfilled' && notifRes.value?.ok) {
         const json = await notifRes.value.json();
         // Unified feed shape nests unread_count under data; the top-level
         // mirror is kept for back-compat — read both.
         notifications = json.data?.unread_count ?? json.unread_count ?? json.total ?? 0;
       }
 
-      // Non-shop-role users get a 403 here — that's expected, .ok is false and
-      // the badge just stays 0 (same graceful-degrade as the other two).
-      if (maintRes.status === 'fulfilled' && maintRes.value.ok) {
+      if (maintRes.status === 'fulfilled' && maintRes.value?.ok) {
         const json = await maintRes.value.json();
         maintenance = json.total ?? json.count ?? (Array.isArray(json.data) ? json.data.length : 0);
       }
@@ -258,7 +277,7 @@ function useBadgeCounts(): BadgeCounts {
     } catch {
       // silently fail — badges are non-critical
     }
-  }, []);
+  }, [role]);
 
   useEffect(() => {
     fetchCounts();
@@ -601,9 +620,11 @@ export default function DashboardSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { branding } = useBranding();
-  const badgeCounts = useBadgeCounts();
 
   const [user, setUser] = useState<User | null>(null);
+  // Declared after `user` so the badge poll knows which role it is polling for
+  // and can skip the endpoints that role would only be refused.
+  const badgeCounts = useBadgeCounts(user?.role ?? null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 

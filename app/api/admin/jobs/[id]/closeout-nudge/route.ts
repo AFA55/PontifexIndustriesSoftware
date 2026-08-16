@@ -26,6 +26,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
+import { notFoundInCompany } from '@/lib/tenant-scope';
 import { sendReminderOnce } from '@/lib/send-reminder';
 import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
 import { formatDay } from '@/lib/dates';
@@ -66,7 +67,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const { data: job, error } = await q.maybeSingle();
 
     if (error || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      // Same answer for missing and cross-company — see lib/tenant-scope.ts.
+      return notFoundInCompany(tenantId);
     }
 
     if (isCloseoutClosed(job.status)) {

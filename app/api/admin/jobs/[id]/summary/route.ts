@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
+import { notFoundInCompany } from '@/lib/tenant-scope';
 import { crewTimecardSpan, groupCrewTimecards } from '@/lib/crew-timecards';
 import { computeJobProgress, matchWorkItemToScope, quantityInUnit, type ScopeItemLike, type WorkItemLike } from '@/lib/job-progress';
 import { getTenantTimezone } from '@/lib/tenant-timezone';
@@ -115,7 +116,13 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     if (jobError || !job) {
       console.error('[summary] job fetch failed', { jobId, tenantId, jobError });
-      return NextResponse.json({ error: 'Job not found', debug: jobError?.message }, { status: 404 });
+      // Missing and cross-company deliberately give the same answer, worded so
+      // the caller can see WHICH company they are signed in to — this is the
+      // route behind the job view, where a founder in the Pontifex portal
+      // opening a Patriot job used to get a bare "Job not found".
+      // `debug: jobError?.message` was also handing raw Postgres error text to
+      // the browser; that stays in the server log where it belongs.
+      return notFoundInCompany(tenantId);
     }
 
     // Fetch operator profile separately (assigned_to → auth.users, not profiles)

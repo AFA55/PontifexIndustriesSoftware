@@ -638,9 +638,18 @@ export default function AdminJobDetailPage({
       setPageError(null);
       const res = await apiFetch(`/api/admin/jobs/${jobId}/summary`);
       if (!res.ok) {
+        // Use the server's sentence when it has one. A 404 here can mean the
+        // job is genuinely gone OR that you are signed in to a different
+        // company — the API says which, naming the company you are in, and
+        // hardcoding "Job not found." here threw that away. That is exactly
+        // what the founder hit: signed into the Pontifex portal, opening a
+        // Patriot job, told only that it did not exist.
+        const body = await res.json().catch(() => null);
         setPageError({
           status: res.status,
-          message: res.status === 404 ? 'Job not found.' : 'Failed to load job details.',
+          message:
+            body?.error ||
+            (res.status === 404 ? 'Job not found.' : 'Failed to load job details.'),
         });
         return;
       }
@@ -1257,9 +1266,15 @@ export default function AdminJobDetailPage({
               </span>
             ) : null}
           </p>
-          <p className="text-xs text-rose-600/80 dark:text-rose-300/70 mt-0.5">
-            If this keeps happening, your session may have expired.
-          </p>
+          {/* Only guess at "your session expired" when the status actually
+              suggests it. On a 404 the message above already explains itself —
+              and if the real cause is being signed in to another company, a
+              session hint sends the reader down the wrong path. */}
+          {pageError.status !== 404 && (
+            <p className="text-xs text-rose-600/80 dark:text-rose-300/70 mt-0.5">
+              If this keeps happening, your session may have expired.
+            </p>
+          )}
           <div className="flex items-center gap-2 flex-wrap mt-2.5">
             <button
               onClick={() => fetchJob()}

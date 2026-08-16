@@ -19,6 +19,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { notFoundInCompany } from '@/lib/tenant-scope';
 import { toLocalYMD } from '@/lib/dates';
 import { attributableTimecards } from '@/lib/job-clock-attribution';
 import { STANDBY_HOURLY_RATE, STANDBY_MINIMUM_HOURS } from '@/lib/legal/standby-policy';
@@ -67,12 +68,19 @@ export async function GET(request: NextRequest, context: RouteContext) {
       .eq('id', jobId)
       .maybeSingle();
 
+    // Missing and cross-company get the SAME answer, deliberately — a 404 that
+    // confirmed "that one lives at Patriot" would let anyone walk ids to
+    // enumerate another company's data. The wording names the company the
+    // caller is signed in to, which they already know, so a founder who is in
+    // the Pontifex portal looking at a Patriot job is told why rather than
+    // being shown a bare "Job not found". See lib/tenant-scope.ts.
     if (jobError || !job) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      return notFoundInCompany(auth.tenantId);
     }
-    // Non-super-admins may only print their own tenant's jobs.
+    // Only this company's jobs. `auth.tenantId` is non-null for every role
+    // except a tenant-less super_admin.
     if (auth.tenantId && job.tenant_id !== auth.tenantId) {
-      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
+      return notFoundInCompany(auth.tenantId);
     }
     const tenantId: string | null = job.tenant_id ?? auth.tenantId ?? null;
     // The job row already proved the tenant above; this keeps every child query
