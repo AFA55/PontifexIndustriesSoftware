@@ -6,6 +6,47 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 
 /**
+ * REPORT WHAT IS TRUE, NOT WHAT WE HOPE.
+ *
+ * This endpoint used to return, hardcoded:
+ *
+ *   "Supabase automatically creates daily backups with point-in-time recovery.
+ *    No manual action required."
+ *
+ * Nothing checked any part of that. Point-in-time recovery is a paid add-on
+ * that may or may not be enabled on this project, and meanwhile `backup_logs`
+ * held ZERO rows — no backup this platform controls had ever run. A screen that
+ * says "you're covered" without checking is worse than one that says nothing,
+ * because it stops you looking. It is the same fault as a work ticket printing
+ * "(Signature on file)" beside an empty box.
+ *
+ * It now reports the state of the one thing it can actually observe: whether an
+ * off-site export has run, when, and whether it succeeded.
+ */
+function offsiteStatus(rows: Array<{ backup_type?: string; status?: string; completed_at?: string | null; notes?: string | null }>) {
+  const configured = !!(
+    process.env.BACKUP_S3_ENDPOINT &&
+    process.env.BACKUP_S3_BUCKET &&
+    process.env.BACKUP_S3_ACCESS_KEY_ID &&
+    process.env.BACKUP_S3_SECRET_ACCESS_KEY
+  );
+  const last = rows.find((r) => r.backup_type === 'offsite_export');
+  const lastGood = rows.find((r) => r.backup_type === 'offsite_export' && r.status === 'completed');
+
+  return {
+    configured,
+    last_run_at: last?.completed_at ?? null,
+    last_run_status: last?.status ?? null,
+    last_successful_at: lastGood?.completed_at ?? null,
+    note: !configured
+      ? 'NO off-site backup destination is configured. The only copy of this data lives inside the Supabase account. Set BACKUP_S3_* in Vercel.'
+      : !lastGood
+        ? 'An off-site destination is configured but no export has completed successfully yet.'
+        : 'Off-site export is running. A backup is only proven by a test restore — do one quarterly.',
+  };
+}
+
+/**
  * GET /api/admin/backups — List backup logs
  * POST /api/admin/backups — Trigger a manual backup snapshot
  */
@@ -22,18 +63,7 @@ export async function GET(request: NextRequest) {
 
     if (error) {
       if (isTableNotFoundError(error)) {
-        return NextResponse.json({
-          success: true,
-          data: [],
-          supabase_backups: {
-            enabled: true,
-            type: 'automatic',
-            frequency: 'daily',
-            retention: '7 days (point-in-time recovery)',
-            provider: 'Supabase Pro Plan',
-            note: 'Supabase automatically creates daily backups with point-in-time recovery. No manual action required.',
-          },
-        });
+        return NextResponse.json({ success: true, data: [], offsite_backup: offsiteStatus([]) });
       }
       throw error;
     }
@@ -41,14 +71,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       data: data || [],
-      supabase_backups: {
-        enabled: true,
-        type: 'automatic',
-        frequency: 'daily',
-        retention: '7 days (point-in-time recovery)',
-        provider: 'Supabase Pro Plan',
-        note: 'Supabase automatically creates daily backups with point-in-time recovery.',
-      },
+      offsite_backup: offsiteStatus(data ?? []),
     });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

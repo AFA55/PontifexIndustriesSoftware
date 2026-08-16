@@ -44,17 +44,41 @@ if (typeof MessageChannel === 'undefined') {
   global.MessageChannel = NodeMessageChannel
 }
 
-// Mock window.matchMedia
-Object.defineProperty(window, 'matchMedia', {
-  writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(), // deprecated
-    removeListener: jest.fn(), // deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
-})
+// TextEncoder / TextDecoder / WebCrypto.
+//
+// jsdom ships none of these, but real code does use them: `lib/s3-put.ts` signs
+// backup uploads with crypto.subtle, and `postal-mime` (pulled in by resend, via
+// lib/email.ts) constructs a TextDecoder at import time. That missing global is
+// why lib/email.test.ts and lib/email-links.test.ts have been failing to LOAD —
+// not an assertion failure, the suite never started. Node has all three; hand
+// them to jsdom rather than making every affected test opt out to the node
+// environment.
+{
+  const { TextEncoder, TextDecoder } = require('util')
+  if (typeof global.TextEncoder === 'undefined') global.TextEncoder = TextEncoder
+  if (typeof global.TextDecoder === 'undefined') global.TextDecoder = TextDecoder
+  if (typeof global.crypto === 'undefined' || !global.crypto.subtle) {
+    const { webcrypto } = require('crypto')
+    Object.defineProperty(global, 'crypto', { value: webcrypto, writable: true, configurable: true })
+  }
+}
+
+// Mock window.matchMedia — guarded, because this same setup file runs for tests
+// that declare `@jest-environment node` (server-only code, where there is no
+// window at all) and an unguarded reference here crashes them before the first
+// assertion.
+if (typeof window !== 'undefined') {
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    value: jest.fn().mockImplementation(query => ({
+      matches: false,
+      media: query,
+      onchange: null,
+      addListener: jest.fn(), // deprecated
+      removeListener: jest.fn(), // deprecated
+      addEventListener: jest.fn(),
+      removeEventListener: jest.fn(),
+      dispatchEvent: jest.fn(),
+    })),
+  })
+}
