@@ -102,11 +102,31 @@ Do this as a **group**, not a direct message — it means you can add a PM or a
 second phone later without redoing anything.
 
 1. New Group → name it `Pontifex Alerts` → add your new bot as a member.
-2. Send any message in the group, e.g. `hello`.
+2. **Send a message the bot can actually hear.** This is the step that catches
+   everyone, and my first version of this doc got it wrong.
+
+   Telegram bots run in **privacy mode** by default: inside a group they only
+   receive messages that are *commands* or that *@mention them*. A plain
+   "hello" is invisible to the bot, so `getUpdates` returns
+   `{"ok":true,"result":[]}` forever and it looks broken when it isn't.
+
+   Either works:
+   - Send `/start@your_bot_name` in the group, **or**
+   - BotFather → `/setprivacy` → pick your bot → **Disable**, then any message
+     reaches it.
+
+   (Simplest alternative: skip the group and just DM the bot. Direct messages
+   always get through, and the chat id will be a positive number. The downside
+   is you cannot add a second person to the thread later.)
 3. In a browser, open:
    `https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates`
 4. Find `"chat":{"id":-1001234567890`. **Copy that id including the minus sign** —
-   group ids are negative and dropping the sign is the usual reason nothing arrives.
+   group ids are negative and dropping the sign is the other usual reason
+   nothing arrives.
+
+If `getUpdates` is still empty, work through it in this order: the bot is not
+actually in the group · privacy mode is on and you sent a plain message · you
+are using the OLD token in the URL after revoking it.
 
 ### 3. Put them in Vercel
 
