@@ -678,11 +678,19 @@ export default function Dashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-900 mb-2">Finish yesterday&apos;s ticket first</h3>
+              {/* Reminder, not a roadblock (founder, Aug 16). This used to say
+                  "you won't be able to start a new job until this is done", and
+                  the server enforced it with a 409. Both are gone: it punished
+                  the person on the jobsite for paperwork the office needs, and
+                  it had already stranded an operator for a week over a job that
+                  was on hold. Filing late is supported — work items carry their
+                  own date, so a day entered later still books to the day it was
+                  worked. */}
+              <h3 className="text-xl font-bold text-gray-900 mb-2">You have a ticket to finish</h3>
               <p className="text-gray-600 text-sm">
-                You clocked out with this ticket unfinished. Complete it now — your work will be
-                logged to the day it was scheduled — then start today&apos;s job. You won&apos;t be
-                able to start a new job until this is done.
+                You clocked out with this one unfinished. Fill it in whenever you get a minute —
+                your work is logged to the day it was scheduled, not today, so nothing lands on the
+                wrong day. Go ahead and start today&apos;s job in the meantime.
               </p>
             </div>
 
@@ -711,7 +719,7 @@ export default function Dashboard() {
               onClick={() => setMorningGateJobs([])}
               className="w-full px-6 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-all font-semibold min-h-[48px]"
             >
-              Not yet — I know I can&apos;t start a new job
+              Later — take me to today&apos;s work
             </button>
           </div>
         </div>

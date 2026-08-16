@@ -74,6 +74,59 @@ async function resolveAuth(request: NextRequest): Promise<
   }
 
   const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+  // ── "YOU ARE LOGGED OUT" WHEN SUPABASE IS SIMPLY UNREACHABLE ─────────────
+  //
+  // Every authenticated request makes a live network call to Supabase Auth to
+  // validate the bearer. When that CALL fails — not the token, the call — this
+  // branch used to report a 401, so a Supabase blip presented to the whole
+  // company as "your session has expired, please sign in again". Signing in
+  // then fails too, because that is the same service.
+  //
+  // Caught live on Aug 16 16:50-16:52 UTC by the token-shape diagnostic below,
+  // which is the reason it exists. The tokens were perfect:
+  //     token_length 765, token_segments 3, well_formed_jwt true,
+  //     had_bearer_prefix true
+  //     reason: {"url":"https://<project>.supabase.co/auth/v1/user"}
+  // A fetch error carrying nothing but a URL — the network, not the credential.
+  // 196 of these in twenty minutes, against 62 successful requests, while the
+  // founder sat looking at a working page.
+  //
+  // A 503 is the honest answer: the credential is fine, the service is not.
+  // It also stops the amplification — lib/authed-fetch only forces a token
+  // refresh on a 401, so a 401 here made every client retry against the very
+  // service that was already failing.
+  const err = authError as { name?: string; status?: number } | null;
+  const isServiceFailure =
+    !!err &&
+    (err.name === 'AuthRetryableFetchError' ||
+      err.status === undefined ||
+      err.status === 0 ||
+      err.status >= 500);
+
+  if (isServiceFailure) {
+    console.error(
+      '[auth] Supabase Auth unreachable — returning 503, NOT signing anyone out',
+      JSON.stringify({
+        reason: authError?.message,
+        name: err?.name,
+        status: err?.status,
+        path: new URL(request.url).pathname,
+      })
+    );
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          error:
+            'We could not reach the sign-in service. Your login is fine — this is on our side. Please try again in a moment.',
+          code: 'auth_service_unavailable',
+        },
+        { status: 503 }
+      ),
+    };
+  }
+
   if (authError || !user) {
     // WHY WE LOG THE TOKEN'S SHAPE (founder, Aug 15 — "I tried to print the work
     // ticket and it said error… this is what the PMs and admin were telling me").

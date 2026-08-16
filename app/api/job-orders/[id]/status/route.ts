@@ -203,55 +203,31 @@ async function updateJobStatus(
     }
     const tenantToday = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
 
-    // ── Overdue-ticket gate (founder Jul 21): an operator may NOT start a
-    // NEW job while a ticket from a previous day is still unfinished — they
-    // complete it first (late completion books to its scheduled day), THEN
-    // start today's. The morning clock-in modal points them there; this is
-    // the server-side enforcement so the order can't be skipped.
-    if (status === 'in_route' && isAssignedOperator && !isAdmin) {
-      try {
-        const today = tenantToday;
-        const { data: overdueCandidates } = await supabaseAdmin
-          .from('job_orders')
-          .select('id, job_number, customer_name, scheduled_date, end_date')
-          .eq('assigned_to', user.id)
-          .neq('id', jobId)
-          .lt('scheduled_date', today)
-          .not('dispatched_at', 'is', null)
-          .is('work_completed_at', null)
-          // `on_hold` is EXCLUDED (founder, Aug 12: "remove BWC from Nate — he
-          // can't see his real schedule because of BWC"). A job the office put
-          // on hold is not a ticket the operator failed to file, but this gate
-          // counted it as one: JOB-2026-521763 (BWC Contracting) sat on_hold
-          // from Aug 5 with no completion, so every morning it returned a 409
-          // and Nate could not start ANY job. Being told to "finish" a job
-          // nobody is allowed to work is a dead end — the operator cannot
-          // clear it, so the block never lifts on its own.
-          .not('status', 'in', '("cancelled","completed","pending_completion","on_hold")');
-        // Multi-day jobs still running today are NOT overdue.
-        const blocking = (overdueCandidates ?? []).filter(
-          (j: any) => !(j.end_date && j.end_date >= today)
-        );
-        if (blocking.length > 0) {
-          return NextResponse.json(
-            {
-              error: `Finish your unfinished ticket first: ${blocking[0].job_number} (${blocking[0].customer_name}). Complete it, then start this job — the office needs that information.`,
-              block_type: 'overdue_ticket_block',
-              overdue_jobs: blocking.map((j: any) => ({
-                id: j.id,
-                job_number: j.job_number,
-                customer_name: j.customer_name,
-                scheduled_date: j.scheduled_date,
-              })),
-            },
-            { status: 409 }
-          );
-        }
-      } catch {
-        // Gate fails OPEN on unexpected errors — never strand a live crew.
-      }
-    }
-
+    // ── Overdue-ticket gate: REMOVED (founder, Aug 16) ─────────────────────
+    //
+    // This used to 409 an operator who tried to start today's job while a
+    // ticket from a previous day was still unfinished — "you won't be able to
+    // start a new job until this is done." The founder asked for it on Jul 21
+    // and removed it on Aug 16, after deliberately leaving tickets open to see
+    // what the system did:
+    //
+    //   "If they forget to complete tickets, allow them to continue on their
+    //    current ticket. I did this deliberately because I want to test how our
+    //    system would act if I input data for a previous ticket on a later
+    //    date."
+    //
+    // Blocking the crew was the wrong lever. It punished the person standing on
+    // a jobsite for paperwork the OFFICE needs, and it had already produced one
+    // dead end in production: a job parked `on_hold` counted as unfinished, so
+    // Nate could not start ANY job for a week over a ticket nobody was allowed
+    // to work. The exclusion list that fixed that case is the tell — a gate
+    // needing a growing list of exceptions is a gate aimed at the wrong person.
+    //
+    // The information still reaches the office, by routes that do not stop work:
+    // the "Remind crew to close out" button on the job view, the
+    // missing-ticket-reminders cron, and the clock-out warning. Late entry is
+    // supported by design — work items carry their own `work_date`, so a day
+    // filed late still books to the day it was worked and prints on its own line.
     // ── Same-day SEQUENCE gate (founder Aug 2: multiple jobs per operator
     // per day, sequenced). If today's per-day ledger gives this operator a
     // LOWER-sequence job that isn't finished for the day yet, they cannot

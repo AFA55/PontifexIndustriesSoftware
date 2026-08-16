@@ -655,11 +655,13 @@ export async function POST(request: NextRequest) {
       ? isWithinShopRadius({ latitude, longitude, accuracy }, shopOverride)
       : { isWithinRange: false, distance: 0, distanceFormatted: 'N/A' };
 
-    // ── Morning unfinished-ticket gate (founder Jul 21): if they clocked out
-    // with an open ticket from a previous day, the morning clock-in tells them
-    // to finish it FIRST — before starting today's ticket. This response
-    // powers the dashboard modal; /api/job-orders/[id]/status enforces it
-    // server-side (overdue_ticket_block) so it can't be skipped.
+    // ── Morning unfinished-ticket REMINDER (was a gate until Aug 16) ────────
+    // If they clocked out with an open ticket from a previous day, clock-in
+    // surfaces it so they remember. It is now only a reminder: the server-side
+    // enforcement in /api/job-orders/[id]/status was removed (founder, Aug 16 —
+    // "if they forget to complete tickets, allow them to continue on their
+    // current ticket"). Filing late is fine; work items carry their own
+    // work_date, so a day entered later books to the day it was worked.
     let overdueTickets: Array<{ id: string; job_number: string; customer_name: string; scheduled_date: string }> = [];
     // Anyone who can lead a job can carry an overdue ticket into the next day.
     if (canBeCrewMember(profile?.role)) {

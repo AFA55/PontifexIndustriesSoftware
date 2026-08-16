@@ -353,13 +353,11 @@ export default function JobDetailPage() {
       });
 
       if (!statusRes.ok) {
+        // The `overdue_ticket_block` branch that used to live here is gone with
+        // the gate itself (founder, Aug 16 — an unfinished ticket no longer
+        // stops the crew starting today's job). Left as dead code it would
+        // suggest a behaviour the server no longer has.
         const err = await statusRes.json().catch(() => null);
-        if (err?.block_type === 'overdue_ticket_block') {
-          alert(err.error);
-          const overdue = err.overdue_jobs?.[0];
-          if (overdue?.id) router.push(`/dashboard/my-jobs/${overdue.id}`);
-          return;
-        }
         console.error('Failed to update job status to in_route');
         if (err?.error) alert(err.error);
         return;

@@ -8,7 +8,33 @@ import {
   isReplayable,
   SessionExpiredError,
   isSessionExpired,
+  AuthServiceUnavailableError,
+  isAuthServiceUnavailable,
 } from './authed-fetch';
+
+describe('AuthServiceUnavailableError', () => {
+  it('is never confused with an expired session', () => {
+    // These must stay distinct: one means "sign in again", the other means
+    // "your login is fine, our dependency is down". Conflating them is what
+    // told a whole company to re-authenticate during a Supabase blip — and
+    // re-authenticating hits the same service that is failing.
+    const service = new AuthServiceUnavailableError();
+    const expired = new SessionExpiredError();
+    expect(isAuthServiceUnavailable(service)).toBe(true);
+    expect(isSessionExpired(service)).toBe(false);
+    expect(isAuthServiceUnavailable(expired)).toBe(false);
+  });
+
+  it('tells the user the problem is not theirs', () => {
+    expect(new AuthServiceUnavailableError().message).toMatch(/your login is fine/i);
+    expect(new AuthServiceUnavailableError().message).not.toMatch(/sign in again/i);
+  });
+
+  it('does not swallow ordinary errors', () => {
+    expect(isAuthServiceUnavailable(new Error('API error 500'))).toBe(false);
+    expect(isAuthServiceUnavailable(null)).toBe(false);
+  });
+});
 
 describe('looksLikeJwt', () => {
   it('accepts a three-segment token', () => {

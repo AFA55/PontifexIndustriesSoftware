@@ -51,10 +51,20 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>;
 
 const DEMO_ACCOUNTS = [
-  // ⚠️ These ship in the public bundle — demo/test accounts ONLY. Rotate the
-  // super admin password when live testing settles (founder-accepted risk,
-  // Jul 21, for fast login while stabilizing the app).
-  { label: 'Super Admin', name: 'Super Admin (Demo)', email: 'super@pontifex.com', password: 'super0202!', color: 'rose' },
+  // ⚠️ EVERY PASSWORD IN THIS ARRAY IS PUBLIC. This file is a Client Component,
+  // so it ships inside the JavaScript every visitor downloads, and the gate in
+  // front of these buttons is a string comparison in the same bundle. Treat any
+  // account listed here as having no password at all.
+  //
+  // REMOVED Aug 16 (founder): `super@pontifex.com` / `super0202!` — an ACTIVE
+  // super_admin inside the PATRIOT tenant, i.e. the paying customer. Anyone who
+  // opened the site and viewed source had full super-admin on live customer
+  // data. "We no longer require a demo super account — I'm doing the test
+  // within my real account."
+  //
+  // STILL PUBLISHED AND STILL REAL: `admin@pontifex.com` is an admin, which can
+  // read every job, customer and timecard in its tenant. Rotating or scoping it
+  // to a demo-only tenant is the remaining half of this cleanup.
   { label: 'Admin',      name: 'Demo Admin', email: 'admin@pontifex.com',      password: 'PontifexDemo2026!', color: 'violet' },
   { label: 'Supervisor', name: 'David',      email: 'supervisor@pontifex.com', password: 'PontifexDemo2026!', color: 'amber' },
   { label: 'Operator',   name: 'Zack',  email: 'zack@demopontifex.com',  password: 'Patriot2026!', color: 'blue' },

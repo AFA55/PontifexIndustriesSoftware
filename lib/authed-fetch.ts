@@ -129,11 +129,43 @@ export function isReplayable(body: BodyInit | null | undefined): boolean {
  * a normal Response for the caller to read, because those mean something and
  * should not be disguised as a login problem.
  */
+/** Thrown when the sign-in service itself is unreachable — NOT a bad session. */
+export class AuthServiceUnavailableError extends Error {
+  constructor(
+    message = 'We could not reach the sign-in service. Your login is fine — please try again in a moment.'
+  ) {
+    super(message);
+    this.name = 'AuthServiceUnavailableError';
+  }
+}
+
+export function isAuthServiceUnavailable(e: unknown): e is AuthServiceUnavailableError {
+  return (
+    e instanceof AuthServiceUnavailableError ||
+    (e as Error)?.name === 'AuthServiceUnavailableError'
+  );
+}
+
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const token = await currentAccessToken();
   if (!token) throw new SessionExpiredError();
 
   const res = await fetch(input, withAuth(init, token));
+
+  // The server distinguishes "your token is bad" (401) from "we cannot reach
+  // the sign-in service" (503). Never refresh on the latter: refreshing calls
+  // the SAME service that is already failing, so a retry here turns one
+  // struggling dependency into two requests per caller. Measured on Aug 16:
+  // 196 auth failures in twenty minutes, all of them service failures, all of
+  // them with a perfectly valid token.
+  if (res.status === 503) {
+    const body = await res.clone().json().catch(() => null);
+    if (body?.code === 'auth_service_unavailable') {
+      throw new AuthServiceUnavailableError(body.error);
+    }
+    return res;
+  }
+
   if (res.status !== 401) return res;
 
   // 401 — the token was refused. Replace it and try exactly once more.
