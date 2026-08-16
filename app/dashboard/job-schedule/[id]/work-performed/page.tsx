@@ -130,6 +130,10 @@ export default function WorkPerformed() {
   // ─── Day lock state (read-only if the day's log is already submitted) ─────
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Set when the submit genuinely failed. Shown as a banner and, critically,
+  // it means we do NOT navigate on — moving to the next screen is what made a
+  // failed save look like a successful one.
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   // ─── Crew co-operator (job_crew role='operator') ─────────────────────────
   // Full work-performed input, but NO day-complete/survey — the LEAD completes
@@ -650,7 +654,32 @@ export default function WorkPerformed() {
         });
 
         if (!res.ok) {
-          console.error('Failed to save work items to DB, falling back to localStorage');
+          // THE MOST EXPENSIVE LINE IN THIS FILE USED TO BE THE ONE THAT WASN'T
+          // HERE: a `return`.
+          //
+          // This branch logged to a console nobody reads and then fell straight
+          // through to `showNotification('Work performed saved!')` and a
+          // navigation to day-complete. The operator finished their day, saw the
+          // word "saved", walked away — and the work was never written. There is
+          // no background sync that would pick it up later: the localStorage
+          // copy below is only ever read to PREFILL this form, and
+          // NetworkMonitor's "Changes will sync when you reconnect" does nothing
+          // but dismiss its own toast.
+          //
+          // That is how a day of billable cutting disappears quietly, which is
+          // strictly worse than an error, because an error gets retried.
+          //
+          // Now: stop here, keep everything they typed (state and draft are both
+          // untouched), and say plainly that it did not save.
+          const detail = await res.json().catch(() => null);
+          console.error('Failed to save work items to DB', res.status, detail);
+          setSaveError(
+            detail?.error ||
+              'Your work could not be saved. Nothing has been lost — check your signal and tap Retry.'
+          );
+          setIsSubmitting(false);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+          return;
         }
 
         // /api/equipment/track-usage DOES NOT EXIST — there is no
@@ -719,7 +748,13 @@ export default function WorkPerformed() {
       }, 800);
     } catch (error) {
       console.error('Error submitting work performed:', error);
-      // Fallback: save to localStorage and still navigate
+      // Same correction as the !res.ok branch above: this used to save a
+      // localStorage copy nothing ever re-sends, and then NAVIGATE FORWARD to
+      // day-complete — which reads to the operator exactly like success. A
+      // dropped connection in a parking garage became a lost day of cutting.
+      //
+      // The local copy is still written (it prefills this form on return), but
+      // we stay on the page and say what happened.
       const workPerformedData = {
         jobId: params.id,
         items: selectedItems,
@@ -728,13 +763,11 @@ export default function WorkPerformed() {
         timestamp: new Date().toISOString()
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
-      localStorage.removeItem(`job_last_page_${params.id}`);
       // NOTE: draft preserved on purpose — see comment in the success path.
-      if (isCoOperator) {
-        router.push(`/dashboard/my-jobs/${params.id}`);
-      } else {
-        router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
-      }
+      setSaveError(
+        'Your work could not be sent — you may have lost signal. Nothing has been lost; tap Retry when you have a bar or two.'
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
     }
@@ -807,6 +840,29 @@ export default function WorkPerformed() {
       </div>
 
       <div className="container mx-auto px-4 py-5 pb-32 max-w-lg">
+        {/* A save that failed has to LOOK like a save that failed. This banner
+            and the missing navigation are the whole fix — the operator stays
+            here, with everything they typed, until it actually lands. */}
+        {saveError && (
+          <div className="mb-4 rounded-2xl border-2 border-red-300 bg-red-50 p-4 dark:border-red-400/40 dark:bg-red-500/10">
+            <p className="text-sm font-bold text-red-800 dark:text-red-200">Not saved yet</p>
+            <p className="mt-1 text-sm leading-relaxed text-red-700 dark:text-red-200/80">
+              {saveError}
+            </p>
+            <button
+              type="button"
+              onClick={() => { setSaveError(null); void handleSubmit(); }}
+              disabled={isSubmitting}
+              className="
+                mt-3 w-full min-h-[48px] rounded-xl bg-red-600 px-4 text-base font-bold text-white
+                hover:bg-red-700 disabled:opacity-60 transition-colors
+              "
+            >
+              {isSubmitting ? 'Sending…' : 'Retry'}
+            </button>
+          </div>
+        )}
+
         {/* Quick Access Buttons */}
         <QuickAccessButtons jobId={params.id as string} />
 
