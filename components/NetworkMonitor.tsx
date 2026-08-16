@@ -3,14 +3,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { WifiOff, RefreshCw } from 'lucide-react';
+import { useOutbox } from '@/lib/use-outbox';
+import { pendingSummary } from '@/lib/outbox';
 
 /**
  * NetworkMonitor — detects offline/online transitions and API failures.
  * Renders a persistent top banner when offline + fires toast notifications.
  * Also monitors for repeated API failures (server issues).
+ *
+ * It is ALSO where the outbox gets flushed, because this is mounted in the root
+ * layout (app/layout.tsx) — so a queued ticket keeps trying no matter which
+ * page the operator wandered off to, and keeps trying after the app is reopened.
+ * Putting the flusher on the work-performed page would have meant the queue only
+ * drained while the operator happened to be standing on that screen.
  */
 export default function NetworkMonitor() {
   const { notify, dismiss } = useNotifications();
+  const { entries: outboxEntries } = useOutbox();
   const [isOffline, setIsOffline] = useState(false);
   const [bannerVisible, setBannerVisible] = useState(false);
 
@@ -21,6 +30,12 @@ export default function NetworkMonitor() {
   const failCountRef = useRef(0);
   const apiHealthyRef = useRef(true);
   const healthCheckRef = useRef<NodeJS.Timeout | null>(null);
+  // Same reason as the refs above: the offline handler is registered once with
+  // an empty dep array, so reading `pendingSummary(...)` directly would capture
+  // the value from first render — always empty — and the toast would never
+  // mention the ticket actually sitting on the phone.
+  const pendingLabelRef = useRef('');
+  pendingLabelRef.current = pendingSummary(outboxEntries);
 
   useEffect(() => {
     // Do NOT trust navigator.onLine on initial mount — it is unreliable in:
@@ -39,7 +54,15 @@ export default function NetworkMonitor() {
         const id = notify({
           type: 'offline',
           title: 'You\'re offline',
-          message: 'Check your internet connection. Changes will sync when you reconnect.',
+          // This used to promise "Changes will sync when you reconnect" while
+          // `handleOnline` did nothing but dismiss its own toast — there was no
+          // sync, anywhere. The promise is true now (lib/outbox + useOutbox
+          // flush a real queue), but it is only claimed for the work that
+          // ACTUALLY queues, and the wording no longer implies everything on
+          // screen is protected.
+          message: pendingLabelRef.current
+            ? `Check your connection. ${pendingLabelRef.current}`
+            : 'Check your internet connection. Anything you submit will be held on this phone and sent when you reconnect.',
           duration: 0, // Persistent
           dismissible: false,
         });

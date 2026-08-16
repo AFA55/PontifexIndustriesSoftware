@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { reportClientError } from '@/lib/report-error';
 
 /**
  * Route-level error boundary — catches unhandled errors within a page segment.
@@ -15,8 +16,9 @@ export default function ErrorBoundary({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Captured by Vercel Function Logs
-    console.error('[ErrorBoundary]', error);
+    // Console + Sentry + /api/log-error → Telegram. This screen claims the team
+    // has been notified; this is the line that makes that true.
+    reportClientError({ error, boundary: 'route' });
   }, [error]);
 
   return (
@@ -48,7 +50,7 @@ export default function ErrorBoundary({
             Try Again
           </button>
           <a
-            href="/dashboard/admin"
+            href="/dashboard"
             className="flex items-center gap-2 px-5 py-2.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white rounded-lg text-sm font-semibold transition-all"
           >
             <Home className="w-4 h-4" />

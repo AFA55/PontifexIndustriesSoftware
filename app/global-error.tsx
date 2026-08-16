@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { reportClientError } from '@/lib/report-error';
 
 /**
  * Global error boundary — catches unhandled errors at the root layout level.
@@ -16,8 +17,10 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log to console so Vercel Function Logs capture it
-    console.error('[GlobalError]', error);
+    // Reports to the console, to Sentry, and to /api/log-error — which now
+    // raises a Telegram alert. Before this, the screen below told the user
+    // "our team has been notified" and nobody was.
+    reportClientError({ error, boundary: 'global' });
   }, [error]);
 
   return (
@@ -112,7 +115,7 @@ export default function GlobalError({
               </button>
 
               <a
-                href="/dashboard/admin"
+                href="/dashboard"
                 style={{
                   display: 'flex',
                   alignItems: 'center',

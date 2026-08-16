@@ -1,6 +1,7 @@
 'use client';
 import { useEffect } from 'react';
 import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react';
+import { reportClientError } from '@/lib/report-error';
 import Link from 'next/link';
 
 export default function DashboardError({
@@ -11,7 +12,7 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error('Dashboard error:', error);
+    reportClientError({ error, boundary: 'dashboard' });
   }, [error]);
 
   return (
@@ -33,7 +34,7 @@ export default function DashboardError({
             Retry
           </button>
           <Link
-            href="/dashboard/admin"
+            href="/dashboard"
             className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm font-medium"
           >
             <ArrowLeft className="w-4 h-4" />

@@ -2,6 +2,31 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { alert, alertFingerprint } from '@/lib/telegram';
+
+/**
+ * Per-instance flood guard. One browser stuck in a render loop can post the
+ * same crash hundreds of times a minute, and a channel that floods gets muted —
+ * at which point it is no better than the hub the founder already does not
+ * check. Per-instance is imperfect across serverless workers, but it turns
+ * "hundreds" into "a handful", which is the difference that matters.
+ */
+const ALERT_WINDOW_MS = 15 * 60 * 1000;
+const recentAlerts = new Map<string, number>();
+
+function shouldAlert(fingerprint: string, now = Date.now()): boolean {
+  const last = recentAlerts.get(fingerprint);
+  if (last && now - last < ALERT_WINDOW_MS) return false;
+  recentAlerts.set(fingerprint, now);
+  // Bound the map so a long-lived instance seeing many distinct errors cannot
+  // grow it without limit.
+  if (recentAlerts.size > 500) {
+    for (const [k, t] of recentAlerts) {
+      if (now - t >= ALERT_WINDOW_MS) recentAlerts.delete(k);
+    }
+  }
+  return true;
+}
 
 /**
  * POST /api/log-error — Client-side error logging endpoint.
@@ -40,6 +65,31 @@ export async function POST(request: NextRequest) {
 
     // Also log to server console
     console.error(`[CLIENT_ERROR] ${errorLog.type}: ${errorLog.error_message} @ ${errorLog.url}`);
+
+    // ── MAKE "OUR TEAM HAS BEEN NOTIFIED" TRUE ──────────────────────────────
+    //
+    // Every crash screen in this app tells the operator "our team has been
+    // notified". Nobody was: 0 of 60 error boundaries reported anywhere, and
+    // this endpoint — which exists to receive exactly this — had no callers.
+    // Meanwhile a feature stayed broken for two months and a twelve-day failure
+    // went unseen.
+    //
+    // Fire-and-forget with its own dedupe. An alerting call must never delay or
+    // fail the error report it is riding on.
+    const fingerprint = alertFingerprint({
+      level: 'error',
+      title: errorLog.error_message.slice(0, 120),
+      source: errorLog.url,
+    });
+    if (shouldAlert(fingerprint)) {
+      void alert({
+        level: 'error',
+        title: 'App crashed for a user',
+        detail: errorLog.error_message.slice(0, 400),
+        source: errorLog.url || errorLog.type,
+        url: errorLog.url || undefined,
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch {

@@ -47,6 +47,7 @@ import {
 } from 'lucide-react';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import { resolveRecommendedWorkTypes, type WorkItem } from '@/lib/work-types';
+import { enqueue } from '@/lib/outbox';
 
 const EquipmentUsageForm = dynamicImport(() => import('@/components/EquipmentUsageForm'), {
   ssr: false,
@@ -134,6 +135,9 @@ export default function WorkPerformed() {
   // it means we do NOT navigate on — moving to the next screen is what made a
   // failed save look like a successful one.
   const [saveError, setSaveError] = useState<string | null>(null);
+  // Queued on the phone because there was no signal. Distinct from saveError:
+  // this one is not a failure, it is a delay, and it must NOT read like a loss.
+  const [queuedOffline, setQueuedOffline] = useState(false);
 
   // ─── Crew co-operator (job_crew role='operator') ─────────────────────────
   // Full work-performed input, but NO day-complete/survey — the LEAD completes
@@ -748,13 +752,19 @@ export default function WorkPerformed() {
       }, 800);
     } catch (error) {
       console.error('Error submitting work performed:', error);
-      // Same correction as the !res.ok branch above: this used to save a
-      // localStorage copy nothing ever re-sends, and then NAVIGATE FORWARD to
-      // day-complete — which reads to the operator exactly like success. A
-      // dropped connection in a parking garage became a lost day of cutting.
+      // NO SIGNAL IS NOT A FAILURE — IT IS A DELAY (founder, Aug 16: "they try
+      // to complete information but they don't have service; how can we resolve
+      // that to ensure there is still a way for them to save information?").
       //
-      // The local copy is still written (it prefills this form on return), but
-      // we stay on the page and say what happened.
+      // This used to write a localStorage copy that nothing ever re-sent, and
+      // then navigate forward to day-complete — which reads exactly like
+      // success. A dropped connection in a parking garage became a lost day of
+      // cutting.
+      //
+      // Now the submission goes into the outbox and is re-sent automatically
+      // when the phone gets a connection. Safe to retry because the server
+      // REPLACES on (job, operator, work_date) rather than appending, so a
+      // duplicate send is a no-op. The operator can walk away.
       const workPerformedData = {
         jobId: params.id,
         items: selectedItems,
@@ -764,9 +774,26 @@ export default function WorkPerformed() {
       };
       localStorage.setItem(`work-performed-${params.id}`, JSON.stringify(workPerformedData));
       // NOTE: draft preserved on purpose — see comment in the success path.
-      setSaveError(
-        'Your work could not be sent — you may have lost signal. Nothing has been lost; tap Retry when you have a bar or two.'
-      );
+
+      enqueue(localStorage, {
+        id: `work-items-${params.id}-${workDate}`,
+        url: `/api/job-orders/${params.id}/work-items`,
+        method: 'POST',
+        body: JSON.stringify({
+          items: selectedItems,
+          dayNumber: currentDayNumber,
+          notes: voiceNotes || undefined,
+          difficulty: difficulty || undefined,
+          difficultyNotes: difficultyNotes.trim() || undefined,
+          workDate,
+        }),
+        // This page never loads the customer name, so the label names the day
+        // instead — which is the part that matters when the office asks "which
+        // ticket is still sitting on your phone?".
+        label: `Work performed · ${formatDayLong(workDate)}`,
+      });
+
+      setQueuedOffline(true);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setIsSubmitting(false);
@@ -843,6 +870,27 @@ export default function WorkPerformed() {
         {/* A save that failed has to LOOK like a save that failed. This banner
             and the missing navigation are the whole fix — the operator stays
             here, with everything they typed, until it actually lands. */}
+        {/* Held on the phone, not lost. Green rather than red on purpose: the
+            operator did their job, the network didn't. Nothing to redo. */}
+        {queuedOffline && (
+          <div className="mb-4 rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-4 dark:border-emerald-400/40 dark:bg-emerald-500/10">
+            <p className="text-sm font-bold text-emerald-800 dark:text-emerald-200">
+              Saved on your phone
+            </p>
+            <p className="mt-1 text-sm leading-relaxed text-emerald-700 dark:text-emerald-200/80">
+              You have no signal right now, so this is being held and will send by itself as soon
+              as you do. You can close the app — it will still go. Nothing to type again.
+            </p>
+            <button
+              type="button"
+              onClick={() => { setQueuedOffline(false); goBack(); }}
+              className="mt-3 w-full min-h-[48px] rounded-xl bg-emerald-600 px-4 text-base font-bold text-white hover:bg-emerald-700 transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        )}
+
         {saveError && (
           <div className="mb-4 rounded-2xl border-2 border-red-300 bg-red-50 p-4 dark:border-red-400/40 dark:bg-red-500/10">
             <p className="text-sm font-bold text-red-800 dark:text-red-200">Not saved yet</p>
