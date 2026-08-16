@@ -1,0 +1,57 @@
+-- NOTHING WAS RECLAIMING ABANDONED CONNECTIONS.
+--
+-- Applied to production 2026-08-16 19:50 UTC, immediately after a ~3.5 hour
+-- outage. Recorded here so the reasoning survives.
+--
+-- WHAT HAPPENED. From ~16:20 UTC the project reported Unhealthy for Database,
+-- PostgREST, Auth and Storage, while Realtime and Edge Functions stayed Healthy.
+-- Supabase's REST edge answered external probes in ~70ms, but `select 1` — a
+-- query touching no table — timed out. Cron jobs intermittently returned 200.
+-- CPU, disk and RAM all reported 0%.
+--
+-- That combination has one shape: every one of the 60 connection slots was
+-- held, so anything needing a NEW connection waited forever, while anything
+-- that did not need one (the edge) stayed instant, and anything that happened
+-- to grab a freed slot (a cron) succeeded. A restart at 19:44 UTC cleared it;
+-- afterwards: 22 connections, 0 idle-in-transaction, 0 lock waits, and every
+-- row count matched the pre-outage audit exactly (0 data loss).
+--
+-- WHY IT COULD PERSIST. The configuration found afterwards:
+--     idle_in_transaction_session_timeout = 0     (disabled)
+--     idle_session_timeout                = 0     (disabled)
+--     statement_timeout                   = 120s
+--     max_connections                     = 60
+--
+-- `statement_timeout` only kills a RUNNING query. A session that opens a
+-- transaction and then goes idle is not running anything, so nothing touched
+-- it — it held its slot, and its locks, indefinitely. With no reaper, leaked
+-- sessions could only accumulate. With this migration in place, the same
+-- failure self-heals in about a minute instead of needing a human to notice.
+--
+-- HONEST LIMIT: the restart destroyed the evidence, so this is the mechanism
+-- that fits every symptom, not a proven trace of the specific sessions. A
+-- support ticket was raised so Supabase can check the metrics we cannot see.
+--
+-- WHY ROLE-SCOPED, NOT DATABASE-WIDE. `ALTER DATABASE ... SET` would also hit
+-- Supabase's internal roles (supabase_admin, supabase_storage_admin) which run
+-- backups, replication and PITR — operations that legitimately hold long
+-- transactions. Killing those to fix a connection leak trades an outage for a
+-- broken backup. Note Supabase already ships `supabase_auth_admin` with a 60s
+-- setting of its own, which is the same convention; the gap was that
+-- `authenticator` — the role every application request uses — had none.
+--
+--   authenticator  60s   every API request. No legitimate request holds an open
+--                        transaction that long.
+--   postgres      300s   migrations, MCP tooling, the SQL editor. Generous
+--                        enough for real interactive work, short enough that a
+--                        forgotten session cannot camp on a slot all afternoon.
+--
+-- `idle_session_timeout` is deliberately LEFT AT 0. Supabase's pooler keeps idle
+-- connections warm on purpose; reaping those causes reconnect churn and makes
+-- things worse.
+--
+-- Reversible:  ALTER ROLE <role> RESET idle_in_transaction_session_timeout;
+-- Applies to NEW sessions; existing sessions keep their current setting.
+
+ALTER ROLE authenticator SET idle_in_transaction_session_timeout = '60s';
+ALTER ROLE postgres      SET idle_in_transaction_session_timeout = '300s';
