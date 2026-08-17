@@ -31,6 +31,15 @@ import { useModuleGate } from '@/components/ModuleGuard';
 import { NumberInput } from '@/components/ui/NumberInput';
 import { toLocalYMD } from '@/lib/dates';
 import { asArray } from '@/lib/job-arrays';
+import {
+  loadJobsiteConditions,
+  serializeJobsiteConditions,
+  loadSiteCompliance,
+  serializeSiteCompliance,
+  loadPermits,
+  permitOtherText,
+  toTimeInputValue,
+} from '@/lib/jobsite-conditions';
 
 // Dynamic-imported modals — only loaded when their state flag flips true.
 // AISmartFillModal pulls in framer-motion; CustomerForm is a large dialog used for the new-customer flow.
@@ -605,7 +614,9 @@ interface FormData {
   scaffolding_provided: boolean;
   electricity_available: boolean;
   electricity_available_ft: string;
-  inside_outside: 'inside' | 'outside' | '';
+  /** Widened from a union: see JobsiteConditionsForm — the schedule board can
+   *  store 'Both', and flattening it to '' would delete the board's answer. */
+  inside_outside: string;
   proper_ventilation: boolean;
   overcutting_allowed: boolean;
   cord_480: boolean;
@@ -613,7 +624,7 @@ interface FormData {
   clean_up_required: boolean;
   high_work: boolean;
   high_work_ft: string;
-  high_work_access: 'lift_provided' | 'we_provide' | 'ladder' | '';
+  high_work_access: string;
   hyd_hose: boolean;
   hyd_hose_ft: string;
   plastic_needed: boolean;
@@ -782,10 +793,40 @@ function Toggle({ checked, onChange, label, icon: Icon }: { checked: boolean; on
   );
 }
 
-function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue, onFtChange, accentColor = 'blue' }: {
+/**
+ * A Step 8 jobsite-condition row.
+ *
+ * THREE THINGS THE FOUNDER ASKED FOR, Aug 2026:
+ *
+ * 1. "I have to click the radio not just the field — let me click on field to
+ *    select it." The whole row is now the control. It is a real <label> wrapping
+ *    a real <input type="checkbox">, so it is keyboard-focusable, space-toggles,
+ *    and announces correctly to a screen reader — a <div onClick> would have
+ *    looked identical and been none of those things. The row is min-h-[56px],
+ *    comfortably past the 44px gloved-hand floor.
+ *
+ * 2. "How far?" needs a LABEL. He typed a number into the Electricity row and
+ *    could not tell what the box meant. The prompt now says it in words, in
+ *    feet, above the input — and once entered, the row itself reads back
+ *    "75 ft from work area" so the answer is visible without focusing the field.
+ *
+ * 3. Clicking INSIDE the distance input must not toggle the row off. That is the
+ *    trap in making the whole row a label: a click on any descendant of a
+ *    <label> is forwarded to its control. The distance block sits in its own
+ *    <div> with onClick/onPointerDown stopPropagation, so typing a distance
+ *    cannot uncheck the condition it belongs to.
+ */
+function ConditionCheck({
+  checked, onChange, label, icon: Icon, showFt, ftValue, onFtChange, accentColor = 'blue',
+  ftPrompt = 'How far from the work area? (ft)',
+  ftReadback = 'ft from work area',
+}: {
   checked: boolean; onChange: (v: boolean) => void; label: string; icon?: any;
   showFt?: boolean; ftValue?: string; onFtChange?: (v: string) => void;
   accentColor?: 'blue' | 'amber' | 'emerald' | 'violet' | 'rose' | 'cyan' | 'orange' | 'teal';
+  /** What the number MEANS. Distance for utilities, height for high work. */
+  ftPrompt?: string;
+  ftReadback?: string;
 }) {
   const colorMap: Record<string, { bg: string; border: string; check: string; icon: string; text: string; ftBg: string; ftBorder: string; ftRing: string }> = {
     blue:    { bg: 'bg-blue-50', border: 'border-blue-300', check: 'bg-blue-600 border-blue-600', icon: 'text-blue-600', text: 'text-blue-800', ftBg: 'bg-blue-50', ftBorder: 'border-blue-300', ftRing: 'focus:ring-blue-500/20 focus:border-blue-500' },
@@ -799,31 +840,65 @@ function ConditionCheck({ checked, onChange, label, icon: Icon, showFt, ftValue,
   };
   const c = colorMap[accentColor] || colorMap.blue;
 
+  const distance = (ftValue || '').trim();
+  const hasDistance = distance !== '';
+
   return (
-    <div className={`flex items-center gap-4 p-4 sm:p-5 rounded-xl border-2 transition-all duration-200 ${
+    <div className={`rounded-xl border-2 transition-all duration-200 ${
       checked ? `${c.bg} ${c.border} shadow-sm` : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20 hover:bg-slate-50/50 dark:hover:bg-white/[0.08]'
     }`}>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
-          checked ? `${c.check} shadow-sm` : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent hover:border-blue-400'
-        }`}
-      >
-        {checked && <Check size={18} className="text-white" />}
-      </button>
-      {Icon && <Icon size={20} className={`flex-shrink-0 ${checked ? c.icon : 'text-slate-400 dark:text-white/40'}`} />}
-      <span className={`text-base sm:text-lg flex-1 ${checked ? `${c.text} font-semibold` : 'text-slate-600 dark:text-white/60'}`}>{label}</span>
+      {/* The ENTIRE row is the hit target — not just the box. */}
+      <label className="flex items-center gap-4 p-4 sm:p-5 min-h-[56px] cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => onChange(e.target.checked)}
+          className="sr-only peer"
+        />
+        <span className={`flex-shrink-0 w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all duration-200 peer-focus-visible:ring-2 peer-focus-visible:ring-offset-2 peer-focus-visible:ring-blue-500 ${
+          checked ? `${c.check} shadow-sm` : 'border-slate-300 dark:border-white/20 bg-white dark:bg-transparent'
+        }`}>
+          {checked && <Check size={18} className="text-white" />}
+        </span>
+        {Icon && <Icon size={20} className={`flex-shrink-0 ${checked ? c.icon : 'text-slate-400 dark:text-white/40'}`} />}
+        <span className={`text-base sm:text-lg flex-1 min-w-0 ${checked ? `${c.text} font-semibold` : 'text-slate-600 dark:text-white/60'}`}>
+          {label}
+          {/* Read the answer back on the row itself. "I typed a value and
+              couldn't see what I'd entered" was the actual complaint. */}
+          {showFt && checked && hasDistance && (
+            <span className={`block sm:inline sm:ml-2 text-sm font-bold ${c.text} dark:opacity-90`}>
+              — {distance} {ftReadback}
+            </span>
+          )}
+        </span>
+      </label>
+
       {showFt && checked && (
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            value={ftValue || ''}
-            onChange={(e) => onFtChange?.(e.target.value)}
-            placeholder="0"
-            className={`w-24 sm:w-28 px-4 py-2.5 sm:py-3 border-2 ${c.ftBorder} ${c.ftBg} rounded-xl text-base sm:text-lg font-bold text-slate-800 dark:text-white text-center ${c.ftRing} focus:ring-2 focus:outline-none transition-all`}
-          />
-          <span className="text-sm sm:text-base text-slate-600 dark:text-white/60 font-bold">ft.</span>
+        // Outside the <label>: a click inside a label is forwarded to its
+        // control, so a distance input nested in the label would toggle the
+        // condition OFF the moment you tried to type in it.
+        <div
+          className={`px-4 sm:px-5 pb-4 sm:pb-5 -mt-1`}
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <label className="block">
+            <span className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1.5">
+              {ftPrompt}
+            </span>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                value={ftValue || ''}
+                onChange={(e) => onFtChange?.(e.target.value)}
+                placeholder="e.g. 75"
+                className={`w-28 sm:w-32 min-h-[44px] px-4 py-2.5 sm:py-3 border-2 ${c.ftBorder} ${c.ftBg} rounded-xl text-base sm:text-lg font-bold text-slate-800 dark:text-white text-center ${c.ftRing} focus:ring-2 focus:outline-none transition-all`}
+              />
+              <span className="text-sm sm:text-base text-slate-600 dark:text-white/60 font-bold">feet</span>
+            </div>
+          </label>
         </div>
       )}
     </div>
@@ -1019,6 +1094,17 @@ export default function ScheduleFormPage() {
   // Toggle state is tracked separately so an accidental toggle-off collapses the
   // section WITHOUT discarding the user's selections (data is preserved in form).
   const [showSafetyReqs, setShowSafetyReqs] = useState(false);
+  /**
+   * Per-service "ladder height = Other" disclosure, keyed by service code.
+   *
+   * Deliberately NOT in scope_details: it is a UI disclosure state, not a fact
+   * about the job, and scope_details is printed field-by-field onto the crew's
+   * ticket (lib/job-ticket-format.ts). Persisting it would put a line reading
+   * "Ladder height other: Yes" on a real ticket. It only has to survive long
+   * enough for someone to type a number into the box it reveals; on reload the
+   * disclosure re-derives from the stored height not being 6 or 12.
+   */
+  const [ladderHeightOther, setLadderHeightOther] = useState<Record<string, boolean>>({});
   const [safetyOtherInput, setSafetyOtherInput] = useState('');
 
   // Site coordinates from Google Places autocomplete (used for drive-time chip)
@@ -1162,9 +1248,18 @@ export default function ScheduleFormPage() {
           // Best-effort map job_orders → form fields
           const sd = j.scope_details || {};
           const sched = j.scheduling_flexibility || {};
-          const compl = j.site_compliance || {};
-          const jc = j.jobsite_conditions || {};
           const removalBlock = sd._removal || {};
+          // ── THE LOAD MUST BE TOTAL ─────────────────────────────────────────
+          // Every control this form renders in edit mode must be able to read
+          // its stored value back, because the PATCH below now SENDS these
+          // objects. A partial load + a sending PATCH = a wipe; a partial load +
+          // a non-sending PATCH = a silent discard (that was the Step 8 bug on
+          // TEST-2026-000103). The only safe combination is total-load + send,
+          // and lib/jobsite-conditions.ts is where both halves are defined so
+          // they cannot drift apart again.
+          const conditions = loadJobsiteConditions(j.jobsite_conditions);
+          const compliance = loadSiteCompliance(j.site_compliance);
+          const loadedPermits = loadPermits(j.permits);
           const cleanScope: Record<string, any> = {};
           for (const [k, v] of Object.entries(sd)) {
             if (k === '_removal') continue;
@@ -1219,8 +1314,38 @@ export default function ScheduleFormPage() {
             difficulty_rating: j.difficulty_rating || (f as any).difficulty_rating,
             additional_notes: j.additional_notes || '',
             project_manager_id: j.project_manager_id || '',
-            // Booleans / nested
-            overcutting_allowed: typeof jc.overcutting_allowed === 'boolean' ? jc.overcutting_allowed : (f as any).overcutting_allowed,
+            // Step 5 — crew start time. Postgres hands back 'HH:MM:SS' and an
+            // <input type="time"> wants 'HH:MM'. Loading this is what makes it
+            // safe to PATCH: without it, re-saving a job that starts at 08:00
+            // would overwrite it with the form's 07:00 default.
+            // NO `|| f.arrival_time` FALLBACK. That default is '07:00', and 17
+            // of 42 live jobs have arrival_time NULL — deliberately, because
+            // nobody has committed to a start time yet. Falling back would load
+            // 07:00 for those, and the PATCH (which now sends arrival_time for
+            // the first time) would write it back, inventing a 7am crew start
+            // that then prints on the customer's dispatch ticket. A blank field
+            // that stays blank is right; fabricating a time on a signed sheet is
+            // worse than the discard bug this whole batch exists to fix.
+            // `payload.arrival_time` already maps '' → null, and a NEW job still
+            // gets 07:00 from the form's initial state.
+            arrival_time: toTimeInputValue(j.arrival_time),
+            special_arrival: typeof sched.special_arrival === 'boolean' ? sched.special_arrival : (f as any).special_arrival,
+            special_arrival_time: toTimeInputValue(sched.special_arrival_time),
+            // Step 6 — compliance, permits, signatures. All total (see above).
+            ...compliance,
+            permit_required: typeof j.permit_required === 'boolean' ? j.permit_required : loadedPermits.length > 0,
+            permits: loadedPermits,
+            permit_other_text: permitOtherText(loadedPermits),
+            require_waiver_signature: !!j.require_waiver_signature,
+            require_completion_signature: !!j.require_completion_signature,
+            // The facility picker reads the top-level column first; the copy
+            // inside site_compliance is the fallback for older rows.
+            facility_id: j.facility_id || compliance.facility_id || '',
+            // Step 7 — PM's time estimate (admin-only).
+            estimated_hours: j.estimated_hours != null ? Number(j.estimated_hours) : null,
+            // Step 8 — jobsite conditions, ALL of them (this used to be the
+            // single `overcutting_allowed` line that caused the data loss).
+            ...conditions,
           }));
           // If the loaded job already has additional safety requirements, start
           // the Step-5 section expanded so the founder can see/edit them.
@@ -1958,20 +2083,7 @@ export default function ScheduleFormPage() {
           out_of_town: form.out_of_town,
           hotel_directions: form.hotel_directions || null,
         },
-        site_compliance: {
-          orientation_required: form.orientation_required,
-          orientation_datetime: form.orientation_datetime || null,
-          badging_required: form.badging_required,
-          badging_type: form.badging_type || null,
-          // Secure-facility flag: operators' photo requirement is waived (with
-          // an explicit skip acknowledgment) when this is true.
-          photos_prohibited: form.photos_prohibited,
-          special_instructions: form.special_instructions || null,
-          attachment_urls: form.compliance_attachment_urls.length > 0 ? form.compliance_attachment_urls : undefined,
-          facility_id: form.facility_id || null,
-          facility_name: form.facility_name || null,
-          facility_requirements: form.facility_requirements || null,
-        },
+        site_compliance: serializeSiteCompliance(form),
         facility_id: form.facility_id || null,
         permit_required: form.permit_required,
         permits: form.permits.length > 0 ? form.permits : undefined,
@@ -1981,27 +2093,7 @@ export default function ScheduleFormPage() {
         difficulty_rating: form.difficulty_rating,
         estimated_hours: form.estimated_hours,
         additional_notes: form.additional_notes || null,
-        jobsite_conditions: {
-          water_available: form.water_available,
-          water_available_ft: form.water_available_ft ? Number(form.water_available_ft) : null,
-          water_control: form.water_control,
-          manpower_provided: form.manpower_provided,
-          scaffolding_provided: form.scaffolding_provided,
-          electricity_available: form.electricity_available,
-          electricity_available_ft: form.electricity_available_ft ? Number(form.electricity_available_ft) : null,
-          inside_outside: form.inside_outside || null,
-          proper_ventilation: form.proper_ventilation,
-          overcutting_allowed: form.overcutting_allowed,
-          cord_480: form.cord_480,
-          cord_480_ft: form.cord_480_ft ? Number(form.cord_480_ft) : null,
-          clean_up_required: form.clean_up_required,
-          high_work: form.high_work,
-          high_work_ft: form.high_work_ft ? Number(form.high_work_ft) : null,
-          high_work_access: form.high_work_access || null,
-          hyd_hose: form.hyd_hose,
-          hyd_hose_ft: form.hyd_hose_ft ? Number(form.hyd_hose_ft) : null,
-          plastic_needed: form.plastic_needed,
-        },
+        jobsite_conditions: serializeJobsiteConditions(form),
       };
 
       // Edit-mode: PATCH the existing job instead of creating a new one.
@@ -2009,11 +2101,28 @@ export default function ScheduleFormPage() {
       // changes actually persist (this was the "lets me edit but doesn't save"
       // bug — the old payload sent only scope/equipment/financials and silently
       // dropped customer, contact, address, location, project, dates, cost, PM).
-      // We deliberately do NOT send jobsite_conditions / site_compliance /
-      // permits / arrival_time / estimated_hours here: the edit-mode load does
-      // not fully re-populate them, so sending form defaults would WIPE the real
-      // values. Those are edited in the schedule board's structured Job Detail
-      // editor (which loads and saves them correctly).
+      //
+      // jobsite_conditions / site_compliance / permits / arrival_time /
+      // estimated_hours USED TO BE EXCLUDED HERE, on the reasoning that the
+      // edit-mode load did not fully re-populate them so sending form defaults
+      // would wipe the real values. The premise was true; the remedy was worse
+      // than the disease. On TEST-2026-000103 the founder ticked five Step 8
+      // conditions, saved, and the row still read `jobsite_conditions: {}` —
+      // the form accepted his input and dropped it on the floor, with a success
+      // toast. A control that silently discards what you type is worse than no
+      // control at all.
+      //
+      // The real fix was upstream: the LOAD is now total (every key the form
+      // writes it also reads — lib/jobsite-conditions.ts, unit-tested for
+      // round-trip equality), and the summary API now returns the columns that
+      // load needs (permits, estimated_hours, duration_working_days,
+      // require_*_signature, facility_id). With a total load, sending is safe,
+      // so everything the form shows in edit mode is now sent.
+      //
+      // The one exception is assigned_form_template_ids: those live in a JOIN
+      // table (job_form_assignments), not a job_orders column, so there is no
+      // PATCH path for them. Rather than leave a picker that discards its
+      // input, that picker is HIDDEN in edit mode (see Step 6).
       let res: Response;
       let result: any;
       if (isEditMode && editJobId) {
@@ -2061,6 +2170,24 @@ export default function ScheduleFormPage() {
             // and changed nothing. Silent, and the kind of thing you only catch
             // by following the second code path.
             is_will_call: payload.is_will_call,
+            // Crew start time + the flexibility block. Both are loaded above,
+            // so both round-trip. arrival_time was previously withheld, which
+            // meant the Step 5 time picker was decorative in edit mode.
+            arrival_time: payload.arrival_time,
+            scheduling_flexibility: payload.scheduling_flexibility,
+            // Step 6 — compliance, permits, signatures, facility.
+            site_compliance: payload.site_compliance,
+            permit_required: payload.permit_required,
+            // `undefined` would be stripped by JSON.stringify and read as "not
+            // sent", so clearing the last permit could never persist. Send [].
+            permits: form.permits,
+            require_waiver_signature: payload.require_waiver_signature,
+            require_completion_signature: payload.require_completion_signature,
+            facility_id: payload.facility_id,
+            // Step 7 — the PM's time estimate.
+            estimated_hours: payload.estimated_hours,
+            // Step 8 — THE FIX. This object is why this task exists.
+            jobsite_conditions: payload.jobsite_conditions,
             // Difficulty / notes / cost
             difficulty_rating: payload.difficulty_rating,
             additional_notes: payload.additional_notes,  // → additional_info
@@ -2884,7 +3011,19 @@ export default function ScheduleFormPage() {
                                           <button
                                             key={opt}
                                             type="button"
-                                            onClick={() => updateScopeDetail(code, 'lift_or_ladder_onsite', selected ? '' : opt)}
+                                            onClick={() => {
+                                              const next = selected ? '' : opt;
+                                              updateScopeDetail(code, 'lift_or_ladder_onsite', next);
+                                              // Anything other than a live "no"
+                                              // makes the follow-up moot; leave
+                                              // no orphaned "we're bringing a
+                                              // 12ft ladder" behind a Yes.
+                                              if (next !== 'no') {
+                                                updateScopeDetail(code, 'we_supply_access', '');
+                                                updateScopeDetail(code, 'ladder_height_ft', '');
+                                                setLadderHeightOther(s => ({ ...s, [code]: false }));
+                                              }
+                                            }}
                                             className={`flex-1 py-2 rounded-xl text-sm font-bold border transition-all capitalize ${
                                               selected
                                                 ? opt === 'yes'
@@ -2898,6 +3037,126 @@ export default function ScheduleFormPage() {
                                         );
                                       })}
                                     </div>
+
+                                    {/* ── "No" IS NOT THE END OF THE QUESTION ──
+                                        Knowing there is no lift onsite is only
+                                        half an answer — somebody still has to
+                                        get up there. If the customer isn't
+                                        supplying it, we are, and the crew needs
+                                        to know WHICH before the truck loads.
+                                        Ladder needs a height (a 6' step-ladder
+                                        and a 12' extension are different loads);
+                                        a lift deliberately does NOT — the
+                                        founder was explicit that he does not
+                                        want lift type or height here. */}
+                                    {form.scope_details[code]?.lift_or_ladder_onsite === 'no' && (
+                                      <div className="mt-3 pt-3 border-t border-amber-200 dark:border-amber-500/30 space-y-3">
+                                        <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                                          Are we supplying a lift or ladder?
+                                        </p>
+                                        <div className="grid grid-cols-3 gap-2">
+                                          {([
+                                            { value: 'lift', label: 'Lift' },
+                                            { value: 'ladder', label: 'Ladder' },
+                                            { value: 'neither', label: 'Neither' },
+                                          ] as const).map(opt => {
+                                            const supplied = form.scope_details[code]?.we_supply_access === opt.value;
+                                            return (
+                                              <button
+                                                key={opt.value}
+                                                type="button"
+                                                onClick={() => {
+                                                  updateScopeDetail(code, 'we_supply_access', supplied ? '' : opt.value);
+                                                  // Leaving Ladder drops the
+                                                  // height with it — a stale
+                                                  // "12 ft" under a Lift answer
+                                                  // is worse than no answer.
+                                                  if (supplied || opt.value !== 'ladder') {
+                                                    updateScopeDetail(code, 'ladder_height_ft', '');
+                                                    setLadderHeightOther(s => ({ ...s, [code]: false }));
+                                                  }
+                                                }}
+                                                className={`px-2 py-2 rounded-lg text-xs font-bold border transition-all min-h-[44px] ${
+                                                  supplied
+                                                    ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                                                    : 'bg-white dark:bg-white/5 text-slate-500 dark:text-white/50 border-slate-200 dark:border-white/10 hover:border-amber-400 hover:text-amber-700'
+                                                }`}
+                                              >
+                                                {opt.label}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+
+                                        {form.scope_details[code]?.we_supply_access === 'ladder' && (() => {
+                                          const height = form.scope_details[code]?.ladder_height_ft || '';
+                                          const isPreset = height === '6' || height === '12';
+                                          // "Other" stays selected while the
+                                          // number box is empty, or the row
+                                          // would collapse the instant it was
+                                          // opened and before anything is typed.
+                                          // Transient UI state, not job data —
+                                          // see the ladderHeightOther comment.
+                                          const otherOpen = !!ladderHeightOther[code];
+                                          return (
+                                            <div className="space-y-2">
+                                              <p className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                                Ladder height
+                                              </p>
+                                              <div className="grid grid-cols-3 gap-2">
+                                                {([
+                                                  { value: '6', label: '6 ft' },
+                                                  { value: '12', label: '12 ft' },
+                                                  { value: 'other', label: 'Other' },
+                                                ] as const).map(opt => {
+                                                  const selected = opt.value === 'other'
+                                                    ? (otherOpen || (!!height && !isPreset))
+                                                    : (!otherOpen && height === opt.value);
+                                                  return (
+                                                    <button
+                                                      key={opt.value}
+                                                      type="button"
+                                                      onClick={() => {
+                                                        if (opt.value === 'other') {
+                                                          setLadderHeightOther(s => ({ ...s, [code]: !otherOpen }));
+                                                          if (!otherOpen && isPreset) updateScopeDetail(code, 'ladder_height_ft', '');
+                                                        } else {
+                                                          setLadderHeightOther(s => ({ ...s, [code]: false }));
+                                                          updateScopeDetail(code, 'ladder_height_ft', selected ? '' : opt.value);
+                                                        }
+                                                      }}
+                                                      className={`px-2 py-2 rounded-lg text-xs font-bold border transition-all min-h-[44px] ${
+                                                        selected
+                                                          ? 'bg-amber-600 text-white border-amber-600 shadow-sm'
+                                                          : 'bg-white dark:bg-white/5 text-slate-500 dark:text-white/50 border-slate-200 dark:border-white/10 hover:border-amber-400 hover:text-amber-700'
+                                                      }`}
+                                                    >
+                                                      {opt.label}
+                                                    </button>
+                                                  );
+                                                })}
+                                              </div>
+                                              {(otherOpen || (!!height && !isPreset)) && (
+                                                <label className="block">
+                                                  <span className="block text-xs font-semibold text-slate-500 dark:text-white/50 mb-1">
+                                                    Height (ft)
+                                                  </span>
+                                                  <input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    min={0}
+                                                    value={height}
+                                                    onChange={e => updateScopeDetail(code, 'ladder_height_ft', e.target.value)}
+                                                    placeholder="e.g. 20"
+                                                    className="w-28 min-h-[44px] px-3 py-2 rounded-xl border-2 border-amber-300 dark:border-amber-500/40 bg-white dark:bg-white/5 text-base font-bold text-slate-800 dark:text-white text-center focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:outline-none transition-all"
+                                                  />
+                                                </label>
+                                              )}
+                                            </div>
+                                          );
+                                        })()}
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -3944,97 +4203,134 @@ export default function ScheduleFormPage() {
                 {form.equipment_needed.length > 0 && (
                   <div className="flex flex-wrap gap-2 mt-3">
                     {asArray<string>(form.equipment_needed).map(eq => (
-                      <div key={eq} className="flex items-center gap-1 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 px-2 py-1.5 rounded-xl text-sm shadow-sm">
+                      // PER-CHIP "Rental?" TOGGLE REMOVED (founder, Aug 2026).
+                      // The panel immediately to the right is "Add Rental
+                      // Equipment" — a dedicated list that already answers
+                      // "what are we renting". Asking the same question a
+                      // second time as a tiny grey pill on every custom chip
+                      // made the two disagree and taught nobody which one the
+                      // dispatch ticket reads.
+                      //
+                      // The COLUMN stays: equipment_rental_flags is read by the
+                      // dispatch PDF (components/pdf/DispatchTicketPDF.tsx) and
+                      // lib/job-ticket-format.ts, so flags already saved on live
+                      // jobs must keep printing. The form still loads and sends
+                      // the object untouched — it just no longer offers a way to
+                      // set it. Removing a chip still clears that chip's flag,
+                      // because a flag for equipment that is no longer on the
+                      // job is orphaned data.
+                      <div key={eq} className="flex items-center gap-1.5 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 pl-3 pr-2 py-2 rounded-xl text-sm shadow-sm">
                         <span className="text-slate-700 dark:text-white/80 font-semibold text-xs">{eq}</span>
                         <button
                           type="button"
-                          onClick={() => updateForm({
-                            equipment_rental_flags: { ...form.equipment_rental_flags, [eq]: !form.equipment_rental_flags[eq] }
-                          })}
-                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded transition-colors ${
-                            form.equipment_rental_flags[eq]
-                              ? 'bg-brand text-white'
-                              : 'bg-slate-200 text-slate-500 hover:bg-brand/10 hover:text-brand'
-                          }`}
-                          title="Toggle rental"
-                        >
-                          {form.equipment_rental_flags[eq] ? '+ Rental' : 'Rental?'}
-                        </button>
-                        <button type="button" onClick={() => {
-                          const flags = { ...form.equipment_rental_flags };
-                          delete flags[eq];
-                          updateForm({
-                            equipment_needed: form.equipment_needed.filter(e => e !== eq),
-                            equipment_rental_flags: flags
-                          });
-                        }} className="ml-0.5 text-slate-400 hover:text-slate-700">×</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-rose-50/50 dark:bg-rose-500/5 border border-rose-200 dark:border-rose-400/20 rounded-2xl p-4 sm:p-5">
-                <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3">Add Rental Equipment</h3>
-                <div className="flex gap-2">
-                  <InputField
-                    icon={Truck}
-                    placeholder="e.g., Scissor Lift, Boom Lift..."
-                    value={form.rental_equipment_input}
-                    onChange={e => updateForm({ rental_equipment_input: e.target.value })}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRentalEquipment(); } }}
-                    className="flex-1"
-                  />
-                  <button
-                    type="button"
-                    onClick={addRentalEquipment}
-                    className="px-4 py-3 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg"
-                  >
-                    Add
-                  </button>
-                </div>
-                {form.equipment_rentals.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {form.equipment_rentals.map((rental, idx) => (
-                      <div key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 border border-rose-200 dark:border-rose-400/20 rounded-xl text-sm font-semibold shadow-sm">
-                        <span className="text-rose-700 dark:text-rose-300">{rental.name}</span>
-                        <button
-                          type="button"
+                          aria-label={`Remove ${eq}`}
                           onClick={() => {
-                            const updated = form.equipment_rentals.map((r, i) =>
-                              i === idx ? { ...r, pickup_required: !r.pickup_required } : r
-                            );
-                            updateForm({ equipment_rentals: updated });
+                            const flags = { ...form.equipment_rental_flags };
+                            delete flags[eq];
+                            updateForm({
+                              equipment_needed: form.equipment_needed.filter(e => e !== eq),
+                              equipment_rental_flags: flags
+                            });
                           }}
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
-                            rental.pickup_required
-                              ? 'bg-amber-100 border-amber-300 text-amber-700'
-                              : 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:bg-amber-50 dark:hover:bg-amber-500/10'
-                          }`}
+                          className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors"
                         >
-                          Pickup: {rental.pickup_required ? 'Yes' : 'No'}
+                          <X size={14} />
                         </button>
-                        <button type="button" onClick={() => updateForm({ equipment_rentals: form.equipment_rentals.filter((_, i) => i !== idx) })} className="text-rose-400 hover:text-rose-700 font-bold">×</button>
                       </div>
                     ))}
                   </div>
                 )}
-                {form.equipment_rentals.length === 0 && (
-                  <p className="mt-2 text-xs text-slate-400 italic">No rental equipment added yet</p>
-                )}
               </div>
+
+              {/* NOT EDITABLE ON AN EXISTING JOB — and shown as a sentence
+                  rather than a dead panel. This block renders a control the
+                  edit-load never populates and the PATCH never sends: opening a
+                  job that HAS rentals showed "No rental equipment added yet",
+                  and anything typed here was dropped behind a success toast.
+                  That is the exact silent-discard bug this batch exists to
+                  remove, and it became load-bearing the moment the printed
+                  ticket started showing a RENTAL block sourced from this data.
+                  Same remedy as the form-template picker above: a control that
+                  cannot round-trip must not be offered. Wiring it properly
+                  (load + allowedFields + the "(PICKUP REQUIRED)" shape) is
+                  filed as follow-up work. */}
+              {isEditMode ? (
+                <p className="text-xs text-slate-500 dark:text-white/40">
+                  Rental equipment isn&apos;t editable here — change it from the job&apos;s detail view.
+                </p>
+              ) : (
+                <div className="bg-rose-50/50 dark:bg-rose-500/5 border border-rose-200 dark:border-rose-400/20 rounded-2xl p-4 sm:p-5">
+                  <h3 className="text-sm font-bold text-slate-800 dark:text-white mb-3">Add Rental Equipment</h3>
+                  <div className="flex gap-2">
+                    <InputField
+                      icon={Truck}
+                      placeholder="e.g., Scissor Lift, Boom Lift..."
+                      value={form.rental_equipment_input}
+                      onChange={e => updateForm({ rental_equipment_input: e.target.value })}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRentalEquipment(); } }}
+                      className="flex-1"
+                    />
+                    <button
+                      type="button"
+                      onClick={addRentalEquipment}
+                      className="px-4 py-3 bg-gradient-to-r from-rose-500 to-red-600 hover:from-rose-600 hover:to-red-700 text-white rounded-xl text-sm font-semibold transition-all shadow-md hover:shadow-lg"
+                    >
+                      Add
+                    </button>
+                  </div>
+                  {form.equipment_rentals.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {form.equipment_rentals.map((rental, idx) => (
+                        <div key={idx} className="inline-flex items-center gap-2 px-3 py-2 bg-white dark:bg-white/5 border border-rose-200 dark:border-rose-400/20 rounded-xl text-sm font-semibold shadow-sm">
+                          <span className="text-rose-700 dark:text-rose-300">{rental.name}</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updated = form.equipment_rentals.map((r, i) =>
+                                i === idx ? { ...r, pickup_required: !r.pickup_required } : r
+                              );
+                              updateForm({ equipment_rentals: updated });
+                            }}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border transition-all ${
+                              rental.pickup_required
+                                ? 'bg-amber-100 border-amber-300 text-amber-700'
+                                : 'bg-slate-100 dark:bg-white/10 border-slate-200 dark:border-white/10 text-slate-500 dark:text-white/40 hover:bg-amber-50 dark:hover:bg-amber-500/10'
+                            }`}
+                          >
+                            Pickup: {rental.pickup_required ? 'Yes' : 'No'}
+                          </button>
+                          <button type="button" onClick={() => updateForm({ equipment_rentals: form.equipment_rentals.filter((_, i) => i !== idx) })} className="text-rose-400 hover:text-rose-700 font-bold">×</button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {form.equipment_rentals.length === 0 && (
+                    <p className="mt-2 text-xs text-slate-400 italic">No rental equipment added yet</p>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* Special Equipment Notes */}
-            <div>
-              <Label>Special Equipment Notes</Label>
-              <TextArea
-                rows={3}
-                placeholder="Any special equipment requirements..."
-                value={form.special_equipment}
-                onChange={e => updateForm({ special_equipment: e.target.value })}
-              />
-            </div>
+            {/* Special Equipment Notes — same story as the rental panel above.
+                Never loaded from the job, never sent by the PATCH, so on an
+                existing job it showed empty regardless of what was there and
+                silently ate anything typed. Hidden on edit rather than left
+                lying. */}
+            {isEditMode ? (
+              <p className="text-xs text-slate-500 dark:text-white/40">
+                Special equipment notes aren&apos;t editable here — change them from the job&apos;s detail view.
+              </p>
+            ) : (
+              <div>
+                <Label>Special Equipment Notes</Label>
+                <TextArea
+                  rows={3}
+                  placeholder="Any special equipment requirements..."
+                  value={form.special_equipment}
+                  onChange={e => updateForm({ special_equipment: e.target.value })}
+                />
+              </div>
+            )}
 
             {/* ── PPE Required ── */}
             <div className="bg-white dark:bg-white/5 rounded-2xl ring-1 ring-slate-200 dark:ring-white/10 shadow-sm p-5">
@@ -4767,7 +5063,20 @@ export default function ScheduleFormPage() {
                 icon={FileText}
               />
 
-              {formTemplates.length > 0 && (
+              {/* HIDDEN IN EDIT MODE, on purpose. Form-template assignments do
+                  not live on job_orders — they are rows in job_form_assignments,
+                  written only by the CREATE route. There is no PATCH path for
+                  them, so in edit mode this picker would load blank, accept
+                  clicks, and save nothing. That is the same silent-discard trap
+                  that lost the Step 8 conditions, and the honest answer while
+                  there's no diff/sync endpoint is not to offer the control.
+                  Assignments are managed from the job's Forms panel. */}
+              {isEditMode && formTemplates.length > 0 && (
+                <p className="text-xs text-slate-500 dark:text-white/40 mt-2">
+                  Form-template assignments aren&apos;t editable here — manage them from the job&apos;s Forms panel.
+                </p>
+              )}
+              {!isEditMode && formTemplates.length > 0 && (
                 <div className="mt-2 space-y-2">
                   <p className="text-xs text-slate-400 dark:text-white/30 font-semibold">Assign Form Templates</p>
                   {formTemplates.map(t => {
@@ -4964,7 +5273,7 @@ export default function ScheduleFormPage() {
                         key={opt}
                         type="button"
                         onClick={() => updateForm({ inside_outside: opt })}
-                        className={`px-6 sm:px-8 py-2.5 sm:py-3 rounded-lg text-sm sm:text-base font-bold transition-all duration-200 capitalize ${
+                        className={`px-6 sm:px-8 py-2.5 sm:py-3 min-h-[44px] rounded-lg text-sm sm:text-base font-bold transition-all duration-200 capitalize ${
                           form.inside_outside === opt
                             ? opt === 'inside'
                               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg'
@@ -4990,6 +5299,9 @@ export default function ScheduleFormPage() {
                   }}
                   label="High Work" icon={Star} showFt ftValue={form.high_work_ft}
                   onFtChange={v => updateForm({ high_work_ft: v })} accentColor="rose"
+                  // Height, not distance — same input, different question.
+                  ftPrompt="How high is the work? (ft)"
+                  ftReadback="ft up"
                 />
 
                 {/* High Work Sub-options */}
@@ -5228,7 +5540,11 @@ export default function ScheduleFormPage() {
         </div>
       </header>
 
-      <div className="max-w-[960px] mx-auto px-4 sm:px-8 py-6 sm:py-10">
+      {/* pb-28: the AI Smart Fill button is `fixed bottom-4 right-4`, i.e. it
+          floats over whatever is at the bottom-right — which at the end of the
+          page is the Save button. The extra bottom padding lets the footer
+          scroll clear of it instead of sitting underneath it. */}
+      <div className="max-w-[960px] mx-auto px-4 sm:px-8 py-6 sm:py-10 pb-28 sm:pb-32">
         {/* ── Step Indicator ───────────────────────────── */}
         <div className="mb-8 sm:mb-10 overflow-x-auto pb-2 -mx-2 px-2">
           <div className="flex gap-1.5 sm:gap-2 min-w-max">
@@ -5306,11 +5622,11 @@ export default function ScheduleFormPage() {
           </div>
 
           {/* ── Navigation ─────────────────────────────── */}
-          <div className="px-6 sm:px-8 lg:px-10 py-5 sm:py-6 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between">
+          <div className="px-4 sm:px-8 lg:px-10 py-5 sm:py-6 border-t border-slate-100 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.03] flex items-center justify-between gap-3">
             <button
               onClick={goPrev}
               disabled={currentStep === 1}
-              className={`flex items-center gap-2 px-5 sm:px-6 py-3 sm:py-3.5 rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 ${
+              className={`flex shrink-0 items-center gap-2 px-4 sm:px-6 py-3 sm:py-3.5 min-h-[48px] whitespace-nowrap rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 ${
                 currentStep === 1
                   ? 'text-slate-300 dark:text-white/20 cursor-not-allowed'
                   : 'bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-slate-600 dark:text-white/80 hover:bg-slate-50 dark:hover:bg-white/10 hover:shadow-md hover:border-slate-300 dark:hover:border-white/20'
@@ -5329,22 +5645,38 @@ export default function ScheduleFormPage() {
                 <ArrowRight size={18} />
               </button>
             ) : (
+              // OVERLAPPING LABEL FIX (founder screenshot, Aug 2026: the button
+              // read "SaveScrpeChanges" over "Save Scope Changes"). The label
+              // was a bare text node in a flex row with no wrapping rule, so
+              // when the footer squeezed it — narrow phone, long label — the
+              // words collapsed into each other instead of the button growing.
+              // The label is now one <span> that will not wrap, and the button
+              // will not shrink below its content (shrink-0 + whitespace-nowrap).
+              //
+              // "Save Scope Changes" also became a LIE the moment this form
+              // started saving conditions, compliance, permits and times as
+              // well. Shorter and true: "Save Changes".
               <button
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="flex items-center gap-2 px-7 sm:px-8 py-3 sm:py-3.5 bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
+                className="flex shrink-0 items-center justify-center gap-2 px-6 sm:px-8 py-3 sm:py-3.5 min-h-[48px] bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 text-white rounded-xl text-sm sm:text-base font-semibold transition-all duration-200 shadow-md hover:shadow-lg disabled:opacity-50"
               >
                 {submitting ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    {isEditMode ? 'Saving Changes...' : 'Creating Job...'}
-                  </>
+                  <Loader2 size={18} className="animate-spin shrink-0" />
                 ) : (
-                  <>
-                    <Check size={18} />
-                    {isEditMode ? 'Save Scope Changes' : 'Submit Schedule Form'}
-                  </>
+                  <Check size={18} className="shrink-0" />
                 )}
+                {/* Verified at 375px: "Submit Schedule Form" + nowrap ran past
+                    the card edge and got clipped. The label shortens on phones
+                    instead of wrapping — a two-line primary button is how the
+                    words ended up on top of each other in the first place. */}
+                <span className="whitespace-nowrap">
+                  {submitting
+                    ? (isEditMode ? 'Saving…' : 'Creating…')
+                    : isEditMode
+                      ? 'Save Changes'
+                      : (<><span className="sm:hidden">Submit</span><span className="hidden sm:inline">Submit Schedule Form</span></>)}
+                </span>
               </button>
             )}
           </div>

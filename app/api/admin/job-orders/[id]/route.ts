@@ -181,6 +181,11 @@ export async function PATCH(
       // until this route's PATCH wired them through.
       'track_financials', 'drive_distance_miles', 'mileage_rate',
       'equipment_cost', 'material_cost', 'other_cost', 'subcontractor_cost',
+      // Step 6 columns the schedule-form editor renders but could not save.
+      // All four verified present + updatable on public.job_orders (prod, Aug
+      // 2026). `permits` is jsonb and goes through jsonbPassthrough below.
+      'permit_required', 'require_waiver_signature', 'require_completion_signature',
+      'facility_id',
     ];
 
     allowedFields.forEach(field => {
@@ -203,6 +208,7 @@ export async function PATCH(
       'jobsite_conditions',
       'equipment_selections',
       'equipment_rental_flags',
+      'permits',
     ];
     for (const f of jsonbPassthrough) {
       if (f in updates) updateFields[f] = updates[f];

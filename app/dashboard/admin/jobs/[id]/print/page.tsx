@@ -5,6 +5,15 @@ export const dynamic = 'force-dynamic';
 import { useEffect, useState, use } from 'react';
 import { authedFetch, isSessionExpired } from '@/lib/authed-fetch';
 import { useBranding } from '@/lib/branding-context';
+// The measurement + equipment + conditions wording is SHARED with the crew's
+// digital ticket (components/ScopeDetailsDisplay). See lib/job-ticket-format.ts
+// for why: two screens formatting the same row differently is a recurring bug
+// class here, and this sheet gets signed by a customer.
+import {
+  formatScopeDetails,
+  groupJobEquipment,
+  formatJobsiteConditions,
+} from '@/lib/job-ticket-format';
 
 // ─── Types (subset of /api/admin/jobs/[id]/summary `data`) ─────────────────────
 
@@ -36,51 +45,12 @@ interface PrintJob {
   additional_safety_requirements?: string[] | null;
   equipment_needed?: string[] | null;
   equipment_selections?: Record<string, Record<string, unknown>> | null;
+  equipment_rentals?: string[] | null;
+  equipment_rental_flags?: Record<string, unknown> | null;
+  /** Per-service measurements from the schedule form (areas / cuts / holes). */
+  scope_details?: Record<string, unknown> | null;
   jobsite_conditions?: Record<string, unknown> | null;
   site_compliance?: Record<string, unknown> | null;
-}
-
-// Human labels for the jobsite_conditions jsonb (+ optional footage keys).
-const CONDITION_FIELDS: { key: string; label: string; ftKey?: string }[] = [
-  { key: 'water_available', label: 'Water available', ftKey: 'water_available_ft' },
-  { key: 'electricity_available', label: 'Power available', ftKey: 'electricity_available_ft' },
-  { key: 'cord_480', label: '480 cord req’d', ftKey: 'cord_480_ft' },
-  { key: 'hyd_hose', label: 'Hyd hose', ftKey: 'hyd_hose_ft' },
-  { key: 'water_control', label: 'Vac water' },
-  { key: 'plastic_needed', label: 'Hang poly' },
-  { key: 'clean_up_required', label: 'Cleanup required' },
-  { key: 'overcutting_allowed', label: 'Overcutting OK' },
-  { key: 'high_work', label: 'High work', ftKey: 'high_work_ft' },
-  { key: 'scaffolding_provided', label: 'Scaffold/lift avail' },
-  { key: 'manpower_provided', label: 'Manpower provided' },
-  { key: 'proper_ventilation', label: 'Proper ventilation' },
-];
-
-function activeConditions(jc: Record<string, unknown> | null | undefined): string[] {
-  if (!jc) return [];
-  const out: string[] = [];
-  for (const { key, label, ftKey } of CONDITION_FIELDS) {
-    if (jc[key]) {
-      const ft = ftKey ? jc[ftKey] : null;
-      out.push(ft ? `${label} (${ft}ft)` : label);
-    }
-  }
-  return out;
-}
-
-function activeEquipmentSelections(sel: Record<string, Record<string, unknown>> | null | undefined): string[] {
-  if (!sel) return [];
-  const out: string[] = [];
-  for (const group of Object.values(sel)) {
-    if (!group || typeof group !== 'object') continue;
-    for (const [key, val] of Object.entries(group)) {
-      if (val && val !== 'no' && val !== 'false' && val !== '0' && val !== false) {
-        const label = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-        out.push(typeof val === 'string' && val !== 'yes' && val !== 'true' ? `${label}: ${val}` : label);
-      }
-    }
-  }
-  return out;
 }
 
 interface PrintScopeItem {
@@ -164,10 +134,22 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
   const arrival = formatTime(job.arrival_time);
   const siteAddress = job.address || job.location || '—';
   const scopeText = job.scope_of_work || job.description;
-  const conditions = activeConditions(job.jobsite_conditions);
-  const insideOutside = (job.jobsite_conditions?.inside_outside as string | undefined) || null;
-  const equipmentNeeded = (job.equipment_needed || []).filter(Boolean);
-  const equipmentSelections = activeEquipmentSelections(job.equipment_selections);
+  // WORK CONDITIONS. `jobsite_conditions` is `{}` on jobs saved while a separate
+  // save bug was live; the shared formatter simply returns [] for that, and the
+  // section hides. When the data IS there it prints every ticked condition —
+  // including its distance run under EITHER key spelling (`*_ft` today,
+  // `*_distance_ft` from the concurrent change): "Power available — 75 ft".
+  const conditions = formatJobsiteConditions(job.jobsite_conditions);
+  // EVERYTHING selected, grouped by service (founder, Aug 16). The old code
+  // showed only the three free-text items and dropped ~16 real picks.
+  const equipmentGroups = groupJobEquipment({
+    equipment_selections: job.equipment_selections,
+    equipment_needed: job.equipment_needed,
+    equipment_rentals: job.equipment_rentals,
+    equipment_rental_flags: job.equipment_rental_flags,
+  });
+  // The measured scope: areas as dimensions + a computed total, not raw JSON.
+  const scopeSections = formatScopeDetails(job.scope_details);
   const ppe = (job.ppe_required || []).filter(Boolean);
   const safety = (job.additional_safety_requirements || []).filter(Boolean);
   const compliance = job.site_compliance || {};
@@ -199,7 +181,9 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
         </button>
       </div>
 
-      <div className="max-w-6xl mx-auto px-8 py-6">
+      {/* py-4 (was py-6) — see the note on `Section`: the sheet was 7px over one
+          landscape page and this is part of the 29px that fixed it. */}
+      <div className="max-w-6xl mx-auto px-8 py-4">
         {/* Header */}
         <div className="border-b-2 border-black pb-3 mb-4">
           <div className="flex items-start justify-between gap-6">
@@ -291,8 +275,32 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
             <Section title="Scope of Work">
               {scopeText ? (
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">{scopeText}</p>
-              ) : (
+              ) : scopeSections.length === 0 ? (
                 <p className="text-sm text-gray-600 italic">No scope description provided.</p>
+              ) : null}
+
+              {/* MEASURED SCOPE (founder, Aug 16): the office enters areas as
+                  L × W × thickness × qty and this sheet printed none of it — the
+                  crew got "HHS/PS — 10 LF" and nothing about the two 10×10 pads.
+                  Rendered as dimensions PLUS the computed total, with the units
+                  spelled out, because the source mixes feet (L/W) and inches
+                  (thickness) and a bare "10 × 10 × 10" is a misread waiting to
+                  happen. Same helper as the crew's digital ticket. */}
+              {scopeSections.length > 0 && (
+                <div className={`space-y-1 ${scopeText ? 'mt-2 pt-2 border-t border-gray-300' : ''}`}>
+                  {scopeSections.map((section) => (
+                    <div key={section.code} className="flex gap-2 text-sm leading-snug">
+                      <span className="w-28 flex-shrink-0 font-semibold uppercase text-[10px] tracking-wide pt-0.5 text-gray-700">
+                        {section.code === '_removal' ? 'Removal' : section.code}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        {section.lines.map((line, i) => (
+                          <span key={i} className="block break-words">{line}</span>
+                        ))}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               )}
             </Section>
 
@@ -328,12 +336,31 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
                 A quick-add job carries no selections, so the crew gets ruled
                 lines to write on rather than the section disappearing — the
                 sheet keeps one shape. (Inferring a kit from the job type is
-                M27b and is deliberately NOT guessed at here.) */}
+                M27b and is deliberately NOT guessed at here.)
+
+                GROUPED BY SERVICE (founder, Aug 16). This box used to print ONLY
+                `equipment_needed` — the three items he had TYPED — and dropped
+                the ~16 items he had actually TICKED per service in
+                `equipment_selections`. "I didn't even click wall saw or slab
+                saw": the sheet named tools he didn't want and omitted the ones
+                he did. CUSTOM is its own row precisely so a typed-in string is
+                never again read as a per-service selection, and RENTAL only
+                appears when there is something to rent.
+
+                Rendered as `·`-separated running text rather than one bordered
+                chip per item: nineteen chips would push this landscape sheet
+                onto a second page, and text wraps inside its row instead of
+                overflowing. */}
             <Section title="Equipment Required">
-              {equipmentNeeded.length > 0 || equipmentSelections.length > 0 ? (
-                <div className="flex flex-wrap gap-1.5">
-                  {[...equipmentNeeded, ...equipmentSelections].map((e, i) => (
-                    <span key={i} className="text-sm border border-gray-500 rounded px-2 py-0.5">{e}</span>
+              {equipmentGroups.length > 0 ? (
+                <div className="space-y-1">
+                  {equipmentGroups.map((group) => (
+                    <div key={group.key} className="flex gap-2 text-sm leading-snug">
+                      <span className="w-28 flex-shrink-0 font-semibold uppercase text-[10px] tracking-wide pt-0.5 text-gray-700">
+                        {group.label}
+                      </span>
+                      <span className="flex-1 min-w-0 break-words">{group.items.join(' · ')}</span>
+                    </div>
                   ))}
                 </div>
               ) : (
@@ -344,10 +371,9 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               )}
             </Section>
 
-            {(conditions.length > 0 || insideOutside) && (
-              <Section title="Jobsite Conditions">
-                {insideOutside && <Field label="Location" value={insideOutside === 'inside' ? 'Inside' : 'Outside'} />}
-                <div className="flex flex-wrap gap-1.5 mt-1">
+            {conditions.length > 0 && (
+              <Section title="Work Conditions">
+                <div className="flex flex-wrap gap-1.5">
                   {conditions.map((c, i) => (
                     <span key={i} className="text-xs border border-gray-400 rounded px-2 py-0.5">{c}</span>
                   ))}
@@ -387,7 +413,13 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="mb-5">
+    // mb-4, not mb-5. Measured against letter LANDSCAPE minus the 0.4in margins
+    // (979 × 739 CSS px): this job's sheet came to 746px — SEVEN pixels onto a
+    // second page — before the measured scope was even added. Four pixels per
+    // section boundary buys 29px of slack and the ticket lands on one page. The
+    // gap is still visible; nothing was compressed to the point of being harder
+    // to read at arm's length on a truck dash.
+    <div className="mb-4">
       <p className="text-xs uppercase tracking-wide font-bold text-gray-700 border-b border-gray-300 pb-1 mb-2">
         {title}
       </p>

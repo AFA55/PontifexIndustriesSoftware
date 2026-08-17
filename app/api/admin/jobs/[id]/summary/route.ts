@@ -35,6 +35,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     const tenantId = auth.tenantId;
 
     // ── 1. Fetch the job ────────────────────────────────────────────────────
+    // NOTE: this is a PostgREST column list, not JavaScript — do NOT put `//`
+    // comments inside the template string, they are sent to the server verbatim.
+    //
+    // duration_working_days / estimated_hours / require_completion_signature /
+    // facility_id are here for the schedule-form EDIT-LOAD. The form renders a
+    // control for each, and its PATCH sends each — so if the load can't read
+    // them back, saving an edit overwrites real values with form defaults.
+    // duration_working_days was exactly that: selected nowhere, loaded as '',
+    // and written back as null, collapsing a multi-day job on every save.
     let jobQuery = supabaseAdmin
       .from('job_orders')
       .select(`
@@ -45,6 +54,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         scheduled_end_date,
         end_date,
         actual_end_date,
+        duration_working_days,
+        estimated_hours,
+        require_completion_signature,
+        facility_id,
         customer_name,
         customer_contact,
         customer_email,
@@ -100,6 +113,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
         equipment_needed,
         equipment_selections,
         equipment_rental_flags,
+        equipment_rentals,
         scope_photo_urls,
         difficulty_rating,
         additional_info,
@@ -563,6 +577,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
             ? ((job as any).permits[0]?.number ?? null)
             : null,
           permit_required: (job as any).permit_required ?? false,
+          // The RAW permit array, not just permits[0].number. The schedule-form
+          // edit-load needs the whole list to repopulate the permit chips; while
+          // only `permit_number` was surfaced, the edit form could not show what
+          // was on the job and the PATCH had to skip permits entirely.
+          permits: Array.isArray((job as any).permits) ? (job as any).permits : [],
           notes: (job as any).completion_notes ?? null,
           internal_notes: null,
           project_name: (job as any).project_name ?? null,
@@ -613,12 +632,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
           // the edit form loaded blanks and a re-save WIPED the stored values
           // (scope photos, rental flags, difficulty, notes). Now they round-trip.
           equipment_rental_flags: (job as any).equipment_rental_flags ?? {},
+          // The printed job ticket groups rentals into their own block; without
+          // this the RENTAL line could never appear on the sheet even when the
+          // office had entered one.
+          equipment_rentals: Array.isArray((job as any).equipment_rentals)
+            ? (job as any).equipment_rentals
+            : [],
           scope_photo_urls: Array.isArray((job as any).scope_photo_urls) ? (job as any).scope_photo_urls : [],
           difficulty_rating: (job as any).difficulty_rating ?? null,
           additional_notes: (job as any).additional_info ?? null,
           // Project manager (office owner of the job).
           project_manager_id: (job as any).project_manager_id ?? null,
           project_manager_name: pmProfile?.full_name ?? null,
+          // Remaining edit-load inputs. Each of these is a control the schedule
+          // form renders in EDIT mode, so each must round-trip or the control is
+          // an input that throws its answer away (the Step 8 bug, again).
+          duration_working_days: (job as any).duration_working_days ?? null,
+          estimated_hours: (job as any).estimated_hours ?? null,
+          require_waiver_signature: (job as any).require_waiver_signature ?? false,
+          require_completion_signature: (job as any).require_completion_signature ?? false,
+          facility_id: (job as any).facility_id ?? null,
           // Job-level route/on-site stamps (the LEAD drives these — the client
           // labels them as the lead's).
           in_route_at: (job as any).in_route_at ?? null,

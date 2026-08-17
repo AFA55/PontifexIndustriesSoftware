@@ -98,6 +98,11 @@ export async function GET(
       operator_name: operatorName,
       helper_name: helperName,
       equipment_needed: job.equipment_needed || [],
+      // The per-service picks — core bits, saws, hoses, pump can. The row is
+      // fetched with `select('*')` so this was always present in `job`; it just
+      // was never forwarded, so the dispatch ticket printed the three free-text
+      // items the office typed and dropped the ~16 actually selected.
+      equipment_selections: job.equipment_selections || {},
       equipment_rentals: job.equipment_rentals || [],
       equipment_rental_flags: job.equipment_rental_flags || {},
       ppe_required: job.ppe_required || [],

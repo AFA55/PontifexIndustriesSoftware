@@ -14,6 +14,7 @@ import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import SubmitRatingModal from './_components/SubmitRatingModal';
 import { formatMaybeDateTime } from '@/lib/dates';
 import { getCardPermission } from '@/lib/rbac';
+import { resolveScheduleBanners, type DispatchBannerStatus } from '@/lib/schedule-banners';
 
 interface PendingRating {
   ratee: { id: string; name: string; role: string };
@@ -54,6 +55,21 @@ export default function MyJobsPage() {
   const visibleContinuing = continuingProjects.filter(
     (j: any) => !shownJobIds.has(j.id) && !visibleMultiDay.some((m: any) => m.id === j.id)
   );
+
+  // ── ONE SURFACE AT A TIME ────────────────────────────────────────────────
+  // Founder, Aug 16: "remove that notification in bright red — have one or the
+  // other. After they click X on the notification then show continuing
+  // projects. Both showing up at once takes up a lot of space."
+  //
+  // NotificationBanner reports whether it owns the slot; the rule (and the
+  // reason 'checking' is not the same as 'no banner') lives in
+  // lib/schedule-banners.ts. A banner the operator NEVER received must never
+  // withhold Continuing Projects — there would be nothing to dismiss.
+  const [dispatchStatus, setDispatchStatus] = useState<DispatchBannerStatus>('checking');
+  const { showContinuingProjects } = resolveScheduleBanners({
+    dispatchStatus,
+    continuingCount: visibleContinuing.length,
+  });
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
   const [scheduleUpdatedBanner, setScheduleUpdatedBanner] = useState(false);
@@ -543,8 +559,8 @@ export default function MyJobsPage() {
       </div>
 
       <div className="container mx-auto px-4 py-5 pb-24 max-w-lg">
-        {/* Notification Banner */}
-        <NotificationBanner />
+        {/* Notification Banner — owns the top of the screen while unread. */}
+        <NotificationBanner onStatusChange={setDispatchStatus} />
 
         {/* Schedule Updated Banner */}
         {scheduleUpdatedBanner && (
@@ -602,48 +618,89 @@ export default function MyJobsPage() {
           </div>
         )}
 
-        {/* Continuing Projects (on_hold / in_progress from past dates) */}
-        {visibleContinuing.length > 0 && (
-          <div className="mb-5 bg-brand/5 border-2 border-brand/30 rounded-2xl overflow-hidden shadow-md">
+        {/* ── Continuing Projects (on_hold / in_progress from past dates) ────
+            DARK MODE WAS UNREADABLE (founder, Aug 16): "make continuing
+            projects easier to see in dark mode". The card had NO dark variants
+            at all, and its surface was `bg-brand/5` — a tenant-brand tint,
+            which over the #0b0618 page renders near-black. So the job name sat
+            at text-slate-800 (#1e293b) on roughly #150819: about 1.3:1, i.e.
+            invisible. Meanwhile the pill and the Resume link were text-brand
+            (Patriot red) — the loudest things on the card were the two least
+            important. The hierarchy was upside down.
+
+            The fix, and why it is written this way for EVERY tenant: in dark
+            mode the type is neutral (white at graded opacity), never the brand
+            colour. Brand red on a dark surface is ~3.9:1 and fails AA — and a
+            tenant is free to pick any primary, so a brand-coloured label can
+            never be guaranteed legible. Brand identity is carried by the solid
+            header band and the status dot, where it is a background and safe.
+            Job name: white on the dark card = 18.6:1. Meta line: white/70 =
+            9.4:1. Both clear AA (4.5:1) with room for a sunlit screen.
+
+            The whole row is now the link, so the tap target is the full ~64px
+            row instead of a 32px text link — one-handed, with gloves. */}
+        {showContinuingProjects && (
+          <div className="mb-5 rounded-2xl overflow-hidden shadow-md border-2 border-brand/30 dark:border-white/15 bg-brand/5 dark:bg-white/[0.04]">
             <div className="flex items-center gap-3 px-4 py-3 bg-brand">
               <PauseCircle className="w-5 h-5 text-white" />
               <h3 className="text-sm font-bold text-white">
-                Continuing Projects ({continuingProjects.length})
+                {/* The DEDUPED count. `continuingProjects.length` counted jobs
+                    already shown as today's ticket, so the header could claim
+                    (2) above a single row. */}
+                Continuing Projects ({visibleContinuing.length})
               </h3>
             </div>
-            <div className="divide-y divide-brand/10">
+            <div className="divide-y divide-brand/10 dark:divide-white/10">
               {visibleContinuing.map((job: any) => (
-                <div key={job.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-brand' : 'bg-orange-400'}`} />
+                <Link
+                  key={job.id}
+                  href={`/dashboard/my-jobs/${job.id}`}
+                  className="flex items-center gap-3 px-4 py-3 min-h-[64px] transition-colors hover:bg-brand/5 dark:hover:bg-white/[0.06] active:bg-brand/10 dark:active:bg-white/10"
+                >
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-brand' : 'bg-orange-400'}`} />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{job.customer_name}</p>
-                    <p className="text-xs text-slate-500 truncate">{job.job_number} &bull; {job.address || job.location || 'No address'}</p>
+                    {/* THE JOB NAME IS THE POINT OF THE CARD — biggest, boldest,
+                        highest contrast element in the row. */}
+                    <p className="text-[15px] font-bold leading-tight truncate text-slate-900 dark:text-white">
+                      {job.customer_name}
+                    </p>
+                    <p className="text-[13px] leading-snug mt-0.5 truncate text-slate-600 dark:text-white/70">
+                      {job.job_number} &bull; {job.address || job.location || 'No address'}
+                    </p>
                     {job.status === 'on_hold' && job.pause_reason && (
-                      <p className="text-xs text-brand mt-0.5 truncate">Hold: {job.pause_reason}</p>
+                      <p className="text-[13px] leading-snug mt-0.5 truncate text-slate-600 dark:text-white/70">
+                        Hold: {job.pause_reason}
+                      </p>
                     )}
+                    {/* slate-500 here was 4.40:1 on the tinted card — a hair
+                        under AA. slate-600 clears it at 7.01:1. */}
                     {job.status === 'on_hold' && job.return_date && (
-                      <p className="text-xs text-brand/70">Return: {job.return_date}</p>
+                      <p className="text-[13px] leading-snug truncate text-slate-600 dark:text-white/65">
+                        Return: {job.return_date}
+                      </p>
                     )}
                   </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {/* Kept at 12px, not shrunk further: the pill is secondary
+                        but still has to be readable in sunlight. The hierarchy
+                        is carried by the 15px bold name above it, not by
+                        making the status too small to read. */}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
-                      job.status === 'on_hold' ? 'bg-brand/10 text-brand' :
-                      job.status === 'pending_completion' ? 'bg-blue-100 text-blue-700' :
-                      'bg-orange-100 text-orange-700'
+                      job.status === 'on_hold' ? 'bg-brand/10 text-brand-dark dark:bg-white/10 dark:text-white/80' :
+                      job.status === 'pending_completion' ? 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-200' :
+                      'bg-orange-100 text-orange-700 dark:bg-amber-400/15 dark:text-amber-200'
                     }`}>
                       {job.status === 'on_hold' ? 'On Hold' :
                        job.status === 'pending_completion' ? 'Awaiting' :
                        'In Progress'}
                     </span>
-                    <Link
-                      href={`/dashboard/my-jobs/${job.id}`}
-                      className="text-xs text-brand font-semibold flex items-center gap-1 hover:text-brand/80 px-2 py-1.5 min-h-[32px]"
-                    >
-                      <PlayCircle className="w-3.5 h-3.5" />
+                    {/* Affordance only — the row itself is the link. */}
+                    <span className="text-[13px] font-semibold flex items-center gap-1 text-brand-dark dark:text-white/90">
+                      <PlayCircle className="w-4 h-4" />
                       Resume
-                    </Link>
+                    </span>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
           </div>

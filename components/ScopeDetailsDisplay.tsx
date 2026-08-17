@@ -5,7 +5,16 @@
  * Renders structured scope details (quantities) from the schedule form.
  * Used by operator job detail and admin views to show core drilling holes,
  * sawing linear feet, depths, etc.
+ *
+ * AREA MATH IS NOT COMPUTED HERE. The square-foot roll-up and the sentence that
+ * states it come from lib/job-ticket-format.ts, which is also what the PRINTED
+ * job ticket renders. The founder printed a ticket on Aug 16 2026 and the areas
+ * were missing from it entirely while this screen showed them — two surfaces,
+ * one row of data, two different answers. One helper, unit-tested, so they
+ * cannot drift apart again.
  */
+
+import { formatScopeAreas } from '@/lib/job-ticket-format';
 
 // Label mapping for field keys → display names
 const FIELD_LABELS: Record<string, string> = {
@@ -231,12 +240,8 @@ type AreaRow = {
 function renderAreas(areasJson: string, fallbackOvercut: boolean) {
   const areas = parseJsonArray<AreaRow>(areasJson, []);
   if (areas.length === 0) return null;
-  const totalSqFt = areas.reduce((sum, a) => {
-    const l = parseFloat(a.length) || 0;
-    const w = parseFloat(a.width) || 0;
-    const q = parseInt(a.qty || '1') || 1;
-    return sum + (l * w * q);
-  }, 0);
+  // SHARED with the printed job ticket — see the file header.
+  const summary = formatScopeAreas(areasJson);
   const hasThickness = areas.some(a => a.thickness);
   const hasQty = areas.some(a => a.qty && parseInt(a.qty) > 1);
   const cols = 2 + (hasThickness ? 1 : 0) + (hasQty ? 1 : 0);
@@ -316,8 +321,11 @@ function renderAreas(areasJson: string, fallbackOvercut: boolean) {
         );
       })}
       <div className="flex flex-wrap items-center gap-3 px-1">
-        {totalSqFt > 0 && (
-          <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{totalSqFt.toLocaleString()} total sq ft</p>
+        {summary && (
+          // The exact sentence the printed ticket carries, so an operator
+          // reading this on a phone and a PM holding the paper are quoting the
+          // same numbers to each other.
+          <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{summary.text}</p>
         )}
         {grandTotalLf > 0 && (
           <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-300">
@@ -360,9 +368,12 @@ export default function ScopeDetailsDisplay({ scopeDetails, compact = false, fal
             if (total > 0) summaryParts.push(`${total.toLocaleString()} LF`);
           }
           if (fields.areas) {
-            const areas = parseJsonArray<{ length: string; width: string; qty?: string }>(fields.areas, []);
-            const total = areas.reduce((s, a) => s + ((parseFloat(a.length) || 0) * (parseFloat(a.width) || 0) * (parseInt(a.qty || '1') || 1)), 0);
-            if (total > 0) summaryParts.push(`${total.toLocaleString()} sq ft`);
+            // Same roll-up as the full view and the printed ticket.
+            const areaSummary = formatScopeAreas(fields.areas);
+            if (areaSummary && areaSummary.totalSquareFeet > 0) {
+              const label = areaSummary.areaCount === 1 ? 'area' : 'areas';
+              summaryParts.push(`${areaSummary.areaCount} ${label} · ${areaSummary.totalSquareFeet.toLocaleString()} sq ft`);
+            }
           }
           // Add regular non-JSON fields
           Object.entries(fields)

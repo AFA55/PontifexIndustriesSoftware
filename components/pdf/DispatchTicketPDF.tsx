@@ -1,6 +1,10 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { asArray } from '@/lib/job-arrays';
+// SHARED with the HTML print page and the crew's digital ticket. Two surfaces
+// formatting the same job differently is a recurring bug class here, and this
+// sheet is the one the customer signs.
+import { groupJobEquipment } from '@/lib/job-ticket-format';
 
 // ── Styles ──────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -122,6 +126,9 @@ interface DispatchTicketData {
   operator_name?: string;
   helper_name?: string;
   equipment_needed?: string[];
+  /** The per-service picks (core bits, saws, hoses). This ticket never read
+   *  them, which is why ~16 selections were missing from the printed sheet. */
+  equipment_selections?: Record<string, Record<string, unknown>> | null;
   equipment_rentals?: string[];
   equipment_rental_flags?: Record<string, boolean>;
   ppe_required?: string[];
@@ -173,43 +180,18 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
   ];
 
   // Equipment checklist items
-  const equipmentItems: { label: string }[] = [
-    { label: 'Wall Saw' },
-    { label: 'Core Rig(s)/Type' },
-    { label: 'Floor Saws/Type' },
-    { label: 'Hand Saws/Type' },
-    { label: 'Chain Saw/Type' },
-    { label: 'Scaffold/Lift' },
-    { label: 'Heavy Equip' },
-    { label: 'Power Pack/Type' },
-    { label: 'Special Vac' },
-    { label: 'Grinders' },
-    { label: 'Chippers/Breakers' },
-    { label: 'Fall Prot Equip' },
-    { label: 'Rigging Equip' },
-  ];
-
-  // Try to match equipment_needed items to checklist
-  const equipNeeded = (job.equipment_needed || []).map(e => e.toLowerCase());
-  const isEquipmentChecked = (label: string) => {
-    const lower = label.toLowerCase();
-    return equipNeeded.some(e =>
-      e.includes('wall') && lower.includes('wall') ||
-      e.includes('core') && lower.includes('core') ||
-      e.includes('floor') && lower.includes('floor') ||
-      e.includes('hand') && lower.includes('hand') ||
-      e.includes('chain') && lower.includes('chain') ||
-      e.includes('scaffold') && lower.includes('scaffold') ||
-      e.includes('vac') && lower.includes('vac') ||
-      e.includes('grind') && lower.includes('grind') ||
-      e.includes('chip') && lower.includes('chip') ||
-      e.includes('break') && lower.includes('break') ||
-      e.includes('rigg') && lower.includes('rigg') ||
-      e.includes('fall') && lower.includes('fall') ||
-      e.includes('power') && lower.includes('power') && !lower.includes('available') ||
-      e === lower
-    );
-  };
+  // The office's ACTUAL selections, grouped by service. This replaced a
+  // hardcoded 13-row checklist plus a fuzzy name matcher that compared the
+  // free-text strings in `equipment_needed` against those labels — which is how
+  // a job where nobody selected "Wall Saw" printed a TICKED Wall Saw box (the
+  // office had typed "Wall Saw" as a custom item), while sixteen genuine picks
+  // sitting in `equipment_selections` never appeared on the sheet at all.
+  const equipmentGroups = groupJobEquipment({
+    equipment_selections: job.equipment_selections,
+    equipment_needed: job.equipment_needed,
+    equipment_rentals: job.equipment_rentals,
+    equipment_rental_flags: job.equipment_rental_flags,
+  });
 
   // Scope details as table rows — parse nested JSON strings for cuts/holes
   const scopeRows: { type: string; qty: string; footage: string; depth: string; wallFloor: string; notes: string }[] = [];
@@ -466,79 +448,39 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                 <Text style={s.sectionTitle}>{"Equipment Req'd"}</Text>
               </View>
               <View style={s.sectionBody}>
-                {/* ONLY THE EQUIPMENT THIS JOB ACTUALLY NEEDS (founder, Aug 15:
-                    "let's just not show the whole list of all equipment — let's
-                    just show the equipment that the admin says we need. Let's
-                    stop showing everything and not doing it.")
+                {/* EVERYTHING THE OFFICE SELECTED, GROUPED BY SERVICE
+                    (founder, Aug 16: "I clicked more than the equipment it
+                    shows — I didn't even click wall saw or slab saw").
 
-                    Thirteen rows printed on every ticket with one or two ticked.
-                    A crew scanning a sheet at 7am reads twelve empty boxes
-                    before finding the two that matter, and a list that is
-                    mostly noise stops being read at all.
+                    THIS is the file that printed his ticket. It read only
+                    `equipment_needed` — the three items typed by hand — and
+                    never touched `equipment_selections`, where the ~16 real
+                    picks live (pump can, slurry ring, four core bits, push saw,
+                    both handsaws, hydraulic hose, gas power pack…). So the
+                    sheet showed the three typed strings and silently dropped
+                    everything actually chosen, and the "Wall Saw" tick was a
+                    NAME MATCH against a typed string, not a selection.
 
-                    The ticked rows still print — they carry the standard
-                    wording ("Core Rig(s)/Type") the office writes against by
-                    hand. Everything unticked is gone. When NOTHING is ticked
-                    the SPECIFIED list below is the whole answer. */}
-                {equipmentItems.filter((item) => isEquipmentChecked(item.label)).map((item) => (
-                  <View key={item.label} style={s.checkRow}>
-                    <View style={s.checkBoxFilled}>
-                      <Text style={s.checkMark}>X</Text>
-                    </View>
-                    <Text style={s.checkLabel}>{item.label}</Text>
-                  </View>
-                ))}
-
-                {/* Nothing matched the standard wording and nothing was
-                    specified — say so, rather than printing an empty panel that
-                    reads like a rendering failure. */}
-                {!equipmentItems.some((item) => isEquipmentChecked(item.label)) &&
-                  !(job.equipment_needed && job.equipment_needed.length > 0) && (
-                    <Text style={{ fontSize: 8, color: '#94A3B8', fontStyle: 'italic' }}>
-                      No equipment specified
-                    </Text>
-                  )}
-
-                {/* List any equipment that doesn't match the standard checklist */}
-                {job.equipment_needed && job.equipment_needed.length > 0 && (
-                  <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
-                    <Text style={{ fontSize: 8, fontWeight: 'bold', color: '#64748B', marginBottom: 2 }}>SPECIFIED:</Text>
-                    {asArray<any>(job.equipment_needed).map((eq, i) => {
-                      const isRental = !!(job.equipment_rental_flags?.[eq]);
-                      return (
-                        <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 1 }}>
-                          <Text style={{ fontSize: 9, color: '#1E293B' }}>• {eq}</Text>
-                          {isRental && (
-                            <View style={{ backgroundColor: '#FEE2E2', borderRadius: 2, paddingHorizontal: 3, paddingVertical: 1, marginLeft: 3, borderWidth: 0.5, borderColor: '#DC2626' }}>
-                              <Text style={{ fontSize: 6, fontWeight: 'bold', color: '#DC2626' }}>RENTAL</Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* Rentals — from legacy equipment_rentals array or derived from flags */}
-                {(() => {
-                  const rentalList = job.equipment_rentals && job.equipment_rentals.length > 0
-                    ? job.equipment_rentals
-                    : job.equipment_needed?.filter(eq => job.equipment_rental_flags?.[eq]) || [];
-                  return rentalList.length > 0 ? (
-                    <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
-                      <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#DC2626', marginBottom: 2 }}>RENTALS:</Text>
-                      <Text style={{ fontSize: 7.5, color: '#DC2626' }}>
-                        {rentalList.join(', ')}
+                    Shares lib/job-ticket-format with the HTML print page and
+                    the crew's digital ticket, so paper and phone cannot drift. */}
+                {equipmentGroups.length === 0 ? (
+                  <Text style={{ fontSize: 8, color: '#94A3B8', fontStyle: 'italic' }}>
+                    No equipment specified
+                  </Text>
+                ) : (
+                  equipmentGroups.map((group) => (
+                    <View key={group.key} style={{ marginBottom: 3 }}>
+                      <Text style={{ fontSize: 7, fontWeight: 'bold', color: '#64748B' }}>
+                        {group.label}
+                      </Text>
+                      {/* One wrapped line, not a box per item — a bordered chip
+                          per pick is what pushes this sheet onto page two. */}
+                      <Text style={{ fontSize: 8, color: '#1E293B', lineHeight: 1.3 }}>
+                        {group.items.join(' · ')}
                       </Text>
                     </View>
-                  ) : null;
-                })()}
-
-                {/* Special equipment */}
-                <View style={{ marginTop: 4, borderTop: '0.5 solid #E2E8F0', paddingTop: 3 }}>
-                  <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#64748B', marginBottom: 2 }}>SPECIAL EQUIP:</Text>
-                  <View style={{ borderBottom: '0.5 solid #CBD5E1', height: 12 }} />
-                </View>
+                  ))
+                )}
               </View>
             </View>
           </View>
