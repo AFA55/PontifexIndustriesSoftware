@@ -48,6 +48,54 @@
 - [ ] **Both nudge routes use the idiom `api-auth.ts` documents as unsafe** — `if (tenantId) q = q.eq('tenant_id', tenantId)` (a NULL tenant bypasses the filter). No live exposure: prod has zero null-`tenant_id` profiles across all five guard roles, and it matches `/api/admin/jobs/[id]/summary`, which feeds the same page. Move both to `resolveTenantScope`.
 - [ ] **`JobDocuments` collapses its whole list on one failed document open** (`error ? <p> : <ul>`), and nothing clears the error until `jobId` changes. Pre-existing.
 
+### 🔜 NEXT TASK — wire Rental Equipment + Special Equipment Notes (founder, Aug 17)
+
+Both controls are currently **hidden in edit mode** (`app/dashboard/admin/schedule-form/page.tsx`,
+search "isEditMode ?" near the rental panel and the notes textarea). That was the
+honest stop-gap: they rendered on an existing job, were never loaded, were never
+sent, and silently ate whatever the office typed behind a success toast. The
+founder asked for them wired properly. Everything below is verified against
+production — do not re-derive it.
+
+**What the data actually looks like (checked Aug 17, real rows):**
+
+| Column | Type | Reality |
+|---|---|---|
+| `equipment_rentals` | jsonb | A **plain array of strings**, e.g. `["Forklift","Floor Scrubber"]` — NOT the `{name, pickup_required}` objects the form's TS type declares. `JOB-2026-852215` has real rentals today. |
+| `special_equipment` | text[] | `["Take 2 drills to help get done faster and water Y connection"]` |
+| `special_equipment_notes` | text | **The same string again.** 4 of 5 populated rows hold identical content in both columns. |
+| `equipment_rental_flags` | jsonb | Still read by `groupJobEquipment` + `DispatchTicketPDF`. The per-chip UI toggle was removed; the column stays. |
+
+**Three decisions to make before writing code:**
+
+1. **`special_equipment` vs `special_equipment_notes` are redundant.** The form has
+   ONE textarea writing both. Pick a canonical column, migrate the other, and stop
+   double-writing — or the next person debugging "which one is real?" pays for it.
+2. **The rental shape mismatch.** Form type is `{name, pickup_required}[]`; the DB
+   holds `string[]`. There is a `" (PICKUP REQUIRED)"` suffix convention in the code
+   — confirm it, then either normalise the column to objects (migration) or make the
+   load/serialize pair own the encoding, the way `lib/jobsite-conditions.ts` does.
+   Do NOT let the form and the ticket each parse the suffix independently.
+3. **`equipment_rentals` prints now.** `groupJobEquipment` renders a RENTAL group on
+   the dispatch ticket and the HTML print page, so whatever shape is chosen has to
+   round-trip through `lib/job-ticket-format.ts` too.
+
+**The work itself:**
+- Add `equipment_rentals`, and the chosen special-equipment column, to `allowedFields`
+  in `app/api/admin/job-orders/[id]/route.ts:163`. Neither is there today, so even a
+  correct client payload is silently dropped.
+- Add the special-equipment column to the summary route's PostgREST select
+  (`app/api/admin/jobs/[id]/summary/route.ts` — it is a template string, NO `//`
+  comments inside it). `equipment_rentals` is already selected and returned.
+- Populate both in the edit-mode load, then send them in the PATCH.
+- Round-trip test in `lib/` pinning a **verbatim production row** (see the table
+  above), the way `lib/jobsite-conditions.test.ts` does.
+- Un-hide both controls in edit mode once the round-trip is proven — not before.
+
+**The rule this sits under, learned the hard way on Aug 16/17:** a field may only be
+editable once the LOAD can re-populate it. Sent-but-not-loaded is a WIPE; loaded-but-
+not-sent is a silent DISCARD. Both are worse than an honestly absent control.
+
 ### 🆕 AUG 16/17 — the day of silent failures, and what it changed
 
 **FIVE separate faults, one disease: something built to tell us what is happening
