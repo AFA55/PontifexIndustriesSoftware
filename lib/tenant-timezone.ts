@@ -13,10 +13,14 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { todayInTz } from '@/lib/reminder-timing';
+import { todayInTz, DEFAULT_TENANT_TZ } from '@/lib/reminder-timing';
 import { startOfDayUTC } from '@/lib/dates';
 
-export const DEFAULT_TENANT_TZ = 'America/New_York';
+// The constant itself now lives in `lib/reminder-timing.ts` (pure — no
+// supabaseAdmin), so payroll-pure and client-bundled modules can share it.
+// Re-exported here so every existing `from '@/lib/tenant-timezone'` import and
+// this module's own role as the tenant-timezone authority are unchanged.
+export { DEFAULT_TENANT_TZ };
 
 export async function getTenantTimezone(tenantId: string | null | undefined): Promise<string> {
   if (!tenantId) return DEFAULT_TENANT_TZ;

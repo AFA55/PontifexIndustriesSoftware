@@ -9,10 +9,12 @@ import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
 import UserAvatar from '@/components/UserAvatar';
 import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
+import { formatDay } from '@/lib/dates';
+import { quotedAmount, QUOTED_AMOUNT_LABEL } from '@/lib/job-quoted-amount';
 import {
   ArrowLeft, Clock, DollarSign, Users, TrendingUp, TrendingDown,
   CheckCircle, AlertTriangle, BarChart3, Calendar, User as UserIcon,
-  Briefcase, Moon, Factory
+  Briefcase, Moon, Factory, Link2Off
 } from 'lucide-react';
 
 interface JobDetail {
@@ -22,7 +24,16 @@ interface JobDetail {
   customer_name: string;
   status: string;
   scheduled_date: string;
+  /** The RESOLVED quote the route already applied `quotedAmount` to. */
   job_quote: number;
+  /**
+   * The raw column the schedule form actually writes. The API has always sent
+   * it; this page declared only `job_quote`, so the field was dropped on
+   * arrival and the page quoted $0 with a blank margin on jobs the Completed
+   * Jobs modal showed a real quote for. Same declare-nothing-and-drop-it shape
+   * as the `attributed` flag. Read it through `quotedAmount`, never directly.
+   */
+  estimated_cost: number | null;
   estimated_hours: number | null;
   track_financials: boolean;
 }
@@ -42,12 +53,26 @@ interface TimecardEntry {
   date: string;
   clock_in_time: string;
   clock_out_time: string | null;
+  /** Hours THIS JOB is charged (bounded), not the card's whole paid day. */
   total_hours: number | null;
+  /** The card's own paid day, and what this job did not get. */
+  raw_hours?: number;
+  excluded_hours?: number;
+  excluded_reason?: 'shop' | 'outside_job_window' | null;
   labor_cost: number;
   hour_type: string;
   is_shop_hours: boolean;
   is_night_shift: boolean;
   is_approved: boolean;
+  /**
+   * TRUE = these hours are ATTRIBUTED, not recorded: the card carries no job
+   * link and counts here because the office placed this person on this job that
+   * day. The API has always sent this; the page declared no field for it, so it
+   * was silently discarded and every row rendered as if it were clocked in
+   * against the job. This screen is the primary admin cost screen — an inferred
+   * hour must never wear the authority of a recorded one on it.
+   */
+  attributed?: boolean;
 }
 
 interface HelperEntry {
@@ -68,6 +93,8 @@ interface WorkerSummary {
   role: string;
   hourly_rate: number | null;
   total_hours: number;
+  /** Of `total_hours`, the part that rests on attribution rather than a clock-in. */
+  attributed_hours?: number;
   labor_cost: number;
   type: string;
 }
@@ -90,8 +117,17 @@ function fmtTime(ts: string): string {
   return new Date(ts).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+/**
+ * A DB `date` column arrives as a bare 'YYYY-MM-DD'. `new Date('2026-08-05')`
+ * is UTC midnight and renders as Aug 4 in every US timezone — the rule
+ * CLAUDE.md forbids and lib/dates.ts exists to enforce. It was wrong here
+ * already; attribution now feeds this row a whole new class of dates.
+ */
 function fmtDate(d: string): string {
-  return new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  if (!d) return '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(d)
+    ? formatDay(d)
+    : new Date(d).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function marginColor(pct: number | null): string {
@@ -116,6 +152,13 @@ export default function JobPnlDetailPage() {
   const [totals, setTotals] = useState<Totals | null>(null);
   const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
   const [labor, setLabor] = useState<LaborBreakdownDTO | null>(null);
+  /**
+   * Days somebody split across jobs, so their card could be given to nobody.
+   * The API has always returned this and the page never read it, which is the
+   * worst of both worlds: the hours below are an undercount and the screen
+   * presented them as complete.
+   */
+  const [unattributableDates, setUnattributableDates] = useState<string[]>([]);
   const [showLaborModal, setShowLaborModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -150,6 +193,7 @@ export default function JobPnlDetailPage() {
         setTotals(result.data.totals);
         setCostBreakdown(result.data.costBreakdown);
         setLabor(result.data.labor || null);
+        setUnattributableDates(result.data.unattributableDates || []);
       }
     } catch (err) {
       console.error('Job P&L detail fetch error:', err);
@@ -165,6 +209,10 @@ export default function JobPnlDetailPage() {
   if (!user) return null;
 
   const profitPositive = (totals?.grossProfit || 0) >= 0;
+  // The quoted figure, by the ONE shared rule the Completed Jobs modal uses.
+  // The route's gross profit / margin are computed from the same function, so
+  // the two can never quote different numbers for the same job.
+  const quoted = quotedAmount(job);
 
   return (
     <div className="min-h-screen bg-[#f8fafc]">
@@ -251,8 +299,10 @@ export default function JobPnlDetailPage() {
                 </p>
                 <div className="pt-3 border-t border-white/20 grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <p className="opacity-60 mb-0.5">Quoted</p>
-                    <p className="font-bold">{totals.jobQuote > 0 ? `$${fmt(totals.jobQuote)}` : '—'}</p>
+                    {/* Same rule and same words as the Completed Jobs modal —
+                        `estimated_cost` first, `job_quote` as the fallback. */}
+                    <p className="opacity-60 mb-0.5">{QUOTED_AMOUNT_LABEL}</p>
+                    <p className="font-bold">{quoted != null && quoted > 0 ? `$${fmt(quoted)}` : '—'}</p>
                   </div>
                   <div>
                     <p className="opacity-60 mb-0.5">Labor Cost</p>
@@ -322,7 +372,7 @@ export default function JobPnlDetailPage() {
                         </td>
                       </tr>
                       <tr>
-                        <td className="px-4 py-3 text-sm text-slate-700">Quote</td>
+                        <td className="px-4 py-3 text-sm text-slate-700">{QUOTED_AMOUNT_LABEL}</td>
                         <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-slate-800">
                           {totals.jobQuote > 0 ? `$${fmt(totals.jobQuote)}` : '—'}
                         </td>
@@ -346,7 +396,12 @@ export default function JobPnlDetailPage() {
               <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden mb-4">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-800">Workers on This Job</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Combined hours and cost per person</p>
+                  {/* This panel merged attributed and clocked hours into one
+                      per-person figure with nothing to tell them apart. The
+                      split is now shown under each total. */}
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Job hours and cost per person — attributed day-card hours called out separately
+                  </p>
                 </div>
                 <div className="divide-y divide-slate-50">
                   {workerSummary.map((w, i) => (
@@ -365,6 +420,11 @@ export default function JobPnlDetailPage() {
                         <div>
                           <p className="text-xs text-slate-400">Hours</p>
                           <p className="text-sm font-bold text-slate-800 tabular-nums">{w.total_hours.toFixed(2)}</p>
+                          {(w.attributed_hours ?? 0) > 0 && (
+                            <p className="text-[10px] font-medium text-sky-700 tabular-nums">
+                              {(w.attributed_hours ?? 0).toFixed(2)} attributed
+                            </p>
+                          )}
                         </div>
                         <div>
                           <p className="text-xs text-slate-400">Labor Cost</p>
@@ -388,12 +448,49 @@ export default function JobPnlDetailPage() {
             )}
 
             {/* Operator Timecard Entries */}
-            {timecardEntries.length > 0 && (
+            {timecardEntries.length > 0 && (() => {
+              const attributedCount = timecardEntries.filter((e) => e.attributed).length;
+              const linkedCount = timecardEntries.length - attributedCount;
+              return (
               <div className="bg-white rounded-xl border border-slate-200/60 shadow-sm overflow-hidden mb-4">
                 <div className="px-5 py-4 border-b border-slate-100">
                   <h3 className="text-sm font-bold text-slate-800">Operator Time Entries</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">{timecardEntries.length} timecard entries linked to this job</p>
+                  {/* This line used to read "N timecard entries LINKED to this
+                      job" for every N, including the jobs where zero cards are
+                      linked and all N reached the job by attribution
+                      (JOB-2026-343888 read "2 … linked" with 0 linked). It now
+                      counts the two classes separately, because the office
+                      writes invoices off this page. */}
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {linkedCount > 0 && `${linkedCount} clocked in against this job`}
+                    {linkedCount > 0 && attributedCount > 0 && ' · '}
+                    {attributedCount > 0 && `${attributedCount} attributed from unlinked day cards`}
+                  </p>
                 </div>
+
+                {attributedCount > 0 && (
+                  <div className="mx-5 mt-4 flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-sky-50 ring-1 ring-sky-200 text-sky-800">
+                    <Link2Off className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Rows marked <span className="font-semibold">(day card)</span> carry no job
+                      link — they count here because the office placed that person on this job, and
+                      only this job, that day. Inferred, not clocked.
+                    </span>
+                  </div>
+                )}
+
+                {unattributableDates.length > 0 && (
+                  <div className="mx-5 mt-4 flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-amber-50 ring-1 ring-amber-200 text-amber-800">
+                    <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>
+                      Somebody split{' '}
+                      {unattributableDates.map((d) => fmtDate(d)).join(', ')} across more than one
+                      job, so their hours could not be given to this one. The hours below are an{' '}
+                      <strong>undercount</strong> for{' '}
+                      {unattributableDates.length === 1 ? 'that day' : 'those days'}.
+                    </span>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
@@ -416,6 +513,16 @@ export default function JobPnlDetailPage() {
                           <tr key={entry.id} className="hover:bg-blue-50/30 transition-colors">
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span className="text-sm font-medium text-slate-800">{entry.worker_name}</span>
+                              {/* Same wording as the labor-cost modal, the
+                                  completed-jobs tile and the printed ticket:
+                                  one label for one idea on every sheet the
+                                  office reads. */}
+                              {entry.attributed && (
+                                <span className="ml-1.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-sky-100 text-sky-700 ring-1 ring-sky-200">
+                                  <Link2Off size={10} />
+                                  day card
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <span className="text-sm text-slate-600">{fmtDate(entry.date)}</span>
@@ -430,10 +537,19 @@ export default function JobPnlDetailPage() {
                                     <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />Active
                                   </span>}
                             </td>
+                            {/* Hours THIS JOB is charged. When the card's own
+                                paid day was larger, say so and why, rather than
+                                quoting a smaller number with no explanation. */}
                             <td className="px-4 py-3 whitespace-nowrap text-right">
                               <span className="text-sm font-bold tabular-nums text-slate-800">
                                 {entry.total_hours != null ? entry.total_hours.toFixed(2) : '—'}
                               </span>
+                              {(entry.excluded_hours ?? 0) > 0 && (
+                                <span className="block text-[10px] text-slate-400 tabular-nums">
+                                  of {(entry.raw_hours ?? 0).toFixed(2)} paid
+                                  {entry.excluded_reason === 'shop' ? ' (shop)' : ' (off job)'}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-right">
                               <span className="text-xs text-slate-500">
@@ -462,7 +578,8 @@ export default function JobPnlDetailPage() {
                   </table>
                 </div>
               </div>
-            )}
+              );
+            })()}
 
             {/* Helper Work Log Entries */}
             {helperEntries.length > 0 && (
@@ -548,6 +665,7 @@ export default function JobPnlDetailPage() {
         onClose={() => setShowLaborModal(false)}
         jobNumber={job?.job_number}
         labor={labor}
+        unattributableDates={unattributableDates}
       />
     </div>
   );

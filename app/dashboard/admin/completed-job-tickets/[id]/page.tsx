@@ -17,6 +17,19 @@ import {
   Image as ImageIcon, Milestone, ChevronRight, Send, PenTool, RefreshCw, Globe, Printer,
 } from 'lucide-react';
 import { formatDay } from '@/lib/dates';
+import { quotedAmount, QUOTED_AMOUNT_LABEL } from '@/lib/job-quoted-amount';
+import {
+  totalDayHours,
+  totalJobHours,
+  attributedDayHours,
+  type CompletedJobDay,
+} from '@/lib/completed-job-days';
+import {
+  formatScopeDetails,
+  groupJobEquipment,
+  formatJobsiteConditions,
+  humanizeValue,
+} from '@/lib/job-ticket-format';
 
 interface CompletionSummary {
   id: string; job_number: string; title: string | null; project_name: string | null;
@@ -24,6 +37,7 @@ interface CompletionSummary {
   address: string | null; location: string | null; job_location: string | null;
   scheduled_date: string | null; completion_signed_at: string | null; work_completed_at: string | null;
   billing_type: string | null; estimated_cost: number | null; actual_cost: number | null;
+  job_quote: number | null;
   expected_scope: Record<string, number> | null; scope_details: Record<string, unknown> | null;
   liability_release_pdf_url: string | null; liability_release_signed_by: string | null;
   liability_release_signed_at: string | null; work_order_pdf_url: string | null;
@@ -35,8 +49,35 @@ interface CompletionSummary {
   assigned_to: string | null; salesman_name: string | null; salesman_id: string | null;
   po_number: string | null; foreman_name: string | null; foreman_phone: string | null;
   description: string | null; scope_of_work: string | null;
+  // EVERYTHING ELSE THE OFFICE COLLECTED. Founder, Aug 17 2026: "even if a job
+  // is completed I would still like to be able to see all the data we
+  // collected, this includes original scope, quote amount." None of these were
+  // rendered on a finished job even though production carries them on most of
+  // them — 9 of 14 completed jobs have `scope_details`, 14 of 14 have PPE.
+  equipment_needed: string[] | null; special_equipment: string[] | null;
+  special_equipment_notes: string | null;
+  equipment_selections: Record<string, Record<string, unknown>> | null;
+  equipment_rentals: string[] | null; equipment_rental_flags: Record<string, unknown> | null;
+  jobsite_conditions: Record<string, unknown> | null;
+  ppe_required: string[] | null; additional_safety_requirements: unknown;
+  permit_required: boolean | null; permits: unknown;
+  directions: string | null; job_site_number: string | null; customer_job_number: string | null;
+  site_contact_phone: string | null;
+  operator_notes: string | null; issues_encountered: string | null;
+  materials_used: string | null; equipment_used: string | null; completion_notes: string | null;
+  is_multi_day: boolean | null; total_days_worked: number | null; total_hours_worked: number | null;
+  require_waiver_signature: boolean | null; utility_waiver_signed: boolean | null;
+  utility_waiver_signed_at: string | null; utility_waiver_signer_name: string | null;
+  scope_photo_urls: string[] | null;
 }
-interface LaborRow { operator_name: string; date: string; regular_hrs: number; ot_hrs: number; ns_hrs: number; total: number; }
+interface LaborRow {
+  operator_name: string; date: string; regular_hrs: number; ot_hrs: number; ns_hrs: number;
+  total: number;
+  /** true = attributed from an unlinked day card, not clocked against this job. */
+  attributed?: boolean;
+  /** true = shop time, which is never job labor; `total` is 0. */
+  shop?: boolean;
+}
 interface BillingMilestone { id: string; label: string; milestone_percent: number; triggered_at: string | null; }
 interface ScopeMetric { label: string; actual: number; expected: number; pct: number; }
 interface Photo { id: string; url: string; caption: string | null; uploaded_at: string; }
@@ -91,6 +132,14 @@ function billingTypeBadge(type: string | null) {
     </span>
   );
 }
+/** A clock timestamp as the office reads it. '--' rather than "Invalid Date". */
+function fmtClock(ts: string | null): string {
+  if (!ts) return '--';
+  const d = new Date(ts);
+  if (!Number.isFinite(d.getTime())) return '--';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 function StarDisplay({ rating, max = 5 }: { rating: number | null; max?: number }) {
   if (rating === null || rating === undefined)
     return <span className="text-slate-400 dark:text-white/40 text-sm">No rating</span>;
@@ -140,6 +189,8 @@ export default function CompletedJobSummaryPage() {
   const [loading, setLoading] = useState(true);
   const [summary, setSummary] = useState<CompletionSummary | null>(null);
   const [laborRows, setLaborRows] = useState<LaborRow[]>([]);
+  const [workDays, setWorkDays] = useState<CompletedJobDay[]>([]);
+  const [unattributableDates, setUnattributableDates] = useState<string[]>([]);
   const [labor, setLabor] = useState<LaborBreakdownDTO | null>(null);
   const [milestones, setMilestones] = useState<BillingMilestone[]>([]);
   const [scopeMetrics, setScopeMetrics] = useState<ScopeMetric[]>([]);
@@ -210,6 +261,8 @@ export default function CompletedJobSummaryPage() {
   const hydrate = (data: any) => {
     setSummary(data.job || data);
     setLaborRows(data.labor_rows || []);
+    setWorkDays(data.work_days || []);
+    setUnattributableDates(data.labor_attribution?.unattributable_dates || []);
     setMilestones(data.billing_milestones || []);
     buildScopeMetrics(data.job || data, data.work_items || []);
     setPhotos(data.photos || []);
@@ -224,11 +277,33 @@ export default function CompletedJobSummaryPage() {
       setSummary(job as CompletionSummary);
       const { data: workItems } = await supabase.from('work_items').select('*').eq('job_order_id', jobId).order('day_number', { ascending: true });
       buildScopeMetrics(job, workItems || []);
-      const { data: timecards } = await supabase.from('timecards').select('*, profiles(full_name)').eq('job_order_id', jobId).order('clock_in', { ascending: true });
+      // COLUMN NAMES. This read `clock_in` (the column is `clock_in_time`) and
+      // `night_shift_hours` (it is `night_shift_premium_hours`), and ordered by
+      // a column that does not exist — so the fallback's labor table showed
+      // "--" dates and zero hours whenever it ran at all. It is also still
+      // job-link-only: this path has no service role, so it cannot apply the
+      // attribution rule. Rows it produces are therefore labelled as clocked,
+      // which is exactly what they are.
+      const { data: timecards } = await supabase
+        .from('timecards')
+        .select('*, profiles(full_name)')
+        .eq('job_order_id', jobId)
+        .order('clock_in_time', { ascending: true });
       if (timecards) {
         setLaborRows(timecards.map((tc: any) => {
-          const reg = Number(tc.regular_hours || 0), ot = Number(tc.overtime_hours || 0), ns = Number(tc.night_shift_hours || 0);
-          return { operator_name: tc.profiles?.full_name || 'Unknown', date: tc.clock_in ? new Date(tc.clock_in).toLocaleDateString() : '--', regular_hrs: reg, ot_hrs: ot, ns_hrs: ns, total: reg + ot + ns };
+          const total = Number(tc.net_hours ?? tc.total_hours) || 0;
+          const ot = Number(tc.overtime_hours || 0);
+          const ns = Number(tc.night_shift_premium_hours || 0);
+          const reg = tc.regular_hours != null ? Number(tc.regular_hours) || 0 : Math.max(0, total - ot);
+          return {
+            operator_name: tc.profiles?.full_name || 'Unknown',
+            date: tc.date || '--',
+            regular_hrs: reg,
+            ot_hrs: ot,
+            ns_hrs: ns,
+            total,
+            attributed: false,
+          };
         }));
       }
       try { const { data: ms } = await supabase.from('billing_milestones').select('*').eq('job_order_id', jobId).order('milestone_percent', { ascending: true }); setMilestones((ms || []) as BillingMilestone[]); } catch (_) {}
@@ -381,10 +456,51 @@ export default function CompletedJobSummaryPage() {
 
   const openPdfViewer = (url: string, title: string) => { setCurrentPdfUrl(url); setCurrentPdfTitle(title); setPdfViewerOpen(true); };
 
+  // Footer totals for the FLAT table below — same rows, so they add up.
   const totalRegular = laborRows.reduce((s, r) => s + r.regular_hrs, 0);
   const totalOT = laborRows.reduce((s, r) => s + r.ot_hrs, 0);
   const totalNS = laborRows.reduce((s, r) => s + r.ns_hrs, 0);
-  const totalHrs = laborRows.reduce((s, r) => s + r.total, 0);
+  const laborRowHrs = laborRows.reduce((s, r) => s + r.total, 0);
+  // THE HEADER TOTAL MUST BE THE SUM OF THE DAYS UNDERNEATH IT. It was summed
+  // from `laborRows`, which are operator cards only — no helper rows — and were
+  // not shop-zeroed, while the day cards it sits above are both. The two agreed
+  // in production only by luck of the data (no helper hours are written yet and
+  // no shop card is attributable to a completed job today). When day data
+  // exists it is the source; the flat table is the degraded fallback path and
+  // keeps its own footer.
+  const totalHrs = workDays.length > 0 ? totalJobHours(workDays) : laborRowHrs;
+  // The crew's PAID hours for those days. Shown beside the billable figure when
+  // they differ, so a smaller "on job" number is explained rather than just
+  // quoted — the office prices a day off this panel.
+  const totalPaidHrs = workDays.length > 0 ? totalDayHours(workDays) : laborRowHrs;
+  const attributedHrs =
+    workDays.length > 0
+      ? attributedDayHours(workDays)
+      : laborRows.filter((r) => r.attributed).reduce((s, r) => s + r.total, 0);
+  const hasAttributedHrs = attributedHrs > 0;
+
+  // The office's own paperwork, as printable lines. Same formatters the printed
+  // job order uses, so a finished job reads the same as the sheet it went out on.
+  const scopeSections = formatScopeDetails(
+    (summary?.scope_details as Record<string, unknown> | null) ?? null
+  );
+  const equipmentGroups = groupJobEquipment({
+    equipment_selections: summary?.equipment_selections ?? null,
+    equipment_needed: summary?.equipment_needed ?? null,
+    equipment_rentals: summary?.equipment_rentals ?? null,
+    equipment_rental_flags: summary?.equipment_rental_flags ?? null,
+  });
+  const conditionLines = formatJobsiteConditions(summary?.jobsite_conditions ?? null);
+  const ppeLines = (summary?.ppe_required ?? []).map((p) => humanizeValue(p)).filter(Boolean);
+  const permitLines = Array.isArray(summary?.permits)
+    ? (summary!.permits as unknown[]).map((p) => humanizeValue(p)).filter(Boolean)
+    : [];
+  const specialEquipment = (summary?.special_equipment ?? []).filter(Boolean);
+  // "Quote amount" (founder), by the ONE shared rule (lib/job-quoted-amount.ts):
+  // `estimated_cost` — what the schedule form writes — then `job_quote`, which
+  // is set on 1 of 48 production jobs. This screen, the Completed Jobs modal
+  // and the P&L page all call the same function now.
+  const quoted = quotedAmount(summary);
   // Labor cost strictly from the API. ratesMissing → show a badge, not a number.
   const laborRatesMissing = !!labor && labor.totals.line_count > 0 && labor.totals.any_rate_missing;
   const laborCost = labor && labor.totals.line_count > 0 && !labor.totals.any_rate_missing
@@ -613,6 +729,186 @@ export default function CompletedJobSummaryPage() {
         </div>
         </RevealSection>
 
+        {/* AS THE OFFICE WROTE IT — the original scope, the quote, the gear,
+            the site conditions, the PPE and the permits. Founder, Aug 17 2026:
+            "even if a job is completed I would still like to be able to see all
+            the data we collected, this includes original scope, quote amount."
+            None of this rendered on a finished job: the route that feeds this
+            screen never SELECTED the columns, so `scope_details` and friends
+            arrived undefined and drew a blank — which looks exactly like never
+            having collected them. Production carries scope_details on 9 of 14
+            completed jobs and PPE on all 14. */}
+        {(scopeSections.length > 0 ||
+          summary.description ||
+          quoted != null ||
+          equipmentGroups.length > 0 ||
+          conditionLines.length > 0 ||
+          ppeLines.length > 0 ||
+          permitLines.length > 0 ||
+          specialEquipment.length > 0 ||
+          summary.special_equipment_notes ||
+          summary.directions) && (
+          <RevealSection index={1}>
+          <div className={SECTION_CARD}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                <FileText className="w-5 h-5 text-violet-600 dark:text-violet-300" />
+                Original Scope &amp; Job Order
+              </h2>
+              {quoted != null && (
+                <span className="inline-flex items-baseline gap-1.5 px-3 py-1 rounded-full bg-emerald-50 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:ring-emerald-400/30">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                    {QUOTED_AMOUNT_LABEL}
+                  </span>
+                  <span className="text-base font-bold tabular-nums text-emerald-700 dark:text-emerald-300">
+                    ${quoted.toLocaleString()}
+                  </span>
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {(scopeSections.length > 0 || summary.description) && (
+                <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-2">
+                    Scope as quoted
+                  </p>
+                  {summary.description && (
+                    <p className="text-sm text-slate-700 dark:text-white/80 mb-3 whitespace-pre-line">
+                      {summary.description}
+                    </p>
+                  )}
+                  {scopeSections.map((s) => (
+                    <div key={s.code} className="mb-2.5 last:mb-0">
+                      <p className="text-xs font-bold text-slate-800 dark:text-white/90">
+                        {s.label}
+                      </p>
+                      <ul className="mt-0.5 space-y-0.5">
+                        {s.lines.map((line, i) => (
+                          <li key={i} className="text-sm text-slate-600 dark:text-white/70 break-words">
+                            {line}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {equipmentGroups.length > 0 && (
+                <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-2">
+                    Equipment
+                  </p>
+                  {equipmentGroups.map((g) => (
+                    <div key={g.key} className="mb-2.5 last:mb-0">
+                      <p className="text-xs font-bold text-slate-800 dark:text-white/90">
+                        {g.label}
+                        {g.sublabel && (
+                          <span className="ml-1.5 font-normal text-slate-400 dark:text-white/40">
+                            {g.sublabel}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-white/70 break-words">
+                        {g.items.join(' · ')}
+                      </p>
+                    </div>
+                  ))}
+                  {specialEquipment.length > 0 && (
+                    <div className="mt-2.5 pt-2.5 border-t border-slate-200 dark:border-white/10">
+                      <p className="text-xs font-bold text-slate-800 dark:text-white/90">Special</p>
+                      <ul className="space-y-0.5">
+                        {specialEquipment.map((e, i) => (
+                          <li key={i} className="text-sm text-slate-600 dark:text-white/70 break-words">
+                            {e}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {summary.special_equipment_notes && (
+                    <p className="mt-2 text-sm text-slate-600 dark:text-white/70 break-words">
+                      {summary.special_equipment_notes}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {conditionLines.length > 0 && (
+                <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-2">
+                    Jobsite conditions
+                  </p>
+                  <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5">
+                    {conditionLines.map((c, i) => (
+                      <li key={i} className="text-sm text-slate-600 dark:text-white/70 break-words">
+                        {c}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {(ppeLines.length > 0 || permitLines.length > 0 || summary.permit_required || summary.directions) && (
+                <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 space-y-3">
+                  {ppeLines.length > 0 && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1.5">
+                        PPE required
+                      </p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {ppeLines.map((p, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30"
+                          >
+                            {p}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {(permitLines.length > 0 || summary.permit_required) && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1.5">
+                        Permits
+                      </p>
+                      {permitLines.length > 0 ? (
+                        <div className="flex flex-wrap gap-1.5">
+                          {permitLines.map((p, i) => (
+                            <span
+                              key={i}
+                              className="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30"
+                            >
+                              {p}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-slate-600 dark:text-white/70">
+                          Permit required — none listed
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {summary.directions && (
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1">
+                        Site directions
+                      </p>
+                      <p className="text-sm text-slate-600 dark:text-white/70 whitespace-pre-line break-words">
+                        {summary.directions}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+          </RevealSection>
+        )}
+
         {/* Scope Completed */}
         {scopeMetrics.length > 0 && (
           <RevealSection index={1}>
@@ -642,25 +938,189 @@ export default function CompletedJobSummaryPage() {
           </RevealSection>
         )}
 
-        {/* Labor Hours */}
+        {/* WORK PERFORMED ← → HOURS, day by day.
+            Founder, Aug 17 2026: "having work performed on one side and their
+            times on the other side, to be able to read data better… showing
+            work performed every day is nice but let's keep that to computer."
+            He prices a day at a time, by hand, off this screen — so on a wide
+            screen the two live side by side and can be read against each other
+            without scrolling. On a phone the pair STACKS (work, then that day's
+            hours) rather than squeezing two columns into 375px. */}
         <RevealSection index={2}>
         <div className={SECTION_CARD}>
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-sky-600 dark:text-sky-300" />
-            Labor Hours
-          </h2>
-          {laborRows.length === 0 ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-sky-600 dark:text-sky-300" />
+              Work Performed &amp; Hours
+            </h2>
+            {totalHrs > 0 && (
+              <span className="text-sm text-slate-500 dark:text-white/60">
+                <span className="font-bold tabular-nums text-slate-900 dark:text-white">
+                  {totalHrs.toFixed(2)}h
+                </span>{' '}
+                on job{workDays.length > 0 ? ` over ${workDays.length} day${workDays.length === 1 ? '' : 's'}` : ''}
+                {totalPaidHrs - totalHrs >= 0.01 && (
+                  <span className="text-slate-400 dark:text-white/40">
+                    {' '}· {totalPaidHrs.toFixed(2)}h paid
+                  </span>
+                )}
+              </span>
+            )}
+          </div>
+
+          {/* ATTRIBUTED ≠ CLOCKED. The office may invoice from these hours, so
+              the two evidence classes never get to look the same. */}
+          {hasAttributedHrs && (
+            <div className="mb-4 flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-sky-50 ring-1 ring-sky-200 text-sky-800 dark:bg-sky-500/10 dark:ring-sky-400/30 dark:text-sky-300">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong className="tabular-nums">{attributedHrs.toFixed(2)}h</strong> of these hours
+                are <strong>attributed</strong>, not clocked against this job — the card carries no
+                job link and counts here because the office placed that person on this job (and only
+                this job) that day. They are marked{' '}
+                <span className="font-semibold">day card</span> below.
+              </span>
+            </div>
+          )}
+          {unattributableDates.length > 0 && (
+            <div className="mb-4 flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-amber-50 ring-1 ring-amber-200 text-amber-800 dark:bg-amber-500/10 dark:ring-amber-400/30 dark:text-amber-300">
+              <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Somebody split{' '}
+                {unattributableDates.map((d) => formatDay(d)).join(', ')} across more than one job,
+                so their hours could not be given to this one. Hours below are an{' '}
+                <strong>undercount</strong> for {unattributableDates.length === 1 ? 'that day' : 'those days'}.
+              </span>
+            </div>
+          )}
+
+          {workDays.length === 0 && laborRows.length === 0 ? (
             <div className="text-center py-8 text-slate-400 dark:text-white/40">
               <Clock className="w-10 h-10 mx-auto mb-2 text-slate-200 dark:text-white/20" />
-              <p className="text-sm">No timecard records found for this job.</p>
+              <p className="text-sm">No hours could be tied to this job.</p>
+              <p className="text-xs mt-1 max-w-sm mx-auto">
+                Nobody clocked in against it, and no crew member&apos;s day card could be attributed
+                to it either.
+              </p>
+            </div>
+          ) : workDays.length > 0 ? (
+            <div className="space-y-4">
+              {workDays.map((day) => (
+                <div
+                  key={day.date}
+                  className="rounded-xl ring-1 ring-slate-200 dark:ring-white/10 overflow-hidden bg-white dark:bg-white/[0.02]"
+                >
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 bg-slate-50 dark:bg-white/[0.04] border-b border-slate-200 dark:border-white/10">
+                    <span className="text-sm font-bold text-slate-900 dark:text-white">
+                      {formatDay(day.date)}
+                    </span>
+                    {day.day_number != null && (
+                      <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300">
+                        Day {day.day_number}
+                      </span>
+                    )}
+                    <span className="ml-auto text-sm font-bold tabular-nums text-slate-900 dark:text-white">
+                      {day.total_job_hours.toFixed(2)}h
+                      {day.total_hours - day.total_job_hours >= 0.01 && (
+                        <span className="ml-1.5 text-[11px] font-medium text-slate-400 dark:text-white/40">
+                          of {day.total_hours.toFixed(2)}h paid
+                        </span>
+                      )}
+                    </span>
+                  </div>
+
+                  {/* One column at ≤ lg (phone/tablet), two side by side above.
+                      `lg:divide-x` only draws the rule once the columns exist. */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 lg:divide-x divide-slate-200 dark:divide-white/10">
+                    <div className="p-4">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-2">
+                        Work performed
+                      </p>
+                      {day.work.length === 0 ? (
+                        <p className="text-sm italic text-slate-400 dark:text-white/40">
+                          Nothing filed for this day.
+                        </p>
+                      ) : (
+                        <ul className="space-y-1.5">
+                          {day.work.map((w, i) => (
+                            <li key={i} className="flex items-start gap-2 text-sm">
+                              <CheckCircle
+                                className={`w-3.5 h-3.5 mt-0.5 flex-shrink-0 ${
+                                  w.kind === 'item'
+                                    ? 'text-emerald-500'
+                                    : 'text-slate-300 dark:text-white/25'
+                                }`}
+                              />
+                              <span className="text-slate-700 dark:text-white/80 min-w-0 break-words">
+                                {w.text}
+                                {w.operator_name && (
+                                  <span className="ml-1.5 text-[11px] text-slate-400 dark:text-white/40">
+                                    — {w.operator_name}
+                                  </span>
+                                )}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+
+                    <div className="p-4 border-t lg:border-t-0 border-slate-200 dark:border-white/10">
+                      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-2">
+                        Hours
+                      </p>
+                      {day.hours.length === 0 ? (
+                        <p className="text-sm italic text-slate-400 dark:text-white/40">
+                          Nobody was on the clock this day.
+                        </p>
+                      ) : (
+                        <ul className="space-y-2">
+                          {day.hours.map((h) => (
+                            <li key={h.key} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                              <span className="font-semibold text-slate-900 dark:text-white">
+                                {h.worker_name}
+                              </span>
+                              {h.attributed && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-400/30">
+                                  day card
+                                </span>
+                              )}
+                              {h.shop && (
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full whitespace-nowrap bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white/60">
+                                  shop
+                                </span>
+                              )}
+                              <span className="ml-auto font-bold tabular-nums text-slate-900 dark:text-white">
+                                {h.job_hours.toFixed(2)}h
+                                {h.hours - h.job_hours >= 0.01 && (
+                                  <span className="ml-1 text-[11px] font-medium text-slate-400 dark:text-white/40">
+                                    of {h.hours.toFixed(2)} paid
+                                  </span>
+                                )}
+                              </span>
+                              <span className="w-full text-xs tabular-nums text-slate-400 dark:text-white/40">
+                                {fmtClock(h.clock_in)} → {h.clock_out ? fmtClock(h.clock_out) : 'still open'}
+                                {h.overtime_hours ? ` · ${h.overtime_hours.toFixed(2)}h OT` : ''}
+                                {h.night_hours ? ` · ${h.night_hours.toFixed(2)}h NS` : ''}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
+            // Degraded path (the client-side Supabase fallback builds no day
+            // view): the flat table is better than nothing.
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-white/[0.03] border-b border-slate-200 dark:border-white/10">
                     {['Operator', 'Date', 'Regular Hrs', 'OT Hrs', 'NS Premium Hrs', 'Total'].map((h) => (
-                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider">
+                      <th key={h} className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 dark:text-white/50 uppercase tracking-wider whitespace-nowrap">
                         {h}
                       </th>
                     ))}
@@ -669,8 +1129,22 @@ export default function CompletedJobSummaryPage() {
                 <tbody>
                   {laborRows.map((row, i) => (
                     <tr key={i} className={i % 2 === 1 ? 'bg-slate-50/70 dark:bg-white/[0.02]' : ''}>
-                      <td className="px-4 py-2.5 text-slate-900 dark:text-white font-medium">{row.operator_name}</td>
-                      <td className="px-4 py-2.5 text-slate-600 dark:text-white/70">{row.date}</td>
+                      <td className="px-4 py-2.5 text-slate-900 dark:text-white font-medium whitespace-nowrap">
+                        {row.operator_name}
+                        {row.attributed && (
+                          <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 dark:bg-sky-500/20 dark:text-sky-200">
+                            day card
+                          </span>
+                        )}
+                        {row.shop && (
+                          <span className="ml-1.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-white/60">
+                            shop
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-slate-600 dark:text-white/70 whitespace-nowrap">
+                        {/^\d{4}-\d{2}-\d{2}$/.test(row.date) ? formatDay(row.date) : row.date}
+                      </td>
                       <td className="px-4 py-2.5 text-slate-700 dark:text-white/80 tabular-nums">{row.regular_hrs.toFixed(1)}</td>
                       <td className="px-4 py-2.5 text-amber-700 dark:text-amber-300 tabular-nums">{row.ot_hrs > 0 ? row.ot_hrs.toFixed(1) : '--'}</td>
                       <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300 tabular-nums">{row.ns_hrs > 0 ? row.ns_hrs.toFixed(1) : '--'}</td>
@@ -682,7 +1156,7 @@ export default function CompletedJobSummaryPage() {
                     <td className="px-4 py-2.5 text-slate-900 dark:text-white tabular-nums">{totalRegular.toFixed(1)}</td>
                     <td className="px-4 py-2.5 text-amber-700 dark:text-amber-300 tabular-nums">{totalOT > 0 ? totalOT.toFixed(1) : '--'}</td>
                     <td className="px-4 py-2.5 text-violet-700 dark:text-violet-300 tabular-nums">{totalNS > 0 ? totalNS.toFixed(1) : '--'}</td>
-                    <td className="px-4 py-2.5 text-slate-900 dark:text-white tabular-nums">{totalHrs.toFixed(1)}</td>
+                    <td className="px-4 py-2.5 text-slate-900 dark:text-white tabular-nums">{laborRowHrs.toFixed(1)}</td>
                   </tr>
                 </tbody>
               </table>

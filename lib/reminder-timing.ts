@@ -5,6 +5,19 @@
  * (the part most likely to silently break) is unit-tested in one place.
  */
 
+/**
+ * The timezone every tenant falls back to when none is set (Patriot's, and the
+ * one the crons already assume).
+ *
+ * IT LIVES IN THIS PURE MODULE, not in `lib/tenant-timezone.ts`, because that
+ * module imports `supabaseAdmin` — so anything client-side or payroll-pure that
+ * needs the default (e.g. `lib/labor-cost.ts`, which the Completed Job Ticket
+ * page bundles) cannot import it from there without dragging the service-role
+ * client into the browser bundle. `lib/tenant-timezone.ts` re-exports this name,
+ * so it remains THE place server code asks "what timezone is this tenant in".
+ */
+export const DEFAULT_TENANT_TZ = 'America/New_York';
+
 /** Parse an "HH:MM" (or "HH:MM:SS") string to minutes-since-midnight. */
 export function parseHHMM(t: string | null | undefined): number | null {
   if (!t) return null;

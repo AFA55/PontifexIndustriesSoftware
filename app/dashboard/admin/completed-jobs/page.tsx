@@ -8,6 +8,13 @@ import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
 import { parseYMDLocal, formatDay, formatMaybeDateTime } from '@/lib/dates';
+import { quotedAmount, QUOTED_AMOUNT_LABEL } from '@/lib/job-quoted-amount';
+import {
+  formatScopeDetails,
+  groupJobEquipment,
+  formatJobsiteConditions,
+  humanizeValue,
+} from '@/lib/job-ticket-format';
 import {
   FileText,
   Clock,
@@ -77,6 +84,30 @@ interface CompletedJob {
   completion_pdf_url: string | null;
   photo_urls: string[] | null;
   helper_assigned_to: string | null;
+  /**
+   * WHAT THE OFFICE WROTE BEFORE THE CREW LEFT. Founder, Aug 17 2026: "even if
+   * a job is completed I would still like to be able to see all the data we
+   * collected, this includes original scope, quote amount." The page already
+   * `select('*')`s these — it simply never rendered them, so a finished job hid
+   * the paperwork it was quoted from. Production carries `scope_details` on 9
+   * of 14 completed jobs and PPE on all 14.
+   */
+  scope_details: Record<string, unknown> | null;
+  estimated_cost: number | null;
+  job_quote: number | null;
+  billing_type: string | null;
+  equipment_needed: string[] | null;
+  special_equipment: string[] | null;
+  special_equipment_notes: string | null;
+  equipment_selections: Record<string, Record<string, unknown>> | null;
+  equipment_rentals: string[] | null;
+  equipment_rental_flags: Record<string, unknown> | null;
+  jobsite_conditions: Record<string, unknown> | null;
+  ppe_required: string[] | null;
+  permit_required: boolean | null;
+  permits: unknown;
+  po_number: string | null;
+  directions: string | null;
 }
 
 interface JobDetails {
@@ -89,11 +120,25 @@ interface JobDetails {
   totalStandbyCost: number;
   totalJobHours: number;
   /**
+   * WHERE `totalJobHours` / `totalHoursWorked` came from, so the tile can name
+   * the number instead of asserting a provenance it may not have:
+   *   'filed'   — summed from the crew's daily logs (or job.total_hours_worked);
+   *   'elapsed' — wall-clock between the job's real start and end timestamps;
+   *   'none'    — neither exists; there is no honest hours figure to print.
+   */
+  hoursSource: 'filed' | 'elapsed' | 'none';
+  /**
    * TRUE labor cost from /api/admin/job-pnl/[id] (bounded hours × wages ×
    * (1 + burden %)). null when the fetch fails or the caller lacks admin
    * access (e.g. salesman) — the tile then shows "—", never an invented rate.
    */
   labor: LaborBreakdownDTO | null;
+  /**
+   * Days somebody split across jobs, so nobody's card could be given to this
+   * one — the job-pnl API returns them and this page dropped them, so the
+   * Labor Cost modal presented a known undercount as the whole picture.
+   */
+  unattributableDates: string[];
   documents: any[];
   // Multi-day metrics
   dailyLogs: any[];
@@ -317,10 +362,21 @@ export default function CompletedJobsArchivePage() {
       const firstLogDate = dailyLogs.length > 0 ? dailyLogs[0].log_date : null;
       const lastLogDate = dailyLogs.length > 0 ? dailyLogs[dailyLogs.length - 1].log_date : null;
 
-      // totalJobHours: use aggregated hours if available, else fall back to timestamp diff
+      // totalJobHours: use aggregated hours if available, else fall back to
+      // timestamp diff.
+      //
+      // SAY WHICH ONE IT IS. The tile over this number reads "as filed on daily
+      // logs", but the fallback below is elapsed WALL-CLOCK, and its end used to
+      // default to `Date.now()` — so a completed job with no logs and no
+      // completion timestamp printed the hours since it was scheduled (days,
+      // eventually hundreds) under a label claiming a crew filed them. The
+      // fallback now requires a real END timestamp; with none, there is no
+      // honest number to show and the tile says so.
       let totalJobHours: number;
+      let hoursSource: 'filed' | 'elapsed' | 'none';
       if (totalHoursWorked > 0) {
         totalJobHours = totalHoursWorked;
+        hoursSource = 'filed';
       } else {
         // `arrival_time` is a bare TEXT clock time ("08:00"), NOT a date.
         // `new Date('08:00')` is Invalid Date, so this whole subtraction was
@@ -333,11 +389,19 @@ export default function CompletedJobsArchivePage() {
           : job.scheduled_date
             ? parseYMDLocal(job.scheduled_date)
             : null;
-        const endTime = new Date(job.completion_signed_at || job.work_completed_at || Date.now());
-        totalJobHours =
-          startTime && !Number.isNaN(startTime.getTime()) && !Number.isNaN(endTime.getTime())
-            ? Math.max(0, (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60))
-            : 0;
+        // A REAL end only. `|| Date.now()` turned "nobody ever closed this job"
+        // into a number that grows every time the modal is opened.
+        const endIso = job.completion_signed_at || job.work_completed_at || null;
+        const endTime = endIso ? new Date(endIso) : null;
+        const measurable =
+          !!startTime &&
+          !Number.isNaN(startTime.getTime()) &&
+          !!endTime &&
+          !Number.isNaN(endTime.getTime());
+        totalJobHours = measurable
+          ? Math.max(0, (endTime!.getTime() - startTime!.getTime()) / (1000 * 60 * 60))
+          : 0;
+        hoursSource = measurable ? 'elapsed' : 'none';
       }
 
       // TRUE labor cost from the job P&L API (bounded hours × real wages ×
@@ -345,6 +409,7 @@ export default function CompletedJobsArchivePage() {
       // if this fetch fails (network / non-admin role) we show "—", never a
       // made-up dollar figure.
       let labor: LaborBreakdownDTO | null = null;
+      let unattributableDates: string[] = [];
       try {
         const pnlRes = await fetch(`/api/admin/job-pnl/${job.id}`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -352,9 +417,11 @@ export default function CompletedJobsArchivePage() {
         if (pnlRes.ok) {
           const pnlJson = await pnlRes.json();
           labor = pnlJson?.data?.labor ?? null;
+          unattributableDates = pnlJson?.data?.unattributableDates ?? [];
         }
       } catch {
         labor = null;
+        unattributableDates = [];
       }
 
       let documents: any[] = [];
@@ -403,7 +470,9 @@ export default function CompletedJobsArchivePage() {
         totalStandbyHours,
         totalStandbyCost,
         totalJobHours,
+        hoursSource,
         labor,
+        unattributableDates,
         documents: signedDocs,
         dailyLogs,
         totalDaysWorked,
@@ -752,9 +821,23 @@ export default function CompletedJobsArchivePage() {
                           {deleteError}
                         </div>
                       )}
-                      <div className="grid grid-cols-2 gap-4 mb-6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                         {[
                           ['Job Number', selectedJobDetails.job.job_number],
+                          // THE QUOTE, by the ONE shared rule
+                          // (lib/job-quoted-amount.ts): `estimated_cost` — what
+                          // the schedule form writes — then `job_quote`, which
+                          // is set on 1 of 48 production jobs. The P&L page and
+                          // its route now call the same function, so the two
+                          // screens cannot quote different numbers.
+                          [
+                            QUOTED_AMOUNT_LABEL,
+                            (() => {
+                              const q = quotedAmount(selectedJobDetails.job);
+                              return q != null ? `$${q.toLocaleString()}` : '—';
+                            })(),
+                          ],
+                          ['PO Number', selectedJobDetails.job.po_number || '—'],
                           [
                             'Customer',
                             selectedJobDetails.job.customer ||
@@ -850,9 +933,30 @@ export default function CompletedJobsArchivePage() {
                           {
                             icon: Clock,
                             label: 'Total Hours',
-                            value: `${selectedJobDetails.totalHoursWorked > 0
-                              ? selectedJobDetails.totalHoursWorked.toFixed(1)
-                              : selectedJobDetails.totalJobHours.toFixed(1)}h`,
+                            value:
+                              selectedJobDetails.hoursSource === 'none'
+                                ? '—'
+                                : `${selectedJobDetails.totalHoursWorked > 0
+                                    ? selectedJobDetails.totalHoursWorked.toFixed(1)
+                                    : selectedJobDetails.totalJobHours.toFixed(1)}h`,
+                            // NAMED, because the Labor Cost tile beside it
+                            // counts something else. This is elapsed time as
+                            // the crew filed it; that one is crew-hours (every
+                            // person's paid time summed). On JOB-2026-343888
+                            // they read 4.9h and 18.27h with nothing to say
+                            // which an invoice takes.
+                            //
+                            // The hint follows the SOURCE. Only the filed case
+                            // may claim a crew filed it; the fallback is
+                            // start-to-finish wall clock and says so, and with
+                            // neither on file the tile shows '—' rather than a
+                            // number wearing a provenance it doesn't have.
+                            hint:
+                              selectedJobDetails.hoursSource === 'filed'
+                                ? 'as filed on daily logs'
+                                : selectedJobDetails.hoursSource === 'elapsed'
+                                  ? 'start to finish — no logs filed'
+                                  : 'no hours on file',
                             tile: 'bg-gradient-to-br from-cyan-500 to-sky-600 shadow-lg shadow-sky-500/30 ring-sky-400/30',
                           },
                           {
@@ -875,6 +979,9 @@ export default function CompletedJobsArchivePage() {
                               </span>
                             </div>
                             <p className="text-3xl font-bold tabular-nums text-white">{m.value}</p>
+                            {'hint' in m && m.hint && (
+                              <p className="text-[11px] font-medium text-white/75 mt-0.5">{m.hint}</p>
+                            )}
                           </div>
                         ))}
 
@@ -919,6 +1026,16 @@ export default function CompletedJobsArchivePage() {
                               tap for breakdown
                             </span>
                           )}
+                          {/* An attributed hour is inferred, not recorded. The
+                              tile says so before the office writes it onto an
+                              invoice — the breakdown behind it names every
+                              line. */}
+                          {(selectedJobDetails.labor?.totals.attributed_line_count ?? 0) > 0 && (
+                            <span className="block text-[11px] font-semibold text-white/90 mt-1 tabular-nums">
+                              incl. {(selectedJobDetails.labor?.totals.attributed_hours ?? 0).toFixed(1)}h
+                              attributed
+                            </span>
+                          )}
                         </button>
                       </div>
 
@@ -951,21 +1068,41 @@ export default function CompletedJobsArchivePage() {
                         <JobDocuments jobId={selectedJobDetails.job.id} />
                       </div>
 
-                      {/* Scope */}
+                      {/* Scope — as quoted, next to what came back.
+                          `grid-cols-2` with no breakpoint squashed both halves
+                          into ~160px each at 375px; the pair now stacks on a
+                          phone and sits side by side from `md` up. */}
                       <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 mb-6">
                         <h3 className="font-bold text-slate-900 dark:text-white mb-3 text-sm">
                           Original Scope vs Work Performed
                         </h3>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
                             <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1">
                               Original Description
                             </p>
-                            <p className="text-sm text-slate-700 dark:text-white/80">
+                            <p className="text-sm text-slate-700 dark:text-white/80 whitespace-pre-line break-words">
                               {selectedJobDetails.job.description ||
                                 selectedJobDetails.job.scope_of_work ||
                                 'No description'}
                             </p>
+                            {/* THE MEASURED SCOPE — the numbers the job was
+                                quoted from. Stored on 9 of 14 completed jobs
+                                and never once shown here. */}
+                            {formatScopeDetails(selectedJobDetails.job.scope_details).map((s) => (
+                              <div key={s.code} className="mt-2.5">
+                                <p className="text-xs font-bold text-slate-800 dark:text-white/90">
+                                  {s.label}
+                                </p>
+                                <ul className="mt-0.5 space-y-0.5">
+                                  {s.lines.map((line, i) => (
+                                    <li key={i} className="text-sm text-slate-600 dark:text-white/70 break-words">
+                                      {line}
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            ))}
                           </div>
                           <div>
                             <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1">
@@ -976,7 +1113,7 @@ export default function CompletedJobsArchivePage() {
                                 {selectedJobDetails.workPerformed.map((item, idx) => (
                                   <li key={idx} className="flex items-start gap-2">
                                     <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
-                                    <span>
+                                    <span className="min-w-0 break-words">
                                       {item.name || item.work_type || 'Work item'}{' '}
                                       {(item.quantity ?? item.linear_feet_cut ?? 0) > 1 ? `(x${item.quantity ?? item.linear_feet_cut})` : ''}
                                     </span>
@@ -991,6 +1128,132 @@ export default function CompletedJobsArchivePage() {
                           </div>
                         </div>
                       </div>
+
+                      {/* THE REST OF THE JOB ORDER. Equipment, site conditions,
+                          PPE and permits are collected on every job and were
+                          dropped the moment it was marked complete — the office
+                          had to reopen the dispatch sheet to answer "what did
+                          we send them out with". */}
+                      {(() => {
+                        const j = selectedJobDetails.job;
+                        const groups = groupJobEquipment({
+                          equipment_selections: j.equipment_selections,
+                          equipment_needed: j.equipment_needed,
+                          equipment_rentals: j.equipment_rentals,
+                          equipment_rental_flags: j.equipment_rental_flags,
+                        });
+                        const conditions = formatJobsiteConditions(j.jobsite_conditions);
+                        const ppe = (j.ppe_required || []).map((p) => humanizeValue(p)).filter(Boolean);
+                        const permits = Array.isArray(j.permits)
+                          ? (j.permits as unknown[]).map((p) => humanizeValue(p)).filter(Boolean)
+                          : [];
+                        const special = (j.special_equipment || []).filter(Boolean);
+                        if (
+                          groups.length === 0 &&
+                          conditions.length === 0 &&
+                          ppe.length === 0 &&
+                          permits.length === 0 &&
+                          special.length === 0 &&
+                          !j.special_equipment_notes &&
+                          !j.permit_required
+                        ) {
+                          return null;
+                        }
+                        return (
+                          <div className="rounded-xl p-4 bg-slate-50 ring-1 ring-slate-200 dark:bg-white/[0.03] dark:ring-white/10 mb-6">
+                            <h3 className="font-bold text-slate-900 dark:text-white mb-3 text-sm">
+                              Job Order Details
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {(groups.length > 0 || special.length > 0 || j.special_equipment_notes) && (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1">
+                                    Equipment
+                                  </p>
+                                  {groups.map((g) => (
+                                    <div key={g.key} className="mb-2 last:mb-0">
+                                      <p className="text-xs font-bold text-slate-800 dark:text-white/90">
+                                        {g.label}
+                                      </p>
+                                      <p className="text-sm text-slate-600 dark:text-white/70 break-words">
+                                        {g.items.join(' · ')}
+                                      </p>
+                                    </div>
+                                  ))}
+                                  {special.map((e, i) => (
+                                    <p key={i} className="text-sm text-slate-600 dark:text-white/70 break-words mt-1">
+                                      {e}
+                                    </p>
+                                  ))}
+                                  {j.special_equipment_notes && (
+                                    <p className="text-sm text-slate-600 dark:text-white/70 break-words mt-1">
+                                      {j.special_equipment_notes}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              {conditions.length > 0 && (
+                                <div>
+                                  <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1">
+                                    Jobsite Conditions
+                                  </p>
+                                  <ul className="space-y-0.5">
+                                    {conditions.map((c, i) => (
+                                      <li key={i} className="text-sm text-slate-600 dark:text-white/70 break-words">
+                                        {c}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              )}
+                              {(ppe.length > 0 || permits.length > 0 || j.permit_required) && (
+                                <div className="md:col-span-2 flex flex-wrap gap-4">
+                                  {ppe.length > 0 && (
+                                    <div>
+                                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1.5">
+                                        PPE Required
+                                      </p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {ppe.map((p, i) => (
+                                          <span
+                                            key={i}
+                                            className="px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30"
+                                          >
+                                            {p}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                  {(permits.length > 0 || j.permit_required) && (
+                                    <div>
+                                      <p className="text-xs font-semibold uppercase text-slate-500 dark:text-white/50 mb-1.5">
+                                        Permits
+                                      </p>
+                                      <div className="flex flex-wrap gap-1.5">
+                                        {permits.length > 0 ? (
+                                          permits.map((p, i) => (
+                                            <span
+                                              key={i}
+                                              className="px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30"
+                                            >
+                                              {p}
+                                            </span>
+                                          ))
+                                        ) : (
+                                          <span className="text-sm text-slate-600 dark:text-white/70">
+                                            Required — none listed
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Ratings */}
                       {(selectedJobDetails.job.customer_overall_rating ||
@@ -1380,6 +1643,17 @@ export default function CompletedJobsArchivePage() {
         onClose={() => setShowLaborModal(false)}
         jobNumber={selectedJobDetails?.job.job_number}
         labor={selectedJobDetails?.labor ?? null}
+        unattributableDates={selectedJobDetails?.unattributableDates ?? []}
+        reportedTotalHours={
+          // Only a figure with a source. 'none' means nothing was ever filed or
+          // stamped, and the modal must not compare its costed hours against a
+          // number nobody reported.
+          selectedJobDetails && selectedJobDetails.hoursSource !== 'none'
+            ? selectedJobDetails.totalHoursWorked > 0
+              ? selectedJobDetails.totalHoursWorked
+              : selectedJobDetails.totalJobHours
+            : null
+        }
       />
     </div>
   );

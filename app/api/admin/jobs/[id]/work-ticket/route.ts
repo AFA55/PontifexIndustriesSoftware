@@ -26,7 +26,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { notFoundInCompany } from '@/lib/tenant-scope';
 import { toLocalYMD } from '@/lib/dates';
-import { attributableTimecards } from '@/lib/job-clock-attribution';
+import { attributableTimecards, TIMECARD_ATTRIBUTION_SELECT } from '@/lib/job-clock-attribution';
 import { STANDBY_HOURLY_RATE, STANDBY_MINIMUM_HOURS } from '@/lib/legal/standby-policy';
 import {
   buildTicketDays,
@@ -176,10 +176,18 @@ export async function GET(request: NextRequest, context: RouteContext) {
         ].filter(Boolean) as string[]
       )
     );
+    // `tenantId` is passed like every other read on this route. Without it the
+    // helper's own queries run unscoped under `supabaseAdmin` (which bypasses
+    // RLS): a second tenant's placement on the same date can make one of these
+    // people look "placed on 2 jobs" and their card is dropped — a silent
+    // cross-tenant UNDER-count on the sheet the office files.
     const { cards: attributedCards } = await attributableTimecards(
       jobId,
       ticketUserIds,
-      ticketDates
+      ticketDates,
+      TIMECARD_ATTRIBUTION_SELECT,
+      'timecards',
+      tenantId
     );
     const timecards = attributedCards as TicketTimecardRow[];
 

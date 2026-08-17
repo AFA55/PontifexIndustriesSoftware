@@ -12,7 +12,7 @@
  */
 
 import { Modal } from '@/components/ui/Modal';
-import { AlertTriangle, Clock, DollarSign, Factory, HardHat, User } from 'lucide-react';
+import { AlertTriangle, Clock, DollarSign, Factory, HardHat, Link2Off, User } from 'lucide-react';
 
 export interface LaborBreakdownLineDTO {
   id: string;
@@ -26,6 +26,8 @@ export interface LaborBreakdownLineDTO {
   bounded_hours: number;
   excluded_hours: number;
   excluded_reason: 'shop' | 'outside_job_window' | null;
+  /** true = inferred from the office's placement, not tagged by the operator. */
+  attributed?: boolean;
   hourly_rate: number | null;
   rate_missing: boolean;
   burden_pct: number;
@@ -44,6 +46,10 @@ export interface LaborBreakdownDTO {
     total: number;
     any_rate_missing: boolean;
     line_count: number;
+    linked_hours?: number;
+    attributed_hours?: number;
+    attributed_total?: number;
+    attributed_line_count?: number;
   };
 }
 
@@ -71,14 +77,38 @@ export default function LaborCostBreakdown({
   onClose,
   jobNumber,
   labor,
+  unattributableDates,
+  reportedTotalHours,
 }: {
   open: boolean;
   onClose: () => void;
   jobNumber?: string | null;
   labor: LaborBreakdownDTO | null;
+  /**
+   * Days somebody split across jobs, so their card could be given to nobody.
+   * `/api/admin/job-pnl/[id]` has always returned these; the completed-jobs
+   * archive did not pass them, so on JOB-2026-124747 and JOB-2026-364026 a real
+   * 7.74h card was excluded as split and this modal presented the remainder as
+   * the complete picture.
+   */
+  unattributableDates?: string[];
+  /**
+   * The "Total Hours" the surrounding screen shows (job_orders.total_hours_worked,
+   * i.e. what the operators FILED on their daily logs). It is a different
+   * measurement from bounded crew-hours — one job-elapsed, one per-person — and
+   * on JOB-2026-343888 the tile read 4.9h beside a breakdown of 18.27h. Pass it
+   * and the modal reconciles the two in words instead of leaving the office to
+   * guess which is the billable one.
+   */
+  reportedTotalHours?: number | null;
 }) {
   const lines = labor?.lines || [];
   const totals = labor?.totals || null;
+  const splitDates = unattributableDates || [];
+  const reported =
+    reportedTotalHours != null && Number.isFinite(reportedTotalHours) && reportedTotalHours > 0
+      ? reportedTotalHours
+      : null;
 
   return (
     <Modal
@@ -101,14 +131,49 @@ export default function LaborCostBreakdown({
         <div className="py-10 text-center">
           <Clock className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-white/20" />
           <p className="text-sm font-semibold text-slate-600 dark:text-white/70">
-            No time entries linked to this job
+            No hours could be tied to this job
           </p>
-          <p className="text-xs text-slate-400 dark:text-white/40 mt-1">
-            Labor cost appears once operators clock in with this job selected.
+          {/* The old copy — "No time entries LINKED to this job… clock in with
+              this job selected" — described the query, not the world. It was
+              shown on jobs the crew had demonstrably worked, because the cost
+              path only ever asked for cards carrying a job_order_id. Now that
+              the day cards are attributed too, an empty modal really does mean
+              nobody's day can be tied here, and the copy says why. */}
+          <p className="text-xs text-slate-400 dark:text-white/40 mt-1 max-w-xs mx-auto">
+            Nobody was clocked in on this job, and no crew member&apos;s day card could be
+            attributed to it — either they were placed elsewhere that day, or they split
+            the day across jobs.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
+          {(totals?.attributed_line_count ?? 0) > 0 && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-sky-50 ring-1 ring-sky-200 text-sky-800 dark:bg-sky-500/10 dark:ring-sky-400/30 dark:text-sky-300">
+              <Link2Off className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                <strong>
+                  {(totals?.attributed_hours ?? 0).toFixed(2)}h of{' '}
+                  {(totals?.bounded_hours ?? 0).toFixed(2)}h are attributed
+                </strong>{' '}
+                — those cards carry no job link, and count here because the office placed
+                that person on this job (and only this job) that day. Lines marked{' '}
+                <span className="font-semibold">(day card)</span> below. The rest were
+                clocked in against this job directly.
+              </span>
+            </div>
+          )}
+
+          {splitDates.length > 0 && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-amber-50 ring-1 ring-amber-200 text-amber-800 dark:bg-amber-500/10 dark:ring-amber-400/30 dark:text-amber-300">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+              <span>
+                Somebody split {splitDates.map((d) => fmtLineDate(d) || d).join(', ')} across more
+                than one job, so their hours could not be given to this one. This total is an{' '}
+                <strong>undercount</strong> for {splitDates.length === 1 ? 'that day' : 'those days'}.
+              </span>
+            </div>
+          )}
+
           {totals?.any_rate_missing && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl text-sm bg-amber-50 ring-1 ring-amber-200 text-amber-800 dark:bg-amber-500/10 dark:ring-amber-400/30 dark:text-amber-300">
               <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
@@ -138,6 +203,15 @@ export default function LaborCostBreakdown({
                         {String(l.role).replace(/_/g, ' ')}
                       </span>
                     )}
+                    {/* Same wording as the printed work ticket's crew grouping,
+                        deliberately: one label for one idea across every sheet
+                        the office reads. */}
+                    {l.attributed && (
+                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold whitespace-nowrap bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/20 dark:text-sky-200 dark:ring-sky-400/30">
+                        <Link2Off className="w-2.5 h-2.5" />
+                        day card
+                      </span>
+                    )}
                   </div>
                   <span className="text-sm font-bold tabular-nums text-slate-900 dark:text-white">
                     {l.rate_missing ? (
@@ -156,7 +230,7 @@ export default function LaborCostBreakdown({
                     {fmtSpanTime(l.span_start)} → {l.span_end ? fmtSpanTime(l.span_end) : 'active'}
                   </span>
                   <span className="font-semibold text-slate-700 dark:text-white/80 tabular-nums">
-                    {l.bounded_hours.toFixed(2)}h on job
+                    {l.bounded_hours.toFixed(2)}h {l.attributed ? 'attributed' : 'on job'}
                   </span>
                   {l.excluded_hours > 0 && (
                     <span className="inline-flex items-center gap-1 text-slate-400 dark:text-white/40">
@@ -194,6 +268,12 @@ export default function LaborCostBreakdown({
                   <p className="text-lg font-bold tabular-nums text-slate-900 dark:text-white">
                     {totals.bounded_hours.toFixed(2)}
                   </p>
+                  {(totals.attributed_line_count ?? 0) > 0 && (
+                    <p className="text-[10px] font-medium text-sky-700 dark:text-sky-300 tabular-nums mt-0.5">
+                      {(totals.linked_hours ?? 0).toFixed(2)} clocked ·{' '}
+                      {(totals.attributed_hours ?? 0).toFixed(2)} attributed
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-white/50">
@@ -220,6 +300,25 @@ export default function LaborCostBreakdown({
                   </p>
                 </div>
               </div>
+
+              {/* TWO DIFFERENT MEASUREMENTS, NAMED. The tile behind this modal
+                  shows what the operators filed on their daily logs — elapsed
+                  time on the job. This shows crew-hours: every person's paid
+                  time, added up. Three people for four hours is 4 filed and 12
+                  billable, so the numbers SHOULD differ; what they must not do
+                  is sit on one screen unlabelled, which is how 4.9h and 18.27h
+                  appeared together on JOB-2026-343888 with nothing to say which
+                  one an invoice takes. */}
+              {reported != null && Math.abs(reported - totals.bounded_hours) >= 0.05 && (
+                <p className="mt-3 pt-3 border-t border-emerald-200/70 dark:border-emerald-400/20 text-[11px] leading-relaxed text-slate-600 dark:text-white/60">
+                  The job&apos;s <span className="font-semibold">{reported.toFixed(2)}h</span>{' '}
+                  &quot;total hours&quot; is what the crew FILED on their daily logs — how long the
+                  job ran. The{' '}
+                  <span className="font-semibold">{totals.bounded_hours.toFixed(2)}h</span> above is
+                  CREW-hours, every person&apos;s paid time added together. Labor cost is built from
+                  the crew-hours.
+                </p>
+              )}
             </div>
           )}
         </div>

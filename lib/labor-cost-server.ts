@@ -7,16 +7,21 @@
  *  - GET /api/admin/job-pnl/[id]        → returns the breakdown to the UI
  *    (job P&L page, completed-jobs modal, completed-job-tickets page all
  *    render labor from that API — no more per-screen hardcoded rates).
- *  - /api/admin/invoices (+ /preview)   → uses the totals for the T&M labor
- *    line when wages are set.
+ *
+ * NOT a consumer, despite what this header used to claim: /api/admin/invoices
+ * does its own thing and has never imported from here. The fetch-and-assemble
+ * variant written for it (`computeJobLaborBreakdown`) had zero callers and was
+ * deleted rather than left as a second, drifting copy of the rules below.
  *
  * Server-only: imports supabaseAdmin. Never import from client components.
  */
 
 import { supabaseAdmin } from './supabase-admin';
 import {
-  boundedJobHours,
+  cardSpanHours,
+  jobHoursForCard,
   laborLine,
+  paidCardHours,
   round2,
   DEFAULT_LABOR_BURDEN_PCT,
   type BoundableCard,
@@ -40,6 +45,14 @@ export interface LaborBreakdownLine {
   excluded_hours: number;
   /** Why hours were excluded, when they were. */
   excluded_reason: 'shop' | 'outside_job_window' | null;
+  /**
+   * TRUE = these hours are ATTRIBUTED, not recorded: the card carries no
+   * `job_order_id`, and it counts here because the office placed this person on
+   * this job that day (or they touched no other job). The office invoices from
+   * this screen, so the distinction has to survive all the way to the pixel —
+   * see lib/job-clock-attribution.ts.
+   */
+  attributed: boolean;
   hourly_rate: number | null;
   rate_missing: boolean;
   burden_pct: number;
@@ -56,6 +69,14 @@ export interface LaborBreakdownTotals {
   /** True when any line with job hours has no wage set — the total is an UNDERCOUNT. */
   any_rate_missing: boolean;
   line_count: number;
+  /** Of `bounded_hours`, how many came from cards LINKED to this job. */
+  linked_hours: number;
+  /** Of `bounded_hours`, how many were ATTRIBUTED from an unlinked day card. */
+  attributed_hours: number;
+  /** Of `total`, the dollars that rest on attributed hours. */
+  attributed_total: number;
+  /** How many lines are attributed — lets a caller say "3 of 5 day cards". */
+  attributed_line_count: number;
 }
 
 export interface LaborBreakdown {
@@ -90,7 +111,19 @@ interface TimecardRowLike extends BoundableCard {
   role?: string | null;
   hourly_rate?: number | null;
   date?: string | null;
+  /** Lunch-deducted payroll hours. Preferred over `total_hours` — see `paidHours`. */
+  net_hours?: number | null;
 }
+
+/**
+ * The hours this card's owner was PAID for — the ceiling on what the job can be
+ * charged, `null` when not yet known. THE RULE LIVES IN `lib/labor-cost.ts` so
+ * this file and `lib/completed-job-days.ts` (the Work-Performed panel rendered
+ * beside this cost) can never quote different hours for the same card. They
+ * drifted once: the day-panel copy mapped `Number(null) → 0` before filtering,
+ * so a NULL `total_hours` became a zero cap and won the `min()`.
+ */
+const paidHours = paidCardHours;
 
 interface HelperProfileLike {
   full_name?: string | null;
@@ -119,27 +152,53 @@ export function buildLaborBreakdown(args: {
   helperLogs: HelperLogRowLike[] | null | undefined;
   burdenPct: number;
   now?: Date;
+  /**
+   * Ids of timecards that reached this job by ATTRIBUTION rather than by a
+   * `job_order_id` link (from `attributableTimecards`). Omit and every card is
+   * treated as linked, which is the pre-attribution behaviour.
+   */
+  attributedTimecardIds?: Set<string>;
 }): LaborBreakdown {
   const { job, burdenPct } = args;
   const now = args.now ?? new Date();
+  const attributedIds = args.attributedTimecardIds ?? new Set<string>();
   const lines: LaborBreakdownLine[] = [];
 
   for (const t of args.timecards || []) {
-    const bounded = boundedJobHours(t, job, now);
+    const attributed = attributedIds.has(t.id);
+    // WHEN AN ATTRIBUTED CARD IS NOT CUT TO THE JOB WINDOW — AND WHEN IT IS.
+    // `work_started_at`/`work_completed_at` are the ON-SITE window of a single
+    // visit, and on a multi-day job they only ever hold one of the days —
+    // JOB-2026-124747 in production records Aug 6 12:14→19:36 and nothing for
+    // Aug 5. Intersecting Dante's 9.54h Aug 5 card with that window yields
+    // 0.00h: the day the office is trying to bill would vanish a second time,
+    // now with a decimal point on it. On THAT day the card's own span is the
+    // right bound, because attribution has already proven the whole day went
+    // here (the office placed him on this job and only this job).
+    //
+    // But that reasoning covers exactly one case: a card on a day the window
+    // does not describe. Skipping the clip unconditionally handed the MORE
+    // speculative evidence class the MORE generous bound, and production showed
+    // what that costs — JOB-2026-343888 billed 18.27 attributed crew-hours
+    // against a single-day 11:46→16:38 window its own daily log measured at
+    // 4.87h, on the same screen where a LINKED card was clipped 9.76h → 0.61h.
+    // So the window is skipped ONLY when the card's day falls outside it; when
+    // the day IS inside, the measurement wins, linked or attributed alike.
+    // The rule itself is `jobHoursForCard` in lib/labor-cost.ts — shared with
+    // the Completed Job Ticket's hours panel, which is read beside this cost
+    // while an invoice is being written and must not quote a different figure.
+    const paid = paidHours(t);
+    const bounded = jobHoursForCard(t, job, attributed, now);
     const isShop =
       t.is_shop_hours === true ||
       t.is_shop_time === true ||
       (typeof t.work_location === 'string' && t.work_location.toLowerCase() === 'shop');
     // raw = the card's own paid hours (lunch-adjusted), else its clocked span.
-    const spanHours =
-      t.clock_in_time && t.clock_out_time
-        ? Math.max(0, (new Date(t.clock_out_time).getTime() - new Date(t.clock_in_time).getTime()) / 3600000)
-        : 0;
-    // Open cards (no clock-out, no total yet) have no span/paid hours — show
-    // the bounded figure as the raw too rather than a nonsensical 0 < bounded.
-    const raw = round2(
-      Math.max(t.total_hours != null ? Number(t.total_hours) || 0 : spanHours, bounded)
-    );
+    // An OPEN card has no paid figure yet (`net_hours` is written 0.00 and
+    // `total_hours` NULL until clock-out), so its span runs to `now` under the
+    // 16h guard — never 0, which would render "0.00h raw" beside live bounded
+    // hours and explain nothing.
+    const raw = round2(Math.max(paid != null ? paid : cardSpanHours(t, now), bounded));
     const excluded = round2(Math.max(0, raw - bounded));
     const rate = t.hourly_rate != null && Number(t.hourly_rate) > 0 ? Number(t.hourly_rate) : null;
     const math = laborLine(bounded, rate ?? 0, burdenPct);
@@ -155,6 +214,7 @@ export function buildLaborBreakdown(args: {
       bounded_hours: bounded,
       excluded_hours: excluded,
       excluded_reason: excluded > 0 ? (isShop ? 'shop' : 'outside_job_window') : null,
+      attributed,
       hourly_rate: rate,
       rate_missing: rate == null && bounded > 0,
       burden_pct: burdenPct,
@@ -191,6 +251,8 @@ export function buildLaborBreakdown(args: {
       bounded_hours: bounded,
       excluded_hours: excluded,
       excluded_reason: excluded > 0 ? 'shop' : null,
+      // A helper_work_log is already a job-scoped row — it names this job.
+      attributed: false,
       hourly_rate: rate,
       rate_missing: rate == null && bounded > 0,
       burden_pct: burdenPct,
@@ -200,6 +262,7 @@ export function buildLaborBreakdown(args: {
     });
   }
 
+  const attributedLines = lines.filter((l) => l.attributed);
   const totals: LaborBreakdownTotals = {
     bounded_hours: round2(lines.reduce((s, l) => s + l.bounded_hours, 0)),
     base: round2(lines.reduce((s, l) => s + l.base_cost, 0)),
@@ -207,48 +270,13 @@ export function buildLaborBreakdown(args: {
     total: round2(lines.reduce((s, l) => s + l.total_cost, 0)),
     any_rate_missing: lines.some((l) => l.rate_missing),
     line_count: lines.length,
+    linked_hours: round2(
+      lines.filter((l) => !l.attributed).reduce((s, l) => s + l.bounded_hours, 0)
+    ),
+    attributed_hours: round2(attributedLines.reduce((s, l) => s + l.bounded_hours, 0)),
+    attributed_total: round2(attributedLines.reduce((s, l) => s + l.total_cost, 0)),
+    attributed_line_count: attributedLines.length,
   };
 
   return { burden_pct: burdenPct, lines, totals };
-}
-
-/**
- * Fetch-and-assemble variant for callers that don't already hold the rows
- * (invoice generation). Tenant-scoped when tenantId is provided. Returns null
- * only when the job can't be found.
- */
-export async function computeJobLaborBreakdown(
-  jobId: string,
-  tenantId: string | null
-): Promise<LaborBreakdown | null> {
-  let jobQuery = supabaseAdmin
-    .from('job_orders')
-    .select('id, tenant_id, work_started_at, route_started_at, work_completed_at')
-    .eq('id', jobId);
-  if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
-  const { data: job, error: jobError } = await jobQuery.maybeSingle();
-  if (jobError || !job) return null;
-
-  const [{ data: timecards }, { data: helperLogs }, burdenPct] = await Promise.all([
-    supabaseAdmin
-      .from('timecards_with_users')
-      .select('*')
-      .eq('job_order_id', jobId)
-      .order('clock_in_time', { ascending: true }),
-    supabaseAdmin
-      .from('helper_work_logs')
-      .select(
-        'id, log_date, hours_worked, started_at, completed_at, is_shop_ticket, profiles!helper_work_logs_helper_id_fkey (full_name, role, hourly_rate)'
-      )
-      .eq('job_order_id', jobId)
-      .order('log_date', { ascending: true }),
-    getTenantLaborBurdenPct((job as { tenant_id?: string | null }).tenant_id ?? tenantId),
-  ]);
-
-  return buildLaborBreakdown({
-    job: job as unknown as JobWindow,
-    timecards: (timecards || []) as unknown as TimecardRowLike[],
-    helperLogs: (helperLogs || []) as unknown as HelperLogRowLike[],
-    burdenPct,
-  });
 }

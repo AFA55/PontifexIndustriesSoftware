@@ -5,6 +5,9 @@
  */
 import {
   boundedJobHours,
+  cardDayIsInsideJobWindow,
+  cardPayrollDay,
+  jobHoursForCard,
   laborLine,
   clampDailyLogHours,
   round2,
@@ -114,6 +117,90 @@ describe('boundedJobHours — interval intersection', () => {
 
   it('no clock_in → 0', () => {
     expect(boundedJobHours(card({ clock_in_time: null }), job(), NOW)).toBe(0);
+  });
+});
+
+// ── THE NIGHT CARD ─────────────────────────────────────────────────────────
+// `cardDayIsInsideJobWindow` decides whether an ATTRIBUTED card gets clipped to
+// the job's on-site window. "Inside" is the answer that APPLIES the clip, so a
+// wrong "inside" deletes hours. It used to answer from a UNION of the card's
+// `date` column and the UTC day of its clock-in — two representations that
+// disagree by a day on any evening card, in the direction that zeroes it.
+//
+// Production carries this card class: one card has `date` 2026-08-16 with a
+// 22:02 local clock-in (2026-08-17 in UTC), plus three `is_night_shift` cards.
+describe('cardDayIsInsideJobWindow — the payroll day of record wins', () => {
+  // 22:00 Aug 14 → 06:00 Aug 15 EDT, filed on payroll day Aug 14.
+  const nightCard = {
+    date: '2026-08-14',
+    clock_in_time: '2026-08-15T02:00:00Z', // 22:00 Aug 14 EDT
+    clock_out_time: '2026-08-15T10:00:00Z', // 06:00 Aug 15 EDT
+    net_hours: 8,
+    total_hours: 8,
+  };
+  // The job was on site Aug 15, 08:00–16:00 EDT.
+  const aug15Window = {
+    work_started_at: '2026-08-15T12:00:00Z',
+    route_started_at: null,
+    work_completed_at: '2026-08-15T20:00:00Z',
+  };
+
+  it('an evening card dated the day BEFORE the window is OUTSIDE it', () => {
+    // The old union said `true` via the UTC-derived '2026-08-15' alone, and the
+    // clip against a window these hours never touched returned 0.00h of 8.00
+    // paid — a whole night's work gone, printed as "off job".
+    expect(cardDayIsInsideJobWindow(nightCard, aug15Window)).toBe(false);
+  });
+
+  it('so the attributed night card keeps its whole paid day', () => {
+    expect(jobHoursForCard(nightCard, aug15Window, true)).toBe(8);
+  });
+
+  it('and the same card IS clipped when it is not attributed (recorded link)', () => {
+    // A LINKED card is clipped regardless — the window is evidence about it.
+    expect(jobHoursForCard(nightCard, aug15Window, false)).toBe(0);
+  });
+
+  it('a card dated INSIDE the window is still clipped (the 18.27h regression)', () => {
+    const dayCard = {
+      date: '2026-08-15',
+      clock_in_time: '2026-08-15T11:00:00Z', // 07:00 EDT
+      clock_out_time: '2026-08-15T21:00:00Z', // 17:00 EDT
+      net_hours: 10,
+      total_hours: 10,
+    };
+    expect(cardDayIsInsideJobWindow(dayCard, aug15Window)).toBe(true);
+    expect(jobHoursForCard(dayCard, aug15Window, true)).toBe(8); // 08:00–16:00
+  });
+
+  it('falls back to the clock-in day in the TENANT zone, never UTC', () => {
+    // Same instant, no `date` column: 22:00 Aug 14 Eastern is Aug 14 to the
+    // office and Aug 15 to the server. The office is right.
+    const undated = { ...nightCard, date: null };
+    expect(cardPayrollDay(undated)).toBe('2026-08-14');
+    expect(cardPayrollDay(undated, 'UTC')).toBe('2026-08-15');
+    expect(cardDayIsInsideJobWindow(undated, aug15Window)).toBe(false);
+  });
+
+  it('window bounds are read in the same zone as the card day', () => {
+    // An evening window: 21:00 Aug 14 EDT → 01:00 Aug 15 EDT. In UTC both
+    // bounds land on Aug 15, and the Aug 14 card would test as OUTSIDE.
+    const eveningWindow = {
+      work_started_at: '2026-08-15T01:00:00Z',
+      route_started_at: null,
+      work_completed_at: '2026-08-15T05:00:00Z',
+    };
+    expect(cardDayIsInsideJobWindow(nightCard, eveningWindow)).toBe(true);
+  });
+
+  it('no window at all → nothing to clip against', () => {
+    expect(
+      cardDayIsInsideJobWindow(nightCard, {
+        work_started_at: null,
+        route_started_at: null,
+        work_completed_at: null,
+      })
+    ).toBe(false);
   });
 });
 

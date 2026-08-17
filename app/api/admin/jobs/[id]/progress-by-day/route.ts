@@ -41,7 +41,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
-import { attributableTimecards } from '@/lib/job-clock-attribution';
+import { attributableTimecards, TIMECARD_ATTRIBUTION_SELECT } from '@/lib/job-clock-attribution';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -183,8 +183,21 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // real ones, 101 invented. On Parkk Concrete alone, Aug 4 showed 28.19
     // crew-hours of which 18.36 were simultaneously billed to two other jobs.
     // That is the founder's original complaint, re-created by the fix for it.
+    //
+    // `tenantId` is passed for the same reason the gate above exists: the
+    // helper's reads run under `supabaseAdmin`, which bypasses RLS, and
+    // `job_daily_assignments` is filtered on DATES alone. A second tenant's
+    // placement on the same day can make one of these people look "placed on 2
+    // jobs", and their card is then dropped — a cross-tenant UNDER-count.
     const { cards: timecards, splitDates: unattributableDates } =
-      await attributableTimecards(jobId, jobOperatorIds, jobLogDates);
+      await attributableTimecards(
+        jobId,
+        jobOperatorIds,
+        jobLogDates,
+        TIMECARD_ATTRIBUTION_SELECT,
+        'timecards',
+        tenantId
+      );
 
     // ── scope_progress summary (cumulative totals) ───────────────────────────
     const scopeProgress = loaded.scope_progress;
