@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
+import { parseStorageRef } from '@/lib/job-ticket-photos';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor'];
 
@@ -63,6 +64,33 @@ export async function POST(
 
     if (!photo_urls || !Array.isArray(photo_urls)) {
       return NextResponse.json({ error: 'photo_urls array required' }, { status: 400 });
+    }
+
+    // VALIDATE WHAT GOES IN, not just what comes out.
+    //
+    // This endpoint used to append any array of strings it was handed, and the
+    // gate is only "assigned to this job" — so any operator could store an
+    // arbitrary URL on a job. Those strings are later parsed for a bucket and a
+    // path and read with the SERVICE-ROLE client (which ignores storage RLS)
+    // when the dispatch ticket is printed, and operators may print dispatch
+    // tickets. A crafted URL therefore meant reading another company's files.
+    //
+    // parseStorageRef is now origin- and bucket-locked; this is the same rule
+    // applied at the door, so the bad value never reaches the row. Defence at
+    // both ends: the reader must not trust stored data, and the writer must not
+    // store data the reader would refuse.
+    const rejected = photo_urls.filter(
+      (u: unknown) => typeof u !== 'string' || parseStorageRef(u) === null
+    );
+    if (rejected.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            'Each photo must be an uploaded job or scope photo from this workspace.',
+          rejected_count: rejected.length,
+        },
+        { status: 400 }
+      );
     }
 
     // Atomic append using SQL to avoid race condition

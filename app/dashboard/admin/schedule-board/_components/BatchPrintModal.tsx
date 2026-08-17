@@ -62,22 +62,44 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
       const results: { id: string; job_number: string; blob: Blob }[] = [];
       const errors: string[] = [];
 
-      await Promise.all(
-        selected.map(async (job) => {
+      // THREE AT A TIME, not all of them at once.
+      //
+      // This fired every selected job simultaneously. Each of those requests now
+      // also pulls the job's photos out of Storage and inlines them, so a
+      // morning batch of a dozen tickets meant a dozen concurrent PDF renders,
+      // each doing several parallel storage reads. That is how you turn "print
+      // the day's tickets" into a stampede against your own rate limits — and
+      // the failure lands on the office at 6:45am with the crew waiting.
+      //
+      // Order of `results` no longer matches selection order, but the caller
+      // sorts/labels by job_number, so nothing downstream depends on it.
+      const CONCURRENT_PRINTS = 3;
+      let cursor = 0;
+      const printWorker = async () => {
+        for (;;) {
+          const i = cursor;
+          cursor += 1;
+          if (i >= selected.length) return;
+          const job = selected[i];
           try {
+            // eslint-disable-next-line no-await-in-loop
             const res = await fetch(`/api/job-orders/${job.id}/dispatch-pdf`, {
               headers: { Authorization: `Bearer ${session.access_token}` },
             });
             if (!res.ok) {
               errors.push(`${job.job_number}: ${res.statusText}`);
-              return;
+              continue;
             }
+            // eslint-disable-next-line no-await-in-loop
             const blob = await res.blob();
             results.push({ id: job.id, job_number: job.job_number, blob });
           } catch {
             errors.push(`${job.job_number}: Network error`);
           }
-        })
+        }
+      };
+      await Promise.all(
+        Array.from({ length: Math.min(CONCURRENT_PRINTS, selected.length) }, printWorker)
       );
 
       if (results.length === 0) {

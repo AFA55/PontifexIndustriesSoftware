@@ -1,10 +1,11 @@
 import React from 'react';
-import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { Document, Page, Text, View, Image, StyleSheet } from '@react-pdf/renderer';
 import { asArray } from '@/lib/job-arrays';
 // SHARED with the HTML print page and the crew's digital ticket. Two surfaces
 // formatting the same job differently is a recurring bug class here, and this
 // sheet is the one the customer signs.
-import { groupJobEquipment } from '@/lib/job-ticket-format';
+import { groupJobEquipment, layoutEquipmentColumns, rowLocationLabel } from '@/lib/job-ticket-format';
+import { chunkPhotoPages, type TicketPhoto } from '@/lib/job-ticket-photos';
 
 // ── Styles ──────────────────────────────────────────────────
 const s = StyleSheet.create({
@@ -27,7 +28,6 @@ const s = StyleSheet.create({
   companyName: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },
   jobNumberBox: { borderWidth: 1.5, borderColor: '#1E293B', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
   jobNumberText: { fontSize: 14, fontWeight: 'bold', color: '#1E293B', letterSpacing: 0.5 },
-  multiDayTag: { fontSize: 7.5, fontWeight: 'bold', color: '#7C3AED' },
   companyAddress: { fontSize: 7, color: '#475569', marginTop: 1 },
   companyPhone: { fontSize: 7, color: '#475569' },
   headerCenter: { alignItems: 'center', justifyContent: 'center' },
@@ -82,6 +82,88 @@ const s = StyleSheet.create({
   footer: { marginTop: 'auto', borderTop: '1 solid #CBD5E1', paddingTop: 6, flexDirection: 'row', gap: 16 },
   sigBox: { flex: 1, borderBottom: '1 solid #94A3B8', paddingBottom: 16 },
   sigLabel: { fontSize: 7, color: '#64748B', fontWeight: 'bold', textTransform: 'uppercase' },
+
+  // Equipment Req'd — a SCANNABLE list, not a paragraph.
+  // See the block that uses these for the measurements behind the sizes.
+  eqGroupTitle: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    borderBottom: '0.5 solid #CBD5E1',
+    paddingBottom: 1,
+    marginTop: 3.5,
+    marginBottom: 1.5,
+  },
+  /** Same heading with no leading gap — it is already against the box edge. */
+  eqGroupTitleFirst: {
+    fontSize: 7,
+    fontWeight: 'bold',
+    color: '#334155',
+    textTransform: 'uppercase',
+    letterSpacing: 0.3,
+    borderBottom: '0.5 solid #CBD5E1',
+    paddingBottom: 1,
+    marginBottom: 1.5,
+  },
+  eqCols: { flexDirection: 'row' },
+  eqColFirst: { flex: 1, paddingRight: 5 },
+  eqColLast: { flex: 1 },
+  eqItem: { fontSize: 7.5, color: '#1E293B', lineHeight: 1.2 },
+
+  // ── Photo pages (page 2+) ──
+  // Every size below is EXPLICIT rather than flexed, because a photo page that
+  // reflows silently drops to one photo per page. LETTER landscape is
+  // 792 × 612pt; at padding 18 the content box is 756 × 576. Header band 16pt +
+  // 6pt gap leaves 554pt for two rows; rows are 272pt (NOT the 277pt that fits
+  // exactly — measured at exactly 576pt total, i.e. zero margin, and a single
+  // point of rounding would push row two onto a page of its own).
+  // Two cells of 370pt + a 16pt gutter = 756pt exactly. A 370pt-wide image
+  // prints 5.1 inches across — wide enough to read a chalk mark on a wall.
+  photoPage: { padding: 18, fontFamily: 'Helvetica', flexDirection: 'column' },
+  photoHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    borderBottom: '1 solid #1E293B',
+    paddingBottom: 3,
+    marginBottom: 6,
+    height: 16,
+  },
+  photoHeaderTitle: { fontSize: 10, fontWeight: 'bold', color: '#1E293B', letterSpacing: 0.5 },
+  photoHeaderMeta: { fontSize: 7.5, color: '#64748B' },
+  photoRow: { flexDirection: 'row', height: 272 },
+  photoCell: { width: 370, height: 272 },
+  photoCellFirst: { width: 370, height: 272, marginRight: 16 },
+  photoFrame: {
+    height: 257,
+    border: '0.75 solid #CBD5E1',
+    borderRadius: 3,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  // A page holding only one or two photos gets the WHOLE height instead of
+  // leaving the bottom half blank — the point of printing them is that the crew
+  // can see the detail, and a 1-up fills the sheet (719 × 539 for a 4:3 shot,
+  // ~10 inches wide).
+  photoRowTall: { flexDirection: 'row', height: 554 },
+  photoCellTall: { width: 370, height: 554 },
+  photoCellTallFirst: { width: 370, height: 554, marginRight: 16 },
+  photoCellTallSolo: { width: 756, height: 554 },
+  photoFrameTall: {
+    height: 539,
+    border: '0.75 solid #CBD5E1',
+    borderRadius: 3,
+    backgroundColor: '#F8FAFC',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  photoImage: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
+  photoCaption: { fontSize: 7.5, fontWeight: 'bold', color: '#475569', marginTop: 2.5 },
 
   // Permit banner
   permitBanner: { backgroundColor: '#FEF3C7', border: '1 solid #F59E0B', borderRadius: 3, padding: 5, marginBottom: 6, flexDirection: 'row', alignItems: 'center' },
@@ -144,6 +226,25 @@ interface DispatchTicketData {
   total_days_worked?: number;
   scheduling_flexibility?: Record<string, any>;
   directions?: string;
+  /** Resolved by the route (lib/job-ticket-photos) — bytes already inlined. */
+  photos?: TicketPhoto[];
+}
+
+/**
+ * One parsed row out of `scope_details[code].cuts` / `.holes`.
+ *
+ * `location` is on here because the schedule form writes it PER ROW (each hole
+ * group carries its own Elevated Slab / Slab on Grade / On Wall pick). The old
+ * type omitted it, which is part of why the printed WALL/FLOOR column silently
+ * read a service-level key that does not exist instead.
+ */
+interface ScopeRowInput {
+  qty?: string;
+  bit_size?: string;
+  depth?: string;
+  linear_feet?: string;
+  num_cuts?: string;
+  location?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -192,6 +293,13 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
     equipment_rentals: job.equipment_rentals,
     equipment_rental_flags: job.equipment_rental_flags,
   });
+  // Two balanced columns, one item per line — see the render block below for
+  // the measurements that ruled out a single column.
+  const equipmentColumns = layoutEquipmentColumns(equipmentGroups, 2);
+
+  // Four photos to a page, 2 × 2. Empty when the job has none — and then the
+  // Document is exactly the one-page ticket it has always been.
+  const photoPages = chunkPhotoPages(job.photos ?? []);
 
   // Scope details as table rows — parse nested JSON strings for cuts/holes
   const scopeRows: { type: string; qty: string; footage: string; depth: string; wallFloor: string; notes: string }[] = [];
@@ -205,14 +313,14 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
       // Floor/wall sawing — parse cuts array
       if (entry.cuts) {
         try {
-          const cuts = JSON.parse(entry.cuts) as { linear_feet?: string; depth?: string; num_cuts?: string }[];
+          const cuts = JSON.parse(entry.cuts) as ScopeRowInput[];
           cuts.forEach((cut, idx) => {
             scopeRows.push({
               type: cuts.length > 1 ? `${label} (cut ${idx + 1})` : label,
               qty: cut.num_cuts || '—',
               footage: cut.linear_feet ? `${cut.linear_feet} LF` : '—',
               depth: cut.depth ? `${cut.depth}"` : '—',
-              wallFloor: entry.wall_floor_type || entry.material || '—',
+              wallFloor: rowLocationLabel(cut, entry) || '—',
               notes: entry.notes || '—',
             });
           });
@@ -223,14 +331,22 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
       // Core drilling — parse holes array
       if (entry.holes) {
         try {
-          const holes = JSON.parse(entry.holes) as { qty?: string; bit_size?: string; depth?: string }[];
+          const holes = JSON.parse(entry.holes) as ScopeRowInput[];
           holes.forEach((hole, idx) => {
             scopeRows.push({
               type: holes.length > 1 ? `${label} (set ${idx + 1})` : label,
               qty: hole.qty || '—',
               footage: hole.bit_size ? `${hole.bit_size}" dia` : '—',
               depth: hole.depth ? `${hole.depth}"` : '—',
-              wallFloor: entry.material || entry.wall_floor_type || '—',
+              // WHERE THE HOLES GO — the founder asked three times why this said
+              // "—" for core drilling. It read `entry.material` /
+              // `entry.wall_floor_type`, two SERVICE-level keys that no
+              // production row has ever carried, and never looked at the hole's
+              // own `location` ('on_wall' / 'elevated_slab' / 'slab_on_grade'),
+              // which the schedule form has been writing per hole group all
+              // along. Older rows keep it one level up as `work_location`; both
+              // are resolved in lib/job-ticket-format.
+              wallFloor: rowLocationLabel(hole, entry) || '—',
               notes: entry.notes || '—',
             });
           });
@@ -249,7 +365,7 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
         qty: entry.quantity || entry.area || '—',
         footage: entry.size || entry.footage || '—',
         depth: entry.depth || '—',
-        wallFloor: entry.material || entry.wall_floor_type || '—',
+        wallFloor: rowLocationLabel(null, entry) || '—',
         notes: noteParts.join(' | ') || entry.notes || '—',
       });
     }
@@ -287,11 +403,12 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
             <View style={s.jobNumberBox}>
               <Text style={s.jobNumberText}>{job.job_number}</Text>
             </View>
-            {job.is_multi_day && (
-              <Text style={{ ...s.multiDayTag, marginTop: 3 }}>
-                MULTI-DAY · DAY {(job.total_days_worked || 0) + 1}
-              </Text>
-            )}
+            {/* MULTI-DAY · DAY N REMOVED from the printed sheet (founder,
+                Aug 16): "operators don't need to know that, that can stay
+                internal." A day counter on a crew's paper invites "day 3 of 5"
+                pacing and is the office's scheduling business, not the crew's.
+                The flag itself is untouched — the job view, the schedule board
+                and the daily-log chain all still run off it. */}
           </View>
         </View>
 
@@ -462,24 +579,64 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
                     NAME MATCH against a typed string, not a selection.
 
                     Shares lib/job-ticket-format with the HTML print page and
-                    the crew's digital ticket, so paper and phone cannot drift. */}
+                    the crew's digital ticket, so paper and phone cannot drift.
+
+                    ── WHY TWO NARROW COLUMNS AND NOT ONE ITEM PER LINE ──
+                    Founder, Aug 16: "all equipment required is just bundled
+                    together, let's make it more legible." It was one wrapped
+                    paragraph — `pump can · ECD machine · slurry ring · 3" core
+                    bit · 4" core bit · …` — which nobody can pick a single tool
+                    out of at 7am.
+
+                    One item per line in ONE column does not fit. MEASURED on
+                    LETTER landscape against real production rows: each of the
+                    three columns is 246.7pt wide, the row is as tall as its
+                    tallest column, and WORK CONDITIONS is a fixed 188pt — so
+                    equipment is FREE up to 188pt and costs page height beyond
+                    it, against 14pt of page-1 slack on the tightest real jobs
+                    (TEST-2026-000103, JOB-2026-160762).
+
+                    Three layouts, measured on the worst real job (23 picks
+                    across 4 services, TEST-2026-000103):
+                      one column, one per line ........ ~250pt → page two
+                      two columns split PER SERVICE ... 210pt  → +22pt, 3pt left
+                      two BALANCED columns ............ 167pt  → free, 25pt left
+                    Per-service splitting loses to the ragged half-row every
+                    group wastes on its last line; balancing the rows
+                    continuously across both columns (layoutEquipmentColumns)
+                    recovers it. All five sampled production jobs now measure
+                    95–167pt, i.e. under the free 188pt, so page 1 does not
+                    reflow at all.
+
+                    THE TRADE: item text is 7.5pt rather than 8pt, and a service
+                    with many picks can straddle the two columns — which is why
+                    a column never ends on a heading and a column that opens
+                    mid-service repeats it as "(cont.)". A very long custom item
+                    wraps to a second line rather than being truncated; nothing
+                    is ever dropped. */}
                 {equipmentGroups.length === 0 ? (
                   <Text style={{ fontSize: 8, color: '#94A3B8', fontStyle: 'italic' }}>
                     No equipment specified
                   </Text>
                 ) : (
-                  equipmentGroups.map((group) => (
-                    <View key={group.key} style={{ marginBottom: 3 }}>
-                      <Text style={{ fontSize: 7, fontWeight: 'bold', color: '#64748B' }}>
-                        {group.label}
-                      </Text>
-                      {/* One wrapped line, not a box per item — a bordered chip
-                          per pick is what pushes this sheet onto page two. */}
-                      <Text style={{ fontSize: 8, color: '#1E293B', lineHeight: 1.3 }}>
-                        {group.items.join(' · ')}
-                      </Text>
-                    </View>
-                  ))
+                  <View style={s.eqCols}>
+                    {equipmentColumns.map((col, ci) => (
+                      <View key={ci} style={ci < equipmentColumns.length - 1 ? s.eqColFirst : s.eqColLast}>
+                        {col.map((row, ri) =>
+                          row.kind === 'heading' ? (
+                            <Text
+                              key={ri}
+                              style={ri === 0 ? s.eqGroupTitleFirst : s.eqGroupTitle}
+                            >
+                              {row.text}
+                            </Text>
+                          ) : (
+                            <Text key={ri} style={s.eqItem}>{`• ${row.text}`}</Text>
+                          )
+                        )}
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
             </View>
@@ -566,6 +723,60 @@ export default function DispatchTicketPDF({ job, branding }: { job: DispatchTick
 
 
       </Page>
+
+      {/* ═══ PHOTO PAGES (page 2 onward) ═══
+          Founder, Aug 16: "if I add photos allow me to print those off as well
+          along with the ticket — I know it will be more than 1 page and that's
+          fine."
+
+          These are ADDITIONAL Pages, deliberately not part of page 1's flow:
+          the ticket is what the customer signs, and it must look identical
+          whether or not anybody attached a photo. Page 1 above is untouched by
+          this block.
+
+          Bytes are inlined by the route before render (lib/job-ticket-photos):
+          react-pdf's <Image> will take a URL, but a slow host stalls
+          renderToBuffer and an expired signed URL throws — either of which
+          would cost the crew the whole ticket over a decorative photo. */}
+      {photoPages.map((photos, pageIndex) => (
+        <Page key={pageIndex} size="LETTER" orientation="landscape" style={s.photoPage}>
+          <View style={s.photoHeader}>
+            <Text style={s.photoHeaderTitle}>
+              {`${job.job_number} — PHOTOS`}
+            </Text>
+            <Text style={s.photoHeaderMeta}>
+              {`${job.customer_name}  |  Page ${pageIndex + 1} of ${photoPages.length}`}
+            </Text>
+          </View>
+          {/* Four to a page in a 2 × 2 grid — except a page with only one or
+              two (always the last one), which uses the full height. */}
+          {(photos.length <= 2 ? [photos] : [photos.slice(0, 2), photos.slice(2, 4)]).map(
+            (row, rowIndex) => {
+              const tall = photos.length <= 2;
+              const solo = tall && row.length === 1;
+              return row.length === 0 ? null : (
+                <View key={rowIndex} style={tall ? s.photoRowTall : s.photoRow}>
+                  {row.map((photo, i) => {
+                    const cell = solo
+                      ? s.photoCellTallSolo
+                      : tall
+                        ? (i === 0 && row.length > 1 ? s.photoCellTallFirst : s.photoCellTall)
+                        : (i === 0 && row.length > 1 ? s.photoCellFirst : s.photoCell);
+                    return (
+                      <View key={i} style={cell}>
+                        <View style={tall ? s.photoFrameTall : s.photoFrame}>
+                          <Image style={s.photoImage} src={photo.dataUri} />
+                        </View>
+                        <Text style={s.photoCaption}>{photo.caption}</Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              );
+            }
+          )}
+        </Page>
+      ))}
     </Document>
   );
 }

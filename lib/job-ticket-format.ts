@@ -119,6 +119,53 @@ export function humanizeValue(value: unknown): string {
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
+// ── Where the work happens (wall / floor / type) ────────────────────────────
+
+/**
+ * The stored tokens for "where does this go", verified against the schedule
+ * form's ECD hole buttons (app/dashboard/admin/schedule-form/page.tsx — the
+ * three-button row under every hole group writes exactly `elevated_slab`,
+ * `slab_on_grade`, `on_wall`, or `''` when deselected) and against the legacy
+ * SERVICE-level `scope_details[code].work_location`, which production rows
+ * JOB-2026-402357 and JOB-2026-880425 still carry with the SAME tokens.
+ *
+ * `slab_on_grade` prints its acronym because that is what the crew says and
+ * what the founder asked for: "elevated slab, Slab on Grade (SOG) or on wall".
+ */
+const SCOPE_LOCATION_LABELS: Record<string, string> = {
+  on_wall: 'On wall',
+  wall: 'On wall',
+  elevated_slab: 'Elevated slab',
+  slab_on_grade: 'Slab on grade (SOG)',
+  sog: 'Slab on grade (SOG)',
+  on_grade: 'Slab on grade (SOG)',
+  floor: 'On floor',
+  on_floor: 'On floor',
+  ceiling: 'On ceiling',
+  on_ceiling: 'On ceiling',
+};
+
+/**
+ * `on_wall` → `On wall`. An UNKNOWN token is humanised and printed anyway
+ * rather than dropped — the office ticked something, and a blank "wall/floor"
+ * cell is how a crew turns up without a lift. Empty in → empty out, so callers
+ * can fall back to the next source.
+ */
+export function scopeLocationLabel(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  return SCOPE_LOCATION_LABELS[raw.toLowerCase()] ?? humanizeValue(raw);
+}
+
+/**
+ * The same label mid-sentence — `… @ 8" deep (on wall)`. Only the leading
+ * character is lowered, so `Slab on grade (SOG)` keeps its acronym.
+ */
+export function scopeLocationLabelInline(value: unknown): string {
+  const label = scopeLocationLabel(value);
+  return label ? label.charAt(0).toLowerCase() + label.slice(1) : '';
+}
+
 /** Tolerates the two shapes the form has used: a JSON string, or a real array. */
 export function parseJsonRows(raw: unknown): Record<string, unknown>[] {
   if (Array.isArray(raw)) return raw.filter((r) => r && typeof r === 'object') as Record<string, unknown>[];
@@ -296,9 +343,9 @@ export function formatScopeHoles(raw: unknown): ScopeHoleSummary | null {
     const bits: string[] = [`${qty} ×`];
     if (bit != null) bits.push(`${formatNumber(bit)}" bit`);
     if (depth != null) bits.push(`@ ${formatNumber(depth)}" deep`);
-    const location = humanizeValue(row.location);
+    const location = scopeLocationLabelInline(row.location);
     let line = bits.join(' ');
-    if (location) line += ` (${location.toLowerCase()})`;
+    if (location) line += ` (${location})`;
     parts.push(line);
   }
 
@@ -372,6 +419,35 @@ const SCOPE_FIELD_SUFFIXES: Record<string, string> = {
 
 const STRUCTURED_SCOPE_KEYS = new Set(['areas', 'cuts', 'holes']);
 
+/** Fields whose stored value is a location token, not free text. */
+const SCOPE_LOCATION_FIELDS = new Set(['work_location', 'location', 'wall_floor_type']);
+
+/**
+ * Where ONE measured row goes, for the printed WALL/FLOOR & TYPE column.
+ *
+ * Priority is newest-storage-first: the ROW's own `location` (what the schedule
+ * form writes today — one pick per hole group), then the legacy SERVICE-level
+ * `work_location` (still on prod rows JOB-2026-402357 / JOB-2026-880425), then
+ * the older free-text `material` / `wall_floor_type`. Returns '' when the office
+ * recorded nothing, so the caller decides what a blank cell looks like.
+ *
+ * The printed ticket read ONLY `material`/`wall_floor_type` — neither of which
+ * any production row has — so this column was "—" on every job ever printed,
+ * including ones where the office had picked a location per hole.
+ */
+export function rowLocationLabel(row: unknown, entry: unknown): string {
+  const asRecord = (v: unknown): Record<string, unknown> =>
+    v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+  const r = asRecord(row);
+  const e = asRecord(entry);
+  return (
+    scopeLocationLabel(r.location) ||
+    scopeLocationLabel(e.work_location) ||
+    scopeLocationLabel(e.material) ||
+    scopeLocationLabel(e.wall_floor_type)
+  );
+}
+
 export interface ScopeSection {
   /** The raw service code as stored — 'ECD', 'HHS/PS', … */
   code: string;
@@ -401,9 +477,12 @@ export function formatScopeSection(code: string, fields: unknown): ScopeSection 
   for (const [key, value] of Object.entries(f)) {
     if (STRUCTURED_SCOPE_KEYS.has(key)) continue;
     if (value == null || value === false) continue;
+    // A location token gets the location vocabulary ("Slab on grade (SOG)"),
+    // not the generic humaniser ("Slab on grade") — same words on paper and phone.
+    const format = SCOPE_LOCATION_FIELDS.has(key) ? scopeLocationLabel : humanizeValue;
     const text = Array.isArray(value)
-      ? value.map((v) => humanizeValue(v)).filter(Boolean).join(', ')
-      : humanizeValue(value);
+      ? value.map((v) => format(v)).filter(Boolean).join(', ')
+      : format(value);
     if (!text || text === '0') continue;
     const label = SCOPE_FIELD_LABELS[key] ?? humanizeValue(key);
     const suffix = SCOPE_FIELD_SUFFIXES[key];
@@ -490,6 +569,10 @@ export const EQUIPMENT_ITEM_LABELS: Record<string, string> = {
   push_saw: 'push saw',
   backup_saw: 'backup saw',
   backup_track_saw: 'backup track saw',
+  // DFS, electric-slab-saw branch only. Value is '15 HP' / '40 HP', which
+  // positiveNumber() correctly refuses to read as a count, so this prints as
+  // "slab saw motor (40 HP)" rather than "slab saw motor ×40".
+  electric_saw_hp: 'slab saw motor',
   handsaw_20: '20" handsaw',
   handsaw_24: '24" handsaw',
   chain_saw: 'chain saw',
@@ -573,10 +656,22 @@ export interface EquipmentGroup {
   items: string[];
 }
 
-/** `_sub` is the WS/TS system pick — it belongs in the heading, not the list. */
-const SUB_OPTION_LABELS: Record<string, string> = {
+/**
+ * `_sub` is the ONE machine a service goes out with — it belongs in the
+ * heading, not the list. WS/TS picks the system; DFS picks the floor saw
+ * (founder, Aug 2026), which is why the shop needs to read "DFS (Husqvarna
+ * 7000)" and not just "DFS".
+ */
+export const SUB_OPTION_LABELS: Record<string, string> = {
+  // WS/TS system
   pentruder: 'Pentruder',
   pbg: 'Track Saw (PBG)',
+  // DFS saw
+  tier4: 'Tier 4 Saw',
+  white_saw: 'White Saw',
+  husqvarna_5000: 'Husqvarna 5000',
+  husqvarna_7000: 'Husqvarna 7000',
+  electric_slab: 'Electric Slab Saw',
 };
 
 /** One `[itemId, value]` pick → its printed text, or null when it is switched off. */
@@ -657,7 +752,14 @@ export function groupJobEquipment(input: JobEquipmentInput): EquipmentGroup[] {
         const text = equipmentSelectionText(itemId, value);
         if (text) items.push(text);
       }
-      if (items.length === 0) continue;
+      // A service whose ONLY pick is the machine still has to print. `_sub` used
+      // to exist only on WS/TS, which gates its whole item list behind that pick
+      // — so there was always something else and dropping an empty group was
+      // harmless. DFS now carries `_sub` too (Tier 4 / White Saw / Husqvarna
+      // 5000 / 7000 / Electric Slab) and its item list is NOT gated, so the
+      // office can legitimately tick the saw and nothing else. Dropping that
+      // group would silently lose the one machine the crew has to load.
+      if (items.length === 0 && !subText) continue;
       groups.push({
         key: code,
         label: subText ? `${code} (${subText})` : code,
@@ -700,6 +802,113 @@ export function groupJobEquipment(input: JobEquipmentInput): EquipmentGroup[] {
 /** True when the job carries no equipment at all (the ticket rules blank lines). */
 export function hasNoJobEquipment(groups: EquipmentGroup[]): boolean {
   return groups.length === 0;
+}
+
+// ── Equipment: laying the list out so a crew can read it ────────────────────
+
+export interface EquipmentRow {
+  kind: 'heading' | 'item';
+  /** What to print. A continued heading already carries its '(cont.)' marker. */
+  text: string;
+  /** The `EquipmentGroup.key` this row belongs to. */
+  groupKey: string;
+  /** Heading only: this is a REPEAT at the top of the next column, not a new service. */
+  continued?: boolean;
+}
+
+/**
+ * A heading line is taller than an item line (bigger leading + its rule +
+ * spacing). Measured on the printed ticket: heading ≈ 10.4pt, item ≈ 8.6pt.
+ * Balancing on line COUNT instead of this ratio puts visibly more ink in one
+ * column than the other once a job has four or five services.
+ */
+const HEADING_WEIGHT = 1.2;
+
+/**
+ * Lay the grouped equipment out as N newspaper-style columns of roughly equal
+ * height, one item per line.
+ *
+ * WHY THIS EXISTS (founder, Aug 16 2026): the printed EQUIPMENT REQ'D box
+ * joined every pick with ' · ' into one wrapped paragraph — `pump can · ECD
+ * machine · slurry ring · 3" core bit · 4" core bit · …`. Nobody can find a
+ * single tool in that at 7am.
+ *
+ * One item per line is the fix, and on this sheet it only fits in two columns:
+ * the ticket is LETTER LANDSCAPE and the equipment column is 246.7pt wide,
+ * while the row it sits in is only as tall as WORK CONDITIONS (a fixed 188pt)
+ * before it starts costing page space — and the tightest real jobs have 14pt of
+ * page-1 slack. Splitting PER GROUP was measured at 210pt on the worst real job
+ * (23 picks over 4 services, TEST-2026-000103) because every group wastes up to
+ * half a row on its ragged last line. Balancing the rows CONTINUOUSLY across
+ * both columns instead measures 167pt on that same job — inside the free
+ * budget, so the ticket does not reflow at all.
+ *
+ * Two rules keep it readable when a service straddles the break:
+ *   - a column never ENDS on a heading (an orphaned service name at the foot of
+ *     a column reads as "this service needs nothing"), and
+ *   - a column that OPENS mid-service repeats the heading with '(cont.)', so no
+ *     item is ever left under the wrong service name.
+ *
+ * Falls back to one column when a balanced split would leave a column empty —
+ * a blank half-box next to two lines of text just looks broken.
+ */
+export function layoutEquipmentColumns(
+  groups: EquipmentGroup[],
+  columns = 2
+): EquipmentRow[][] {
+  const rows: EquipmentRow[] = [];
+  for (const group of groups) {
+    // A heading with no items is legitimate — a service whose only pick is the
+    // machine itself (the `_sub` saw). It prints as a bare service line.
+    if (!group) continue;
+    rows.push({ kind: 'heading', text: group.label, groupKey: group.key });
+    for (const item of group.items) rows.push({ kind: 'item', text: item, groupKey: group.key });
+  }
+  if (rows.length === 0) return [];
+  if (columns <= 1) return [rows];
+
+  const weightOf = (r: EquipmentRow) => (r.kind === 'heading' ? HEADING_WEIGHT : 1);
+  const labelFor = (key: string) => groups.find((g) => g.key === key)?.label ?? key;
+
+  const out: EquipmentRow[][] = [];
+  let idx = 0;
+  for (let c = 0; c < columns; c++) {
+    const col: EquipmentRow[] = [];
+    // Opening mid-service: say which service these items belong to.
+    if (c > 0 && idx < rows.length && rows[idx].kind === 'item') {
+      col.push({
+        kind: 'heading',
+        text: `${labelFor(rows[idx].groupKey)} (cont.)`,
+        groupKey: rows[idx].groupKey,
+        continued: true,
+      });
+    }
+    const remainingCols = columns - c;
+    const remainingWeight = rows.slice(idx).reduce((sum, r) => sum + weightOf(r), 0);
+    const target = remainingWeight / remainingCols;
+    let filled = col.reduce((sum, r) => sum + weightOf(r), 0);
+    while (idx < rows.length) {
+      if (c < columns - 1 && filled >= target) break;
+      col.push(rows[idx]);
+      filled += weightOf(rows[idx]);
+      idx += 1;
+    }
+    // Never leave a service name stranded at the foot of a column.
+    while (
+      col.length > 0 &&
+      col[col.length - 1].kind === 'heading' &&
+      !col[col.length - 1].continued &&
+      idx < rows.length
+    ) {
+      col.pop();
+      idx -= 1;
+    }
+    out.push(col);
+  }
+
+  // A balanced split that empties a column is worse than not splitting.
+  if (out.some((col) => col.length === 0)) return [rows];
+  return out;
 }
 
 // ── Jobsite conditions ──────────────────────────────────────────────────────

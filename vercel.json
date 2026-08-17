@@ -35,6 +35,9 @@
     "app/api/job-orders/[id]/generate-completion-pdf/route.ts": {
       "maxDuration": 60
     },
+    "app/api/job-orders/[id]/dispatch-pdf/route.tsx": {
+      "maxDuration": 60
+    },
     "app/api/admin/invoices/[id]/pdf/route.ts": {
       "maxDuration": 60
     },

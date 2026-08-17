@@ -27,6 +27,10 @@ import {
   hasNoJobEquipment,
   conditionDistance,
   formatJobsiteConditions,
+  scopeLocationLabel,
+  scopeLocationLabelInline,
+  rowLocationLabel,
+  layoutEquipmentColumns,
 } from './job-ticket-format';
 
 // PROD — job_orders.scope_details for TEST-2026-000103
@@ -522,5 +526,152 @@ describe('jobsite conditions', () => {
     expect(formatJobsiteConditions({})).toEqual([]);
     expect(formatJobsiteConditions(null)).toEqual([]);
     expect(formatJobsiteConditions(undefined)).toEqual([]);
+  });
+});
+
+// ── Where the work happens (the "core drilling always printed —" bug) ───────
+
+describe('scopeLocationLabel', () => {
+  it('PROD: maps the three tokens the schedule form actually writes', () => {
+    // Verified against the ECD hole buttons in the schedule form AND against
+    // the values stored on TEST-2026-000103.
+    expect(scopeLocationLabel('on_wall')).toBe('On wall');
+    expect(scopeLocationLabel('elevated_slab')).toBe('Elevated slab');
+    expect(scopeLocationLabel('slab_on_grade')).toBe('Slab on grade (SOG)');
+  });
+
+  it('is empty for the deselected/absent case so callers can fall back', () => {
+    expect(scopeLocationLabel('')).toBe('');
+    expect(scopeLocationLabel(null)).toBe('');
+    expect(scopeLocationLabel(undefined)).toBe('');
+    expect(scopeLocationLabel('   ')).toBe('');
+  });
+
+  it('prints an unknown token rather than dropping it', () => {
+    // A blank wall/floor cell is how a crew turns up without a lift.
+    expect(scopeLocationLabel('under_slab')).toBe('Under slab');
+    expect(scopeLocationLabel('SLAB_ON_GRADE')).toBe('Slab on grade (SOG)');
+    expect(scopeLocationLabel('third floor landing')).toBe('third floor landing');
+  });
+
+  it('keeps the SOG acronym when used mid-sentence', () => {
+    expect(scopeLocationLabelInline('on_wall')).toBe('on wall');
+    expect(scopeLocationLabelInline('elevated_slab')).toBe('elevated slab');
+    expect(scopeLocationLabelInline('slab_on_grade')).toBe('slab on grade (SOG)');
+  });
+});
+
+describe('rowLocationLabel', () => {
+  it("PROD: reads the HOLE's own location (TEST-2026-000103)", () => {
+    const holes = JSON.parse(PROD_SCOPE_DETAILS.ECD.holes);
+    expect(rowLocationLabel(holes[0], PROD_SCOPE_DETAILS.ECD)).toBe('On wall');
+    expect(rowLocationLabel(holes[1], PROD_SCOPE_DETAILS.ECD)).toBe('Elevated slab');
+  });
+
+  it('PROD: falls back to the legacy SERVICE-level work_location', () => {
+    // JOB-2026-402357 and JOB-2026-880425 store it one level up, on the
+    // service, with no per-hole location at all.
+    expect(rowLocationLabel({ qty: '80', bit_size: '8' }, { work_location: 'on_wall' })).toBe('On wall');
+    expect(rowLocationLabel({ qty: '3' }, { work_location: 'elevated_slab' })).toBe('Elevated slab');
+  });
+
+  it('prefers the row over the service when both are present', () => {
+    expect(rowLocationLabel({ location: 'on_wall' }, { work_location: 'elevated_slab' })).toBe('On wall');
+  });
+
+  it('falls back to the oldest free-text keys, then to empty', () => {
+    expect(rowLocationLabel(null, { material: 'reinforced concrete' })).toBe('reinforced concrete');
+    expect(rowLocationLabel(null, { wall_floor_type: 'floor' })).toBe('On floor');
+    expect(rowLocationLabel(null, {})).toBe('');
+    expect(rowLocationLabel(undefined, undefined)).toBe('');
+    // Junk in must not throw — this runs inside a PDF render.
+    expect(rowLocationLabel('nonsense', 42)).toBe('');
+  });
+});
+
+// ── Equipment column layout (legibility of the printed EQUIPMENT REQ'D box) ─
+
+describe('layoutEquipmentColumns', () => {
+  const groups = groupJobEquipment({
+    equipment_selections: PROD_EQUIPMENT_SELECTIONS,
+    equipment_needed: PROD_EQUIPMENT_NEEDED,
+  });
+
+  it('PROD: keeps every selection, one row per item, across two columns', () => {
+    const cols = layoutEquipmentColumns(groups, 2);
+    expect(cols).toHaveLength(2);
+    const items = cols.flat().filter((r) => r.kind === 'item').map((r) => r.text);
+    const expected = groups.flatMap((g) => g.items);
+    // NEVER DROP A SELECTION — the rule this whole file exists for.
+    expect(items.sort()).toEqual(expected.sort());
+  });
+
+  it('balances the two columns instead of splitting down the middle', () => {
+    const cols = layoutEquipmentColumns(groups, 2);
+    const rows = cols.map((c) => c.length);
+    expect(Math.abs(rows[0] - rows[1])).toBeLessThanOrEqual(2);
+  });
+
+  it('never ends a column on a service heading', () => {
+    // An orphaned service name at the foot of a column reads as "this service
+    // needs nothing" — the opposite of the truth.
+    for (let n = 1; n <= 30; n += 1) {
+      const synthetic = Array.from({ length: n }, (_, i) => ({
+        key: `S${i}`,
+        label: `S${i}`,
+        sublabel: '',
+        items: Array.from({ length: (i % 4) + 1 }, (_, j) => `item ${i}-${j}`),
+      }));
+      for (const col of layoutEquipmentColumns(synthetic, 2)) {
+        if (col.length === 0) continue;
+        const last = col[col.length - 1];
+        expect(last.kind === 'item' || last.continued === true).toBe(true);
+      }
+    }
+  });
+
+  it('repeats the heading as "(cont.)" when a service straddles the columns', () => {
+    const cols = layoutEquipmentColumns(
+      [{ key: 'ECD', label: 'ECD', sublabel: '', items: Array.from({ length: 12 }, (_, i) => `bit ${i}`) }],
+      2
+    );
+    expect(cols[1][0]).toMatchObject({ kind: 'heading', text: 'ECD (cont.)', continued: true });
+    // …and no item is left sitting under the wrong service name.
+    expect(cols[0][0]).toMatchObject({ kind: 'heading', text: 'ECD' });
+  });
+
+  it('falls back to one column rather than leaving a blank half-box', () => {
+    const tiny = [{ key: 'CS', label: 'CS', sublabel: '', items: ['chain saw'] }];
+    const cols = layoutEquipmentColumns(tiny, 2);
+    expect(cols).toHaveLength(1);
+    expect(cols[0].map((r) => r.text)).toEqual(['CS', 'chain saw']);
+  });
+
+  it('is empty for a job with no equipment', () => {
+    expect(layoutEquipmentColumns([], 2)).toEqual([]);
+  });
+
+  it('still prints a service whose only pick is the machine', () => {
+    // DFS can store `{"_sub":"husqvarna_7000"}` and nothing else; the group has
+    // no items but the saw still has to be loaded on the truck.
+    const cols = layoutEquipmentColumns(
+      [{ key: 'DFS', label: 'DFS (Husqvarna 7000)', sublabel: 'Diesel Floor Sawing', items: [] }],
+      2
+    );
+    expect(cols.flat().map((r) => r.text)).toEqual(['DFS (Husqvarna 7000)']);
+  });
+});
+
+describe('groupJobEquipment — machine-only service', () => {
+  it('keeps a service whose only pick is the `_sub` machine', () => {
+    const groups = groupJobEquipment({ equipment_selections: { DFS: { _sub: 'husqvarna_7000' } } });
+    expect(groups).toHaveLength(1);
+    expect(groups[0].label).toBe('DFS (Husqvarna 7000)');
+    expect(groups[0].items).toEqual([]);
+  });
+
+  it('still drops a service where nothing at all was ticked', () => {
+    expect(groupJobEquipment({ equipment_selections: { DFS: { chalk_line: 'no' } } })).toEqual([]);
+    expect(groupJobEquipment({ equipment_selections: { DFS: {} } })).toEqual([]);
   });
 });

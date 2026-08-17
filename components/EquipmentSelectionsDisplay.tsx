@@ -34,6 +34,7 @@ const ITEM_LABELS: Record<string, string> = {
   'slurry_drums': 'Slurry Drums',
   'extra_vacuum_head': 'Extra Vacuum Head',
   'backup_saw': 'Backup Saw',
+  'electric_saw_hp': 'Motor',
   'chalk_line': 'Chalk Line',
   'clear_spray': 'Clear Spray',
   '480_cord': '480 Cord',

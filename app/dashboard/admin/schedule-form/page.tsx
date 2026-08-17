@@ -31,6 +31,7 @@ import { useModuleGate } from '@/components/ModuleGuard';
 import { NumberInput } from '@/components/ui/NumberInput';
 import { toLocalYMD } from '@/lib/dates';
 import { asArray } from '@/lib/job-arrays';
+import { applySubOption, showWhenMap } from '@/lib/equipment-sub-options';
 import {
   loadJobsiteConditions,
   serializeJobsiteConditions,
@@ -255,6 +256,16 @@ interface EquipItem {
 }
 interface ServiceEquipConfig {
   subOption?: { label: string; choices: { value: string; label: string }[] };
+  /**
+   * WS/TS hides its ENTIRE item list until a system is picked, because a
+   * Pentruder job and a PBG job share almost nothing. DFS must NOT do that:
+   * every DFS row in production predates the saw picker and has no `_sub`
+   * (verified against prod, Aug 2026), so gating would make an existing job's
+   * slurry drums and chalk line vanish from the form while still sitting in the
+   * database — hidden-but-saved, the exact failure mode this form keeps
+   * relearning. Opt in, never default.
+   */
+  gateItemsOnSub?: boolean;
   items: EquipItem[];
   getDynamicItems?: (scopeData: Record<string, string>) => EquipItem[];
 }
@@ -432,7 +443,33 @@ const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
     getDynamicItems: getCoreBitItems,
   },
   'DFS': {
+    // WHICH SAW GOES ON THE TRUCK (founder, Aug 2026: "for diesel floor sawing
+    // ask Tier 4 saw, White saw, Husqvarna 5000, Husqvarna 7000, that way we
+    // can choose. Or also electric slab saw and choose between 15 horse and
+    // 40 HP.")
+    //
+    // SINGLE-SELECT, deliberately. `_sub` is one string by contract: it prints
+    // in the ticket's service heading ("DFS (Husqvarna 7000)") through
+    // SUB_OPTION_LABELS, and it is what `showWhen` matches against. A
+    // comma-joined multi-value would miss the label lookup (printing
+    // "Tier4,husqvarna 5000") and would make the HP follow-up ambiguous — 15 HP
+    // of WHICH saw? A second machine is already expressible: Backup Saw below.
+    subOption: {
+      label: 'Saw',
+      choices: [
+        { value: 'tier4', label: 'Tier 4 Saw' },
+        { value: 'white_saw', label: 'White Saw' },
+        { value: 'husqvarna_5000', label: 'Husqvarna 5000' },
+        { value: 'husqvarna_7000', label: 'Husqvarna 7000' },
+        { value: 'electric_slab', label: 'Electric Slab Saw' },
+      ],
+    },
     items: [
+      // Only meaningful for the electric slab saw — the diesel saws don't come
+      // in horsepower variants. Gated by showWhen, and pruned from the saved
+      // picks the moment the saw changes (see applySubOption) so a Tier 4
+      // ticket can never print "slab saw motor (40 HP)".
+      { id: 'electric_saw_hp', label: 'Motor', type: 'option', options: ['15 HP', '40 HP'], showWhen: 'electric_slab' },
       { id: 'slurry_drums', label: 'Slurry Drums', type: 'qty' },
       { id: 'extra_vacuum_head', label: 'Extra Vacuum Head', type: 'toggle' },
       { id: 'backup_saw', label: 'Backup Saw', type: 'toggle' },
@@ -459,6 +496,9 @@ const SERVICE_EQUIPMENT: Record<string, ServiceEquipConfig> = {
         { value: 'pbg', label: 'Track Saw (PBG)' },
       ],
     },
+    // Pre-existing behaviour, kept: nothing in a WS/TS kit is common enough to
+    // show before the system is chosen.
+    gateItemsOnSub: true,
     items: [
       // Pentruder-specific
       { id: '480_cord', label: '480 Cord', type: 'qty', showWhen: 'pentruder' },
@@ -815,6 +855,24 @@ function Toggle({ checked, onChange, label, icon: Icon }: { checked: boolean; on
  *    <label> is forwarded to its control. The distance block sits in its own
  *    <div> with onClick/onPointerDown stopPropagation, so typing a distance
  *    cannot uncheck the condition it belongs to.
+ *
+ * 4. "I STILL can't see fields in jobsite conditions" (founder, twice, Aug 2026).
+ *    The digits he typed were invisible, and this is why: the CHECKED row was
+ *    styled light-only — `bg-amber-50` with NO `dark:` variant — while every
+ *    piece of text inside it carried a `dark:text-white*` override. In dark mode
+ *    that is white text on a cream card. The distance input was the worst case:
+ *    `bg-amber-50` + `dark:text-white` ⇒ white-on-#FFFBEB, a contrast ratio of
+ *    1.03:1. Not "low contrast" — literally unreadable.
+ *
+ *    Every colour in the map below now carries a dark variant, and the distance
+ *    input no longer borrows the row's tint at all: it is the house input
+ *    surface (`bg-white dark:bg-white/10`) with the accent living in its 2px
+ *    border, which is both higher contrast AND a stronger "this is a field you
+ *    type in" affordance than a tinted box. Measured value-text contrast:
+ *      light  #0F172A on #FFFFFF                → 18.0:1
+ *      dark   #FFFFFF on white/10 over the row  → 11.5:1
+ *    Both clear WCAG AA (4.5:1) with room to spare, which is the point — this is
+ *    read one-handed, outdoors, in sunlight.
  */
 function ConditionCheck({
   checked, onChange, label, icon: Icon, showFt, ftValue, onFtChange, accentColor = 'blue',
@@ -828,15 +886,17 @@ function ConditionCheck({
   ftPrompt?: string;
   ftReadback?: string;
 }) {
-  const colorMap: Record<string, { bg: string; border: string; check: string; icon: string; text: string; ftBg: string; ftBorder: string; ftRing: string }> = {
-    blue:    { bg: 'bg-blue-50', border: 'border-blue-300', check: 'bg-blue-600 border-blue-600', icon: 'text-blue-600', text: 'text-blue-800', ftBg: 'bg-blue-50', ftBorder: 'border-blue-300', ftRing: 'focus:ring-blue-500/20 focus:border-blue-500' },
-    amber:   { bg: 'bg-amber-50', border: 'border-amber-300', check: 'bg-amber-600 border-amber-600', icon: 'text-amber-600', text: 'text-amber-800', ftBg: 'bg-amber-50', ftBorder: 'border-amber-300', ftRing: 'focus:ring-amber-500/20 focus:border-amber-500' },
-    emerald: { bg: 'bg-emerald-50', border: 'border-emerald-300', check: 'bg-emerald-600 border-emerald-600', icon: 'text-emerald-600', text: 'text-emerald-800', ftBg: 'bg-emerald-50', ftBorder: 'border-emerald-300', ftRing: 'focus:ring-emerald-500/20 focus:border-emerald-500' },
-    violet:  { bg: 'bg-violet-50', border: 'border-violet-300', check: 'bg-violet-600 border-violet-600', icon: 'text-violet-600', text: 'text-violet-800', ftBg: 'bg-violet-50', ftBorder: 'border-violet-300', ftRing: 'focus:ring-violet-500/20 focus:border-violet-500' },
-    rose:    { bg: 'bg-rose-50', border: 'border-rose-300', check: 'bg-rose-600 border-rose-600', icon: 'text-rose-600', text: 'text-rose-800', ftBg: 'bg-rose-50', ftBorder: 'border-rose-300', ftRing: 'focus:ring-rose-500/20 focus:border-rose-500' },
-    cyan:    { bg: 'bg-cyan-50', border: 'border-cyan-300', check: 'bg-cyan-600 border-cyan-600', icon: 'text-cyan-600', text: 'text-cyan-800', ftBg: 'bg-cyan-50', ftBorder: 'border-cyan-300', ftRing: 'focus:ring-cyan-500/20 focus:border-cyan-500' },
-    orange:  { bg: 'bg-orange-50', border: 'border-orange-300', check: 'bg-orange-600 border-orange-600', icon: 'text-orange-600', text: 'text-orange-800', ftBg: 'bg-orange-50', ftBorder: 'border-orange-300', ftRing: 'focus:ring-orange-500/20 focus:border-orange-500' },
-    teal:    { bg: 'bg-teal-50', border: 'border-teal-300', check: 'bg-teal-600 border-teal-600', icon: 'text-teal-600', text: 'text-teal-800', ftBg: 'bg-teal-50', ftBorder: 'border-teal-300', ftRing: 'focus:ring-teal-500/20 focus:border-teal-500' },
+  // Every entry MUST carry a dark: variant. A light-only `bg-*-50` here is what
+  // made the checked row a cream card in dark mode and erased the text on it.
+  const colorMap: Record<string, { bg: string; border: string; check: string; icon: string; text: string; ftBorder: string; ftRing: string }> = {
+    blue:    { bg: 'bg-blue-50 dark:bg-blue-500/15',       border: 'border-blue-300 dark:border-blue-400/50',       check: 'bg-blue-600 border-blue-600 dark:bg-blue-500 dark:border-blue-400',          icon: 'text-blue-600 dark:text-blue-300',       text: 'text-blue-900 dark:text-blue-100',       ftBorder: 'border-blue-400 dark:border-blue-400/70',       ftRing: 'focus:ring-blue-500/40 focus:border-blue-600 dark:focus:border-blue-300' },
+    amber:   { bg: 'bg-amber-50 dark:bg-amber-500/15',     border: 'border-amber-300 dark:border-amber-400/50',     check: 'bg-amber-700 border-amber-700 dark:bg-amber-600 dark:border-amber-500',       icon: 'text-amber-700 dark:text-amber-300',     text: 'text-amber-900 dark:text-amber-100',     ftBorder: 'border-amber-500 dark:border-amber-400/70',     ftRing: 'focus:ring-amber-500/40 focus:border-amber-600 dark:focus:border-amber-300' },
+    emerald: { bg: 'bg-emerald-50 dark:bg-emerald-500/15', border: 'border-emerald-300 dark:border-emerald-400/50', check: 'bg-emerald-600 border-emerald-600 dark:bg-emerald-500 dark:border-emerald-400', icon: 'text-emerald-700 dark:text-emerald-300', text: 'text-emerald-900 dark:text-emerald-100', ftBorder: 'border-emerald-500 dark:border-emerald-400/70', ftRing: 'focus:ring-emerald-500/40 focus:border-emerald-600 dark:focus:border-emerald-300' },
+    violet:  { bg: 'bg-violet-50 dark:bg-violet-500/15',   border: 'border-violet-300 dark:border-violet-400/50',   check: 'bg-violet-600 border-violet-600 dark:bg-violet-500 dark:border-violet-400',    icon: 'text-violet-600 dark:text-violet-300',   text: 'text-violet-900 dark:text-violet-100',   ftBorder: 'border-violet-500 dark:border-violet-400/70',   ftRing: 'focus:ring-violet-500/40 focus:border-violet-600 dark:focus:border-violet-300' },
+    rose:    { bg: 'bg-rose-50 dark:bg-rose-500/15',       border: 'border-rose-300 dark:border-rose-400/50',       check: 'bg-rose-600 border-rose-600 dark:bg-rose-500 dark:border-rose-400',          icon: 'text-rose-600 dark:text-rose-300',       text: 'text-rose-900 dark:text-rose-100',       ftBorder: 'border-rose-500 dark:border-rose-400/70',       ftRing: 'focus:ring-rose-500/40 focus:border-rose-600 dark:focus:border-rose-300' },
+    cyan:    { bg: 'bg-cyan-50 dark:bg-cyan-500/15',       border: 'border-cyan-300 dark:border-cyan-400/50',       check: 'bg-cyan-700 border-cyan-700 dark:bg-cyan-600 dark:border-cyan-400',          icon: 'text-cyan-700 dark:text-cyan-300',       text: 'text-cyan-900 dark:text-cyan-100',       ftBorder: 'border-cyan-500 dark:border-cyan-400/70',       ftRing: 'focus:ring-cyan-500/40 focus:border-cyan-600 dark:focus:border-cyan-300' },
+    orange:  { bg: 'bg-orange-50 dark:bg-orange-500/15',   border: 'border-orange-300 dark:border-orange-400/50',   check: 'bg-orange-700 border-orange-700 dark:bg-orange-600 dark:border-orange-500',    icon: 'text-orange-700 dark:text-orange-300',   text: 'text-orange-900 dark:text-orange-100',   ftBorder: 'border-orange-500 dark:border-orange-400/70',   ftRing: 'focus:ring-orange-500/40 focus:border-orange-600 dark:focus:border-orange-300' },
+    teal:    { bg: 'bg-teal-50 dark:bg-teal-500/15',       border: 'border-teal-300 dark:border-teal-400/50',       check: 'bg-teal-700 border-teal-700 dark:bg-teal-600 dark:border-teal-400',          icon: 'text-teal-700 dark:text-teal-300',       text: 'text-teal-900 dark:text-teal-100',       ftBorder: 'border-teal-500 dark:border-teal-400/70',       ftRing: 'focus:ring-teal-500/40 focus:border-teal-600 dark:focus:border-teal-300' },
   };
   const c = colorMap[accentColor] || colorMap.blue;
 
@@ -866,7 +926,7 @@ function ConditionCheck({
           {/* Read the answer back on the row itself. "I typed a value and
               couldn't see what I'd entered" was the actual complaint. */}
           {showFt && checked && hasDistance && (
-            <span className={`block sm:inline sm:ml-2 text-sm font-bold ${c.text} dark:opacity-90`}>
+            <span className={`block sm:inline sm:ml-2 text-sm font-bold ${c.text}`}>
               — {distance} {ftReadback}
             </span>
           )}
@@ -883,7 +943,9 @@ function ConditionCheck({
           onPointerDown={(e) => e.stopPropagation()}
         >
           <label className="block">
-            <span className="block text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-white/50 mb-1.5">
+            {/* Was text-slate-500 / dark:text-white/50 — 4.6:1 on the light row
+                and invisible on the (previously cream) dark one. */}
+            <span className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-white/80 mb-1.5">
               {ftPrompt}
             </span>
             <div className="flex items-center gap-2">
@@ -894,9 +956,13 @@ function ConditionCheck({
                 value={ftValue || ''}
                 onChange={(e) => onFtChange?.(e.target.value)}
                 placeholder="e.g. 75"
-                className={`w-28 sm:w-32 min-h-[44px] px-4 py-2.5 sm:py-3 border-2 ${c.ftBorder} ${c.ftBg} rounded-xl text-base sm:text-lg font-bold text-slate-800 dark:text-white text-center ${c.ftRing} focus:ring-2 focus:outline-none transition-all`}
+                /* The value text is the whole point of this control, so it gets
+                   a neutral high-contrast surface rather than the row's tint:
+                   18.0:1 in light, 11.5:1 in dark. The accent lives in the 2px
+                   border, which also reads as "field" instead of "label". */
+                className={`w-28 sm:w-32 min-h-[44px] px-4 py-2.5 sm:py-3 border-2 ${c.ftBorder} bg-white dark:bg-white/10 rounded-xl text-base sm:text-lg font-bold text-slate-900 dark:text-white placeholder-slate-500 dark:placeholder-white/60 placeholder:font-semibold text-center ${c.ftRing} focus:ring-2 focus:outline-none transition-all`}
               />
-              <span className="text-sm sm:text-base text-slate-600 dark:text-white/60 font-bold">feet</span>
+              <span className="text-sm sm:text-base text-slate-700 dark:text-white/80 font-bold">feet</span>
             </div>
           </label>
         </div>
@@ -3989,6 +4055,19 @@ export default function ScheduleFormPage() {
           const current = getEquipVal(serviceCode, itemId);
           setEquipVal(serviceCode, itemId, current ? '' : 'yes');
         };
+        // Changing the machine must also drop the picks that only belonged to
+        // the OLD machine. They vanish from the form the moment `showWhen`
+        // stops matching, so leaving them in the row would print equipment
+        // nobody can see or unpick. See lib/equipment-sub-options.ts.
+        const setSubOption = (serviceCode: string, nextSub: string) => {
+          const cfg = SERVICE_EQUIPMENT[serviceCode];
+          const svc = applySubOption(
+            form.equipment_selections[serviceCode],
+            nextSub,
+            showWhenMap(cfg?.items || []),
+          );
+          updateForm({ equipment_selections: { ...form.equipment_selections, [serviceCode]: svc } });
+        };
 
         // Service types that have equipment configs
         const serviceCodesWithEquip = form.service_types.filter(code => SERVICE_EQUIPMENT[code]);
@@ -4014,8 +4093,13 @@ export default function ScheduleFormPage() {
                   return item.showWhen === subVal;
                 });
 
-                // Only show items if sub-option is selected (when sub-options exist)
-                const showItems = config.subOption ? (subVal ? visibleItems : []) : visibleItems;
+                // Only show items if sub-option is selected — and ONLY for the
+                // services that opted into that (WS/TS). DFS keeps its list
+                // visible so an existing job's saved picks never disappear
+                // behind a question that job was created before we asked.
+                const showItems = (config.subOption && config.gateItemsOnSub)
+                  ? (subVal ? visibleItems : [])
+                  : visibleItems;
 
                 return (
                   <div key={code} className="bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl p-5 sm:p-6 shadow-sm">
@@ -4029,17 +4113,20 @@ export default function ScheduleFormPage() {
                     {/* Sub-option selector (e.g., Pentruder vs PBG) */}
                     {config.subOption && (
                       <div className="mb-4">
-                        <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest mb-2 block">{config.subOption.label}</label>
-                        <div className="flex gap-2">
+                        <label className="text-[11px] font-bold text-slate-600 dark:text-white/60 uppercase tracking-widest mb-2 block">{config.subOption.label}</label>
+                        {/* A grid, not `flex-1` in a single row: DFS has five
+                            saws and "Husqvarna 5000" cannot share a 375px row
+                            four ways without overflowing. */}
+                        <div className={`grid gap-2 ${config.subOption.choices.length > 2 ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
                           {config.subOption.choices.map(choice => (
                             <button
                               key={choice.value}
                               type="button"
-                              onClick={() => setEquipVal(code, '_sub', subVal === choice.value ? '' : choice.value)}
-                              className={`flex-1 px-4 py-3 rounded-xl text-sm font-bold transition-all ${
+                              onClick={() => setSubOption(code, subVal === choice.value ? '' : choice.value)}
+                              className={`w-full min-h-[48px] px-3 py-3 rounded-xl text-sm font-bold text-center transition-all ${
                                 subVal === choice.value
                                   ? 'bg-blue-600 text-white border-2 border-blue-500 shadow-lg'
-                                  : 'bg-slate-50 dark:bg-white/5 text-slate-600 dark:text-white/70 border-2 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                                  : 'bg-slate-50 dark:bg-white/5 text-slate-700 dark:text-white/70 border-2 border-slate-200 dark:border-white/10 hover:bg-slate-100 dark:hover:bg-white/10 hover:border-slate-300 dark:hover:border-white/20'
                               }`}
                             >
                               {choice.label}
@@ -4125,17 +4212,21 @@ export default function ScheduleFormPage() {
                             <div key={item.id} className={`flex items-center gap-2 px-3 py-1.5 rounded-xl border-2 transition-all ${
                               isActive ? 'border-blue-400 bg-blue-50 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10 bg-white dark:bg-white/5'
                             }`}>
-                              <span className={`text-sm font-semibold ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-500 dark:text-white/50'}`}>{item.label}</span>
+                              <span className={`text-sm font-semibold ${isActive ? 'text-blue-700 dark:text-blue-300' : 'text-slate-600 dark:text-white/70'}`}>{item.label}</span>
                               <div className="flex gap-1">
                                 {item.options.map(opt => (
                                   <button
                                     key={opt}
                                     type="button"
                                     onClick={() => setEquipVal(code, item.id, val === opt ? '' : opt)}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                    /* 44px floor + slate-600/white-70 instead of
+                                       slate-500/white-50, which sat at 4.35:1 on
+                                       the light chip — under AA, and this is the
+                                       control that answers "15 HP or 40 HP". */
+                                    className={`min-h-[44px] px-3.5 py-2 rounded-lg text-xs font-bold transition-all ${
                                       val === opt
                                         ? 'bg-blue-600 text-white shadow-sm'
-                                        : 'bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-white/50 hover:bg-slate-200 dark:hover:bg-white/15'
+                                        : 'bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-white/70 hover:bg-slate-200 dark:hover:bg-white/15'
                                     }`}
                                   >
                                     {opt}

@@ -80,6 +80,7 @@ const ITEM_CATEGORY: Record<string, EquipmentCategory> = {
   generator: 'machines_power',
   hcd_stand: 'machines_power',
   backup_saw: 'machines_power',
+  electric_saw_hp: 'machines_power',
   backup_track_saw: 'machines_power',
   '63_backup': 'machines_power',
 
@@ -124,6 +125,7 @@ function getCategory(itemId: string): EquipmentCategory {
 
 const ITEM_LABELS: Record<string, string> = {
   ecd_machine: 'Electric Core Drill',
+  electric_saw_hp: 'Slab Saw Motor',
   hfcd_machine: 'HF Core Drill',
   pump_can: 'Pump Can',
   slurry_ring: 'Slurry Ring',
@@ -277,7 +279,11 @@ function mergeFromSelections(
 
       // Parse quantity
       // chain_saw values like "20 inch" or "15'" are SIZE selectors, NOT quantities
-      const isToggle = value === 'yes' || itemId === 'chain_saw';
+      // `electric_saw_hp` holds "15 HP" / "40 HP" — a MOTOR SIZE, exactly like
+      // chain_saw's "20 inch". Without it here, parseFloat("40 HP") = 40 and the
+      // operator's truck-load panel showed "Electric Saw Hp ×40" filed under
+      // Supplies, as a mandatory checkbox in the pre-route gate.
+      const isToggle = value === 'yes' || itemId === 'chain_saw' || itemId === 'electric_saw_hp';
       const numericValue = !isToggle ? parseFloat(value) : NaN;
       const hasQuantity = !isNaN(numericValue) && numericValue > 0;
 

@@ -11,6 +11,8 @@ import { renderToBuffer } from '@react-pdf/renderer';
 import React from 'react';
 import DispatchTicketPDF from '@/components/pdf/DispatchTicketPDF';
 import { getTenantPdfBranding, type PDFBranding } from '@/lib/pdf-branding';
+import { collectTicketPhotos } from '@/lib/job-ticket-photos';
+import { resolveTicketPhotos } from '@/lib/job-ticket-photos-server';
 
 export async function GET(
   request: NextRequest,
@@ -65,6 +67,47 @@ export async function GET(
       helperName = helpProfile?.full_name || '';
     }
 
+    // ── QUOTED BY ──────────────────────────────────────────────────────────
+    // Founder, Aug 16: "it has submitted by blank but when I go to schedule
+    // form it shows Andres Altamirano."
+    //
+    // The ticket prints `salesman_name`, which is NULL on 9 of the 46 job
+    // orders in production. Only the CREATE path ever sets it (POST
+    // /api/admin/schedule-form maps body.submitted_by → salesman_name); the
+    // edit PATCH never sends it, and until now `salesman_name` was not even in
+    // that route's allowedFields, so no edit could ever fill one in. Meanwhile
+    // the schedule form's "Submitted By" box auto-fills with the CURRENT user's
+    // name on mount — which is exactly why the form looked populated while the
+    // column was null.
+    //
+    // Patching the write path alone leaves every existing job blank forever, so
+    // the ticket falls back to the profile behind `created_by` — the person who
+    // actually filled the form. 8 of those 9 null rows resolve that way; the
+    // 9th has no created_by either (a seeded demo row) and prints '—'.
+    let quotedBy: string = job.salesman_name || '';
+    if (!quotedBy && job.created_by) {
+      const { data: creator } = await supabaseAdmin
+        .from('profiles')
+        .select('full_name')
+        .eq('id', job.created_by)
+        .maybeSingle();
+      quotedBy = creator?.full_name || '';
+    }
+
+    // ── PHOTOS (page 2 onward) ─────────────────────────────────────────────
+    // Bytes are pulled out of Storage with the service-role client and inlined
+    // BEFORE render. Two reasons, both verified against production: the stored
+    // `/object/public/job-photos/...` URLs 400 ("Bucket not found") because
+    // both photo buckets are private, and a remote URL inside renderToBuffer
+    // stalls or throws — either way a decorative photo would have cost the crew
+    // the whole ticket. A photo that cannot be resolved is simply not printed.
+    let photos: { dataUri: string; caption: string }[] = [];
+    try {
+      photos = await resolveTicketPhotos(collectTicketPhotos(job));
+    } catch (photoError) {
+      console.error('dispatch-pdf: photo resolution failed, printing ticket without them', photoError);
+    }
+
     // Fetch branding for PDF — tenant-scoped (was unscoped: any tenant's row).
     // A null-tenant super_admin brands with the JOB's tenant, not neutral.
     const tenantBranding = await getTenantPdfBranding(tenantId ?? job.tenant_id ?? null);
@@ -94,7 +137,7 @@ export async function GET(
       estimated_cost: job.estimated_cost ? Number(job.estimated_cost) : undefined,
       estimated_hours: job.estimated_hours ? Number(job.estimated_hours) : undefined,
       po_number: job.po_number,
-      salesman_name: job.salesman_name,
+      salesman_name: quotedBy,
       operator_name: operatorName,
       helper_name: helperName,
       equipment_needed: job.equipment_needed || [],
@@ -117,13 +160,35 @@ export async function GET(
       is_multi_day: job.is_multi_day || false,
       total_days_worked: job.total_days_worked || 0,
       scheduling_flexibility: job.scheduling_flexibility || {},
+      photos,
     };
 
-    // Render PDF to buffer
+    // THE TICKET MATTERS MORE THAN THE PHOTOS.
+    //
+    // The try/catch above only covers RESOLVING photos. The render was outside
+    // it, so a photo that resolves but cannot be DECODED took the whole ticket
+    // down with a 500 — the crew gets no sheet at all because of a decorative
+    // image. The magic-byte sniff proves a JPEG/PNG header, not a file react-pdf
+    // can draw: a CMYK JPEG, a truncated upload, or a 16-bit/interlaced PNG all
+    // pass the sniff and throw at render time.
+    //
+    // So: try with photos, and on any failure print the ticket without them.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const buffer = await renderToBuffer(
-      React.createElement(DispatchTicketPDF, { job: pdfData, branding: pdfBranding }) as any
-    );
+    const render = (data: any) =>
+      renderToBuffer(
+        React.createElement(DispatchTicketPDF, { job: data, branding: pdfBranding }) as any
+      );
+
+    let buffer: Awaited<ReturnType<typeof render>>;
+    try {
+      buffer = await render(pdfData);
+    } catch (renderError) {
+      console.error(
+        'dispatch-pdf: render failed with photos, retrying without them',
+        renderError
+      );
+      buffer = await render({ ...pdfData, photos: [] });
+    }
 
     // Return PDF response
     const uint8 = new Uint8Array(buffer);

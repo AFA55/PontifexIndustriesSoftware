@@ -177,6 +177,13 @@ export async function PATCH(
       // (the "edits don't stick" bug): project name, job type, scope photos,
       // and the project-manager owner.
       'project_name', 'job_type', 'scope_photo_urls', 'project_manager_id',
+      // Who quoted/submitted the job. The CREATE route maps the schedule form's
+      // `submitted_by` onto this column, but it was missing here — so an edit
+      // could never set or correct it, and a job created any other way stayed
+      // null forever. That null is what printed "Quoted By: —" on the job
+      // ticket while the form showed a name (the form auto-fills the box with
+      // the current user, which is not the same thing as a stored value).
+      'salesman_name',
       // Optional job financials (opt-in via track_financials) — schema-only
       // until this route's PATCH wired them through.
       'track_financials', 'drive_distance_miles', 'mileage_rate',

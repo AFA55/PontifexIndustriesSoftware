@@ -15,6 +15,7 @@
  *   - job_type:            string   — comma-joined service codes fallback
  */
 
+import { SUB_OPTION_LABELS } from '@/lib/job-ticket-format';
 import { getDisplayName } from './equipment-map';
 
 /** Human-readable label for each service code (mirrors schedule-form SERVICE_TYPES). */
@@ -35,6 +36,11 @@ export const SERVICE_TYPE_LABELS: Record<string, string> = {
 };
 
 /** Turn a service code into its friendly label (falls back to the raw code). */
+/** Canonical machine wording, shared with the printed ticket. */
+function subOptionLabel(sub: string): string {
+  return SUB_OPTION_LABELS[sub] ?? humanizeItemId(sub);
+}
+
 export function serviceTypeLabel(code: string): string {
   const trimmed = (code || '').trim();
   return SERVICE_TYPE_LABELS[trimmed] ?? trimmed;
@@ -96,6 +102,12 @@ export function selectionsToLines(
   for (const [code, picks] of Object.entries(selections)) {
     if (!picks || typeof picks !== 'object') continue;
     const sub = typeof picks._sub === 'string' ? String(picks._sub) : undefined;
+    // Track whether anything besides the machine itself got listed. A DFS job
+    // whose only pick is "Husqvarna 7000" used to produce ZERO shop lines: the
+    // sub is normally rendered as a prefix on other items, so with no other
+    // items the one machine that has to go on the truck disappeared from the
+    // shop list entirely while still printing on the paper ticket.
+    let emittedForCode = false;
 
     for (const [itemId, rawVal] of Object.entries(picks)) {
       if (itemId === '_sub') continue;
@@ -107,11 +119,23 @@ export function selectionsToLines(
 
       const isToggle = TRUTHY.has(lower);
       const codeLabel = serviceTypeLabel(code);
-      const subPrefix = sub ? ` (${humanizeItemId(sub)})` : '';
+      // Canonical wording, shared with the printed ticket — humanizeItemId
+      // renders these as "Tier4" / "Electric Slab", which is not what the
+      // paper says and not what the shop calls them.
+      const subPrefix = sub ? ` (${subOptionLabel(sub)})` : '';
       lines.push({
         label: `${codeLabel}${subPrefix}: ${humanizeItemId(itemId)}`,
         source: 'selection',
         detail: isToggle ? undefined : val,
+      });
+      emittedForCode = true;
+    }
+
+    // The machine on its own still has to be pulled.
+    if (sub && !emittedForCode) {
+      lines.push({
+        label: `${serviceTypeLabel(code)}: ${subOptionLabel(sub)}`,
+        source: 'selection',
       });
     }
   }
