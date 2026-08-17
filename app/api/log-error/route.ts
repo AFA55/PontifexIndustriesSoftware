@@ -37,12 +37,27 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
 
+    const reportedUrl = (body.url || '').slice(0, 500);
+
     const errorLog = {
       type: body.type || 'client_error',
+      // `endpoint` and `method` are NOT NULL with no default — the table was
+      // designed for API errors and later reused for browser crashes without
+      // anyone supplying them. Every single insert this route has ever
+      // attempted was rejected with:
+      //     null value in column "endpoint" violates not-null constraint
+      // caught by the .then() below, printed to a console nobody reads, and the
+      // route still returned 200. So the endpoint built to capture crashes has
+      // never stored one.
+      //
+      // For a browser crash the "endpoint" is the page the user was on, which
+      // is the genuinely useful thing to record.
+      endpoint: (reportedUrl || 'unknown').slice(0, 500),
+      method: 'CLIENT',
       error_message: (body.error || body.message || 'Unknown error').slice(0, 2000),
       stack_trace: (body.stack || '').slice(0, 5000),
       component_stack: (body.componentStack || '').slice(0, 5000),
-      url: (body.url || '').slice(0, 500),
+      url: reportedUrl,
       user_agent: (body.userAgent || request.headers.get('user-agent') || '').slice(0, 500),
       metadata: {
         timestamp: body.timestamp || new Date().toISOString(),
@@ -51,17 +66,15 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
 
-    // Fire-and-forget — insert into error_logs table if it exists
-    Promise.resolve(
-      supabaseAdmin
-        .from('error_logs')
-        .insert(errorLog)
-    ).then(({ error }) => {
-      if (error) {
-        // Table might not exist yet — just log to console
-        console.error('[log-error] DB insert failed:', error.message);
-      }
-    }).catch(() => {});
+    // AWAITED, not fire-and-forget. This runs in a serverless function: once the
+    // response is returned the runtime may freeze the instance, and any promise
+    // still in flight is simply killed. A write that "usually" lands is not a
+    // record. It stays inside the try/catch, so a failure still cannot turn an
+    // error report into a second error.
+    const { error: insertError } = await supabaseAdmin.from('error_logs').insert(errorLog);
+    if (insertError) {
+      console.error('[log-error] DB insert failed:', insertError.message);
+    }
 
     // Also log to server console
     console.error(`[CLIENT_ERROR] ${errorLog.type}: ${errorLog.error_message} @ ${errorLog.url}`);
@@ -74,15 +87,27 @@ export async function POST(request: NextRequest) {
     // Meanwhile a feature stayed broken for two months and a twelve-day failure
     // went unseen.
     //
-    // Fire-and-forget with its own dedupe. An alerting call must never delay or
-    // fail the error report it is riding on.
+    // AWAITED, and this is the whole reason the first three test alerts never
+    // arrived. It was `void alert(...)` — fire-and-forget — and the Vercel log
+    // showed exactly what that costs:
+    //
+    //     [telegram] send error This operation was aborted
+    //
+    // The config was present and the send WAS attempted; the serverless instance
+    // simply froze once the response was returned, killing the in-flight fetch.
+    // A fire-and-forget network call in a serverless function is a coin flip,
+    // and an alert that arrives sometimes is worse than none — you stop
+    // trusting the silence.
+    //
+    // `sendTelegram` carries its own 4s abort, so the worst this adds to an
+    // error report is four seconds, and it can never throw.
     const fingerprint = alertFingerprint({
       level: 'error',
       title: errorLog.error_message.slice(0, 120),
       source: errorLog.url,
     });
     if (shouldAlert(fingerprint)) {
-      void alert({
+      await alert({
         level: 'error',
         title: 'App crashed for a user',
         detail: errorLog.error_message.slice(0, 400),
