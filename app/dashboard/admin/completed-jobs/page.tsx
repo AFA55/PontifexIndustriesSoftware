@@ -177,7 +177,13 @@ export default function CompletedJobsArchivePage() {
       .select('role')
       .eq('id', session.user.id)
       .single();
-    if (!['admin', 'super_admin', 'salesman', 'operations_manager'].includes(profile?.role || '')) {
+    // `supervisor` belongs here (founder, Aug 17: project managers and
+    // supervisors "need to be able to print out tickets and other things").
+    // David Schadt is a supervisor, and every API this page calls now admits the
+    // role — leaving him out of the page gate would mean the permissions were
+    // fixed and he still could not reach the button. Matches SALES_STAFF_ROLES,
+    // the set that may already see these jobs elsewhere.
+    if (!['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(profile?.role || '')) {
       router.push('/dashboard');
     }
   };
@@ -684,43 +690,62 @@ export default function CompletedJobsArchivePage() {
                         className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 to-teal-500"
                         aria-hidden
                       />
-                      <div className="flex items-center justify-between mb-4 gap-3">
+                      <div className="flex flex-wrap items-center justify-between mb-4 gap-3">
                         <h2 className="text-xl font-bold text-slate-900 dark:text-white">
                           Job Details
                         </h2>
-                        {/* A finished job is exactly when the office needs the
-                            ticket — to file it and to bill from it. There was
-                            no way to print one from here at all (founder,
-                            Aug 12: "I can't print out the tickets for the work
-                            that they've done"). Week mode, so a multi-day job
-                            prints every day on one sheet. */}
-                        <Link
-                          href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/work-ticket?mode=week`}
-                          target="_blank"
-                          className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
-                          title="Print the work ticket for this job"
-                        >
-                          <Printer className="w-3.5 h-3.5" />
-                          Print Ticket
-                        </Link>
-                        <button
-                          onClick={() =>
-                            handleDeleteJob(
-                              selectedJobDetails.job.id,
-                              selectedJobDetails.job.job_number
-                            )
-                          }
-                          disabled={deletingId === selectedJobDetails.job.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                          title="Permanently delete this job"
-                        >
-                          {deletingId === selectedJobDetails.job.id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3.5 h-3.5" />
-                          )}
-                          {deletingId === selectedJobDetails.job.id ? 'Deleting…' : 'Delete Job'}
-                        </button>
+                        {/* THE TWO SHEETS, and they are NOT the same document.
+                            "Job Order" is the dispatch sheet the office writes
+                            BEFORE the job (scope, equipment, PPE, permits);
+                            "Ticket" is the record of work performed per day per
+                            operator, printed AFTER. Same wording and same order
+                            as the job page (app/dashboard/admin/jobs/[id]) so a
+                            name always means the same piece of paper.
+
+                            Founder, Aug 17: "add print work order in completed
+                            jobs in case we lose the work order — put it next to
+                            Print Ticket so we can print both." A finished job is
+                            exactly when the office needs to re-file either one.
+                            Ticket is week mode, so a multi-day job prints every
+                            day on one sheet. */}
+                        <div className="ml-auto flex flex-wrap items-center gap-2">
+                          <Link
+                            href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/print`}
+                            target="_blank"
+                            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
+                            title="Print the job order sheet (scope, equipment, site details) for this job"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            Print Job Order
+                          </Link>
+                          <Link
+                            href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/work-ticket?mode=week`}
+                            target="_blank"
+                            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
+                            title="Print the work ticket for this job"
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            Print Ticket
+                          </Link>
+                          <button
+                            onClick={() =>
+                              handleDeleteJob(
+                                selectedJobDetails.job.id,
+                                selectedJobDetails.job.job_number
+                              )
+                            }
+                            disabled={deletingId === selectedJobDetails.job.id}
+                            className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold bg-rose-50 text-rose-700 ring-1 ring-rose-200 hover:bg-rose-100 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            title="Permanently delete this job"
+                          >
+                            {deletingId === selectedJobDetails.job.id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-3.5 h-3.5" />
+                            )}
+                            {deletingId === selectedJobDetails.job.id ? 'Deleting…' : 'Delete Job'}
+                          </button>
+                        </div>
                       </div>
                       {deleteError && (
                         <div className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30">

@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAuth } from '@/lib/api-auth';
+import { requireAuth, DISPATCH_TICKET_ROLES } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { renderToBuffer } from '@react-pdf/renderer';
 import React from 'react';
@@ -24,9 +24,16 @@ export async function GET(
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    // Verify role (admins, operators, and salesmen can print dispatch tickets)
-    const allowedRoles = ['admin', 'super_admin', 'operations_manager', 'salesman', 'operator'];
-    if (!auth.role || !allowedRoles.includes(auth.role)) {
+    // WHO MAY PRINT A DISPATCH TICKET.
+    //
+    // This was a hand-rolled array, and hand-rolled arrays drift: it omitted
+    // `supervisor`, so David Schadt could open the schedule board, see the job,
+    // press Print Ticket and get a 403 — while a salesman standing next to him
+    // could print the same sheet. Now it is the shared constant, so this route
+    // can never fall out of step with the other print surfaces again.
+    //
+    // `operator` stays: the crew prints its own ticket from /dashboard/my-jobs.
+    if (!auth.role || !DISPATCH_TICKET_ROLES.includes(auth.role)) {
       return NextResponse.json({ error: 'Not authorized to print dispatch tickets' }, { status: 403 });
     }
 

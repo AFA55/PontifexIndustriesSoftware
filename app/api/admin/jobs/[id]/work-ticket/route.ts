@@ -13,12 +13,17 @@ export const dynamic = 'force-dynamic';
  * supplies the scope. `profiles` IS scoped too (it does have tenant_id —
  * defence in depth; every id it resolves already came from a scoped row).
  *
- * GET — requireAdmin
+ * GET — requireSalesStaff (PRINT_VIEWER_ROLES). Was requireAdmin, which meant
+ * the job page admitted five roles and this route answered three: the two
+ * "project manager" roles (salesman, supervisor) got a rendered Print Work
+ * Ticket button and a 403 behind it. Read-only render of a job they may
+ * already open — the tenant scoping below is what protects the data, and it is
+ * unchanged.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { notFoundInCompany } from '@/lib/tenant-scope';
 import { toLocalYMD } from '@/lib/dates';
 import { attributableTimecards } from '@/lib/job-clock-attribution';
@@ -43,7 +48,7 @@ const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;

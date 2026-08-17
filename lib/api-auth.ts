@@ -40,7 +40,43 @@ export type AuthResult = AuthSuccess | AuthFailure;
 /** Roles allowed through `requireAdmin` (narrowed — excludes salesman/supervisor). */
 export const ADMIN_ROLES: string[] = ['admin', 'super_admin', 'operations_manager'];
 /** Broader set for read-only / schedule-board / sales pipeline routes. */
-const SALES_STAFF_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor', 'salesman'];
+export const SALES_STAFF_ROLES = [
+  'admin',
+  'super_admin',
+  'operations_manager',
+  'supervisor',
+  'salesman',
+];
+
+/**
+ * Who may PRINT a job's paperwork (dispatch ticket, work ticket, job order,
+ * signed waiver). Read-only rendering of a job the caller may already see.
+ *
+ * FOUNDER (Aug 17): "fix permissions… check for project managers as well — we
+ * need to have them able to print out tickets and other things."
+ *
+ * The people he calls project managers hold `salesman` (Adam Ingalls, Jeter
+ * Yates, Demo Project Manager) or `supervisor` (David Schadt, Demo Supervisor).
+ * Every one of them could open the job — `/api/admin/jobs/[id]/summary` is
+ * `requireSalesStaff` and the job page admits all five roles — but the printing
+ * routes sat behind `requireAdmin` (three roles), so the button rendered and
+ * the request 403'd. The platform's signature defect: the page admits a role
+ * the API refuses, so the screen shows an error instead of a permission.
+ *
+ * Deliberately equal to SALES_STAFF_ROLES — the same set that may SEE the job
+ * may print it. Nothing here mutates a job; write routes keep their own guards.
+ */
+export const PRINT_VIEWER_ROLES: string[] = [...SALES_STAFF_ROLES];
+
+/**
+ * Dispatch-ticket printing = PRINT_VIEWER_ROLES + `operator`.
+ *
+ * The crew prints its own ticket from `/dashboard/my-jobs/[id]`, so `operator`
+ * has to stay. It was the ONLY non-office role ever granted here and that is
+ * unchanged; `supervisor` is what was missing, from a hand-rolled list that
+ * drifted out of step with every other print surface.
+ */
+export const DISPATCH_TICKET_ROLES: string[] = [...PRINT_VIEWER_ROLES, 'operator'];
 
 // Read-only view roles: SALES_STAFF + shop_manager. Used by routes that only
 // expose data (no mutations). shop_manager needs to SEE the schedule + active

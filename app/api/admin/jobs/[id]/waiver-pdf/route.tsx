@@ -21,12 +21,17 @@ export const dynamic = 'force-dynamic';
  *
  * Streams `application/pdf` inline so the browser previews it rather than
  * downloading a file the office then has to find again.
+ *
+ * GET — requireSalesStaff (PRINT_VIEWER_ROLES). Was requireAdmin, while the
+ * sibling `documents` route that LISTS this PDF is requireSalesStaff — so a
+ * salesman or supervisor saw "Signed Utility Waiver" in the documents list and
+ * got a 403 on opening it. Read-only render; tenant scoping below unchanged.
  */
 
 import React from 'react';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { requireAdmin } from '@/lib/api-auth';
+import { requireSalesStaff } from '@/lib/api-auth';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { LiabilityReleasePDF } from '@/components/pdf/LiabilityReleasePDF';
 import { getTenantEmailBranding } from '@/lib/email';
@@ -35,7 +40,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 export async function GET(request: NextRequest, context: RouteContext) {
   try {
-    const auth = await requireAdmin(request);
+    const auth = await requireSalesStaff(request);
     if (!auth.authorized) return auth.response;
 
     const { id: jobId } = await context.params;
