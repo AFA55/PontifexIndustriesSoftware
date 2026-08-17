@@ -96,6 +96,33 @@ production — do not re-derive it.
 editable once the LOAD can re-populate it. Sent-but-not-loaded is a WIPE; loaded-but-
 not-sent is a silent DISCARD. Both are worse than an honestly absent control.
 
+### 🔜 PARKED — change orders (founder: "higher priority things first")
+
+Plan + verified current state: **`docs/plans/CHANGE_ORDERS.md`**. Short version:
+the table and the API exist and agree; `components/jobs/ChangeOrdersSection.tsx`
+speaks a completely different shape and is imported by nothing; **zero rows have
+ever been written**. It is not a working feature with gaps — it is a back end, an
+orphaned UI that could not work if wired, and no usage.
+
+- [ ] **🔴 Do this one NOW, independently — it is not a workflow decision.** The
+      operator's own job page (`app/dashboard/my-jobs/[id]/page.tsx:193`) calls
+      `GET /api/admin/jobs/[id]/change-orders`, which is `requireAdmin`. Every
+      operator 403s and a bare `catch {}` swallows it, so "Recent change orders"
+      has never rendered for the crew since April and nobody ever saw an error.
+      Those are the production 403s — operators, NOT office staff (my first read
+      of them was wrong). Split the guard: GET for the job's crew, POST stays
+      office-only.
+- [ ] Buttons beside Original Scope on the job view: **Edit Original Scope** +
+      **Add Additional Scope** → "is this a change order?"
+- [ ] Change-order scope fields + a required cost.
+- [ ] Printed work-performed ticket separates original vs each change order, with
+      what the operator did against each — extend `lib/job-ticket-format.ts` so
+      paper, PDF and the crew's phone cannot drift.
+- [ ] **One** edit path into scope (founder: "not two ways to edit the ticket").
+- [ ] Open decisions listed in the plan: cost vs price, approval, customer
+      signature, and who may raise one (the API is `requireAdmin`, which excludes
+      exactly the salesman/supervisor PMs who would raise them).
+
 ### 🆕 AUG 16/17 — the day of silent failures, and what it changed
 
 **FIVE separate faults, one disease: something built to tell us what is happening
