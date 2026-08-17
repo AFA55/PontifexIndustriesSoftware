@@ -36,7 +36,10 @@ const OPERATOR_STEPS: OnboardingStep[] = [
       '📅 Swipe the date bar to look ahead or back',
       '🏷️ Status badge shows where each job is in the workflow',
       '📍 Tap any job card to open its details and get started',
-      '🔄 Multi-day jobs carry over automatically day to day',
+      // Was "Multi-day jobs carry over automatically day to day". Founder,
+      // Aug 2026: the crew doesn't need to know a job is booked across days —
+      // an unfinished job simply shows up again, which is all this has to say.
+      '🔄 A job you didn\'t finish shows up again the next day',
     ],
   },
   {
@@ -78,15 +81,17 @@ const OPERATOR_STEPS: OnboardingStep[] = [
     id: 'complete-job',
     title: '✅ Completing a Job',
     description:
-      'On your final scheduled day, tap "Complete Job" instead of "Done for Today". Add any closing notes for your supervisor — that\'s it. Your supervisor will review and approve.',
+      'When the work is finished, tap "Complete Job" instead of "Done for Today". Add any closing notes for your supervisor — that\'s it. Your supervisor will review and approve.',
     icon: (
       <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
     ),
     features: [
-      '🗓️ On earlier days of multi-day jobs, tap "Done for Today"',
-      '🏁 On the last day, tap "Complete Job" to send for approval',
+      // Same reason: the decision is "is the work finished?", not "is this a
+      // multi-day job?" — and that is the question the two buttons actually ask.
+      '🗓️ If the work isn\'t finished, tap "Done for Today"',
+      '🏁 When the work is finished, tap "Complete Job" to send for approval',
       '💬 Add closing notes for your supervisor before submitting',
       '🔔 Your supervisor is notified automatically once you submit',
     ],

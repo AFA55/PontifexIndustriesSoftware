@@ -22,6 +22,8 @@ import { unifyEquipmentSelections, allItemsConfirmed as checkAllConfirmed } from
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import { PhotoViewer } from '@/components/PhotoUploader';
 import OfficeNotes from '../_components/OfficeNotes';
+import SiteComplianceList from '../_components/SiteComplianceList';
+import { buildComplianceItems } from '@/lib/site-compliance-display';
 
 // HelperWorkLog only renders when the user is in the helper slot on this job.
 // Whoever is assigned as `assigned_to` gets the full operator flow regardless of their profile role.
@@ -274,15 +276,17 @@ export default function JobDetailPage() {
 
   const equipmentAlreadyConfirmed = job ? hasOperatorConfirmedEquipment() : false;
 
-  const isMultiDayReturnVisit = dayNumber > 1;
+  // They have worked this job before (day_number came back > 1). The equipment
+  // was confirmed on the first visit, so the checklist is not re-imposed.
+  const isReturnVisit = dayNumber > 1;
 
-  const canStartRoute = equipmentAlreadyConfirmed || isMultiDayReturnVisit ||
+  const canStartRoute = equipmentAlreadyConfirmed || isReturnVisit ||
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
 
   // Location & site contact unlock once equipment is confirmed AND job is in_route or further
-  const equipmentAllChecked = equipmentAlreadyConfirmed || isMultiDayReturnVisit ||
+  const equipmentAllChecked = equipmentAlreadyConfirmed || isReturnVisit ||
     (hasEquipmentSelections
       ? checkAllConfirmed(unifiedItems, checkedItems)
       : mandatoryComplete);
@@ -312,8 +316,11 @@ export default function JobDetailPage() {
   // pending_completion = operator submitted for approval; treat same as in_progress so they can still navigate freely
   const isPendingCompletion = job?.status === 'pending_completion';
   const isInProgress = job ? ['in_route', 'in_progress', 'pending_completion'].includes(job.status) : false;
-  // Multi-day job that was reset to "scheduled" after "Done for Today"
-  const isMultiDayReadyToStart = job?.status === 'scheduled' && job?.is_multi_day === true && dayNumber > 1;
+  // A job the crew already worked at least one day on, reset to "scheduled" by
+  // "Done for Today". Named for what it MEANS to the operator (they are picking
+  // it back up), not for the office's multi-day flag — that word is off the
+  // operator surfaces now, but the underlying state still has to be detected.
+  const isReturnVisitReadyToStart = job?.status === 'scheduled' && job?.is_multi_day === true && dayNumber > 1;
   // jobIsHelper is slot-based, NOT role-based.
   // A helper/apprentice put in the assigned_to (operator) slot gets the full operator view.
   // Only users in the helper_assigned_to slot see the simplified helper view.
@@ -493,22 +500,19 @@ export default function JobDetailPage() {
 
   const arrivalDisplay = formatTime(job.arrival_time);
   const shopArrival = formatTime(job.shop_arrival_time);
-  const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
 
   // Jobsite conditions + site compliance (same as jobsite page)
   const conditions: Record<string, any> = job.jobsite_conditions || {};
-  const compliance: Record<string, any> = job.site_compliance || {};
   const filledConditions = Object.entries(conditions).filter(([, value]) => {
     if (value === null || value === undefined || value === '' || value === false) return false;
     return true;
   });
-  const filledCompliance = Object.entries(compliance).filter(([key, value]) => {
-    if (key === 'attachment_urls') return false;
-    if (value === null || value === undefined || value === '' || value === false) return false;
-    return true;
-  });
+  // Compliance is NOT a generic key/value dump any more — see
+  // lib/site-compliance-display.ts. The two operator surfaces share one builder
+  // so they cannot disagree about the same job.
+  const complianceItems = buildComplianceItems(job.site_compliance);
   const hasConditions = filledConditions.length > 0;
-  const hasCompliance = filledCompliance.length > 0;
+  const hasCompliance = complianceItems.length > 0;
   const hasAdditionalNotes = !!(job.additional_info || job.special_equipment_notes || job.directions);
 
   const conditionLabels: Record<string, string> = {
@@ -917,11 +921,12 @@ export default function JobDetailPage() {
           <span className={`text-sm px-3 py-1.5 rounded-full border font-bold ${getStatusStyle(job.status)}`}>
             {job.readable_status}
           </span>
-          {isMultiDay && (
-            <span className="text-sm px-3 py-1.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-bold border border-brand/30 dark:border-brand/30">
-              Multi-Day
-            </span>
-          )}
+          {/* (Removed Aug 2026) The "Multi-Day" badge. Founder: "remove multiday
+              notification for operators — if they have a job lasting longer
+              they don't need to know." A crew works TODAY; how many days the
+              office booked is an office fact. `is_multi_day` / `end_date` are
+              untouched in the data, on the admin surfaces and on the printed
+              ticket — this is only about what the crew is shown. */}
           {jobIsHelper && (
             <span className="text-sm px-3 py-1.5 bg-emerald-100 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-full font-bold border border-emerald-200 dark:border-emerald-500/30">
               Team Member
@@ -974,15 +979,22 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Multi-Day Ready to Start Banner */}
-        {isMultiDayReadyToStart && (
+        {/* RETURN VISIT — the ticket is back at the start and they should know
+            why, without being told the job spans days.
+
+            This used to read "Ready to Start Day 3 / You completed Day 2 of
+            this job…". The banner itself still earns its place: after "Done for
+            Today" the job resets to `scheduled`, so the crew opens a ticket
+            that looks brand new with its equipment step already ticked off. It
+            has to explain that. It just doesn't have to count days at them. */}
+        {isReturnVisitReadyToStart && (
           <div className="bg-amber-50 dark:bg-amber-500/10 border-2 border-amber-300 dark:border-amber-500/40 rounded-2xl p-5 shadow-sm">
             <div className="flex items-start gap-3">
               <PlayCircle className="w-6 h-6 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
-                <p className="text-base font-bold text-amber-800 dark:text-amber-300">Ready to Start Day {dayNumber}</p>
+                <p className="text-base font-bold text-amber-800 dark:text-amber-300">Picking this job back up</p>
                 <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">
-                  You completed Day {dayNumber - 1} of this job. Check your equipment and start your route to begin Day {dayNumber}.
+                  Your equipment is already confirmed. Start your route when you&apos;re ready.
                 </p>
               </div>
             </div>
@@ -1304,32 +1316,31 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Site Compliance — collapsible */}
+        {/* ── SITE RULES — collapsible ────────────────────────────────────
+            Was "Site Compliance", a generic key/value dump. Founder, Aug 2026:
+            "site compliance lets make it more clear and easier to understand —
+            that looks like military time and really doesn't say anything."
+            He was reading `Orientation Datetime  2026-08-16T08:00` on a phone.
+
+            The heading now says WHY it is on screen. The rows are built by
+            lib/site-compliance-display.ts and drawn by SiteComplianceList, both
+            shared with the jobsite screen. */}
         {hasCompliance && (
           <div className="bg-white/90 dark:bg-white/[0.05] backdrop-blur-lg rounded-2xl shadow-xl border border-brand/30 dark:border-white/10 overflow-hidden">
             <button
               onClick={() => setComplianceOpen(!complianceOpen)}
-              className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
+              className="w-full flex items-center justify-between gap-2 px-5 py-4 min-h-[56px] hover:bg-gray-50 dark:hover:bg-white/[0.05] transition-colors"
             >
-              <div className="flex items-center gap-2">
-                <Shield className="w-5 h-5 text-brand dark:text-brand" />
-                <span className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</span>
-                <span className="text-xs px-2 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand dark:text-brand rounded-full font-bold">Required</span>
+              <div className="flex items-center gap-2 min-w-0">
+                <Shield className="w-5 h-5 flex-shrink-0 text-brand dark:text-brand" />
+                <span className="text-base font-bold text-gray-800 dark:text-white truncate">Before You Start</span>
+                <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand-dark dark:text-white/80 rounded-full font-bold">Required</span>
               </div>
-              <ChevronDown className={`w-5 h-5 text-gray-400 dark:text-white/40 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-5 h-5 flex-shrink-0 text-gray-400 dark:text-white/40 transition-transform ${complianceOpen ? 'rotate-180' : ''}`} />
             </button>
             {complianceOpen && (
-              <div className="px-5 pb-5 space-y-2">
-                {filledCompliance.map(([key, value]) => {
-                  const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-                  const displayValue = typeof value === 'boolean' ? (value ? 'Required' : 'Not Required') : String(value);
-                  return (
-                    <div key={key} className="flex items-center justify-between p-3 bg-brand/5 dark:bg-brand/10 rounded-xl border border-brand/30 dark:border-brand/20">
-                      <span className="text-sm font-semibold text-brand dark:text-brand">{label}</span>
-                      <span className="text-sm font-bold text-brand dark:text-white ml-2">{displayValue}</span>
-                    </div>
-                  );
-                })}
+              <div className="px-5 pb-5">
+                <SiteComplianceList items={complianceItems} />
               </div>
             )}
           </div>
@@ -1395,10 +1406,10 @@ export default function JobDetailPage() {
             </button>
             {equipmentOpen && (
               <div className="px-5 pb-5">
-                {isMultiDayReturnVisit && (
-                  <div className="mb-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2 text-sm text-blue-700 font-medium">
-                    <CheckCircle2 className="w-4 h-4 text-blue-500 flex-shrink-0" />
-                    Day {dayNumber} — Equipment already confirmed. Review as needed.
+                {isReturnVisit && (
+                  <div className="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 rounded-xl flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300 font-medium">
+                    <CheckCircle2 className="w-4 h-4 text-blue-500 dark:text-blue-400 flex-shrink-0" />
+                    Equipment already confirmed on this job. Review as needed.
                   </div>
                 )}
                 <UnifiedEquipmentPanel
@@ -1408,7 +1419,7 @@ export default function JobDetailPage() {
                   specialEquipment={job.special_equipment}
                   checkedItems={checkedItems}
                   onToggle={toggleEquipment}
-                  disabled={isCompleted || equipmentAlreadyConfirmed || isMultiDayReturnVisit}
+                  disabled={isCompleted || equipmentAlreadyConfirmed || isReturnVisit}
                 />
 
                 {/* Additional / Custom Equipment — items the admin typed in the schedule
@@ -1532,9 +1543,10 @@ export default function JobDetailPage() {
                 {startingRoute ? (
                   <><Loader2 className="w-6 h-6 animate-spin" /> Starting...</>
                 ) : canStartRoute ? (
-                  isMultiDayReadyToStart
-                    ? <><PlayCircle className="w-6 h-6" /> Start Day {dayNumber} In Route</>
-                    : <><PlayCircle className="w-6 h-6" /> Start In Route</>
+                  // One label, every visit. "Start Day 3 In Route" told the
+                  // operator how long the office booked the job for — which is
+                  // the thing they asked us to stop saying.
+                  <><PlayCircle className="w-6 h-6" /> Start In Route</>
                 ) : (
                   <><Wrench className="w-6 h-6" /> Complete Required Equipment First</>
                 )}

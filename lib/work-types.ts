@@ -109,7 +109,14 @@ export function defaultUnitFor(name: string): string {
   if (n.includes('INSTALL') || n.includes('BOLLARD') || n.includes('LINTEL') || n.includes('BOOT')) return 'each';
   if (n.includes('SEALING')) return 'linear ft';
   if (n.includes('STANDBY') || n.includes('TRAVEL') || n.includes('MEETING') || n.includes('WASH') || n.includes('VACUUM')) return 'hours';
-  if (n.includes('SCAN')) return 'sq ft';
+  // SCANNING IS BILLED BY THE HOUR, NOT BY AREA (founder, Aug 17 2026: "for the
+  // GPR ... we bill that by the hour, so they can just input hours onsite").
+  // The office's GPR scope now asks for hours on site, so the operator's IMAGE
+  // SCAN entry defaults to the same unit — a crew reporting square feet against
+  // an hours target is a number nobody can invoice. A row already stored with
+  // 'sq ft' still reads back as 'sq ft' (workEntryFromWorkItem keeps the stored
+  // unit), so nothing already submitted changes meaning.
+  if (n.includes('SCAN')) return 'hours';
   return 'each';
 }
 

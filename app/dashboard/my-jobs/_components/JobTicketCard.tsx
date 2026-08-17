@@ -134,7 +134,6 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
   const arrivalDisplay = formatTime(job.arrival_time);
   const shopArrival = formatTime(job.shop_arrival_time);
   const priorityInfo = getPriorityIndicator(job.priority);
-  const isMultiDay = job.end_date && job.end_date !== job.scheduled_date;
   const isCompleted = job.status === 'completed';
 
   // ── DAY-TICKET STATUS (the founder's DSM reference) ──────────────────────
@@ -207,11 +206,15 @@ export default function JobTicketCard({ job, doneToday, helperLogSubmitted }: Jo
               <span className={`text-xs px-2 py-0.5 rounded-full border font-semibold ${getStatusStyle(job.status)}`}>
                 {job.readable_status}
               </span>
-              {isMultiDay && (
-                <span className="text-xs px-2 py-0.5 bg-brand/10 text-brand rounded-full font-semibold border border-brand/30">
-                  Multi-Day
-                </span>
-              )}
+              {/* (Removed Aug 2026) The "Multi-Day" badge, which was derived
+                  from end_date !== scheduled_date. Founder: "remove multiday
+                  notification for operators — if they have a job lasting longer
+                  they don't need to know." The card's job is TODAY: what state
+                  today's ticket is in, and who is on the crew. The span is an
+                  office fact and stays on the admin surfaces + printed ticket.
+                  The card is unaffected otherwise — a multi-day job is painted
+                  on every day of its span by /api/job-orders, so it still
+                  arrives here as a normal ticket on day 2. */}
               {job.isHelper && (
                 <span className="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-semibold border border-emerald-200">
                   Team Member

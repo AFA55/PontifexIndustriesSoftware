@@ -31,6 +31,7 @@ import { useModuleGate } from '@/components/ModuleGuard';
 import { NumberInput } from '@/components/ui/NumberInput';
 import { toLocalYMD } from '@/lib/dates';
 import { asArray } from '@/lib/job-arrays';
+import { withCutCount, type CutRow } from '@/lib/cut-rows';
 import { applySubOption, showWhenMap } from '@/lib/equipment-sub-options';
 import {
   loadJobsiteConditions,
@@ -198,15 +199,24 @@ const SCOPE_FIELDS: Record<string, ScopeConfig> = {
   },
   'GPR': {
     label: 'GPR Scanning Details',
-    // "Allow them to add multiple areas, and instead of square ft, length and
-    // width" (founder, Aug 15). One square-foot box forced whoever filled it in
-    // to do the multiplication in their head across several rooms and write
-    // down the answer — so the office got a total with no way to see what it
-    // was made of, and the crew got no idea which areas to scan.
-    hasDynamicAreas: true,
-    areaLengthWidthOnly: true,
+    // GPR IS BILLED BY THE HOUR, SO THAT IS THE ONLY NUMBER WE ASK FOR
+    // (founder, Aug 17 2026: "for the GPR, instead of getting sqft that they
+    // did, they don't have to do that — we bill that by the hour, so they can
+    // just input hours onsite and that should be all").
+    //
+    // Scanning is time-and-materials: nobody quotes it per square foot, so the
+    // area builder (added Aug 15) and the scan count were measuring something
+    // that never reaches an invoice, and both had to be filled in before the
+    // job would carry a target at all. Hours on site is the billable fact.
+    //
+    // The AREA BUILDER IS GONE FROM THE FORM, NOT FROM THE DATA. No production
+    // job carries a GPR scope entry (verified against klatddoyncxidgqtcjnu,
+    // Aug 17 2026 — zero rows), but if one ever turns up with `areas` /
+    // `num_scans` / `area_sqft` it still round-trips through the edit load
+    // (scope_details is loaded and re-sent whole) and still prints, because
+    // lib/job-ticket-format.ts formats those keys for every service code.
     fields: [
-      { key: 'num_scans', label: 'Number of Scans', placeholder: '0', type: 'number' },
+      { key: 'hours_on_site', label: 'Hours On Site', placeholder: '0', type: 'number', suffix: 'hrs' },
     ],
   },
   'Demo': {
@@ -402,15 +412,29 @@ function buildScopeItemsFromScope(
     let holes = 0;
     for (const h of parseArr(detail.holes)) holes += parseInt(h.qty) || 0;
 
+    // TIME IS A TARGET TOO. GPR is billed by the hour (founder, Aug 17 2026), so
+    // hours on site is its measurable scope — without this the service fell
+    // through to the 100%-complete fallback below and the office's number was
+    // recorded on the ticket but never became something the operator reports
+    // against. `hours` is already an allowed unit end to end: ALLOWED_UNITS in
+    // app/api/admin/schedule-form/route.ts, ScopeUnit + quantityInUnit in
+    // lib/job-progress.ts, and SCOPE_UNIT_LABELS in lib/job-ticket-format.ts
+    // (prints as "4 hrs").
+    const hoursParsed = parseFloat(detail.hours_on_site || '');
+    const hours = isFinite(hoursParsed) && hoursParsed > 0 ? hoursParsed : 0;
+
     if (lf > 0) {
       items.push({ work_type: label, unit: 'linear_ft', target_quantity: Math.round(lf * 10) / 10, description: `${label} — linear ft` });
     }
     if (holes > 0) {
       items.push({ work_type: label, unit: 'holes', target_quantity: holes, description: `${label} — holes` });
     }
-    // Selected service with no measurable target (Demo, Brokk, GPR, Other, …) →
+    if (hours > 0) {
+      items.push({ work_type: label, unit: 'hours', target_quantity: Math.round(hours * 10) / 10, description: `${label} — hours` });
+    }
+    // Selected service with no measurable target (Demo, Brokk, Other, …) →
     // a manual-percent item so the operator logs % complete directly.
-    if (lf === 0 && holes === 0 && (serviceTypes || []).includes(code)) {
+    if (lf === 0 && holes === 0 && hours === 0 && (serviceTypes || []).includes(code)) {
       items.push({ work_type: label, unit: 'percent', target_quantity: 100, description: `${label} — % complete` });
     }
   }
@@ -3247,24 +3271,25 @@ export default function ScheduleFormPage() {
                         )}
                         {config.hasDynamicCuts && (
                         (() => {
-                          type CutRow = {
-                            length: string;
-                            width: string;
-                            depth: string;
-                            cross_cut_lengthwise_ft?: string;
-                            cross_cut_widthwise_ft?: string;
-                            overcut_allowed?: boolean;
-                            // Backward-compat: legacy entries stored linear_feet/num_cuts directly
-                            linear_feet?: string;
-                            num_cuts?: string;
-                          };
                           const cutsRaw = form.scope_details[code]?.cuts;
                           const cuts: CutRow[] = cutsRaw
                             ? (() => { try { return JSON.parse(cutsRaw); } catch { return [{ length: '', width: '', depth: '' }]; } })()
                             : [{ length: '', width: '', depth: '' }];
 
+                          // ── ONE ROW OF LINEAR FEET IS ONE CUT ──────────────
+                          // "For linear ft, if they only added 1 area then make
+                          // number of cuts 1 because it's just inputting linear
+                          // ft" (founder, Aug 17 2026). With SEVERAL rows the
+                          // count genuinely varies, so the field appears then and
+                          // only then.
+                          //
+                          // The rule itself — including why collapsing to one row
+                          // FORCES the count rather than only filling a blank one
+                          // — lives in lib/cut-rows.ts with its tests.
+                          const showCutCount = cuts.length > 1;
+
                           const updateCuts = (newCuts: CutRow[]) => {
-                            updateScopeDetail(code, 'cuts', JSON.stringify(newCuts));
+                            updateScopeDetail(code, 'cuts', JSON.stringify(withCutCount(newCuts)));
                           };
 
                           // Resolve overcut: per-cut explicit boolean wins, else fall back to top-level form default
@@ -3308,9 +3333,12 @@ export default function ScheduleFormPage() {
                                 <div key={idx} className={`${idx > 0 ? 'pt-3 border-t border-slate-100 dark:border-white/5' : ''}`}>
                                   {/* Field labels (first row only) */}
                                   {idx === 0 && (
-                                    <div className="grid grid-cols-2 gap-2 mb-1.5">
+                                    <div className={`grid ${showCutCount ? 'grid-cols-3' : 'grid-cols-2'} gap-2 mb-1.5`}>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Linear Feet</label>
                                       <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest">Cut Depth</label>
+                                      {showCutCount && (
+                                        <label className="text-[11px] font-bold text-slate-500 dark:text-white/40 uppercase tracking-widest"># of Cuts</label>
+                                      )}
                                     </div>
                                   )}
 
@@ -3324,7 +3352,7 @@ export default function ScheduleFormPage() {
                                       having them here made the two modes ask the
                                       same questions in different words. */}
                                   <div className="flex items-center gap-2">
-                                    <div className="grid grid-cols-2 gap-2 flex-1">
+                                    <div className={`grid ${showCutCount ? 'grid-cols-3' : 'grid-cols-2'} gap-2 flex-1`}>
                                       <div className="relative">
                                         <input
                                           type="number"
@@ -3355,6 +3383,29 @@ export default function ScheduleFormPage() {
                                         />
                                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400 dark:text-white/30">in.</span>
                                       </div>
+                                      {/* Only once there is more than one row.
+                                          Blank means one cut; nothing rewrites
+                                          what the office types while several
+                                          rows are on screen. Delete back down to
+                                          one and the count resets to 1, because
+                                          this input is gone at that point and an
+                                          invisible 3 is unfixable — see
+                                          lib/cut-rows.ts. */}
+                                      {showCutCount && (
+                                        <input
+                                          type="number"
+                                          inputMode="numeric"
+                                          min={1}
+                                          placeholder="1"
+                                          value={cut.num_cuts ?? ''}
+                                          onChange={e => {
+                                            const updated = [...cuts];
+                                            updated[idx] = { ...updated[idx], num_cuts: e.target.value };
+                                            updateCuts(updated);
+                                          }}
+                                          className="w-full px-3 py-3 bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-xl text-lg font-semibold text-slate-800 dark:text-white placeholder-slate-400 dark:placeholder-white/30 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition-all"
+                                        />
+                                      )}
                                     </div>
                                     {cuts.length > 1 && (
                                       <button

@@ -11,6 +11,9 @@ import {
   Paperclip, Image, File, Eye, RefreshCw
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import SiteComplianceList from '../../_components/SiteComplianceList';
+import { buildComplianceItems } from '@/lib/site-compliance-display';
+import { PhotoViewer } from '@/components/PhotoUploader';
 
 export default function JobsitePage() {
   const router = useRouter();
@@ -220,15 +223,26 @@ export default function JobsitePage() {
     return true;
   });
 
-  const filledCompliance = Object.entries(compliance).filter(([key, value]) => {
-    if (key === 'attachment_urls') return false; // Handle separately
-    if (value === null || value === undefined || value === '' || value === false) return false;
-    if (typeof value === 'string' && value.trim() === '') return false;
-    return true;
-  });
+  // Compliance goes through the SHARED builder — this screen and the job
+  // ticket used to run two different key/value loops over the same jsonb and
+  // could disagree about the same job. See lib/site-compliance-display.ts.
+  const complianceItems = buildComplianceItems(compliance);
+
+  // The badge scan, the safety sheet, the site map — `site_compliance` can
+  // carry attachments, and `buildComplianceItems` deliberately never turns them
+  // into text (they are files, not sentences). The job ticket has rendered them
+  // as a PhotoViewer for months; this screen dropped them on the floor, so the
+  // two operator surfaces disagreed about the same jsonb — the exact drift the
+  // shared builder was introduced to end. Absent or empty is the ONLY shape in
+  // production today, and both fall out as `[]` here → no panel row at all.
+  const complianceDocs: string[] = Array.isArray(compliance.attachment_urls)
+    ? compliance.attachment_urls.filter((u: unknown) => typeof u === 'string' && u.trim() !== '')
+    : [];
 
   const hasConditions = filledConditions.length > 0;
-  const hasCompliance = filledCompliance.length > 0;
+  // Attachments alone are enough to open the panel: a job whose only compliance
+  // fact is "here is the badge form" still has to show the badge form.
+  const hasCompliance = complianceItems.length > 0 || complianceDocs.length > 0;
 
   const conditionLabels: Record<string, string> = {
     surface_type: 'Surface Type',
@@ -379,23 +393,25 @@ export default function JobsitePage() {
           </div>
         )}
 
-        {/* Site Compliance - Only shows filled fields */}
+        {/* ── SITE RULES ──────────────────────────────────────────────────
+            Was "Site Compliance" over a raw `key.replace(/_/g,' ')` / `String(value)`
+            loop — the worst of the two copies, since it printed booleans as a
+            bare "Yes" and the orientation timestamp as `2026-08-16T08:00`.
+            Same heading, same builder and same component as the job ticket now,
+            so the two screens cannot drift again. */}
         {hasCompliance && (
-          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-gray-200/50 dark:border-white/10 p-5">
+          <div className="bg-white/90 dark:bg-white/5 backdrop-blur-lg rounded-2xl shadow-xl border border-brand/30 dark:border-white/10 p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Shield className="w-5 h-5 text-brand" />
-              <h3 className="text-base font-bold text-gray-800 dark:text-white">Site Compliance</h3>
+              <Shield className="w-5 h-5 flex-shrink-0 text-brand" />
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Before You Start</h3>
+              <span className="flex-shrink-0 text-xs px-2 py-0.5 bg-brand/10 dark:bg-brand/20 text-brand-dark dark:text-white/80 rounded-full font-bold">Required</span>
             </div>
-            <div className="space-y-2">
-              {filledCompliance.map(([key, value]) => (
-                <div key={key} className="flex items-center justify-between p-3 bg-brand/5 rounded-xl border border-brand/30">
-                  <span className="text-sm text-gray-600 dark:text-white/60 font-semibold capitalize">{key.replace(/_/g, ' ')}</span>
-                  <span className="text-base font-bold text-gray-900 dark:text-white">
-                    {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <SiteComplianceList items={complianceItems} />
+            {complianceDocs.length > 0 && (
+              <div className={complianceItems.length > 0 ? 'mt-4' : ''}>
+                <PhotoViewer photos={complianceDocs} label="Compliance Documents" />
+              </div>
+            )}
           </div>
         )}
 

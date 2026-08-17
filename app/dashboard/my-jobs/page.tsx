@@ -51,10 +51,44 @@ export default function MyJobsPage() {
   // wins and the secondary lists only ever show what it does NOT already
   // contain.
   const shownJobIds = new Set(jobs.map((j) => j.id));
-  const visibleMultiDay = multiDayScheduled.filter((j: any) => !shownJobIds.has(j.id));
-  const visibleContinuing = continuingProjects.filter(
-    (j: any) => !shownJobIds.has(j.id) && !visibleMultiDay.some((m: any) => m.id === j.id)
+  const visibleSpanCarryover = multiDayScheduled.filter((j: any) => !shownJobIds.has(j.id));
+  const visibleOpenJobs = continuingProjects.filter(
+    (j: any) => !shownJobIds.has(j.id) && !visibleSpanCarryover.some((m: any) => m.id === j.id)
   );
+
+  // ── ONE LIST OF UNFINISHED WORK, NO "MULTI-DAY" ANYWHERE ─────────────────
+  // Founder, Aug 2026: "remove multiday notification for operators — if they
+  // have a job lasting longer they don't need to know and we can remove that."
+  //
+  // But the amber "Multi-Day In Progress" panel could NOT simply be deleted,
+  // because for one shape of job it was the only door left. Trace it:
+  //   • /api/job-orders?scheduled_date=D paints a job on EVERY day of its span
+  //     when is_multi_day is true — so on day 2, 3, 4 the job arrives in
+  //     `jobs` and renders as a normal ticket. That is the ordinary path and it
+  //     never depended on this panel (which deduped those rows out anyway).
+  //   • A job that OVERRUNS its booked end_date, though, stops matching that
+  //     span query while still sitting at `scheduled`. And the Continuing
+  //     Projects fetch explicitly excludes `is_multi_day === true` from its
+  //     stale-singles bucket. So that job appeared in exactly one place on the
+  //     whole screen: the amber panel. Delete the panel and a crew standing on
+  //     the job could not open it.
+  // So the panel's ROWS survive; only its language dies. They fold into
+  // Continuing Projects, which is the same idea in plainer words — and which
+  // already got the dark-mode contrast fix and full-row 64px tap targets the
+  // amber card never had.
+  //
+  // AND THE ONE THING THAT DOES *NOT* CHANGE FOR THEM: the amber panel rendered
+  // UNCONDITIONALLY, so an overrun job sat on screen BESIDE the red dispatch
+  // banner. Continuing Projects is banner-gated. Folding these rows in without
+  // an exemption would have put the one job shape with no other door behind a
+  // banner that, for the operators who have such a job, is unread every single
+  // day (live unread counts: 16, 13, 9, 7, 5, 4, 3, 3, 2 — a new dispatch adds
+  // a new unread row daily, and the banner only clears the ids it fetched). So
+  // `visibleSpanCarryover` — and ONLY that slice — is exempt from the
+  // one-surface-at-a-time rule; see `spanCarryoverCount` in
+  // lib/schedule-banners.ts for why widening it to the whole card would undo
+  // the founder's decision.
+  const visibleContinuing = [...visibleSpanCarryover, ...visibleOpenJobs];
 
   // ── ONE SURFACE AT A TIME ────────────────────────────────────────────────
   // Founder, Aug 16: "remove that notification in bright red — have one or the
@@ -69,6 +103,7 @@ export default function MyJobsPage() {
   const { showContinuingProjects } = resolveScheduleBanners({
     dispatchStatus,
     continuingCount: visibleContinuing.length,
+    spanCarryoverCount: visibleSpanCarryover.length,
   });
   const [completingShop, setCompletingShop] = useState(false);
   const [shopDescription, setShopDescription] = useState('');
@@ -577,46 +612,10 @@ export default function MyJobsPage() {
           </div>
         )}
 
-        {/* Multi-Day Jobs in progress (scheduled + is_multi_day). Neutral
-            wording on purpose: the same card is seen the evening after "Done
-            for Today" AND the next morning — "tomorrow"/"today" would each be
-            wrong half the time, "in progress / up next" is always true. */}
-        {visibleMultiDay.length > 0 && (
-          <div className="mb-5 bg-amber-50 border-2 border-amber-300 rounded-2xl overflow-hidden shadow-md">
-            <div className="flex items-center gap-3 px-4 py-3 bg-amber-500">
-              <Clock className="w-5 h-5 text-white" />
-              <h3 className="text-sm font-bold text-white">
-                Multi-Day In Progress ({visibleMultiDay.length})
-              </h3>
-            </div>
-            <div className="divide-y divide-amber-100">
-              {visibleMultiDay.map((job: any) => (
-                <div key={job.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="w-2 h-2 rounded-full flex-shrink-0 bg-amber-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-800 truncate">{job.customer_name}</p>
-                    <p className="text-xs text-slate-500 truncate">{job.job_number} &bull; {job.address || job.location || 'No address'}</p>
-                    {job.total_days_worked != null && (
-                      <p className="text-xs text-amber-600 mt-0.5">Up next: Day {job.total_days_worked + 1}</p>
-                    )}
-                  </div>
-                  <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                    <span className="text-xs px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-700">
-                      Multi-Day
-                    </span>
-                    <Link
-                      href={`/dashboard/my-jobs/${job.id}`}
-                      className="text-xs text-amber-700 font-semibold flex items-center gap-1 hover:text-amber-900 px-2 py-1.5 min-h-[32px]"
-                    >
-                      <PlayCircle className="w-3.5 h-3.5" />
-                      View
-                    </Link>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* (Removed Aug 2026) The amber "Multi-Day In Progress (N)" panel, its
+            "Multi-Day" chip and its "Up next: Day N" line. Its rows did not go
+            anywhere — see the fold into `visibleContinuing` at the top of this
+            file, and the note there explaining which job shape depended on it. */}
 
         {/* ── Continuing Projects (on_hold / in_progress from past dates) ────
             DARK MODE WAS UNREADABLE (founder, Aug 16): "make continuing
@@ -657,7 +656,11 @@ export default function MyJobsPage() {
                   href={`/dashboard/my-jobs/${job.id}`}
                   className="flex items-center gap-3 px-4 py-3 min-h-[64px] transition-colors hover:bg-brand/5 dark:hover:bg-white/[0.06] active:bg-brand/10 dark:active:bg-white/10"
                 >
-                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${job.status === 'on_hold' ? 'bg-brand' : 'bg-orange-400'}`} />
+                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                    job.status === 'on_hold' ? 'bg-brand' :
+                    job.status === 'scheduled' ? 'bg-slate-400' :
+                    'bg-orange-400'
+                  }`} />
                   <div className="flex-1 min-w-0">
                     {/* THE JOB NAME IS THE POINT OF THE CARD — biggest, boldest,
                         highest contrast element in the row. */}
@@ -684,20 +687,31 @@ export default function MyJobsPage() {
                     {/* Kept at 12px, not shrunk further: the pill is secondary
                         but still has to be readable in sunlight. The hierarchy
                         is carried by the 15px bold name above it, not by
-                        making the status too small to read. */}
+                        making the status too small to read.
+
+                        'scheduled' IS ITS OWN CASE, not a fallthrough. This
+                        list gained the span-carryover rows in Aug 2026 and
+                        those are `scheduled` — JOB-2026-160762 has never been
+                        started. The old else-branch told the crew a job was
+                        "In Progress" when nobody had touched it, which is a
+                        phone call to the office. */}
                     <span className={`text-xs px-2 py-0.5 rounded-full font-semibold whitespace-nowrap ${
                       job.status === 'on_hold' ? 'bg-brand/10 text-brand-dark dark:bg-white/10 dark:text-white/80' :
                       job.status === 'pending_completion' ? 'bg-blue-100 text-blue-700 dark:bg-blue-400/15 dark:text-blue-200' :
+                      job.status === 'scheduled' ? 'bg-slate-200 text-slate-700 dark:bg-white/10 dark:text-white/80' :
                       'bg-orange-100 text-orange-700 dark:bg-amber-400/15 dark:text-amber-200'
                     }`}>
                       {job.status === 'on_hold' ? 'On Hold' :
                        job.status === 'pending_completion' ? 'Awaiting' :
+                       job.status === 'scheduled' ? 'Not Started' :
                        'In Progress'}
                     </span>
-                    {/* Affordance only — the row itself is the link. */}
+                    {/* Affordance only — the row itself is the link. Same
+                        reason as the pill: you cannot "Resume" a job nobody
+                        has started. */}
                     <span className="text-[13px] font-semibold flex items-center gap-1 text-brand-dark dark:text-white/90">
                       <PlayCircle className="w-4 h-4" />
-                      Resume
+                      {job.status === 'scheduled' ? 'Open' : 'Resume'}
                     </span>
                   </div>
                 </Link>

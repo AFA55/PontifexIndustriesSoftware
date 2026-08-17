@@ -14,7 +14,7 @@
  * cannot drift apart again.
  */
 
-import { formatScopeAreas } from '@/lib/job-ticket-format';
+import { formatScopeAreas, formatScopeCuts } from '@/lib/job-ticket-format';
 
 // Label mapping for field keys → display names
 const FIELD_LABELS: Record<string, string> = {
@@ -23,8 +23,12 @@ const FIELD_LABELS: Record<string, string> = {
   depth: 'Depth',
   linear_feet: 'Linear Feet',
   num_cuts: 'Cuts',
+  // area_sqft / num_scans are what GPR USED to collect. GPR is billed by the
+  // hour now (founder, Aug 17 2026) — the old keys stay so a job saved before
+  // the change still reads as words rather than as a raw storage key.
   area_sqft: 'Area (sq ft)',
   num_scans: 'Scans',
+  hours_on_site: 'Hours On Site',
   volume_cuyd: 'Volume (cu yd)',
   description: 'Description',
   length: 'Length',
@@ -63,6 +67,7 @@ const FIELD_SUFFIXES: Record<string, string> = {
   length: 'ft',
   width: 'ft',
   thickness: 'in.',
+  hours_on_site: 'hrs',
 };
 
 // Friendly labels for removal method values
@@ -194,16 +199,28 @@ function renderHoles(holesJson: string) {
 
 // Render dynamic cuts (sawing linear mode)
 function renderCuts(cutsJson: string) {
-  const cuts = parseJsonArray<{ linear_feet: string; depth: string; num_cuts: string }>(cutsJson, []);
+  const cuts = parseJsonArray<{ linear_feet?: string; depth?: string; num_cuts?: string; length?: string; width?: string }>(cutsJson, []);
   if (cuts.length === 0) return null;
-  const totalLF = cuts.reduce((sum, c) => sum + (parseFloat(c.linear_feet) || 0), 0);
-  const totalCuts = cuts.reduce((sum, c) => sum + (parseInt(c.num_cuts) || 0), 0);
+  // SHARED with the printed job ticket — same reason as the areas above. The
+  // count used to be `parseInt(num_cuts) || 0` summed per row, so every row the
+  // schedule form writes (it stamps a count only on save, and rows saved before
+  // Aug 17 2026 have none at all) totalled ZERO: the crew's ticket read
+  // "316 total LF" with no cut count while the paper sheet read "1 cut". One
+  // row of linear feet is one cut, on both surfaces.
+  const summary = formatScopeCuts(cutsJson);
+  const totalLF = summary?.totalLinearFeet ?? 0;
+  const totalCuts = summary?.cutCount ?? 0;
   return (
     <div className="col-span-full space-y-1.5">
       <div className="grid grid-cols-3 gap-2 text-[10px] font-semibold text-slate-400 dark:text-white/45 uppercase tracking-wider px-1">
         <span>Linear Feet</span><span>Cut Depth</span><span># of Cuts</span>
       </div>
-      {cuts.map((c, i) => (
+      {cuts.map((c, i) => {
+        // A row with a measurement on it is one cut unless it says otherwise.
+        // An entirely blank row stays '-' — it is not a cut, it is an unfilled
+        // row, and printing "1" beside three dashes invents work.
+        const hasData = !!(c.linear_feet || c.depth || c.length || c.width);
+        return (
         <div key={i} className="grid grid-cols-3 gap-2">
           <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
             <span className="text-base font-bold text-slate-800 dark:text-white">{c.linear_feet || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">ft</span></span>
@@ -212,10 +229,11 @@ function renderCuts(cutsJson: string) {
             <span className="text-base font-bold text-slate-800 dark:text-white">{c.depth || '-'}<span className="text-xs text-slate-400 dark:text-white/40 ml-0.5">in.</span></span>
           </div>
           <div className="bg-white dark:bg-slate-900/40 rounded-lg p-2 border border-blue-100 dark:border-blue-500/20 text-center">
-            <span className="text-base font-bold text-slate-800 dark:text-white">{c.num_cuts || '-'}</span>
+            <span className="text-base font-bold text-slate-800 dark:text-white">{c.num_cuts || (hasData ? '1' : '-')}</span>
           </div>
         </div>
-      ))}
+        );
+      })}
       <div className="flex gap-3 px-1">
         {totalLF > 0 && <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{totalLF.toLocaleString()} total LF</p>}
         {totalCuts > 0 && <p className="text-xs font-semibold text-blue-600 dark:text-blue-300">{totalCuts} total cut{totalCuts !== 1 ? 's' : ''}</p>}

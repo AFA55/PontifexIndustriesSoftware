@@ -401,6 +401,12 @@ export function formatScopeCuts(raw: unknown): ScopeCutSummary | null {
     const num = measurementNumber(row.num_cuts);
     if (lf == null && depth == null && length == null && width == null) continue;
 
+    // ONE ROW OF LINEAR FEET IS ONE CUT (founder, Aug 17 2026: "for linear ft,
+    // if they only added 1 area then make number of cuts 1 because it's just
+    // inputting linear ft"). The schedule form no longer asks for a count on a
+    // single row — it stamps `num_cuts: '1'` — but rows saved before that stamp
+    // carry no count at all, and this fallback is what stops them printing as
+    // "0 cuts". A stored count still wins; nothing is overridden.
     cutCount += num != null ? Math.floor(num) : 1;
     if (lf != null) totalLinearFeet += lf;
 
@@ -495,6 +501,11 @@ const SCOPE_FIELD_LABELS: Record<string, string> = {
   num_cuts: 'Cuts',
   area_sqft: 'Area',
   num_scans: 'Scans',
+  // GPR is time-and-materials, not measured work (founder, Aug 17 2026). The two
+  // keys above are what the GPR scope USED to collect and are kept here on
+  // purpose: a job saved before the change still prints its scans / square feet
+  // rather than falling through to the raw key.
+  hours_on_site: 'Hours on site',
   volume_cuyd: 'Volume',
   length: 'Length',
   width: 'Width',
@@ -519,6 +530,9 @@ const SCOPE_FIELD_SUFFIXES: Record<string, string> = {
   area_sqft: 'sq ft',
   volume_cuyd: 'cu yd',
   ladder_height_ft: 'ft',
+  // Matches SCOPE_UNIT_LABELS.hours below, so the GPR line on the ticket and the
+  // GPR row in SERVICE ITEMS say the same word.
+  hours_on_site: 'hrs',
 };
 
 const STRUCTURED_SCOPE_KEYS = new Set(['areas', 'cuts', 'holes']);

@@ -99,19 +99,74 @@ describe('resolveScheduleBanners', () => {
     }
   });
 
-  it('never puts both surfaces on screen at once', () => {
+  it('never puts both surfaces on screen at once — for ordinary continuing work', () => {
     // The whole point: two stacked cards pushed the day's job tickets below
-    // the fold on a 375px phone.
+    // the fold on a 375px phone. Holds for every row EXCEPT span carryover,
+    // which is exempt on purpose (see the block of tests below).
     const statuses: DispatchBannerStatus[] = ['checking', 'unread', 'none'];
     for (const dispatchStatus of statuses) {
       for (const continuingCount of [0, 1, 5]) {
         const { showDispatchBanner, showContinuingProjects } = resolveScheduleBanners({
           dispatchStatus,
           continuingCount,
+          spanCarryoverCount: 0,
         });
         expect(showDispatchBanner && showContinuingProjects).toBe(false);
       }
     }
+  });
+
+  it('renders a span-carryover row EVEN WHILE a dispatch banner is unread', () => {
+    // THE REGRESSION THIS PINS (Aug 17, JOB-2026-160762 / Keontre Mcknight):
+    // deleting the amber "Multi-Day In Progress" panel folded its rows into
+    // Continuing Projects, which is banner-gated. That panel rendered
+    // UNCONDITIONALLY, and an overrun span job has no other door on this
+    // screen — it no longer matches the day query and is excluded from the
+    // stale-singles bucket. With 2 unread dispatch notifications (16/13/9/7/5
+    // across the fleet, one new row per day) the banner is the steady state,
+    // so "dismiss it and the job appears" is not a real escape hatch.
+    expect(
+      resolveScheduleBanners({ dispatchStatus: 'unread', continuingCount: 1, spanCarryoverCount: 1 })
+    ).toEqual({
+      showDispatchBanner: true,
+      showContinuingProjects: true,
+    });
+  });
+
+  it('shows a span-carryover row before the banner lookup even settles', () => {
+    // The 'checking' hold exists to stop a flicker — card up, banner arrives,
+    // card gone. An exempt card never vanishes, so there is nothing to protect
+    // it from, and the crew standing on the job should not wait on a fetch.
+    expect(
+      resolveScheduleBanners({ dispatchStatus: 'checking', continuingCount: 2, spanCarryoverCount: 1 })
+        .showContinuingProjects
+    ).toBe(true);
+  });
+
+  it('does NOT exempt ordinary continuing projects riding along with a span row', () => {
+    // The exemption is about the SHAPE with no other door, not about the card.
+    // A banner-unread screen with only on_hold / in_progress singles stays
+    // one-surface-at-a-time — those rows are reachable from the day the office
+    // scheduled them.
+    expect(
+      resolveScheduleBanners({ dispatchStatus: 'unread', continuingCount: 4, spanCarryoverCount: 0 })
+        .showContinuingProjects
+    ).toBe(false);
+  });
+
+  it('defaults to no exemption when the caller omits the span count', () => {
+    expect(
+      resolveScheduleBanners({ dispatchStatus: 'unread', continuingCount: 3 }).showContinuingProjects
+    ).toBe(false);
+  });
+
+  it('still shows nothing when the span rows deduped down to zero', () => {
+    // visibleSpanCarryover strips anything already painted as today's ticket.
+    // An exemption for an empty list would reserve the slot for no rows.
+    expect(
+      resolveScheduleBanners({ dispatchStatus: 'unread', continuingCount: 0, spanCarryoverCount: 0 })
+        .showContinuingProjects
+    ).toBe(false);
   });
 
   it('counts the deduped list, not the raw fetch', () => {

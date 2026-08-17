@@ -1169,3 +1169,112 @@ describe('formatScopeQuantity — the unit alone, with no number', () => {
     expect(formatScopeQuantity(null, null)).toBe('');
   });
 });
+
+// ── The two scope-entry changes of Aug 17 2026 ──────────────────────────────
+//
+// 1. "For linear ft, if they only added 1 area then make number of cuts 1
+//    because it's just inputting linear ft."
+// 2. "For the GPR, instead of getting sqft that they did, they don't have to do
+//    that — we bill that by the hour, so they can just input hours onsite."
+//
+// Both are about what the office is ASKED for. Everything already stored has to
+// keep printing exactly as it did, which is what the legacy cases below pin.
+
+describe('one linear-feet row is one cut', () => {
+  it('a single row with no count stored still prints as 1 cut', () => {
+    // The shape the schedule form wrote for every job before it started
+    // stamping the count — JOB-2026-288227 (in_progress) is literally this.
+    const s = formatScopeCuts('[{"length":"","width":"","depth":"7","linear_feet":"316"}]');
+    expect(s!.cutCount).toBe(1);
+    expect(s!.text).toBe('1 cut — 316 LF @ 7" deep = 316 LF total');
+  });
+
+  it('the stamped count says the same thing', () => {
+    const stamped = formatScopeCuts('[{"depth":"7","linear_feet":"316","num_cuts":"1"}]');
+    const unstamped = formatScopeCuts('[{"depth":"7","linear_feet":"316"}]');
+    expect(stamped!.text).toBe(unstamped!.text);
+    expect(stamped!.cutCount).toBe(1);
+  });
+
+  it('several rows each count for themselves, and a per-row count is honoured', () => {
+    // With more than one row the office gets the field back, because the count
+    // genuinely varies: four identical 20 ft cuts plus one 60 ft cut.
+    const s = formatScopeCuts([
+      { linear_feet: '20', depth: '6', num_cuts: '4' },
+      { linear_feet: '60', depth: '6', num_cuts: '1' },
+    ]);
+    expect(s!.cutCount).toBe(5);
+    // The COUNT never multiplies the footage — 20 LF entered is 20 LF billed.
+    expect(s!.totalLinearFeet).toBe(80);
+    expect(s!.text).toBe('5 cuts — 20 LF @ 6" deep, 60 LF @ 6" deep = 80 LF total');
+  });
+
+  it('a multi-row job with counts missing falls back to one per row', () => {
+    const s = formatScopeCuts([{ linear_feet: '20' }, { linear_feet: '60' }]);
+    expect(s!.cutCount).toBe(2);
+    expect(s!.totalLinearFeet).toBe(80);
+  });
+
+  it('LEGACY: a stored count other than 1 on a single row is never overridden', () => {
+    // DEMO-2026-000002 (cancelled) carries exactly this: one row, num_cuts "3".
+    const s = formatScopeCuts('[{"linear_feet":"100","depth":"8","num_cuts":"3","overcut_allowed":true}]');
+    expect(s!.cutCount).toBe(3);
+    expect(s!.totalLinearFeet).toBe(100);
+  });
+
+  it('an empty row is still not a cut', () => {
+    expect(formatScopeCuts('[{"length":"","width":"","depth":"","num_cuts":"1"}]')).toBeNull();
+  });
+});
+
+describe('GPR is billed by the hour', () => {
+  it('the new shape prints hours on site, labelled', () => {
+    const s = formatScopeSection('GPR', { hours_on_site: '4' });
+    expect(s!.label).toBe('GPR Scanning');
+    expect(s!.lines).toEqual(['Hours on site: 4 hrs']);
+  });
+
+  it('a fractional figure survives', () => {
+    expect(formatScopeSection('GPR', { hours_on_site: '2.5' })!.lines).toEqual([
+      'Hours on site: 2.5 hrs',
+    ]);
+  });
+
+  it('the SERVICE ITEMS row reads as hours, not as a raw storage key', () => {
+    const [row] = formatScopeItems([
+      { id: 'g1', work_type: 'GPR Scanning', unit: 'hours', target_quantity: 4, description: 'GPR Scanning — hours' },
+    ]);
+    expect(row.quantity).toBe('4 hrs');
+    expect(row.service).toBe('GPR Scanning');
+    // The auto-generated description is an echo of the work type; it is stripped.
+    expect(row.detail).toBe('');
+    expect(formatScopeQuantity(1, 'hours')).toBe('1 hr');
+  });
+
+  it('LEGACY: a GPR scope stored as areas + scans still prints, and never blank', () => {
+    // No production job carries a GPR scope entry (verified Aug 17 2026), but
+    // the Aug-15 form could have written this shape, and a job saved with it
+    // must not render as an empty heading or NaN after the change.
+    const s = formatScopeSection('GPR', {
+      areas: '[{"length":"20","width":"10","qty":"2"}]',
+      num_scans: '3',
+    });
+    expect(s!.lines).toEqual([
+      "2 areas — 20' × 10' = 400 sq ft total",
+      'Scans: 3',
+    ]);
+    expect(s!.lines.join(' ')).not.toContain('NaN');
+  });
+
+  it('LEGACY: the even older single square-foot box still prints', () => {
+    const s = formatScopeSection('GPR', { area_sqft: '1200' });
+    // Verbatim — the leftover-field loop prints what was stored, it does not
+    // re-format a number the office typed.
+    expect(s!.lines).toEqual(['Area: 1200 sq ft']);
+  });
+
+  it('a GPR entry with nothing filled in is still dropped, not printed empty', () => {
+    expect(formatScopeSection('GPR', { hours_on_site: '' })).toBeNull();
+    expect(formatScopeSection('GPR', {})).toBeNull();
+  });
+});
