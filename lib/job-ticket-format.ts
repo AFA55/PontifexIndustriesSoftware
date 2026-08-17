@@ -119,6 +119,100 @@ export function humanizeValue(value: unknown): string {
 
 const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
+/**
+ * A tri-state boolean out of whatever was stored. `true`/`false` when the office
+ * actually recorded something, `null` when the key is absent or holds junk.
+ *
+ * The DISTINCTION MATTERS on this sheet: "recorded as no" and "never recorded"
+ * are different facts, and collapsing them is exactly how the supply conditions
+ * lost their explicit NO (see `formatJobsiteConditions`).
+ */
+export function booleanish(value: unknown): boolean | null {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') return Number.isFinite(value) ? value !== 0 : null;
+  if (typeof value !== 'string') return null;
+  const s = value.trim().toLowerCase();
+  if (s === 'true' || s === 'yes' || s === 'y' || s === 'on' || s === '1') return true;
+  if (s === 'false' || s === 'no' || s === 'n' || s === 'off' || s === '0') return false;
+  return null;
+}
+
+// ── Cross-cut spacing + overcut (HOW to cut, not just what) ─────────────────
+//
+// WHY THIS EXISTS (guardian, Aug 17 2026, against production):
+//
+// The schedule form writes `cross_cut_lengthwise_ft` / `cross_cut_widthwise_ft`
+// / `overcut_allowed` INTO the same `areas` / `cuts` row objects as the
+// dimensions (app/dashboard/admin/schedule-form/page.tsx — the per-area sawing
+// block). Nothing printed them. Because they sit inside the structured arrays,
+// the leftover-field loop in `formatScopeSection` could not surface them either.
+//
+// 9 of the 48 production job orders carry cross-cut spacing, 7 of them still
+// active. JOB-2026-793440 was `in_progress` on the day this was found: its row
+// is `60' × 2' @ 6" deep` with a 2 ft × 2 ft cross-cut grid, and its Service
+// Items total of 182 LF is only correct BECAUSE of that grid (124 ft of
+// perimeter + 29 interior cuts × 2 ft). So the sheet printed a number that
+// presupposed an instruction it never stated — a crew reading it saws the
+// perimeter, hits 124 ft, and goes home.
+//
+// SPACING, NOT SIZE. `cross_cut_lengthwise_ft: 2` means "cut every 2 ft along
+// the length" (the form's own placeholder text), so the wording is "every".
+//
+// OVERCUT: `false` doubles the perimeter in the office's LF math — it is
+// billing-relevant, so it prints. `true` is the default and stays silent; a
+// note on every single row is a note nobody reads.
+
+export interface CrossCutSpec {
+  /** Spacing in FEET between cuts running along the length, or null. */
+  lengthwise: number | null;
+  /** Spacing in FEET between cuts running along the width, or null. */
+  widthwise: number | null;
+  /** false → the office forbade overcutting. null → not recorded (or the default). */
+  overcutAllowed: boolean | null;
+}
+
+/** Reads the cross-cut / overcut fields off ONE stored area or cut row. */
+export function parseCrossCut(row: unknown): CrossCutSpec {
+  const r = row && typeof row === 'object' && !Array.isArray(row) ? (row as Record<string, unknown>) : {};
+  return {
+    // `measurementNumber` refuses '' and '0', which is what makes a stored zero
+    // print nothing instead of "cross-cut every 0' × 0'".
+    lengthwise: measurementNumber(r.cross_cut_lengthwise_ft),
+    widthwise: measurementNumber(r.cross_cut_widthwise_ft),
+    overcutAllowed: booleanish(r.overcut_allowed),
+  };
+}
+
+/**
+ * The parenthetical that follows a row's dimensions:
+ *
+ *   (cross-cut every 2' × 2')
+ *   (cross-cut every 100' lengthwise)          ← only one side was entered
+ *   (cross-cut every 10' widthwise)
+ *   (cross-cut every 5' × 5', no overcut)
+ *   (no overcut)                               ← overcut recorded, no spacing
+ *   ''                                          ← nothing recorded
+ *
+ * PARENTHESISED rather than comma-appended on purpose: `formatScopeAreas` joins
+ * its ROWS with ', ', so a comma-led clause on a four-row job (JOB-2026-400368)
+ * would be indistinguishable from the start of the next area. Same bracket
+ * convention the hole rows already use for their location.
+ */
+export function crossCutText(spec: CrossCutSpec): string {
+  const bits: string[] = [];
+  const { lengthwise, widthwise } = spec;
+  if (lengthwise != null && widthwise != null) {
+    // Lengthwise first, matching the L × W order of the dimensions it follows.
+    bits.push(`cross-cut every ${formatNumber(lengthwise)}' × ${formatNumber(widthwise)}'`);
+  } else if (lengthwise != null) {
+    bits.push(`cross-cut every ${formatNumber(lengthwise)}' lengthwise`);
+  } else if (widthwise != null) {
+    bits.push(`cross-cut every ${formatNumber(widthwise)}' widthwise`);
+  }
+  if (spec.overcutAllowed === false) bits.push('no overcut');
+  return bits.length > 0 ? ` (${bits.join(', ')})` : '';
+}
+
 // ── Where the work happens (wall / floor / type) ────────────────────────────
 
 /**
@@ -193,6 +287,8 @@ export interface ScopeAreaRow {
   qty: number;
   /** length × width × qty, or null when length or width is missing. */
   squareFeet: number | null;
+  /** HOW to cut it — the grid spacing + the overcut constraint. */
+  crossCut: CrossCutSpec;
 }
 
 export interface ScopeAreaSummary {
@@ -221,6 +317,7 @@ export function parseAreaRows(raw: unknown): ScopeAreaRow[] {
       thickness,
       qty,
       squareFeet: length != null && width != null ? round2(length * width * qty) : null,
+      crossCut: parseCrossCut(row),
     });
   }
   return out;
@@ -240,7 +337,11 @@ function areaRowText(row: ScopeAreaRow, showQty: boolean): string {
   }
   if (row.thickness != null) dims.push(`${formatNumber(row.thickness)}" thick`);
   const body = dims.join(' × ');
-  return showQty && row.qty > 1 ? `${row.qty} × ${body}` : body;
+  // HOW to cut it. Appended AFTER the qty prefix so "2 × 8' × 2' × 12" thick
+  // (cross-cut every 4' × 2')" reads as two identical areas, each cross-cut —
+  // which is what it means.
+  const withCuts = `${body}${crossCutText(row.crossCut)}`;
+  return showQty && row.qty > 1 ? `${row.qty} × ${withCuts}` : withCuts;
 }
 
 /**
@@ -309,7 +410,10 @@ export function formatScopeCuts(raw: unknown): ScopeCutSummary | null {
     else if (length != null) bits.push(`${formatNumber(length)}' long`);
     else if (width != null) bits.push(`${formatNumber(width)}' wide`);
     if (depth != null) bits.push(`@ ${formatNumber(depth)}" deep`);
-    if (bits.length > 0) parts.push(bits.join(' '));
+    // The office's cross-cut grid lives on cut rows too (JOB-2026-793440 is
+    // `60' × 2' @ 6" deep` with a 2 ft × 2 ft grid, and its 182 LF target is
+    // only reachable WITH the interior cuts).
+    if (bits.length > 0) parts.push(`${bits.join(' ')}${crossCutText(parseCrossCut(row))}`);
   }
 
   if (parts.length === 0) return null;
@@ -543,6 +647,272 @@ export function formatScopeDetails(
   }
 
   return out;
+}
+
+// ── Service items (job_scope_items) ─────────────────────────────────────────
+//
+// WHY THIS SECTION EXISTS (founder, Aug 17 2026, holding a printout):
+//
+//   Wall/Track Sawing        Wall/Track Sawing — linear ft        48 linear_ft
+//   Handheld / Push Sawing   Handheld / Push Sawing — %          100 percent
+//
+// Three faults in two lines. The unit printed as the RAW DATABASE KEY
+// (`linear_ft`, `percent`). The Type and Description columns said the same words
+// twice. And a separate "Target Qty" column implied a count that does not exist
+// for linear feet — his words: "no quantities needed because it's total linear
+// ft, unless they add an area of a different size." A count only means something
+// when there are several distinct areas, and that case is already handled by
+// `formatScopeAreas` above ("2 areas — 10' × 10' × 10" thick = 200 sq ft total").
+//
+// So a service item now prints as ONE resolved measure — `48 LF`, `12 holes`,
+// `100%` — and the description prints only when a human actually wrote one.
+
+interface UnitLabel {
+  one: string;
+  many: string;
+  /** true → glued to the number with no space (`100%`). */
+  suffix?: boolean;
+}
+
+/**
+ * The unit vocabulary, VERIFIED against production (Supabase klatddoyncxidgqtcjnu,
+ * Aug 17 2026) rather than guessed:
+ *
+ *   job_scope_items.unit  →  linear_ft (18 rows), percent (14), holes (7)
+ *   takeoff_conditions.unit → LF (7), EA (1), SF (1)   ← already abbreviated
+ *
+ * and against every unit the code can WRITE, which is a wider set than the rows
+ * that happen to exist today:
+ *
+ *   app/api/admin/schedule-form/route.ts  ALLOWED_UNITS
+ *     linear_ft · holes · percent · sq_ft · items · each · hours
+ *   lib/job-progress.ts  ScopeUnit          — the same seven
+ *   components/JobScopePanel.tsx UNIT_OPTIONS — six of the seven, admin-editable
+ *   lib/work-types.ts  UNIT_CHOICES / defaultUnitFor — the operator's spelling,
+ *     which uses SPACES: 'linear ft', 'sq ft', 'each', 'holes', 'loads', 'hours'
+ *
+ * Both spellings of the same unit therefore have to resolve to the same printed
+ * word, which is what `normalizeUnitKey` + `UNIT_ALIASES` are for. `loads` and
+ * `cu_yd` are here because `defaultUnitFor` and the takeoff/estimating side can
+ * produce them even though no scope row carries one yet.
+ */
+const SCOPE_UNIT_LABELS: Record<string, UnitLabel> = {
+  linear_ft: { one: 'LF', many: 'LF' },
+  sq_ft: { one: 'sq ft', many: 'sq ft' },
+  cu_yd: { one: 'cu yd', many: 'cu yd' },
+  holes: { one: 'hole', many: 'holes' },
+  each: { one: 'ea', many: 'ea' },
+  items: { one: 'item', many: 'items' },
+  loads: { one: 'load', many: 'loads' },
+  hours: { one: 'hr', many: 'hrs' },
+  // A percentage is not a quantity of anything — it is "how much of this scope".
+  // Printed glued to the number so it can never be mistaken for a unit of work.
+  percent: { one: '%', many: '%', suffix: true },
+};
+
+/** Every spelling seen in the DB or written by the app, mapped to one key. */
+const UNIT_ALIASES: Record<string, string> = {
+  lf: 'linear_ft',
+  linear_feet: 'linear_ft',
+  linearft: 'linear_ft',
+  linear_foot: 'linear_ft',
+  ft: 'linear_ft',
+  feet: 'linear_ft',
+  sf: 'sq_ft',
+  sqft: 'sq_ft',
+  sq_feet: 'sq_ft',
+  square_feet: 'sq_ft',
+  square_ft: 'sq_ft',
+  cy: 'cu_yd',
+  cu_yds: 'cu_yd',
+  cubic_yard: 'cu_yd',
+  cubic_yards: 'cu_yd',
+  hole: 'holes',
+  ea: 'each',
+  item: 'items',
+  load: 'loads',
+  hr: 'hours',
+  hrs: 'hours',
+  hour: 'hours',
+  pct: 'percent',
+  '%': 'percent',
+  percentage: 'percent',
+};
+
+/** `'Linear Ft'`, `'linear ft'`, `'LINEAR-FT'`, `'linear_ft.'` → `'linear_ft'`. */
+function normalizeUnitKey(unit: unknown): string {
+  return String(unit ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\.$/, '')
+    .replace(/[\s-]+/g, '_');
+}
+
+/**
+ * A quantity that may legitimately be zero — `positiveNumber` refuses 0, and a
+ * scope row with a 0 target is real data the ticket must still show.
+ */
+function quantityNumber(value: unknown): number | null {
+  if (value == null || typeof value === 'boolean') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+  const text = value.replace(/,/g, '').trim();
+  if (!/^-?\d*\.?\d+$/.test(text)) return null;
+  const n = parseFloat(text);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * ONE service item's measure as printed text.
+ *
+ *   (48, 'linear_ft') → '48 LF'
+ *   (1,  'holes')     → '1 hole'
+ *   (100,'percent')   → '100%'
+ *   (3,  'cubic_yds') → '3 cu yd'
+ *   (2,  'pallets')   → '2 pallets'    ← unknown unit, humanised, NEVER dropped
+ *   (null,'holes')    → 'holes'        ← the unit alone beats printing nothing
+ *
+ * An UNKNOWN unit prints its own key with the underscores taken out, for the
+ * same reason an unknown equipment id still prints: the office recorded
+ * something, and a blank measure on a sheet the crew works from is worse than an
+ * unfamiliar word. Returns '' only when there is genuinely nothing to say.
+ */
+export function formatScopeQuantity(quantity: unknown, unit: unknown): string {
+  const n = quantityNumber(quantity);
+  const key = normalizeUnitKey(unit);
+  const resolved = key ? UNIT_ALIASES[key] ?? key : '';
+  const label = SCOPE_UNIT_LABELS[resolved];
+
+  if (n == null) {
+    if (!resolved) return '';
+    // No number: name the unit rather than print a bare dash. `many` for every
+    // unit — with no quantity there is nothing to agree with, and `one` vs
+    // `many` differs for exactly two entries ('hole'/'holes', 'hr'/'hrs').
+    // (This was `label.suffix ? label.many : label.many` — both branches
+    // identical. The only suffix unit is `percent`, whose `one` and `many` are
+    // BOTH '%', so no behaviour the ternary could have intended is recoverable
+    // from it; it is simplified rather than guessed at.)
+    return label ? label.many : resolved.replace(/_/g, ' ');
+  }
+
+  const num = formatNumber(n);
+  if (!label) {
+    // Unknown unit — humanised and appended. `formatNumber` has already made the
+    // number readable; the key is all we know about the unit.
+    const word = resolved.replace(/_/g, ' ').trim();
+    return word ? `${num} ${word}` : num;
+  }
+  if (label.suffix) return `${num}${label.many}`;
+  return `${num} ${n === 1 ? label.one : label.many}`;
+}
+
+/**
+ * The unit words the schedule form appends when it AUTO-GENERATES a scope item's
+ * description (app/dashboard/admin/schedule-form/page.tsx):
+ *
+ *   `${label} — linear ft` · `${label} — holes` · `${label} — % complete`
+ *
+ * Those three strings are 33 of the 39 descriptions in production, and every one
+ * of them just repeats the work type followed by the unit — which is precisely
+ * the doubled column the founder was looking at. They are stripped. Anything
+ * else a human typed ("12 conduit penetrations, 4in bit, 8in SOG", "Equipment
+ * trench 60ft x 3ft x 8in" — both real production rows) is left ALONE, in full.
+ */
+const GENERATED_DESCRIPTION_TAILS = new Set([
+  '',
+  'linear ft',
+  'linear feet',
+  'lf',
+  'holes',
+  'hole',
+  'sq ft',
+  'square feet',
+  'each',
+  'ea',
+  'items',
+  'hours',
+  'hrs',
+  'loads',
+  'percent',
+  '% complete',
+  '%',
+  'complete',
+]);
+
+/**
+ * The description worth printing beside a service, or '' when the stored one is
+ * only an echo of the work type.
+ *
+ * Deliberately conservative: the description is dropped ONLY when it is the work
+ * type followed by nothing but a unit word. A description that merely STARTS
+ * with the work type and then says something real is printed whole — mangling a
+ * human's own note on a sheet a customer signs is not worth the tidier column.
+ */
+export function scopeItemDetail(workType: unknown, description: unknown): string {
+  const detail = String(description ?? '').trim();
+  if (!detail) return '';
+  const type = String(workType ?? '').trim();
+  if (!type) return detail;
+  if (detail.toLowerCase() === type.toLowerCase()) return '';
+  if (!detail.toLowerCase().startsWith(type.toLowerCase())) return detail;
+
+  // What follows the work type, minus the em/en dash or hyphen separator.
+  const tail = detail
+    .slice(type.length)
+    .replace(/^\s*[—–-]\s*/, '')
+    .trim()
+    .toLowerCase();
+  return GENERATED_DESCRIPTION_TAILS.has(tail) ? '' : detail;
+}
+
+export interface ScopeItemInput {
+  id?: string | null;
+  work_type?: string | null;
+  description?: string | null;
+  unit?: string | null;
+  target_quantity?: number | string | null;
+}
+
+export interface ScopeItemLine {
+  /** Stable react key — the row id when there is one, else its index. */
+  key: string;
+  /** 'Wall/Track Sawing' */
+  service: string;
+  /** The human's own note, or '' when the stored description was an echo. */
+  detail: string;
+  /** '48 LF' · '12 holes' · '100%' · '' when nothing measurable was stored. */
+  quantity: string;
+}
+
+/**
+ * The SERVICE ITEMS block, identical on the printed HTML sheet and the react-pdf
+ * ticket. Rows with no service name AND nothing to measure are dropped — they
+ * would print as an empty ruled line and nothing else.
+ */
+export function formatScopeItems(items: ScopeItemInput[] | null | undefined): ScopeItemLine[] {
+  if (!Array.isArray(items)) return [];
+  const out: ScopeItemLine[] = [];
+  items.forEach((item, index) => {
+    if (!item || typeof item !== 'object') return;
+    const service = String(item.work_type ?? '').trim();
+    const quantity = formatScopeQuantity(item.target_quantity, item.unit);
+    const detail = scopeItemDetail(service, item.description);
+    if (!service && !quantity && !detail) return;
+    out.push({ key: String(item.id ?? index), service, detail, quantity });
+  });
+  return out;
+}
+
+/**
+ * Whether the DETAIL column earns its place on this job.
+ *
+ * On the 33 auto-generated rows in production every detail is stripped, so the
+ * column would print as a full height of em-dashes next to the numbers that
+ * actually matter. Both tickets ask this before drawing the column, so neither
+ * can decide differently for the same job.
+ */
+export function scopeItemsHaveDetail(rows: ScopeItemLine[]): boolean {
+  return rows.some((r) => !!r.detail);
 }
 
 // ── Equipment ───────────────────────────────────────────────────────────────
@@ -911,6 +1281,85 @@ export function layoutEquipmentColumns(
   return out;
 }
 
+// ── PPE & safety ────────────────────────────────────────────────────────────
+
+/**
+ * `gloves_cut_3` → `Gloves Cut Level 3`; `hard_hat` → `Hard Hat`.
+ *
+ * The react-pdf ticket already did this; the HTML ticket printed the raw
+ * storage token, so the same job's PPE box read "gloves_cut_3" on one sheet and
+ * "Gloves Cut Level 3" on the other. Shared here so that cannot recur.
+ *
+ * Free text an office typed is returned untouched — `humanizeValue`'s rule.
+ */
+export function ppeLabel(value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  if (/\s/.test(raw)) return raw;
+  const glove = raw.match(/^gloves_cut_(\d+)$/i);
+  if (glove) return `Gloves Cut Level ${glove[1]}`;
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/** Every PPE + additional-safety string on the job, humanised, blanks dropped. */
+export function formatPpeAndSafety(
+  ppe: unknown[] | null | undefined,
+  safety: unknown[] | null | undefined
+): string[] {
+  return [...(Array.isArray(ppe) ? ppe : []), ...(Array.isArray(safety) ? safety : [])]
+    .map((p) => ppeLabel(p))
+    .filter(Boolean);
+}
+
+// ── Permits ─────────────────────────────────────────────────────────────────
+//
+// WHY THIS MOVED HERE (guardian, Aug 17 2026): the react-pdf ticket named the
+// permits ("Hot Work Permit") while the HTML sheet printed only
+// "Permit Required: Yes" — even though the raw array was already in its payload
+// and simply never rendered. A production job carries a `hot_work` permit, and
+// "Yes" tells a crew nothing about the fire watch, extinguisher and cool-down
+// that a hot-work permit means. One table, both sheets.
+
+export const PERMIT_TYPE_LABELS: Record<string, string> = {
+  work_permit: 'Work Permit',
+  hot_work: 'Hot Work Permit',
+  excavation: 'Excavation Permit',
+  confined_space: 'Confined Space Permit',
+};
+
+export interface PermitInput {
+  type?: string | null;
+  details?: string | null;
+  number?: string | null;
+}
+
+/**
+ * `[{ type: 'hot_work', details: '' }]` → `['Hot Work Permit']`.
+ *
+ * An UNKNOWN type is humanised and printed rather than dropped (same rule as the
+ * equipment ids), and free-text `details` is appended in brackets when it says
+ * something the label does not. A row with neither reads 'Other' — the office
+ * ticked a permit, and a silently empty permit line is how a crew arrives
+ * without one.
+ */
+export function formatPermits(permits: unknown): string[] {
+  if (!Array.isArray(permits)) return [];
+  const out: string[] = [];
+  for (const raw of permits) {
+    if (!raw || typeof raw !== 'object') continue;
+    const p = raw as PermitInput;
+    const type = String(p.type ?? '').trim();
+    const details = String(p.details ?? '').trim();
+    const label = PERMIT_TYPE_LABELS[type] || (type && type !== 'other' ? humanizeValue(type) : '') || details || 'Other';
+    // Don't print "Other (Other)" or repeat the label back at itself.
+    const text = details && details.toLowerCase() !== label.toLowerCase() ? `${label} (${details})` : label;
+    out.push(text);
+  }
+  return out;
+}
+
 // ── Jobsite conditions ──────────────────────────────────────────────────────
 
 interface ConditionField {
@@ -938,6 +1387,27 @@ const CONDITION_FIELDS: ConditionField[] = [
   { key: 'manpower_provided', label: 'Manpower provided' },
   { key: 'proper_ventilation', label: 'Proper ventilation' },
 ];
+
+/**
+ * The SUPPLY conditions — the two that decide what the truck is loaded with.
+ *
+ * WHY THEY ARE SPECIAL (guardian, Aug 17 2026): the react-pdf ticket used to
+ * draw a FIXED checkbox list, so `water_available: false` printed as an unticked
+ * box — "no water on site", which is why the crew hooks up a water buggy before
+ * leaving the shop. The chip rendering that replaced it shows only what is
+ * TICKED, so `false` became indistinguishable from never-recorded. That is a
+ * one-way loss of information: 31 of the 48 production jobs record these keys,
+ * and 22 of them say water is NOT available.
+ *
+ * So a recorded `false` prints explicitly. DELIBERATELY ONLY THESE TWO: turning
+ * all 19 condition keys into NO chips would double the WORK CONDITIONS box on a
+ * sheet with a hard one-page budget, to say things nobody has to load a truck
+ * for. `null`/absent still prints nothing — "not recorded" is not "no".
+ */
+const SUPPLY_CONDITION_NEGATIVES: Record<string, string> = {
+  water_available: 'Water: NO',
+  electricity_available: 'Power: NO',
+};
 
 /** Value-bearing (non-boolean) conditions. */
 const CONDITION_VALUE_FIELDS: { key: string; label: string; values?: Record<string, string> }[] = [
@@ -1017,7 +1487,22 @@ export function formatJobsiteConditions(
   const out: string[] = [];
 
   for (const { key, label } of CONDITION_FIELDS) {
-    if (!conditions[key]) continue;
+    const raw = conditions[key];
+    // ON/OFF THROUGH `booleanish`, NOT raw truthiness. A JSONB blob that stored
+    // the string 'false' (or '0') is truthy in JavaScript, so a plain `if
+    // (!conditions[key])` printed "Power available" over an explicit NO — the
+    // one direction that gets a crew to site without a generator. Production
+    // stores real booleans today, so nothing changes now; this is the guard on
+    // the day one write path starts sending strings.
+    const flag = booleanish(raw);
+    if (flag === false || (flag == null && !raw)) {
+      // A SUPPLY condition the office actually answered "no" to is a fact the
+      // crew loads equipment for — see SUPPLY_CONDITION_NEGATIVES. Everything
+      // else that is off simply does not print.
+      const negative = SUPPLY_CONDITION_NEGATIVES[key];
+      if (negative && key in conditions && flag === false) out.push(negative);
+      continue;
+    }
     const ft = conditionDistance(conditions, key);
     out.push(ft != null ? `${label} — ${formatNumber(ft)} ft` : label);
   }

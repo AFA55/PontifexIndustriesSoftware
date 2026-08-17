@@ -4,117 +4,184 @@ import { asArray } from '@/lib/job-arrays';
 // SHARED with the HTML print page and the crew's digital ticket. Two surfaces
 // formatting the same job differently is a recurring bug class here, and this
 // sheet is the one the customer signs.
-import { groupJobEquipment, layoutEquipmentColumns, rowLocationLabel } from '@/lib/job-ticket-format';
+import {
+  groupJobEquipment,
+  layoutEquipmentColumns,
+  formatScopeDetails,
+  formatJobsiteConditions,
+  formatScopeItems,
+  scopeItemsHaveDetail,
+  formatPpeAndSafety,
+  formatPermits,
+} from '@/lib/job-ticket-format';
 import { chunkPhotoPages, type TicketPhoto } from '@/lib/job-ticket-photos';
 
-// ── Styles ──────────────────────────────────────────────────
+/**
+ * ONE TICKET, TWO RENDERERS (founder, Aug 17 2026, holding both printouts):
+ * "I clicked on Print Work Ticket and Print Ticket on schedule board — same
+ * data, different design. I like the one from the Completed Jobs better and
+ * would like it to be uniform throughout the application. We shouldn't have 2
+ * different ways our ticket prints."
+ *
+ * The reference design is the HTML sheet at
+ * app/dashboard/admin/jobs/[id]/print/page.tsx: a header rule with the company
+ * name and a boxed JOB ID, then two columns —
+ *
+ *   LEFT   SCHEDULE · CUSTOMER · SITE · COMPLIANCE & PERMITS · NOTES
+ *   RIGHT  SCOPE OF WORK · SERVICE ITEMS · EQUIPMENT REQUIRED ·
+ *          WORK CONDITIONS · PPE & SAFETY
+ *
+ * — then two signature rules across the foot. This file now renders exactly
+ * that, in the same order, with the same section titles and field labels.
+ *
+ * WHY NOT JUST POINT THE SCHEDULE BOARD AT THE HTML PAGE: BatchPrintModal
+ * fetches PDF *blobs* and merges a whole day's jobs into one document. A
+ * browser-print page cannot be merged. So there are two renderers and one
+ * design, and everything either of them formats comes out of
+ * lib/job-ticket-format.
+ *
+ * ── THE SCALE, AND THE ONE THING THAT IS DELIBERATELY NOT A COPY ──
+ * The HTML sheet lays out at 979 × 739 CSS px (letter landscape minus its 0.4in
+ * print margins) = 734 × 554pt. This page is letter landscape at 18pt padding:
+ * 756 × 576pt. So the PDF has 22pt more height and 22pt more width to play with.
+ *
+ * Geometry — margins, rules, column widths, section spacing — is the HTML value
+ * × 0.75 (96dpi px → 72dpi pt): gap-x-10 40px → 30pt, mb-4 16px → 12pt, h-20
+ * 80px → 60pt.
+ *
+ * TYPE IS NOT. A straight × 0.75 type port (text-sm 14px → 10.5pt) was built and
+ * MEASURED against all 48 production job orders: 6 of them ran onto a second
+ * page, and the median sheet had only ~57pt of slack left. The founder's
+ * objection on Aug 17 was about DESIGN — stacked sections under rules instead of
+ * the old bordered three-column cards — not about type size, and this ticket has
+ * a hard one-page budget that the HTML sheet (which can simply spill) does not.
+ * So the type stays at the sizes this renderer already proved fit: 8.5pt fields,
+ * 8pt body, 7.5pt equipment items and chips. Same document, same order, same
+ * words, set a little tighter. Measured result: 48/48 on one page.
+ *
+ * ── WHAT COULD NOT BE MATCHED EXACTLY ──
+ *  - Type is ~80% of the HTML sheet's size, for the reason above.
+ *  - No CSS grid. The two body columns are explicit widths (363pt each) with a
+ *    30pt gutter rather than `grid-cols-2 gap-x-10`. Same result, but a column
+ *    cannot rebalance itself, which is why the widths are stated and measured.
+ *  - No `break-words`. A single unbroken token longer than its column overflows
+ *    instead of hyphenating. Real equipment labels and addresses do not do this.
+ *  - Chips wrap by margin, not `gap`, so the last chip in a row leaves a little
+ *    more trailing space than the HTML does.
+ *  - System sans vs Helvetica: the same shapes, ~2% different widths.
+ */
+
+// ── Palette: the HTML sheet's Tailwind grays, so the two sheets print the same
+//    weight of ink. Black text on white, gray rules — NOT the old card design's
+//    slate-blue headers, which is most of what made the two look unrelated.
+const C = {
+  black: '#000000',
+  gray700: '#374151',
+  gray600: '#4B5563',
+  gray400: '#9CA3AF',
+  gray300: '#D1D5DB',
+};
+
+// ── Styles ──────────────────────────────────────────────
 const s = StyleSheet.create({
   page: {
     padding: 18,
-    fontSize: 8,
+    fontSize: 8.5,
     fontFamily: 'Helvetica',
+    color: C.black,
+    backgroundColor: '#FFFFFF',
     flexDirection: 'column',
   },
 
-  // Header
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-    paddingBottom: 6,
-    borderBottom: '2 solid #1E293B',
+  // Header — `border-b-2 border-black pb-3 mb-4` with the JOB ID box at right.
+  header: { borderBottomWidth: 1.5, borderBottomColor: C.black, paddingBottom: 9, marginBottom: 12 },
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  companyName: { fontSize: 15, fontFamily: 'Helvetica-Bold', letterSpacing: 0.5, textTransform: 'uppercase' },
+  companyMeta: { fontSize: 7.5, color: C.gray600, marginTop: 2 },
+  // `border-[2.5px] border-black rounded px-3 py-1 text-right`
+  jobIdBox: { borderWidth: 1.9, borderColor: C.black, borderRadius: 3, paddingHorizontal: 9, paddingVertical: 3, alignItems: 'flex-end' },
+  jobIdLabel: { fontSize: 6.5, fontFamily: 'Helvetica-Bold', letterSpacing: 1.2, color: C.gray700 },
+  jobIdValue: { fontSize: 14, fontFamily: 'Courier-Bold', marginTop: 1 },
+  ticketKicker: { fontSize: 8.5, textTransform: 'uppercase', letterSpacing: 0.6, color: C.gray700, marginTop: 2 },
+
+  // Two-column body — `grid grid-cols-2 gap-x-10 items-start`.
+  body: { flexDirection: 'row', alignItems: 'flex-start' },
+  colLeft: { width: 363, marginRight: 30 },
+  colRight: { width: 363 },
+
+  // Section — `mb-4` + a titled rule, NOT a bordered card.
+  section: { marginBottom: 10 },
+  sectionTitle: {
+    fontSize: 8.5,
+    fontFamily: 'Helvetica-Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    color: C.gray700,
+    borderBottomWidth: 0.75,
+    borderBottomColor: C.gray300,
+    paddingBottom: 3,
+    marginBottom: 6,
   },
-  companyName: { fontSize: 15, fontWeight: 'bold', color: '#1E293B' },
-  jobNumberBox: { borderWidth: 1.5, borderColor: '#1E293B', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
-  jobNumberText: { fontSize: 14, fontWeight: 'bold', color: '#1E293B', letterSpacing: 0.5 },
-  companyAddress: { fontSize: 7, color: '#475569', marginTop: 1 },
-  companyPhone: { fontSize: 7, color: '#475569' },
-  headerCenter: { alignItems: 'center', justifyContent: 'center' },
-  jobTicketTitle: { fontSize: 18, fontWeight: 'bold', color: '#1E293B', letterSpacing: 1 },
-  headerRight: { alignItems: 'flex-end' },
-  employeesLabel: { fontSize: 8, fontWeight: 'bold', color: '#475569', marginBottom: 2 },
-  employeeLine: { fontSize: 8, color: '#1E293B', marginBottom: 1 },
 
-  // Three-column layout
-  threeColumns: { flexDirection: 'row', gap: 8, marginBottom: 6 },
-  col: { flex: 1 },
-
-  // Section card
-  section: { border: '0.75 solid #CBD5E1', borderRadius: 3, marginBottom: 5, overflow: 'hidden' },
-  sectionHeader: { backgroundColor: '#F1F5F9', paddingHorizontal: 6, paddingVertical: 3, borderBottom: '0.75 solid #CBD5E1' },
-  sectionTitle: { fontSize: 9, fontWeight: 'bold', color: '#334155', textTransform: 'uppercase', letterSpacing: 0.5 },
-  sectionBody: { padding: 5 },
-
-  // Field rows
+  // Field row — `flex text-sm`, label `w-36 text-gray-600`, value `font-medium`.
   fieldRow: { flexDirection: 'row', marginBottom: 2.5, alignItems: 'flex-start' },
-  fieldLabel: { fontSize: 8.5, fontWeight: 'bold', color: '#64748B', width: 82, textTransform: 'uppercase' },
-  fieldValue: { fontSize: 9.5, color: '#1E293B', flex: 1 },
-  fieldValueBold: { fontSize: 8, fontWeight: 'bold', color: '#1E293B', flex: 1 },
+  fieldLabel: { fontSize: 8.5, color: C.gray600, width: 88 },
+  fieldValue: { fontSize: 8.5, fontFamily: 'Helvetica-Bold', flex: 1 },
 
-  // Checkbox row for conditions
-  checkRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 2.5 },
-  checkBox: { width: 8, height: 8, border: '0.75 solid #94A3B8', borderRadius: 1, marginRight: 4, justifyContent: 'center', alignItems: 'center' },
-  checkBoxFilled: { width: 8, height: 8, border: '0.75 solid #1E293B', borderRadius: 1, marginRight: 4, backgroundColor: '#1E293B', justifyContent: 'center', alignItems: 'center' },
-  checkMark: { fontSize: 6, color: '#FFFFFF', fontWeight: 'bold' },
-  checkLabel: { fontSize: 8.5, color: '#334155', flex: 1 },
-  checkDetail: { fontSize: 6.5, color: '#64748B', marginLeft: 2 },
+  paragraph: { fontSize: 8, lineHeight: 1.4 },
+  muted: { fontSize: 8, color: C.gray600, fontStyle: 'italic' },
 
-  // Scope table
-  scopeTable: { border: '0.75 solid #CBD5E1', borderRadius: 3, overflow: 'hidden', marginBottom: 5 },
-  scopeHeaderRow: { flexDirection: 'row', backgroundColor: '#F1F5F9', borderBottom: '0.75 solid #CBD5E1' },
-  scopeHeaderCell: { fontSize: 6.5, fontWeight: 'bold', color: '#475569', paddingHorizontal: 4, paddingVertical: 3, textTransform: 'uppercase' },
-  scopeDataRow: { flexDirection: 'row', borderBottom: '0.5 solid #E2E8F0' },
-  scopeDataRowAlt: { flexDirection: 'row', borderBottom: '0.5 solid #E2E8F0', backgroundColor: '#FAFAFA' },
-  scopeCell: { fontSize: 7.5, color: '#1E293B', paddingHorizontal: 4, paddingVertical: 2.5 },
+  // SCOPE OF WORK measurement rows — `w-28` code column beside its lines.
+  scopeRow: { flexDirection: 'row', marginBottom: 3 },
+  scopeCode: { width: 66, fontSize: 6.5, fontFamily: 'Helvetica-Bold', textTransform: 'uppercase', letterSpacing: 0.4, color: C.gray700, paddingTop: 1 },
+  scopeLines: { flex: 1 },
+  scopeLine: { fontSize: 8, lineHeight: 1.3 },
+  scopeDivider: { borderTopWidth: 0.75, borderTopColor: C.gray300, marginTop: 6, paddingTop: 6 },
 
-  // Bottom sections
-  textBlock: { border: '0.75 solid #CBD5E1', borderRadius: 3, padding: 5, marginBottom: 5 },
-  textBlockLabel: { fontSize: 7, fontWeight: 'bold', color: '#475569', textTransform: 'uppercase', marginBottom: 2 },
-  textBlockValue: { fontSize: 8, color: '#1E293B', lineHeight: 1.3 },
+  // SERVICE ITEMS table — `border-b border-black` head, `border-b border-gray-300` rows.
+  tableHeadRow: { flexDirection: 'row', borderBottomWidth: 0.75, borderBottomColor: C.black },
+  tableHeadCell: { fontSize: 7.5, fontFamily: 'Helvetica-Bold', paddingBottom: 2.5 },
+  tableRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: C.gray300 },
+  tableCell: { fontSize: 8, paddingVertical: 2.5, paddingRight: 5 },
 
-  // Notes lines
-  notesSection: { border: '0.75 solid #CBD5E1', borderRadius: 3, padding: 5, marginBottom: 5 },
-  notesTitle: { fontSize: 7, fontWeight: 'bold', color: '#94A3B8', textTransform: 'uppercase', marginBottom: 4 },
-  notesLine: { borderBottom: '0.5 solid #CBD5E1', height: 14, marginBottom: 0 },
-
-  // Footer / Signature
-  footer: { marginTop: 'auto', borderTop: '1 solid #CBD5E1', paddingTop: 6, flexDirection: 'row', gap: 16 },
-  sigBox: { flex: 1, borderBottom: '1 solid #94A3B8', paddingBottom: 16 },
-  sigLabel: { fontSize: 7, color: '#64748B', fontWeight: 'bold', textTransform: 'uppercase' },
-
-  // Equipment Req'd — a SCANNABLE list, not a paragraph.
-  // See the block that uses these for the measurements behind the sizes.
-  eqGroupTitle: {
-    fontSize: 7,
-    fontWeight: 'bold',
-    color: '#334155',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    borderBottom: '0.5 solid #CBD5E1',
-    paddingBottom: 1,
-    marginTop: 3.5,
-    marginBottom: 1.5,
-  },
-  /** Same heading with no leading gap — it is already against the box edge. */
-  eqGroupTitleFirst: {
-    fontSize: 7,
-    fontWeight: 'bold',
-    color: '#334155',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
-    borderBottom: '0.5 solid #CBD5E1',
-    paddingBottom: 1,
-    marginBottom: 1.5,
-  },
+  // EQUIPMENT REQUIRED — two balanced columns, one item per line.
   eqCols: { flexDirection: 'row' },
-  eqColFirst: { flex: 1, paddingRight: 5 },
+  eqColFirst: { flex: 1, paddingRight: 18 },
   eqColLast: { flex: 1 },
-  eqItem: { fontSize: 7.5, color: '#1E293B', lineHeight: 1.2 },
+  eqHeading: {
+    fontSize: 7.5,
+    fontFamily: 'Helvetica-Bold',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: C.gray700,
+    borderBottomWidth: 0.5,
+    borderBottomColor: C.gray300,
+    paddingBottom: 1.5,
+    marginBottom: 3,
+  },
+  eqHeadingNext: { marginTop: 6 },
+  eqItem: { fontSize: 7.5, lineHeight: 1.25 },
+  // The write-on rules a quick-add job gets instead of a list.
+  blankRule: { borderBottomWidth: 0.75, borderBottomColor: C.black, height: 12, marginBottom: 9 },
+
+  // Chips — `text-xs border border-gray-400 rounded px-2 py-0.5`.
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  chip: { borderWidth: 0.75, borderColor: C.gray400, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1.25, marginRight: 4, marginBottom: 3.5 },
+  chipText: { fontSize: 7.5 },
+
+  // NOTES write-on box — `border border-gray-400 h-20 rounded`.
+  notesBox: { borderWidth: 0.75, borderColor: C.gray400, borderRadius: 3, height: 48 },
+
+  // Signatures — `mt-4 grid grid-cols-2 gap-8`.
+  signatures: { flexDirection: 'row', marginTop: 12 },
+  sigCellFirst: { flex: 1, marginRight: 24 },
+  sigCell: { flex: 1 },
+  sigRule: { borderBottomWidth: 0.75, borderBottomColor: C.black, height: 24 },
+  sigLabel: { fontSize: 7.5, color: C.gray700, marginTop: 3 },
 
   // ── Photo pages (page 2+) ──
-  // Every size below is EXPLICIT rather than flexed, because a photo page that
-  // reflows silently drops to one photo per page. LETTER landscape is
+  // UNCHANGED. Every size below is EXPLICIT rather than flexed, because a photo
+  // page that reflows silently drops to one photo per page. LETTER landscape is
   // 792 × 612pt; at padding 18 the content box is 756 × 576. Header band 16pt +
   // 6pt gap leaves 554pt for two rows; rows are 272pt (NOT the 277pt that fits
   // exactly — measured at exactly 576pt total, i.e. zero margin, and a single
@@ -164,11 +231,6 @@ const s = StyleSheet.create({
   },
   photoImage: { maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' },
   photoCaption: { fontSize: 7.5, fontWeight: 'bold', color: '#475569', marginTop: 2.5 },
-
-  // Permit banner
-  permitBanner: { backgroundColor: '#FEF3C7', border: '1 solid #F59E0B', borderRadius: 3, padding: 5, marginBottom: 6, flexDirection: 'row', alignItems: 'center' },
-  permitLabel: { fontSize: 8, fontWeight: 'bold', color: '#92400E', marginRight: 4 },
-  permitText: { fontSize: 7.5, color: '#78350F' },
 });
 
 // ── Branding prop for PDF (cannot use hooks) ───────────────
@@ -201,12 +263,18 @@ interface DispatchTicketData {
   scheduled_date?: string;
   end_date?: string;
   arrival_time?: string;
+  is_will_call?: boolean;
   estimated_cost?: number;
   estimated_hours?: number;
   po_number?: string;
+  /** The RAW `job_orders.salesman_name` column. Fallback only — prefer `quoted_by`. */
   salesman_name?: string;
+  /** Who quoted it: the column, else the profile behind `created_by`. */
+  quoted_by?: string;
   operator_name?: string;
   helper_name?: string;
+  project_name?: string;
+  project_manager_name?: string;
   equipment_needed?: string[];
   /** The per-service picks (core bits, saws, hoses). This ticket never read
    *  them, which is why ~16 selections were missing from the printed sheet. */
@@ -214,14 +282,24 @@ interface DispatchTicketData {
   equipment_rentals?: string[];
   equipment_rental_flags?: Record<string, boolean>;
   ppe_required?: string[];
+  additional_safety_requirements?: string[];
   scope_details?: Record<string, any>;
+  /** job_scope_items — the measured targets. Printed as SERVICE ITEMS. */
+  scope_items?: {
+    id?: string | null;
+    work_type?: string | null;
+    description?: string | null;
+    unit?: string | null;
+    target_quantity?: number | string | null;
+  }[];
   site_compliance?: Record<string, any>;
   jobsite_conditions?: Record<string, any>;
   additional_info?: string;
   job_difficulty_rating?: number;
   difficulty_rating?: number;
   permit_required?: boolean;
-  permits?: { type: string; details?: string }[];
+  permit_number?: string;
+  permits?: { type: string; details?: string; number?: string }[];
   is_multi_day?: boolean;
   total_days_worked?: number;
   scheduling_flexibility?: Record<string, any>;
@@ -230,498 +308,399 @@ interface DispatchTicketData {
   photos?: TicketPhoto[];
 }
 
+// ── Helpers ─────────────────────────────────────────────────
+
 /**
- * One parsed row out of `scope_details[code].cuts` / `.holes`.
+ * The HTML sheet's date wording, to the letter: `Monday, August 17, 2026`.
  *
- * `location` is on here because the schedule form writes it PER ROW (each hole
- * group carries its own Elevated Slab / Slab on Grade / On Wall pick). The old
- * type omitted it, which is part of why the printed WALL/FLOOR column silently
- * read a service-level key that does not exist instead.
+ * `+ 'T00:00:00'` is not decoration — see CLAUDE.md. A bare 'YYYY-MM-DD' parsed
+ * by `new Date()` is UTC midnight and renders as the PREVIOUS DAY in every US
+ * timezone, which on a dispatch ticket sends a crew out on the wrong morning.
  */
-interface ScopeRowInput {
-  qty?: string;
-  bit_size?: string;
-  depth?: string;
-  linear_feet?: string;
-  num_cuts?: string;
-  location?: string;
+function formatDate(d?: string) {
+  if (!d) return '—';
+  try {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  } catch {
+    return d;
+  }
 }
 
-// ── Helpers ─────────────────────────────────────────────────
-function formatDate(d?: string) {
-  if (!d) return '';
-  try {
-    return new Date(d + 'T00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
-  } catch { return d; }
+/** `13:30` → `1:30 PM`. Same helper the HTML sheet uses. */
+function formatTime(time?: string): string | null {
+  if (!time) return null;
+  const [hours, minutes] = time.split(':');
+  const hour = parseInt(hours, 10);
+  if (!Number.isFinite(hour)) return time;
+  const ampm = hour >= 12 ? 'PM' : 'AM';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${minutes} ${ampm}`;
+}
+
+// PERMIT_TYPE_LABELS moved to lib/job-ticket-format (`formatPermits`) — the HTML
+// sheet has to name the same permits, and by definition a second copy of the
+// table is how the two sheets start disagreeing about what a `hot_work` job is.
+
+// ── Presentational helpers (mirrors of the HTML page's Section / Field) ─────
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <View style={s.section}>
+      <Text style={s.sectionTitle}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function Field({ label, value }: { label: string; value: string }) {
+  return (
+    <View style={s.fieldRow}>
+      <Text style={s.fieldLabel}>{label}</Text>
+      <Text style={s.fieldValue}>{value}</Text>
+    </View>
+  );
+}
+
+function Chips({ items }: { items: string[] }) {
+  return (
+    <View style={s.chipWrap}>
+      {items.map((text, i) => (
+        <View key={i} style={s.chip}>
+          <Text style={s.chipText}>{text}</Text>
+        </View>
+      ))}
+    </View>
+  );
 }
 
 // ── Component ───────────────────────────────────────────────
 
-
-export default function DispatchTicketPDF({ job, branding }: { job: DispatchTicketData; branding?: PDFBranding }) {
-  const today = new Date().toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+export default function DispatchTicketPDF({
+  job,
+  branding,
+  measureFillerPt,
+}: {
+  job: DispatchTicketData;
+  branding?: PDFBranding;
+  /**
+   * PAGE-FIT HARNESS HOOK. Adds exactly this many points of empty space at the
+   * foot of page 1 — NEGATIVE values pull the content up instead. A script can
+   * then binary-search the largest value that still produces a one-page ticket:
+   * a positive answer is the slack left on the sheet, a negative one is how far
+   * over it went. Points, measured, rather than eyeballing a rendered image.
+   * Never set in production; undefined renders nothing at all.
+   */
+  measureFillerPt?: number;
+}) {
   const conditions = job.jobsite_conditions || {};
   const compliance = job.site_compliance || {};
 
-  // Condition checklist items
-  const conditionItems: { label: string; key: string; detailKey?: string; detailSuffix?: string }[] = [
-    { label: 'Water Available', key: 'water_available', detailKey: 'water_available_ft', detailSuffix: 'ft' },
-    { label: 'Power Available', key: 'electricity_available', detailKey: 'electricity_available_ft', detailSuffix: 'ft' },
-    { label: '480 Cord Req\'d', key: 'cord_480', detailKey: 'cord_480_ft', detailSuffix: 'ft' },
-    { label: 'Hyd Hose', key: 'hyd_hose', detailKey: 'hyd_hose_ft', detailSuffix: 'ft' },
-    { label: 'Vac Water', key: 'water_control' },
-    { label: 'Hang Poly', key: 'plastic_needed' },
-    { label: 'Cleanup', key: 'clean_up_required' },
-    { label: 'Overcutting OK', key: 'overcutting_allowed' },
-    { label: 'High Work', key: 'high_work', detailKey: 'high_work_ft', detailSuffix: 'ft' },
-    { label: 'Scaffold/Lift Avail', key: 'scaffolding_provided' },
-    { label: 'Manpower Prov\'d', key: 'manpower_provided' },
-    { label: 'Inside/Outside', key: 'inside_outside' },
-    { label: 'Ventilation', key: 'proper_ventilation' },
-  ];
-
-  // Equipment checklist items
-  // The office's ACTUAL selections, grouped by service. This replaced a
-  // hardcoded 13-row checklist plus a fuzzy name matcher that compared the
-  // free-text strings in `equipment_needed` against those labels — which is how
-  // a job where nobody selected "Wall Saw" printed a TICKED Wall Saw box (the
-  // office had typed "Wall Saw" as a custom item), while sixteen genuine picks
-  // sitting in `equipment_selections` never appeared on the sheet at all.
+  // ── Everything the office selected, grouped by service, then laid out as two
+  //    balanced newspaper columns, one item per line.
+  //
+  //    Founder, Aug 16: "I clicked more than the equipment it shows — I didn't
+  //    even click wall saw or slab saw." This file read only `equipment_needed`
+  //    (three items typed by hand) and never touched `equipment_selections`,
+  //    where the ~16 real picks live. Then Aug 17: the same list must not be one
+  //    wrapped `·`-separated paragraph, on EITHER sheet.
+  //
+  //    MEASURED on letter landscape: one column, one item per line, does not
+  //    fit; two columns split PER SERVICE wastes up to half a row per group on
+  //    its ragged last line; two CONTINUOUSLY BALANCED columns fit with room.
+  //    layoutEquipmentColumns never ends a column on a service heading and
+  //    repeats a straddled heading as "(cont.)". The HTML sheet calls the same
+  //    helper with the same column count.
   const equipmentGroups = groupJobEquipment({
     equipment_selections: job.equipment_selections,
     equipment_needed: job.equipment_needed,
     equipment_rentals: job.equipment_rentals,
     equipment_rental_flags: job.equipment_rental_flags,
   });
-  // Two balanced columns, one item per line — see the render block below for
-  // the measurements that ruled out a single column.
   const equipmentColumns = layoutEquipmentColumns(equipmentGroups, 2);
+
+  // SCOPE OF WORK — the measured areas / cuts / holes as sentences with their
+  // units spelled out, replacing this file's old six-column table. The table
+  // printed raw `scope_details` cells and could not show an `areas` row at all.
+  const scopeSections = formatScopeDetails(job.scope_details);
+
+  // SERVICE ITEMS — `48 LF`, not "48 linear_ft" beside a description that
+  // repeats the service name.
+  const scopeLines = formatScopeItems(job.scope_items);
+  const showScopeDetail = scopeItemsHaveDetail(scopeLines);
+
+  // WORK CONDITIONS — the ticked ones only, through the shared formatter. The
+  // old hardcoded 13-row checkbox list had already drifted from the HTML sheet:
+  // it was missing `high_work_access`, and it read only the `*_ft` spelling of a
+  // distance while the shared formatter also accepts `*_distance_ft`.
+  const conditionLines = formatJobsiteConditions(conditions);
+
+  const ppeAndSafety = formatPpeAndSafety(job.ppe_required, job.additional_safety_requirements);
 
   // Four photos to a page, 2 × 2. Empty when the job has none — and then the
   // Document is exactly the one-page ticket it has always been.
   const photoPages = chunkPhotoPages(job.photos ?? []);
 
-  // Scope details as table rows — parse nested JSON strings for cuts/holes
-  const scopeRows: { type: string; qty: string; footage: string; depth: string; wallFloor: string; notes: string }[] = [];
+  const arrival = formatTime(job.arrival_time);
+  const siteAddress = job.address || job.location || '—';
+  // `location` differs from `address` on 13 of the 48 production jobs (it holds
+  // the building / area name), so it gets its own line rather than being lost to
+  // the `||` above.
+  const siteName =
+    job.location && job.location.trim() && job.location.trim() !== (job.address || '').trim()
+      ? job.location.trim()
+      : '';
 
-  if (job.scope_details) {
-    for (const [serviceCode, val] of Object.entries(job.scope_details)) {
-      if (!val || typeof val !== 'object') continue;
-      const entry = val as Record<string, string>;
-      const label = serviceCode.replace(/_/g, ' ');
+  const permitList = formatPermits(asArray<{ type: string; details?: string }>(job.permits));
 
-      // Floor/wall sawing — parse cuts array
-      if (entry.cuts) {
-        try {
-          const cuts = JSON.parse(entry.cuts) as ScopeRowInput[];
-          cuts.forEach((cut, idx) => {
-            scopeRows.push({
-              type: cuts.length > 1 ? `${label} (cut ${idx + 1})` : label,
-              qty: cut.num_cuts || '—',
-              footage: cut.linear_feet ? `${cut.linear_feet} LF` : '—',
-              depth: cut.depth ? `${cut.depth}"` : '—',
-              wallFloor: rowLocationLabel(cut, entry) || '—',
-              notes: entry.notes || '—',
-            });
-          });
-        } catch { /* skip malformed */ }
-        continue;
-      }
-
-      // Core drilling — parse holes array
-      if (entry.holes) {
-        try {
-          const holes = JSON.parse(entry.holes) as ScopeRowInput[];
-          holes.forEach((hole, idx) => {
-            scopeRows.push({
-              type: holes.length > 1 ? `${label} (set ${idx + 1})` : label,
-              qty: hole.qty || '—',
-              footage: hole.bit_size ? `${hole.bit_size}" dia` : '—',
-              depth: hole.depth ? `${hole.depth}"` : '—',
-              // WHERE THE HOLES GO — the founder asked three times why this said
-              // "—" for core drilling. It read `entry.material` /
-              // `entry.wall_floor_type`, two SERVICE-level keys that no
-              // production row has ever carried, and never looked at the hole's
-              // own `location` ('on_wall' / 'elevated_slab' / 'slab_on_grade'),
-              // which the schedule form has been writing per hole group all
-              // along. Older rows keep it one level up as `work_location`; both
-              // are resolved in lib/job-ticket-format.
-              wallFloor: rowLocationLabel(hole, entry) || '—',
-              notes: entry.notes || '—',
-            });
-          });
-        } catch { /* skip malformed */ }
-        continue;
-      }
-
-      // Demo, Removal, GPR, or other text-based entries
-      const noteParts: string[] = [];
-      if (entry.description) noteParts.push(entry.description);
-      if (entry.method) noteParts.push(`Method: ${entry.method.replace(/_/g, ' ')}`);
-      if (entry.equipment) noteParts.push(`Equip: ${entry.equipment}`);
-
-      scopeRows.push({
-        type: label,
-        qty: entry.quantity || entry.area || '—',
-        footage: entry.size || entry.footage || '—',
-        depth: entry.depth || '—',
-        wallFloor: rowLocationLabel(null, entry) || '—',
-        notes: noteParts.join(' | ') || entry.notes || '—',
-      });
-    }
-  }
+  // QUOTED BY — `quoted_by` is the DERIVED value (the salesman_name column, else
+  // the profile behind created_by). `salesman_name` is the raw column and is
+  // read only as a fallback for callers that have not been updated: emitting a
+  // guess under the column's own name is how an editor pre-filled from it would
+  // persist the guess as fact. See lib/job-ticket-quoted-by.ts.
+  const quotedBy = job.quoted_by || job.salesman_name || '';
 
   return (
     <Document>
       <Page size="LETTER" orientation="landscape" style={s.page}>
+        {/* ═══ HEADER ═══
+            WHITE-LABEL: the company name comes from tenant branding. The JOB ID
+            is boxed and set large because sifting a stack of paper for one job
+            is the actual use (founder, Aug 15) — and it is BLACK, not the brand
+            colour, because a coloured number goes grey on a mono printer.
 
-        {/* ═══ HEADER ═══ */}
-        {/* The company block and the title sit together on the left, with the
-            JOB NUMBER beside the title — "put the job number right next to JOB
-            TICKET, just so it's easy to see when we're sifting through it for
-            the admin" (founder, Aug 15). Sifting a stack of paper is the actual
-            use, so the number has to be findable at the top edge.
-
-            EMPLOYEES REMOVED. Third time asked: a sheet printed Monday must not
-            assert who is on the job Thursday. Who actually worked it is on the
-            WORK ticket, taken from the clock cards. */}
-        {/* Company on the left, the ticket's identity stacked on the right:
-            JOB TICKET, the printed date under it, then the job number
-            (founder, Aug 15). One place to look for what this sheet is and
-            which job it belongs to. */}
-        <View style={s.headerRow}>
-          <View style={{ flex: 1 }}>
-            <Text style={s.companyName}>{(branding?.company_name || 'PATRIOT CONCRETE CUTTING').toUpperCase()}</Text>
-            <Text style={s.companyAddress}>{branding?.company_address || 'P.O Box 504, Piedmont, SC 29673'}</Text>
-            <Text style={s.companyPhone}>{branding?.company_phone || 'Phone: 864-299-0330  |  Fax: 864-299-1532'}</Text>
-          </View>
-          <View style={s.headerRight}>
-            <Text style={s.jobTicketTitle}>JOB TICKET</Text>
-            <Text style={{ fontSize: 7.5, color: '#64748B', marginTop: 1, marginBottom: 3 }}>
-              Printed: {today}
-            </Text>
-            <View style={s.jobNumberBox}>
-              <Text style={s.jobNumberText}>{job.job_number}</Text>
+            NO CREW NAMES. A sheet printed Monday must not assert who is on the
+            job Thursday; who actually worked it is on the WORK ticket, from the
+            clock cards. */}
+        <View style={s.header}>
+          <View style={s.headerRow}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={s.companyName}>
+                {(branding?.company_name || 'Job Ticket').toUpperCase()}
+              </Text>
+              {!!branding?.company_address && (
+                <Text style={s.companyMeta}>{branding.company_address}</Text>
+              )}
+              {!!branding?.company_phone && <Text style={s.companyMeta}>{branding.company_phone}</Text>}
             </View>
-            {/* MULTI-DAY · DAY N REMOVED from the printed sheet (founder,
-                Aug 16): "operators don't need to know that, that can stay
-                internal." A day counter on a crew's paper invites "day 3 of 5"
-                pacing and is the office's scheduling business, not the crew's.
-                The flag itself is untouched — the job view, the schedule board
-                and the daily-log chain all still run off it. */}
+            <View style={s.jobIdBox}>
+              <Text style={s.jobIdLabel}>JOB ID</Text>
+              <Text style={s.jobIdValue}>{job.job_number}</Text>
+            </View>
           </View>
+          <Text style={s.ticketKicker}>Job Ticket</Text>
         </View>
 
-        {/* ═══ PERMIT BANNER ═══ */}
-        {job.permit_required && job.permits && job.permits.length > 0 && (
-          <View style={s.permitBanner}>
-            <Text style={s.permitLabel}>PERMITS REQUIRED:</Text>
-            <Text style={s.permitText}>
-              {asArray<any>(job.permits).map(p => {
-                const label = p.type === 'work_permit' ? 'Work Permit' :
-                  p.type === 'hot_work' ? 'Hot Work Permit' :
-                  p.type === 'excavation' ? 'Excavation Permit' :
-                  p.type === 'confined_space' ? 'Confined Space Permit' :
-                  p.details || 'Other';
-                return p.details && p.type !== 'other' ? `${label} (${p.details})` : label;
-              }).join(' | ')}
-            </Text>
+        {/* ═══ TWO-COLUMN BODY ═══ */}
+        <View style={s.body}>
+          {/* ── LEFT ── */}
+          <View style={s.colLeft}>
+            <Section title="Schedule">
+              <Field label="Date" value={formatDate(job.scheduled_date)} />
+              {!!job.end_date && job.end_date !== job.scheduled_date && (
+                <Field label="End Date" value={formatDate(job.end_date)} />
+              )}
+              <Field label="Arrival Time" value={job.is_will_call ? 'Will Call' : arrival || '—'} />
+              {!!job.project_manager_name && (
+                <Field label="Project Manager" value={job.project_manager_name} />
+              )}
+            </Section>
+
+            <Section title="Customer">
+              <Field label="Customer" value={job.customer_name || '—'} />
+              {!!job.project_name && <Field label="Project" value={job.project_name} />}
+              {!!job.customer_contact && <Field label="Site Contact" value={job.customer_contact} />}
+              {!!(job.site_contact_phone || job.foreman_phone) && (
+                <Field label="Phone" value={job.site_contact_phone || job.foreman_phone || '—'} />
+              )}
+              {!!quotedBy && <Field label="Quoted By" value={quotedBy} />}
+            </Section>
+
+            <Section title="Site">
+              <Field label="Address" value={siteAddress} />
+              {!!siteName && <Field label="Job Site" value={siteName} />}
+              {!!job.job_type && <Field label="Job Type" value={job.job_type} />}
+              {!!job.po_number && <Field label="PO Number" value={job.po_number} />}
+              {!!job.directions && <Field label="Directions" value={job.directions} />}
+            </Section>
+
+            {/* The permit list used to be a yellow banner across the top of this
+                sheet and a plain field list on the other. It is one section on
+                both now; the permits themselves are named here so nothing the
+                banner carried is lost. */}
+            <Section title="Compliance & Permits">
+              <Field label="Permit Required" value={job.permit_required ? 'Yes' : 'No'} />
+              {!!job.permit_number && <Field label="Permit #" value={job.permit_number} />}
+              {permitList.length > 0 && <Field label="Permits" value={permitList.join(' | ')} />}
+              {!!compliance.orientation_required && <Field label="Orientation" value="Required" />}
+              {!!compliance.badging_required && (
+                <Field label="Badging" value={(compliance.badging_type as string) || 'Required'} />
+              )}
+              {!!compliance.special_instructions && (
+                <Field label="Instructions" value={String(compliance.special_instructions)} />
+              )}
+            </Section>
+
+            {/* NOTES sits under Compliance & Permits rather than running full
+                width below both columns (founder, Aug 13: "have notes under
+                compliance and permits so it can all fit in one ticket"). */}
+            <Section title="Notes">
+              {!!job.additional_info && (
+                <Text style={{ ...s.paragraph, marginBottom: 6 }}>{job.additional_info}</Text>
+              )}
+              <View style={s.notesBox} />
+            </Section>
           </View>
-        )}
 
-        {/* ═══ THREE-COLUMN LAYOUT ═══ */}
-        <View style={s.threeColumns}>
+          {/* ── RIGHT ── */}
+          <View style={s.colRight}>
+            <Section title="Scope of Work">
+              {job.description ? (
+                <Text style={s.paragraph}>{job.description}</Text>
+              ) : scopeSections.length === 0 ? (
+                <Text style={s.muted}>No scope description provided.</Text>
+              ) : null}
 
-          {/* ── COLUMN 1: Job Info ── */}
-          <View style={s.col}>
-            <View style={s.section}>
-              <View style={s.sectionHeader}>
-                <Text style={s.sectionTitle}>Job Information</Text>
-              </View>
-              <View style={s.sectionBody}>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Date</Text>
-                  <Text style={s.fieldValueBold}>{formatDate(job.scheduled_date)}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Time</Text>
-                  <Text style={s.fieldValueBold}>{job.arrival_time || '—'}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Cust Name</Text>
-                  <Text style={s.fieldValueBold}>{job.customer_name}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Job #</Text>
-                  <Text style={s.fieldValueBold}>{job.job_number}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>P.O. #</Text>
-                  <Text style={s.fieldValue}>{job.po_number || '—'}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Job Loc</Text>
-                  <Text style={s.fieldValueBold}>{job.location || '—'}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Address</Text>
-                  <Text style={s.fieldValue}>{job.address || '—'}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Contact</Text>
-                  <Text style={s.fieldValue}>{job.customer_contact || '—'}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Job Phone</Text>
-                  <Text style={s.fieldValue}>{job.site_contact_phone || job.foreman_phone || '—'}</Text>
-                </View>
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Quoted By</Text>
-                  <Text style={s.fieldValue}>{job.salesman_name || '—'}</Text>
-                </View>
-                {/* Estimated hours intentionally NOT printed on the crew ticket (admin-only). */}
-                <View style={s.fieldRow}>
-                  <Text style={s.fieldLabel}>Job Type</Text>
-                  <Text style={s.fieldValue}>{job.job_type || '—'}</Text>
-                </View>
-                {/* DIFFICULTY REMOVED (founder, asked repeatedly — Aug 12 and
-                    again Aug 15). It is an INTERNAL scheduling signal: it drives
-                    operator skill-matching and capacity planning. It is not
-                    something to hand a crew, and it is certainly not something
-                    to hand a customer who happens to see the sheet. It still
-                    shows on the schedule board and the approval modal, where
-                    the office actually uses it. */}
-              </View>
-            </View>
-
-            {/* Compliance section in column 1 */}
-            {(compliance.orientation_required || compliance.badging_required) && (
-              <View style={s.section}>
-                <View style={{ ...s.sectionHeader, backgroundColor: '#DBEAFE' }}>
-                  <Text style={s.sectionTitle}>Site Compliance</Text>
-                </View>
-                <View style={s.sectionBody}>
-                  {compliance.orientation_required && (
-                    <View style={s.fieldRow}>
-                      <Text style={{ ...s.fieldLabel, color: '#1E40AF' }}>Orientation</Text>
-                      <Text style={{ ...s.fieldValue, fontWeight: 'bold', color: '#1E40AF' }}>REQUIRED</Text>
-                    </View>
-                  )}
-                  {compliance.badging_required && (
-                    <View style={s.fieldRow}>
-                      <Text style={{ ...s.fieldLabel, color: '#1E40AF' }}>Badging</Text>
-                      <Text style={{ ...s.fieldValue, fontWeight: 'bold', color: '#1E40AF' }}>
-                        REQUIRED {compliance.badging_type ? `(${compliance.badging_type})` : ''}
+              {scopeSections.length > 0 && (
+                <View style={job.description ? s.scopeDivider : {}}>
+                  {scopeSections.map((section) => (
+                    <View key={section.code} style={s.scopeRow}>
+                      <Text style={s.scopeCode}>
+                        {section.code === '_removal' ? 'Removal' : section.code}
                       </Text>
+                      <View style={s.scopeLines}>
+                        {section.lines.map((line, i) => (
+                          <Text key={i} style={s.scopeLine}>
+                            {line}
+                          </Text>
+                        ))}
+                      </View>
                     </View>
-                  )}
-                  {compliance.special_instructions && (
-                    <View style={{ marginTop: 2 }}>
-                      <Text style={{ fontSize: 6.5, fontWeight: 'bold', color: '#1E40AF', marginBottom: 1 }}>SPECIAL INSTRUCTIONS:</Text>
-                      <Text style={{ fontSize: 7.5, color: '#1E293B', lineHeight: 1.3 }}>{compliance.special_instructions}</Text>
-                    </View>
-                  )}
+                  ))}
                 </View>
-              </View>
+              )}
+            </Section>
+
+            {/* SERVICE ITEMS — see lib/job-ticket-format for why this is one
+                resolved measure per row and why the DETAIL column only appears
+                when a human actually typed one. */}
+            {scopeLines.length > 0 && (
+              <Section title="Service Items">
+                {/* The Service cell FLEXES when there is no Detail column.
+                    It was a fixed 230pt, which with the 62pt Quantity cell
+                    filled 292pt of a 363pt column — so the right-aligned
+                    Quantity stopped 71pt short of the header rule that spans
+                    the full width, and the number floated in the middle of the
+                    row. 36 of the 39 production scope rows take exactly this
+                    no-detail branch. The HTML reference is `w-full` +
+                    `text-right`, i.e. flush; `flex: 1` is that. */}
+                <View style={s.tableHeadRow}>
+                  <Text style={showScopeDetail ? { ...s.tableHeadCell, width: 110 } : { ...s.tableHeadCell, flex: 1 }}>
+                    Service
+                  </Text>
+                  {showScopeDetail && <Text style={{ ...s.tableHeadCell, flex: 1 }}>Detail</Text>}
+                  <Text style={{ ...s.tableHeadCell, width: 62, textAlign: 'right' }}>Quantity</Text>
+                </View>
+                {scopeLines.map((item) => (
+                  <View key={item.key} style={s.tableRow}>
+                    <Text
+                      style={{
+                        ...s.tableCell,
+                        ...(showScopeDetail ? { width: 110 } : { flex: 1 }),
+                        fontFamily: 'Helvetica-Bold',
+                      }}
+                    >
+                      {item.service || '—'}
+                    </Text>
+                    {showScopeDetail && (
+                      <Text style={{ ...s.tableCell, flex: 1 }}>{item.detail || '—'}</Text>
+                    )}
+                    <Text
+                      style={{
+                        ...s.tableCell,
+                        width: 62,
+                        paddingRight: 0,
+                        textAlign: 'right',
+                        fontFamily: 'Helvetica-Bold',
+                      }}
+                    >
+                      {item.quantity || '—'}
+                    </Text>
+                  </View>
+                ))}
+              </Section>
             )}
 
-          </View>
-
-          {/* ── COLUMN 2: Work Conditions ── */}
-          <View style={s.col}>
-            <View style={s.section}>
-              <View style={s.sectionHeader}>
-                <Text style={s.sectionTitle}>Work Conditions</Text>
-              </View>
-              <View style={s.sectionBody}>
-                {conditionItems.map((item) => {
-                  const isActive = item.key === 'inside_outside'
-                    ? !!conditions[item.key]
-                    : !!conditions[item.key];
-                  const detail = item.detailKey && conditions[item.detailKey]
-                    ? `${conditions[item.detailKey]}${item.detailSuffix || ''}`
-                    : item.key === 'inside_outside' && conditions[item.key]
-                      ? String(conditions[item.key])
-                      : undefined;
-
-                  return (
-                    <View key={item.key} style={s.checkRow}>
-                      <View style={isActive ? s.checkBoxFilled : s.checkBox}>
-                        {isActive && <Text style={s.checkMark}>X</Text>}
-                      </View>
-                      <Text style={s.checkLabel}>{item.label}</Text>
-                      {detail && <Text style={s.checkDetail}>({detail})</Text>}
+            {/* EQUIPMENT REQUIRED — always printed, filled or blank. A quick-add
+                job carries no selections, so the crew gets ruled lines to write
+                on rather than the section disappearing; the sheet keeps one
+                shape (founder, Aug 13). */}
+            <Section title="Equipment Required">
+              {equipmentColumns.length > 0 ? (
+                <View style={s.eqCols}>
+                  {equipmentColumns.map((col, ci) => (
+                    <View
+                      key={ci}
+                      style={ci < equipmentColumns.length - 1 ? s.eqColFirst : s.eqColLast}
+                    >
+                      {col.map((row, ri) =>
+                        row.kind === 'heading' ? (
+                          <Text
+                            key={ri}
+                            style={ri === 0 ? s.eqHeading : { ...s.eqHeading, ...s.eqHeadingNext }}
+                          >
+                            {row.text}
+                          </Text>
+                        ) : (
+                          <Text key={ri} style={s.eqItem}>{`• ${row.text}`}</Text>
+                        )
+                      )}
                     </View>
-                  );
-                })}
-              </View>
-            </View>
-          </View>
+                  ))}
+                </View>
+              ) : (
+                <View>
+                  <View style={s.blankRule} />
+                  <View style={s.blankRule} />
+                </View>
+              )}
+            </Section>
 
-          {/* ── COLUMN 3: Equipment Req'd ── */}
-          <View style={s.col}>
-            <View style={s.section}>
-              <View style={s.sectionHeader}>
-                <Text style={s.sectionTitle}>{"Equipment Req'd"}</Text>
-              </View>
-              <View style={s.sectionBody}>
-                {/* EVERYTHING THE OFFICE SELECTED, GROUPED BY SERVICE
-                    (founder, Aug 16: "I clicked more than the equipment it
-                    shows — I didn't even click wall saw or slab saw").
 
-                    THIS is the file that printed his ticket. It read only
-                    `equipment_needed` — the three items typed by hand — and
-                    never touched `equipment_selections`, where the ~16 real
-                    picks live (pump can, slurry ring, four core bits, push saw,
-                    both handsaws, hydraulic hose, gas power pack…). So the
-                    sheet showed the three typed strings and silently dropped
-                    everything actually chosen, and the "Wall Saw" tick was a
-                    NAME MATCH against a typed string, not a selection.
+            {conditionLines.length > 0 && (
+              <Section title="Work Conditions">
+                <Chips items={conditionLines} />
+              </Section>
+            )}
 
-                    Shares lib/job-ticket-format with the HTML print page and
-                    the crew's digital ticket, so paper and phone cannot drift.
-
-                    ── WHY TWO NARROW COLUMNS AND NOT ONE ITEM PER LINE ──
-                    Founder, Aug 16: "all equipment required is just bundled
-                    together, let's make it more legible." It was one wrapped
-                    paragraph — `pump can · ECD machine · slurry ring · 3" core
-                    bit · 4" core bit · …` — which nobody can pick a single tool
-                    out of at 7am.
-
-                    One item per line in ONE column does not fit. MEASURED on
-                    LETTER landscape against real production rows: each of the
-                    three columns is 246.7pt wide, the row is as tall as its
-                    tallest column, and WORK CONDITIONS is a fixed 188pt — so
-                    equipment is FREE up to 188pt and costs page height beyond
-                    it, against 14pt of page-1 slack on the tightest real jobs
-                    (TEST-2026-000103, JOB-2026-160762).
-
-                    Three layouts, measured on the worst real job (23 picks
-                    across 4 services, TEST-2026-000103):
-                      one column, one per line ........ ~250pt → page two
-                      two columns split PER SERVICE ... 210pt  → +22pt, 3pt left
-                      two BALANCED columns ............ 167pt  → free, 25pt left
-                    Per-service splitting loses to the ragged half-row every
-                    group wastes on its last line; balancing the rows
-                    continuously across both columns (layoutEquipmentColumns)
-                    recovers it. All five sampled production jobs now measure
-                    95–167pt, i.e. under the free 188pt, so page 1 does not
-                    reflow at all.
-
-                    THE TRADE: item text is 7.5pt rather than 8pt, and a service
-                    with many picks can straddle the two columns — which is why
-                    a column never ends on a heading and a column that opens
-                    mid-service repeats it as "(cont.)". A very long custom item
-                    wraps to a second line rather than being truncated; nothing
-                    is ever dropped. */}
-                {equipmentGroups.length === 0 ? (
-                  <Text style={{ fontSize: 8, color: '#94A3B8', fontStyle: 'italic' }}>
-                    No equipment specified
-                  </Text>
-                ) : (
-                  <View style={s.eqCols}>
-                    {equipmentColumns.map((col, ci) => (
-                      <View key={ci} style={ci < equipmentColumns.length - 1 ? s.eqColFirst : s.eqColLast}>
-                        {col.map((row, ri) =>
-                          row.kind === 'heading' ? (
-                            <Text
-                              key={ri}
-                              style={ri === 0 ? s.eqGroupTitleFirst : s.eqGroupTitle}
-                            >
-                              {row.text}
-                            </Text>
-                          ) : (
-                            <Text key={ri} style={s.eqItem}>{`• ${row.text}`}</Text>
-                          )
-                        )}
-                      </View>
-                    ))}
-                  </View>
-                )}
-              </View>
-            </View>
+            {ppeAndSafety.length > 0 && (
+              <Section title="PPE & Safety">
+                <Chips items={ppeAndSafety} />
+              </Section>
+            )}
           </View>
         </View>
 
-        {/* ═══ PPE REQUIRED ═══ */}
-        {job.ppe_required && job.ppe_required.length > 0 && (
-          <View style={{ border: '1 solid #F59E0B', borderRadius: 3, marginBottom: 5, overflow: 'hidden' }}>
-            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 6, paddingVertical: 3, borderBottom: '0.75 solid #F59E0B', flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#92400E', textTransform: 'uppercase', letterSpacing: 0.5 }}>PPE REQUIRED</Text>
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 5 }}>
-              {asArray<string>(job.ppe_required).map((item, i) => {
-                const gloveMatch = item.match(/^gloves_cut_(\d)$/);
-                const label = gloveMatch
-                  ? `Gloves Cut Level ${gloveMatch[1]}`
-                  : item.replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
-                return (
-                  <View key={i} style={{ backgroundColor: '#FFF3CD', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2, marginRight: 4, marginBottom: 3, borderWidth: 0.75, borderColor: '#F59E0B' }}>
-                    <Text style={{ fontSize: 7.5, fontWeight: 'bold', color: '#92400E' }}>{label}</Text>
-                  </View>
-                );
-              })}
-            </View>
+        {/* ═══ SIGNATURES — the only full-width block, so the sheet ends here ═══ */}
+        <View style={s.signatures}>
+          <View style={s.sigCellFirst}>
+            <View style={s.sigRule} />
+            <Text style={s.sigLabel}>Customer Signature / Date</Text>
           </View>
-        )}
-
-        {/* ═══ SCOPE TABLE ═══ */}
-        {scopeRows.length > 0 && (
-          <View style={s.scopeTable}>
-            <View style={s.scopeHeaderRow}>
-              <Text style={{ ...s.scopeHeaderCell, width: 100 }}>Type</Text>
-              <Text style={{ ...s.scopeHeaderCell, width: 60 }}>Quantity</Text>
-              <Text style={{ ...s.scopeHeaderCell, width: 100 }}>Footage/Diameter</Text>
-              <Text style={{ ...s.scopeHeaderCell, width: 80 }}>Depth (Inches)</Text>
-              <Text style={{ ...s.scopeHeaderCell, width: 120 }}>Wall/Floor & Type</Text>
-              <Text style={{ ...s.scopeHeaderCell, flex: 1 }}>Notes</Text>
-            </View>
-            {scopeRows.map((row, i) => (
-              <View key={i} style={i % 2 === 0 ? s.scopeDataRow : s.scopeDataRowAlt}>
-                <Text style={{ ...s.scopeCell, width: 100, fontWeight: 'bold' }}>{row.type}</Text>
-                <Text style={{ ...s.scopeCell, width: 60 }}>{row.qty}</Text>
-                <Text style={{ ...s.scopeCell, width: 100 }}>{row.footage}</Text>
-                <Text style={{ ...s.scopeCell, width: 80 }}>{row.depth}</Text>
-                <Text style={{ ...s.scopeCell, width: 120 }}>{row.wallFloor}</Text>
-                <Text style={{ ...s.scopeCell, flex: 1 }}>{row.notes}</Text>
-              </View>
-            ))}
+          <View style={s.sigCell}>
+            <View style={s.sigRule} />
+            <Text style={s.sigLabel}>Operator Signature / Date</Text>
           </View>
-        )}
-
-        {/* ═══ JOB DESCRIPTION ═══ */}
-        {job.description && (
-          <View style={s.textBlock}>
-            <Text style={s.textBlockLabel}>Job Description</Text>
-            <Text style={s.textBlockValue}>{job.description}</Text>
-          </View>
-        )}
-
-        {/* ═══ DIRECTIONS ═══ */}
-        {job.directions && (
-          <View style={s.textBlock}>
-            <Text style={s.textBlockLabel}>Directions</Text>
-            <Text style={s.textBlockValue}>{job.directions}</Text>
-          </View>
-        )}
-
-        {/* ═══ ADDITIONAL INFO ═══ */}
-        {job.additional_info && (
-          <View style={s.textBlock}>
-            <Text style={s.textBlockLabel}>Additional Notes</Text>
-            <Text style={s.textBlockValue}>{job.additional_info}</Text>
-          </View>
-        )}
-
-        {/* ═══ BLANK NOTES LINES ═══ */}
-        <View style={s.notesSection}>
-          <Text style={s.notesTitle}>Field Notes</Text>
-          {Array.from({ length: 6 }).map((_, i) => (
-            <View key={i} style={s.notesLine} />
-          ))}
         </View>
 
-
+        {/* Page-fit harness only — see the `measureFillerPt` prop. */}
+        {typeof measureFillerPt === 'number' && measureFillerPt !== 0 && (
+          <View style={{ marginTop: measureFillerPt }} />
+        )}
       </Page>
 
       {/* ═══ PHOTO PAGES (page 2 onward) ═══

@@ -13,6 +13,7 @@ import DispatchTicketPDF from '@/components/pdf/DispatchTicketPDF';
 import { getTenantPdfBranding, type PDFBranding } from '@/lib/pdf-branding';
 import { collectTicketPhotos } from '@/lib/job-ticket-photos';
 import { resolveTicketPhotos } from '@/lib/job-ticket-photos-server';
+import { resolveQuotedBy } from '@/lib/job-ticket-quoted-by';
 
 export async function GET(
   request: NextRequest,
@@ -52,53 +53,47 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Fetch operator and helper names
-    let operatorName = '';
-    let helperName = '';
-
-    if (job.assigned_to) {
-      const { data: opProfile } = await supabaseAdmin
+    /** One profile name. `.maybeSingle()`, so a deleted profile is '' not a 500. */
+    const lookupFullName = async (profileId: string): Promise<string | null> => {
+      const { data } = await supabaseAdmin
         .from('profiles')
         .select('full_name')
-        .eq('id', job.assigned_to)
-        .single();
-      operatorName = opProfile?.full_name || '';
-    }
+        .eq('id', profileId)
+        .maybeSingle();
+      return data?.full_name ?? null;
+    };
 
-    if (job.helper_assigned_to) {
-      const { data: helpProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('full_name')
-        .eq('id', job.helper_assigned_to)
-        .single();
-      helperName = helpProfile?.full_name || '';
-    }
+    // Fetch operator and helper names. NOT printed on the sheet (crew names were
+    // removed from both tickets — a sheet printed Monday must not assert who is
+    // on the job Thursday), but still carried on the data object.
+    const operatorName = job.assigned_to ? (await lookupFullName(job.assigned_to)) || '' : '';
+    const helperName = job.helper_assigned_to
+      ? (await lookupFullName(job.helper_assigned_to)) || ''
+      : '';
 
     // ── QUOTED BY ──────────────────────────────────────────────────────────
-    // Founder, Aug 16: "it has submitted by blank but when I go to schedule
-    // form it shows Andres Altamirano."
-    //
-    // The ticket prints `salesman_name`, which is NULL on 9 of the 46 job
-    // orders in production. Only the CREATE path ever sets it (POST
-    // /api/admin/schedule-form maps body.submitted_by → salesman_name); the
-    // edit PATCH never sends it, and until now `salesman_name` was not even in
-    // that route's allowedFields, so no edit could ever fill one in. Meanwhile
-    // the schedule form's "Submitted By" box auto-fills with the CURRENT user's
-    // name on mount — which is exactly why the form looked populated while the
-    // column was null.
-    //
-    // Patching the write path alone leaves every existing job blank forever, so
-    // the ticket falls back to the profile behind `created_by` — the person who
-    // actually filled the form. 8 of those 9 null rows resolve that way; the
-    // 9th has no created_by either (a seeded demo row) and prints '—'.
-    let quotedBy: string = job.salesman_name || '';
-    if (!quotedBy && job.created_by) {
-      const { data: creator } = await supabaseAdmin
-        .from('profiles')
-        .select('full_name')
-        .eq('id', job.created_by)
-        .maybeSingle();
-      quotedBy = creator?.full_name || '';
+    // The salesman_name-or-created_by fallback now lives in
+    // lib/job-ticket-quoted-by.ts, because the HTML printed ticket renders this
+    // same field and two copies of the rule is how the two sheets start
+    // disagreeing about who quoted a job. See that file for the full history.
+    const quotedBy = await resolveQuotedBy(job.salesman_name, job.created_by, lookupFullName);
+
+    // ── SERVICE ITEMS ──────────────────────────────────────────────────────
+    // `job_scope_items` — the measured targets the office set per service. The
+    // HTML ticket has always printed these; this one never fetched them, which
+    // is one of the two documents' biggest content differences.
+    let scopeItemsQuery = supabaseAdmin
+      .from('job_scope_items')
+      .select('id, work_type, description, unit, target_quantity, sort_order')
+      .eq('job_order_id', jobId);
+    if (tenantId) scopeItemsQuery = scopeItemsQuery.eq('tenant_id', tenantId);
+    const { data: scopeItemRows } = await scopeItemsQuery.order('sort_order', { ascending: true });
+
+    // ── PROJECT MANAGER ────────────────────────────────────────────────────
+    // On the HTML ticket's SCHEDULE block. Same office owner, same sheet.
+    let projectManagerName = '';
+    if (job.project_manager_id) {
+      projectManagerName = (await lookupFullName(job.project_manager_id)) || '';
     }
 
     // ── PHOTOS (page 2 onward) ─────────────────────────────────────────────
@@ -144,9 +139,25 @@ export async function GET(
       estimated_cost: job.estimated_cost ? Number(job.estimated_cost) : undefined,
       estimated_hours: job.estimated_hours ? Number(job.estimated_hours) : undefined,
       po_number: job.po_number,
-      salesman_name: quotedBy,
+      // The DERIVED value gets its own name; the raw column keeps its own. See
+      // the note on `salesman_name` in /api/admin/jobs/[id]/summary — a derived
+      // guess emitted under a writable column's name is how it gets persisted
+      // as fact. Nothing PATCHes `quoted_by`.
+      quoted_by: quotedBy,
+      salesman_name: job.salesman_name ?? undefined,
       operator_name: operatorName,
       helper_name: helperName,
+      // ── Fields the HTML ticket shows and this one did not ────────────────
+      // The two sheets are now the same document rendered twice, so anything
+      // one of them prints has to reach the other.
+      is_will_call: job.is_will_call ?? false,
+      project_name: job.project_name || undefined,
+      project_manager_name: projectManagerName || undefined,
+      permit_number: Array.isArray(job.permits) ? job.permits[0]?.number ?? undefined : undefined,
+      additional_safety_requirements: Array.isArray(job.additional_safety_requirements)
+        ? job.additional_safety_requirements
+        : [],
+      scope_items: Array.isArray(scopeItemRows) ? scopeItemRows : [],
       equipment_needed: job.equipment_needed || [],
       // The per-service picks — core bits, saws, hoses, pump can. The row is
       // fetched with `select('*')` so this was always present in `job`; it just

@@ -12,7 +12,12 @@ import { useBranding } from '@/lib/branding-context';
 import {
   formatScopeDetails,
   groupJobEquipment,
+  layoutEquipmentColumns,
   formatJobsiteConditions,
+  formatScopeItems,
+  scopeItemsHaveDetail,
+  formatPpeAndSafety,
+  formatPermits,
 } from '@/lib/job-ticket-format';
 
 // ─── Types (subset of /api/admin/jobs/[id]/summary `data`) ─────────────────────
@@ -22,9 +27,17 @@ interface PrintJob {
   customer_name: string;
   contact_name: string | null;
   customer_phone: string | null;
+  /** site_contact_phone, falling back to foreman_phone — what the PDF prints. */
+  contact_phone?: string | null;
   job_type: string | null;
   location: string | null;
   address: string | null;
+  /** The RAW `job_orders.salesman_name` column — fallback only. */
+  salesman_name?: string | null;
+  /** Who quoted the job: the column, else the profile behind `created_by`.
+   *  Same DERIVED field, same fallback rule, as the react-pdf ticket. */
+  quoted_by?: string | null;
+  directions?: string | null;
   description: string | null;
   scope_of_work: string | null;
   scheduled_date: string | null;
@@ -34,6 +47,11 @@ interface PrintJob {
   po_number: string | null;
   permit_number: string | null;
   permit_required: boolean;
+  /** The RAW permit array. Already in the summary payload; this sheet never
+   *  declared it, so the named permit TYPES the react-pdf ticket prints were
+   *  loaded and thrown away — "Permit Required: Yes" with no hint it is a HOT
+   *  WORK permit. */
+  permits?: { type?: string | null; details?: string | null; number?: string | null }[] | null;
   operator_name: string | null;
   project_name?: string | null;
   // Added to the printed ticket (founder: missing jobsite/equipment/details)
@@ -133,6 +151,10 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
 
   const arrival = formatTime(job.arrival_time);
   const siteAddress = job.address || job.location || '—';
+  const siteName =
+    job.location && job.location.trim() && job.location.trim() !== (job.address || '').trim()
+      ? job.location.trim()
+      : '';
   const scopeText = job.scope_of_work || job.description;
   // WORK CONDITIONS. `jobsite_conditions` is `{}` on jobs saved while a separate
   // save bug was live; the shared formatter simply returns [] for that, and the
@@ -148,10 +170,28 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
     equipment_rentals: job.equipment_rentals,
     equipment_rental_flags: job.equipment_rental_flags,
   });
+  // Two balanced newspaper columns, ONE ITEM PER LINE — the same helper the
+  // react-pdf ticket uses, so the two sheets cannot drift. This box used to
+  // print `group.items.join(' · ')`, i.e. one wrapped paragraph:
+  //   "apron · plastic · 32" guard · 480 cord — 200 ft · chain saw (15') · …"
+  // Nobody can find a single tool in that at 7am (founder, Aug 17).
+  const equipmentColumns = layoutEquipmentColumns(equipmentGroups, 2);
   // The measured scope: areas as dimensions + a computed total, not raw JSON.
   const scopeSections = formatScopeDetails(job.scope_details);
-  const ppe = (job.ppe_required || []).filter(Boolean);
-  const safety = (job.additional_safety_requirements || []).filter(Boolean);
+  // SERVICE ITEMS as one resolved measure per row — `48 LF`, not
+  // "48 linear_ft" beside a description that repeats the service name.
+  const scopeLines = formatScopeItems(scope);
+  const showScopeDetail = scopeItemsHaveDetail(scopeLines);
+  // PPE — humanised. This sheet printed the raw storage token, so the same job's
+  // PPE box read "gloves_cut_3" here and "Gloves Cut Level 3" on the react-pdf
+  // ticket. One helper now, so they cannot say different things.
+  const ppeAndSafety = formatPpeAndSafety(job.ppe_required, job.additional_safety_requirements);
+  // The named permits — same helper, same words, as the react-pdf ticket.
+  const permitList = formatPermits(job.permits);
+  // QUOTED BY — the DERIVED value, not the raw `salesman_name` column. See the
+  // summary route: emitting the derived guess under the column's own name is how
+  // an editor pre-filled from that endpoint would persist a guess as fact.
+  const quotedBy = job.quoted_by || job.salesman_name || '';
   const compliance = job.site_compliance || {};
   const orientationReq = !!compliance.orientation_required;
   const badgingReq = !!compliance.badging_required;
@@ -240,18 +280,36 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               <Field label="Customer" value={job.customer_name || '—'} />
               {job.project_name && <Field label="Project" value={job.project_name} />}
               {job.contact_name && <Field label="Site Contact" value={job.contact_name} />}
-              {job.customer_phone && <Field label="Phone" value={job.customer_phone} />}
+              {(job.contact_phone || job.customer_phone) && (
+                <Field label="Phone" value={job.contact_phone || job.customer_phone || '—'} />
+              )}
+              {/* QUOTED BY — the react-pdf ticket has printed this since Aug 16
+                  ("it has submitted by blank but the schedule form shows Andres
+                  Altamirano"). Unifying the two sheets by DROPPING it here would
+                  have quietly undone that fix, so it is added rather than
+                  removed. Same field, same created_by fallback — see
+                  lib/job-ticket-quoted-by.ts. */}
+              {quotedBy && <Field label="Quoted By" value={quotedBy} />}
             </Section>
 
             <Section title="Site">
               <Field label="Address" value={siteAddress} />
+              {/* `location` differs from `address` on 13 of the 48 production
+                  jobs — it holds the building or area name. It used to vanish
+                  into the `address || location` fallback above. */}
+              {siteName && <Field label="Job Site" value={siteName} />}
               {job.job_type && <Field label="Job Type" value={job.job_type} />}
               {job.po_number && <Field label="PO Number" value={job.po_number} />}
+              {job.directions && <Field label="Directions" value={job.directions} />}
             </Section>
 
             <Section title="Compliance & Permits">
               <Field label="Permit Required" value={job.permit_required ? 'Yes' : 'No'} />
               {job.permit_number && <Field label="Permit #" value={job.permit_number} />}
+              {/* The named permits. Shared table with the react-pdf ticket
+                  (lib/job-ticket-format → formatPermits): "Yes" tells a crew
+                  nothing about the fire watch a HOT WORK permit means. */}
+              {permitList.length > 0 && <Field label="Permits" value={permitList.join(' | ')} />}
               {orientationReq && <Field label="Orientation" value="Required" />}
               {badgingReq && <Field label="Badging" value={(compliance.badging_type as string) || 'Required'} />}
               {specialInstructions && <Field label="Instructions" value={specialInstructions} />}
@@ -304,23 +362,45 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               )}
             </Section>
 
-            {scope.length > 0 && (
+            {/* SERVICE ITEMS — ONE resolved measure per service.
+                Founder, Aug 17, reading his own printout:
+
+                  Wall/Track Sawing      Wall/Track Sawing — linear ft   48 linear_ft
+                  Handheld / Push Sawing Handheld / Push Sawing — %     100 percent
+
+                Three faults. The unit was the RAW DATABASE KEY. Type and
+                Description said the same words twice (the schedule form
+                auto-writes `${label} — linear ft` as the description). And the
+                "Target Qty" column implied a count that does not exist for
+                linear feet: "no quantities needed because it's total linear ft,
+                unless they add an area of a different size" — and that multiple-
+                areas case is already carried by SCOPE OF WORK above ("2 areas —
+                10' × 10' × 10" thick = 200 sq ft total").
+
+                So: `48 LF`, `12 holes`, `100%`. The DETAIL column is drawn only
+                when a human actually typed something ("12 conduit penetrations,
+                4in bit, 8in SOG" — a real production row); otherwise it would be
+                a column of dashes. Both decisions come from
+                lib/job-ticket-format so the PDF cannot disagree. */}
+            {scopeLines.length > 0 && (
               <Section title="Service Items">
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-black">
-                      <th className="text-left py-1 pr-2 font-semibold">Type</th>
-                      <th className="text-left py-1 pr-2 font-semibold">Description</th>
-                      <th className="text-right py-1 font-semibold">Target Qty</th>
+                      <th className="text-left py-1 pr-2 font-semibold">Service</th>
+                      {showScopeDetail && <th className="text-left py-1 pr-2 font-semibold">Detail</th>}
+                      <th className="text-right py-1 font-semibold">Quantity</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {scope.map((item) => (
-                      <tr key={item.id} className="border-b border-gray-300">
-                        <td className="py-1.5 pr-2 align-top font-medium">{item.work_type}</td>
-                        <td className="py-1.5 pr-2 align-top">{item.description || '—'}</td>
-                        <td className="py-1.5 align-top text-right whitespace-nowrap">
-                          {item.target_quantity} {item.unit}
+                    {scopeLines.map((item) => (
+                      <tr key={item.key} className="border-b border-gray-300">
+                        <td className="py-1.5 pr-2 align-top font-medium">{item.service || '—'}</td>
+                        {showScopeDetail && (
+                          <td className="py-1.5 pr-2 align-top">{item.detail || '—'}</td>
+                        )}
+                        <td className="py-1.5 align-top text-right whitespace-nowrap font-medium">
+                          {item.quantity || '—'}
                         </td>
                       </tr>
                     ))}
@@ -347,19 +427,42 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
                 never again read as a per-service selection, and RENTAL only
                 appears when there is something to rent.
 
-                Rendered as `·`-separated running text rather than one bordered
-                chip per item: nineteen chips would push this landscape sheet
-                onto a second page, and text wraps inside its row instead of
-                overflowing. */}
+                ── ONE ITEM PER LINE, TWO BALANCED COLUMNS (founder, Aug 17) ──
+                This box used to render `group.items.join(' · ')`, which on his
+                actual printout came out as:
+
+                  apron · plastic · 32" guard · 480 cord — 200 ft · chain saw
+                  (15') · duct tape · boots (Pentruder) ×3 · chalk line · track
+                  (Pentruder) — 15 ft · clear spray
+
+                Unreadable. The react-pdf ticket had already been fixed with
+                `layoutEquipmentColumns` — a MEASURED, weight-balanced two-column
+                split that never ends a column on a service heading and repeats
+                the heading as "(cont.)" when a column opens mid-service. This
+                sheet now calls the same helper with the same column count, so
+                the two surfaces produce the same list in the same order and
+                neither can drift. */}
             <Section title="Equipment Required">
-              {equipmentGroups.length > 0 ? (
-                <div className="space-y-1">
-                  {equipmentGroups.map((group) => (
-                    <div key={group.key} className="flex gap-2 text-sm leading-snug">
-                      <span className="w-28 flex-shrink-0 font-semibold uppercase text-[10px] tracking-wide pt-0.5 text-gray-700">
-                        {group.label}
-                      </span>
-                      <span className="flex-1 min-w-0 break-words">{group.items.join(' · ')}</span>
+              {equipmentColumns.length > 0 ? (
+                <div className="flex gap-6">
+                  {equipmentColumns.map((col, ci) => (
+                    <div key={ci} className="flex-1 min-w-0">
+                      {col.map((row, ri) =>
+                        row.kind === 'heading' ? (
+                          <p
+                            key={ri}
+                            className={`font-semibold uppercase text-[10px] tracking-wide text-gray-700 border-b border-gray-300 pb-0.5 mb-1 ${
+                              ri === 0 ? '' : 'mt-2'
+                            }`}
+                          >
+                            {row.text}
+                          </p>
+                        ) : (
+                          <p key={ri} className="text-xs leading-snug break-words">
+                            • {row.text}
+                          </p>
+                        )
+                      )}
                     </div>
                   ))}
                 </div>
@@ -381,10 +484,10 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
               </Section>
             )}
 
-            {(ppe.length > 0 || safety.length > 0) && (
+            {ppeAndSafety.length > 0 && (
               <Section title="PPE & Safety">
                 <div className="flex flex-wrap gap-1.5">
-                  {[...ppe, ...safety].map((p, i) => (
+                  {ppeAndSafety.map((p, i) => (
                     <span key={i} className="text-xs border border-gray-400 rounded px-2 py-0.5">{p}</span>
                   ))}
                 </div>

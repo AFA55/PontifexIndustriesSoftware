@@ -31,6 +31,16 @@ import {
   scopeLocationLabelInline,
   rowLocationLabel,
   layoutEquipmentColumns,
+  formatScopeQuantity,
+  scopeItemDetail,
+  formatScopeItems,
+  scopeItemsHaveDetail,
+  ppeLabel,
+  formatPpeAndSafety,
+  booleanish,
+  parseCrossCut,
+  crossCutText,
+  formatPermits,
 } from './job-ticket-format';
 
 // PROD — job_orders.scope_details for TEST-2026-000103
@@ -468,6 +478,18 @@ describe('jobsite conditions', () => {
     expect(formatJobsiteConditions({ electricity_available: true })).toEqual(['Power available']);
   });
 
+  it('a STRING "false" reads as NO, not as a truthy yes', () => {
+    // Production stores real booleans today, so this changes nothing now. But
+    // 'false' is a truthy JavaScript string, and the old raw-truthiness test
+    // would have printed "Power available" over an explicit no — the one
+    // direction that sends a crew to site without a generator.
+    expect(formatJobsiteConditions({ electricity_available: 'false' })).toEqual(['Power: NO']);
+    expect(formatJobsiteConditions({ water_available: '0' })).toEqual(['Water: NO']);
+    // …while a real boolean false is unchanged, and 'true'/'yes' still print.
+    expect(formatJobsiteConditions({ electricity_available: false })).toEqual(['Power: NO']);
+    expect(formatJobsiteConditions({ electricity_available: 'yes' })).toEqual(['Power available']);
+  });
+
   it('renders a full real-world condition set in ticket order', () => {
     expect(
       formatJobsiteConditions({
@@ -498,8 +520,16 @@ describe('jobsite conditions', () => {
   });
 
   it('never emits a bare distance key as its own line', () => {
-    // The condition is OFF but its footage lingered — it must not print alone.
+    // The condition is OFF but its footage lingered. The FOOTAGE must not print
+    // alone ("Electricity available ft: 75" beside a power source that isn't
+    // there). Power itself is a SUPPLY condition, so a recorded `false` now says
+    // so explicitly — see the supply-condition block below.
     const lines = formatJobsiteConditions({ electricity_available: false, electricity_available_ft: 75 });
+    expect(lines).toEqual(['Power: NO']);
+  });
+
+  it('never emits a bare distance key for a NON-supply condition either', () => {
+    const lines = formatJobsiteConditions({ hyd_hose: false, hyd_hose_ft: 50 });
     expect(lines).toEqual([]);
   });
 
@@ -673,5 +703,469 @@ describe('groupJobEquipment — machine-only service', () => {
   it('still drops a service where nothing at all was ticked', () => {
     expect(groupJobEquipment({ equipment_selections: { DFS: { chalk_line: 'no' } } })).toEqual([]);
     expect(groupJobEquipment({ equipment_selections: { DFS: {} } })).toEqual([]);
+  });
+});
+
+// ── Service items (job_scope_items) ─────────────────────────────────────────
+//
+// PROD — the two rows off the founder's Aug 17 printout, verbatim from
+// job_scope_items, plus the two hand-typed descriptions that also exist in
+// production and must survive untouched.
+
+describe('formatScopeQuantity — the unit vocabulary that is actually in the DB', () => {
+  it('prints linear feet as the total, not a count plus a raw key', () => {
+    // The printout said "48 linear_ft".
+    expect(formatScopeQuantity(48, 'linear_ft')).toBe('48 LF');
+    expect(formatScopeQuantity('913.00', 'linear_ft')).toBe('913 LF');
+    expect(formatScopeQuantity(3280, 'linear_ft')).toBe('3,280 LF');
+  });
+
+  it('prints a percentage glued to its number, never the word "percent"', () => {
+    // The printout said "100 percent".
+    expect(formatScopeQuantity(100, 'percent')).toBe('100%');
+    expect(formatScopeQuantity(50, 'percent')).toBe('50%');
+  });
+
+  it('singularises a count of one', () => {
+    expect(formatScopeQuantity(1, 'holes')).toBe('1 hole');
+    expect(formatScopeQuantity(80, 'holes')).toBe('80 holes');
+    expect(formatScopeQuantity(1, 'items')).toBe('1 item');
+    expect(formatScopeQuantity(2, 'hours')).toBe('2 hrs');
+    expect(formatScopeQuantity(1, 'hours')).toBe('1 hr');
+    expect(formatScopeQuantity(1, 'loads')).toBe('1 load');
+  });
+
+  it('reads the writable units the app never happened to store yet', () => {
+    // schedule-form ALLOWED_UNITS + lib/job-progress ScopeUnit.
+    expect(formatScopeQuantity(200, 'sq_ft')).toBe('200 sq ft');
+    expect(formatScopeQuantity(4, 'each')).toBe('4 ea');
+  });
+
+  it('reads the operator-side spelling, which uses spaces not underscores', () => {
+    // lib/work-types UNIT_CHOICES / defaultUnitFor.
+    expect(formatScopeQuantity(48, 'linear ft')).toBe('48 LF');
+    expect(formatScopeQuantity(200, 'sq ft')).toBe('200 sq ft');
+    expect(formatScopeQuantity(3, 'loads')).toBe('3 loads');
+  });
+
+  it('reads the takeoff/estimating abbreviations and the UI title-case labels', () => {
+    // takeoff_conditions.unit is LF / EA / SF; JobScopePanel labels are 'Linear Ft'.
+    expect(formatScopeQuantity(7, 'LF')).toBe('7 LF');
+    expect(formatScopeQuantity(1, 'EA')).toBe('1 ea');
+    expect(formatScopeQuantity(9, 'SF')).toBe('9 sq ft');
+    expect(formatScopeQuantity(48, 'Linear Ft')).toBe('48 LF');
+    expect(formatScopeQuantity(100, '% Complete (demo/manual)')).toBe('100 % complete (demo/manual)');
+  });
+
+  it('NEVER drops an unknown unit — it humanises the key instead', () => {
+    expect(formatScopeQuantity(2, 'pallets')).toBe('2 pallets');
+    expect(formatScopeQuantity(3, 'cubic_yards')).toBe('3 cu yd');
+    expect(formatScopeQuantity(5, 'man_days')).toBe('5 man days');
+  });
+
+  it('keeps a zero target — 0 is data, and positiveNumber would have eaten it', () => {
+    expect(formatScopeQuantity(0, 'holes')).toBe('0 holes');
+  });
+
+  it('falls back to the unit alone rather than printing nothing', () => {
+    expect(formatScopeQuantity(null, 'holes')).toBe('holes');
+    expect(formatScopeQuantity('n/a', 'pallets')).toBe('pallets');
+  });
+
+  it('returns empty when there is genuinely nothing to say', () => {
+    expect(formatScopeQuantity(null, null)).toBe('');
+    expect(formatScopeQuantity(undefined, '')).toBe('');
+  });
+});
+
+describe('scopeItemDetail — the doubled Type/Description column', () => {
+  it('drops the schedule form’s auto-generated echo', () => {
+    // PROD, verbatim: these three shapes are 33 of the 39 rows in job_scope_items.
+    expect(scopeItemDetail('Wall/Track Sawing', 'Wall/Track Sawing — linear ft')).toBe('');
+    expect(scopeItemDetail('Electric Core Drilling', 'Electric Core Drilling — holes')).toBe('');
+    expect(scopeItemDetail('Handheld / Push Sawing', 'Handheld / Push Sawing — % complete')).toBe('');
+  });
+
+  it('drops a description that is just the work type again', () => {
+    expect(scopeItemDetail('Chain Sawing', 'Chain Sawing')).toBe('');
+    expect(scopeItemDetail('Chain Sawing', '  chain sawing ')).toBe('');
+  });
+
+  it('KEEPS what a human actually typed, in full', () => {
+    // PROD rows — the whole point of the column.
+    expect(scopeItemDetail('Diesel Floor Sawing', 'Equipment trench 60ft x 3ft x 8in')).toBe(
+      'Equipment trench 60ft x 3ft x 8in'
+    );
+    expect(scopeItemDetail('Electric Core Drilling', '12 conduit penetrations, 4in bit, 8in SOG')).toBe(
+      '12 conduit penetrations, 4in bit, 8in SOG'
+    );
+  });
+
+  it('keeps a note that merely STARTS with the work type', () => {
+    expect(
+      scopeItemDetail('Wall/Track Sawing', 'Wall/Track Sawing — two door openings, 10in wall')
+    ).toBe('Wall/Track Sawing — two door openings, 10in wall');
+  });
+
+  it('handles a missing work type or description without throwing', () => {
+    expect(scopeItemDetail('', 'Something')).toBe('Something');
+    expect(scopeItemDetail('Chain Sawing', null)).toBe('');
+    expect(scopeItemDetail(null, undefined)).toBe('');
+  });
+});
+
+describe('formatScopeItems — the SERVICE ITEMS block on both tickets', () => {
+  it('turns the founder’s printout into one resolved measure per row', () => {
+    const rows = formatScopeItems([
+      {
+        id: 'a',
+        work_type: 'Wall/Track Sawing',
+        description: 'Wall/Track Sawing — linear ft',
+        unit: 'linear_ft',
+        target_quantity: 48,
+      },
+      {
+        id: 'b',
+        work_type: 'Handheld / Push Sawing',
+        description: 'Handheld / Push Sawing — % complete',
+        unit: 'percent',
+        target_quantity: 100,
+      },
+    ]);
+    expect(rows).toEqual([
+      { key: 'a', service: 'Wall/Track Sawing', detail: '', quantity: '48 LF' },
+      { key: 'b', service: 'Handheld / Push Sawing', detail: '', quantity: '100%' },
+    ]);
+  });
+
+  it('carries a hand-written description through', () => {
+    const rows = formatScopeItems([
+      {
+        id: 'c',
+        work_type: 'Electric Core Drilling',
+        description: '12 conduit penetrations, 4in bit, 8in SOG',
+        unit: 'holes',
+        target_quantity: 12,
+      },
+    ]);
+    expect(rows[0]).toEqual({
+      key: 'c',
+      service: 'Electric Core Drilling',
+      detail: '12 conduit penetrations, 4in bit, 8in SOG',
+      quantity: '12 holes',
+    });
+  });
+
+  it('falls back to the array index when a row has no id', () => {
+    const rows = formatScopeItems([{ work_type: 'GPR Scanning', unit: 'percent', target_quantity: 100 }]);
+    expect(rows[0].key).toBe('0');
+  });
+
+  it('drops only rows that would print as a blank line', () => {
+    expect(formatScopeItems([{ work_type: '', description: '', unit: '', target_quantity: null }])).toEqual([]);
+    // …but a row with nothing BUT a service name still prints.
+    expect(formatScopeItems([{ work_type: 'Other' }])).toEqual([
+      { key: '0', service: 'Other', detail: '', quantity: '' },
+    ]);
+  });
+
+  it('tolerates junk instead of an array', () => {
+    expect(formatScopeItems(null)).toEqual([]);
+    expect(formatScopeItems(undefined)).toEqual([]);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect(formatScopeItems([null as any, 'x' as any])).toEqual([]);
+  });
+});
+
+describe('ppeLabel / formatPpeAndSafety', () => {
+  it('spells out the glove cut level', () => {
+    expect(ppeLabel('gloves_cut_3')).toBe('Gloves Cut Level 3');
+    expect(ppeLabel('gloves_cut_5')).toBe('Gloves Cut Level 5');
+  });
+
+  it('title-cases a storage token', () => {
+    expect(ppeLabel('hard_hat')).toBe('Hard Hat');
+    expect(ppeLabel('face_shield')).toBe('Face Shield');
+    expect(ppeLabel('vest')).toBe('Vest');
+  });
+
+  it('leaves free text a human typed alone', () => {
+    expect(ppeLabel('FR clothing required in Bay 4')).toBe('FR clothing required in Bay 4');
+  });
+
+  it('merges PPE and additional safety, dropping blanks', () => {
+    expect(formatPpeAndSafety(['hard_hat', '', null], ['gloves_cut_3'])).toEqual([
+      'Hard Hat',
+      'Gloves Cut Level 3',
+    ]);
+    expect(formatPpeAndSafety(null, undefined)).toEqual([]);
+  });
+});
+
+describe('scopeItemsHaveDetail — one decision, both tickets', () => {
+  it('is false for the all-auto-generated job (33 of 39 production rows)', () => {
+    const rows = formatScopeItems([
+      { work_type: 'Wall/Track Sawing', description: 'Wall/Track Sawing — linear ft', unit: 'linear_ft', target_quantity: 48 },
+      { work_type: 'GPR Scanning', description: 'GPR Scanning — % complete', unit: 'percent', target_quantity: 100 },
+    ]);
+    expect(scopeItemsHaveDetail(rows)).toBe(false);
+  });
+
+  it('is true as soon as one row carries a typed note', () => {
+    const rows = formatScopeItems([
+      { work_type: 'Wall/Track Sawing', description: 'Wall/Track Sawing — linear ft', unit: 'linear_ft', target_quantity: 48 },
+      { work_type: 'Diesel Floor Sawing', description: 'Equipment trench 60ft x 3ft x 8in', unit: 'linear_ft', target_quantity: 60 },
+    ]);
+    expect(scopeItemsHaveDetail(rows)).toBe(true);
+  });
+
+  it('is false for no rows at all', () => {
+    expect(scopeItemsHaveDetail([])).toBe(false);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// CROSS-CUT SPACING — the instruction for HOW to cut (guardian, Aug 17 2026)
+//
+// Every fixture below is a LITERAL production row. The office writes
+// `cross_cut_lengthwise_ft` / `cross_cut_widthwise_ft` / `overcut_allowed` into
+// the same objects as the dimensions, and nothing printed them: 9 of 48 job
+// orders carry spacing, 7 still active, one (`JOB-2026-793440`) in_progress on
+// the day this was found. Its Service Items target of 182 LF is only reachable
+// WITH the 2 ft grid (124 ft perimeter + 29 interior cuts × 2 ft), so the sheet
+// printed a number that presupposed an instruction it never stated.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('cross-cut spacing on cut rows', () => {
+  it('PROD JOB-2026-793440 (in_progress): states the 2ft × 2ft grid the 182 LF depends on', () => {
+    const s = formatScopeCuts(
+      '[{"length":"60","width":"2","depth":"6","cross_cut_lengthwise_ft":"2","cross_cut_widthwise_ft":"2","overcut_allowed":true}]'
+    );
+    expect(s!.text).toBe('1 cut — 60\' × 2\' @ 6" deep (cross-cut every 2\' × 2\')');
+  });
+
+  it('PROD JOB-2026-815303: 100ft lengthwise / 10ft widthwise on a 100 × 11.5 slab', () => {
+    const s = formatScopeCuts(
+      '[{"length":"100","width":"11.5","depth":"10","cross_cut_lengthwise_ft":"100","cross_cut_widthwise_ft":"10"},{"length":"","width":"","depth":""}]'
+    );
+    // The second production row is entirely blank and must still be dropped.
+    expect(s!.text).toBe('1 cut — 100\' × 11.5\' @ 10" deep (cross-cut every 100\' × 10\')');
+  });
+
+  it('PROD JOB-2026-895358: overcut:false with NO spacing prints the constraint alone', () => {
+    const s = formatScopeCuts('[{"length":"5","width":"5","depth":"7-10","overcut_allowed":false}]');
+    // `7-10` is not a number, so no depth is invented — but the billing-relevant
+    // overcut constraint still reaches paper.
+    expect(s!.text).toBe("1 cut — 5' × 5' (no overcut)");
+  });
+
+  it('PROD JOB-2026-384218: a row with no dimensions at all stays dropped', () => {
+    // overcut_allowed alone is not a cut. Resurrecting this row would print an
+    // empty ruled line that says nothing.
+    expect(formatScopeCuts('[{"length":"","width":"","depth":"","overcut_allowed":false}]')).toBeNull();
+  });
+
+  it('PROD JOB-2026-859542: an all-zero cut row is still dropped, not printed as 0', () => {
+    expect(formatScopeCuts('[{"length":"0","width":"0","depth":"0"}]')).toBeNull();
+  });
+});
+
+describe('cross-cut spacing on area rows', () => {
+  it('PROD JOB-2026-400368: four rows, each carrying its own 5ft × 5ft grid', () => {
+    const s = formatScopeAreas(
+      '[{"length":"30","width":"21","thickness":"6","qty":"","cross_cut_lengthwise_ft":"5","cross_cut_widthwise_ft":"5"},' +
+        '{"length":"17","width":"5","thickness":"6","qty":"","cross_cut_lengthwise_ft":"5","cross_cut_widthwise_ft":"5"},' +
+        '{"length":"44","width":"11","thickness":"6","qty":"","cross_cut_lengthwise_ft":"5","cross_cut_widthwise_ft":"5"},' +
+        '{"length":"40","width":"9.5","thickness":"6","qty":"2","cross_cut_lengthwise_ft":"5","cross_cut_widthwise_ft":"5"}]'
+    );
+    expect(s!.areaCount).toBe(5);
+    // Bracketed, NOT comma-appended: the rows themselves are joined with ', ',
+    // so a comma-led clause would read as the start of the next area.
+    expect(s!.text).toBe(
+      '5 areas — 30\' × 21\' × 6" thick (cross-cut every 5\' × 5\'), ' +
+        '17\' × 5\' × 6" thick (cross-cut every 5\' × 5\'), ' +
+        '44\' × 11\' × 6" thick (cross-cut every 5\' × 5\'), ' +
+        '2 × 40\' × 9.5\' × 6" thick (cross-cut every 5\' × 5\') = 1,959 sq ft total'
+    );
+  });
+
+  it('PROD JOB-2026-914932: a leading-dot decimal renders as 0.25, never NaN', () => {
+    const s = formatScopeAreas(
+      '[{"length":"3","width":"3","thickness":"8","qty":"2","cross_cut_lengthwise_ft":"3","cross_cut_widthwise_ft":"3"},' +
+        '{"length":"3","width":"3","thickness":"18","qty":"","cross_cut_lengthwise_ft":".25","cross_cut_widthwise_ft":"3"}]'
+    );
+    expect(s!.text).toContain("(cross-cut every 0.25' × 3')");
+    expect(s!.text).not.toMatch(/NaN/);
+  });
+
+  it('PROD JOB-2026-859542: mixed grids including a .67 fraction, plus a row with none', () => {
+    const s = formatScopeAreas(
+      '[{"length":"40","width":"28","thickness":"12","qty":"","cross_cut_lengthwise_ft":"4","cross_cut_widthwise_ft":"4"},' +
+        '{"length":"8","width":"2","thickness":"12","qty":"2","cross_cut_lengthwise_ft":"4","cross_cut_widthwise_ft":"2"},' +
+        '{"length":"12","width":".67","thickness":"12","qty":"","cross_cut_lengthwise_ft":"6","cross_cut_widthwise_ft":".67"},' +
+        '{"length":"4","width":"4","thickness":"unknown","qty":"3"}]'
+    );
+    expect(s!.text).toContain('40\' × 28\' × 12" thick (cross-cut every 4\' × 4\')');
+    // The qty prefix stays OUTSIDE: two identical areas, each cross-cut 4 × 2.
+    expect(s!.text).toContain('2 × 8\' × 2\' × 12" thick (cross-cut every 4\' × 2\')');
+    expect(s!.text).toContain('12\' × 0.67\' × 12" thick (cross-cut every 6\' × 0.67\')');
+    // The last row carries no spacing at all — no dangling bracket, no comma.
+    expect(s!.text).toContain("3 × 4' × 4' =");
+  });
+
+  it('PROD JOB-2026-499921: overcut TRUE stays silent (it is the default)', () => {
+    const s = formatScopeAreas(
+      '[{"length":"3","width":"1","thickness":"6","qty":"2","cross_cut_lengthwise_ft":"1","cross_cut_widthwise_ft":"1","overcut_allowed":true}]'
+    );
+    expect(s!.text).toBe(
+      '2 areas — 3\' × 1\' × 6" thick (cross-cut every 1\' × 1\') = 6 sq ft total'
+    );
+  });
+
+  it('PROD TEST-2026-000103: overcut FALSE is billing-relevant and prints', () => {
+    const s = formatScopeAreas(
+      '[{"length":"10","width":"10","thickness":"10","qty":"1","overcut_allowed":false,"cross_cut_lengthwise_ft":"5","cross_cut_widthwise_ft":"5"}]'
+    );
+    expect(s!.text).toBe(
+      '1 area — 10\' × 10\' × 10" thick (cross-cut every 5\' × 5\', no overcut) = 100 sq ft total'
+    );
+  });
+});
+
+describe('crossCutText — the edge cases that must never reach paper wrong', () => {
+  it('prints nothing at all when neither dimension was recorded', () => {
+    expect(crossCutText(parseCrossCut({ length: '10' }))).toBe('');
+    expect(crossCutText(parseCrossCut({}))).toBe('');
+  });
+
+  it('never prints a zero or an empty-string spacing', () => {
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: '0', cross_cut_widthwise_ft: '0' }))).toBe('');
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: '', cross_cut_widthwise_ft: '' }))).toBe('');
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: 0, cross_cut_widthwise_ft: 0 }))).toBe('');
+    // One real, one zero → the real one still has to reach the crew.
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: '2', cross_cut_widthwise_ft: '0' }))).toBe(
+      " (cross-cut every 2' lengthwise)"
+    );
+  });
+
+  it('says WHICH way when only one side was entered', () => {
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: '100' }))).toBe(
+      " (cross-cut every 100' lengthwise)"
+    );
+    expect(crossCutText(parseCrossCut({ cross_cut_widthwise_ft: '10' }))).toBe(
+      " (cross-cut every 10' widthwise)"
+    );
+  });
+
+  it('carries the overcut constraint with or without spacing', () => {
+    expect(crossCutText(parseCrossCut({ overcut_allowed: false }))).toBe(' (no overcut)');
+    expect(crossCutText(parseCrossCut({ overcut_allowed: true }))).toBe('');
+    expect(crossCutText(parseCrossCut({ overcut_allowed: 'false', cross_cut_lengthwise_ft: '2' }))).toBe(
+      " (cross-cut every 2' lengthwise, no overcut)"
+    );
+  });
+
+  it('ignores junk rather than inventing a number', () => {
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: 'abc' }))).toBe('');
+    expect(crossCutText(parseCrossCut({ cross_cut_lengthwise_ft: '-3' }))).toBe('');
+    expect(crossCutText(parseCrossCut(null))).toBe('');
+    expect(crossCutText(parseCrossCut('nope'))).toBe('');
+  });
+});
+
+describe('booleanish — recorded-no vs never-recorded', () => {
+  it('separates false from absent', () => {
+    expect(booleanish(false)).toBe(false);
+    expect(booleanish('false')).toBe(false);
+    expect(booleanish('no')).toBe(false);
+    expect(booleanish(true)).toBe(true);
+    expect(booleanish('yes')).toBe(true);
+    expect(booleanish(undefined)).toBeNull();
+    expect(booleanish(null)).toBeNull();
+    expect(booleanish('')).toBeNull();
+    expect(booleanish('maybe')).toBeNull();
+  });
+});
+
+describe('formatJobsiteConditions — the explicit NO on supply conditions', () => {
+  it('prints Water: NO / Power: NO when the office recorded false (20 production jobs)', () => {
+    expect(
+      formatJobsiteConditions({ water_available: false, electricity_available: false })
+    ).toEqual(['Water: NO', 'Power: NO']);
+  });
+
+  it('says nothing when the keys were never recorded', () => {
+    // "not recorded" is not "no" — the old fixed checkbox list could not tell
+    // them apart either way, but inventing a NO is worse than omitting one.
+    expect(formatJobsiteConditions({ high_work: true })).toEqual(['High work']);
+    expect(formatJobsiteConditions({})).toEqual([]);
+  });
+
+  it('still prints the positive form, with its distance', () => {
+    expect(
+      formatJobsiteConditions({ water_available: true, electricity_available: true, electricity_distance_ft: 75 })
+    ).toEqual(['Water available', 'Power available — 75 ft']);
+  });
+
+  it('does NOT turn every other off condition into a NO chip', () => {
+    // A hard one-page budget: only the two SUPPLY conditions the crew loads
+    // equipment for get the explicit negative.
+    expect(
+      formatJobsiteConditions({
+        water_available: false,
+        plastic_needed: false,
+        clean_up_required: false,
+        high_work: false,
+        proper_ventilation: false,
+      })
+    ).toEqual(['Water: NO']);
+  });
+
+  it('mixes one recorded NO with one recorded YES', () => {
+    expect(formatJobsiteConditions({ water_available: false, electricity_available: true })).toEqual([
+      'Water: NO',
+      'Power available',
+    ]);
+  });
+});
+
+describe('formatPermits — the permit TYPE, on both sheets', () => {
+  it('PROD JOB-2026-914932: names both permits, including HOT WORK', () => {
+    expect(
+      formatPermits([
+        { type: 'hot_work', details: '' },
+        { type: 'work_permit', details: '' },
+      ])
+    ).toEqual(['Hot Work Permit', 'Work Permit']);
+  });
+
+  it('appends free-text details when they say something the label does not', () => {
+    expect(formatPermits([{ type: 'excavation', details: 'city of Greenville #4412' }])).toEqual([
+      'Excavation Permit (city of Greenville #4412)',
+    ]);
+  });
+
+  it('never drops an unknown type, and never prints "Other (Other)"', () => {
+    expect(formatPermits([{ type: 'night_work', details: '' }])).toEqual(['Night work']);
+    expect(formatPermits([{ type: 'other', details: 'roof access' }])).toEqual(['roof access']);
+    expect(formatPermits([{ type: '', details: '' }])).toEqual(['Other']);
+  });
+
+  it('returns nothing for a missing or malformed array', () => {
+    expect(formatPermits(null)).toEqual([]);
+    expect(formatPermits([])).toEqual([]);
+    expect(formatPermits('hot_work')).toEqual([]);
+    expect(formatPermits([null, 'x'])).toEqual([]);
+  });
+});
+
+describe('formatScopeQuantity — the unit alone, with no number', () => {
+  it('names the unit rather than printing a dash', () => {
+    expect(formatScopeQuantity(null, 'holes')).toBe('holes');
+    expect(formatScopeQuantity(null, 'linear_ft')).toBe('LF');
+    expect(formatScopeQuantity(null, 'percent')).toBe('%');
+    expect(formatScopeQuantity(null, 'hours')).toBe('hrs');
+    expect(formatScopeQuantity(null, 'pallets')).toBe('pallets');
+    expect(formatScopeQuantity(null, null)).toBe('');
   });
 });

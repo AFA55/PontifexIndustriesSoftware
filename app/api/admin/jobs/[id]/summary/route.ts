@@ -16,6 +16,7 @@ import { computeJobProgress, matchWorkItemToScope, quantityInUnit, type ScopeIte
 import { getTenantTimezone } from '@/lib/tenant-timezone';
 import { dateInTz } from '@/lib/reminder-timing';
 import { normalizeJobArrays } from '@/lib/job-arrays';
+import { resolveQuotedBy } from '@/lib/job-ticket-quoted-by';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -44,6 +45,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // them back, saving an edit overwrites real values with form defaults.
     // duration_working_days was exactly that: selected nowhere, loaded as '',
     // and written back as null, collapsing a multi-day job on every save.
+    //
+    // salesman_name / directions / created_by are for the PRINTED TICKET: the
+    // react-pdf sheet has printed all three since Aug 16, and the two sheets are
+    // now the same document rendered twice (founder, Aug 17), so this one reads
+    // the same columns. `created_by` is the fallback behind Quoted By — see
+    // lib/job-ticket-quoted-by.ts. NOTE: no comments inside the select template
+    // literal; supabase-js parses that string at the TYPE level and a `//` line
+    // turns the whole row type into a ParserError.
     let jobQuery = supabaseAdmin
       .from('job_orders')
       .select(`
@@ -118,6 +127,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         difficulty_rating,
         additional_info,
         project_manager_id,
+        salesman_name,
+        directions,
+        created_by,
         in_route_at,
         arrived_at_jobsite_at,
         route_started_at,
@@ -278,6 +290,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .maybeSingle();
       pmProfile = pmProf;
     }
+
+    // QUOTED BY — salesman_name, falling back to the profile behind created_by.
+    // Shared with the react-pdf ticket so the two printed sheets cannot end up
+    // naming different people. See lib/job-ticket-quoted-by.ts.
+    const quotedBy = await resolveQuotedBy(
+      (job as any).salesman_name,
+      (job as any).created_by,
+      async (profileId) => {
+        const { data } = await supabaseAdmin
+          .from('profiles')
+          .select('full_name')
+          .eq('id', profileId)
+          .maybeSingle();
+        return data?.full_name ?? null;
+      }
+    );
 
     // ── 2. Fetch scope items ────────────────────────────────────────────────
     let scopeQuery = supabaseAdmin
@@ -568,6 +596,24 @@ export async function GET(request: NextRequest, context: RouteContext) {
           job_type: (job as any).job_type ?? null,
           location: (job as any).location ?? null,
           address: (job as any).address ?? null,
+          // QUOTED BY / DIRECTIONS — carried so the HTML printed ticket can show
+          // the same two fields the react-pdf ticket already showed. The two
+          // sheets are meant to be the same document rendered twice (founder,
+          // Aug 17: "we shouldn't have 2 different ways our ticket prints"), and
+          // unifying them by DROPPING data the PDF carried would have quietly
+          // undone the Aug 16 "Quoted By was blank" fix.
+          // THE RAW COLUMN, untouched. It used to carry `quotedBy` — the column
+          // OR a guess derived from `created_by` — under the column's own name.
+          // `salesman_name` is in the PATCH allowlist
+          // (app/api/admin/job-orders/[id]/route.ts), so the first editor
+          // pre-filled from this endpoint would have written the guess back as
+          // fact. A field may only be editable once the load can re-populate it
+          // truthfully; the derived value therefore gets its own name below.
+          salesman_name: (job as any).salesman_name ?? null,
+          // The DERIVED "who quoted this" for the two printed tickets. Never
+          // written back — nothing PATCHes `quoted_by`.
+          quoted_by: quotedBy || null,
+          directions: (job as any).directions ?? null,
           description: (job as any).description ?? null,
           scope_of_work: (job as any).description ?? null,
           arrival_time: (job as any).arrival_time ?? null,
