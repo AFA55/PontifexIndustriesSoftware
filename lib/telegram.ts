@@ -54,6 +54,22 @@ export function escapeMarkdownV2(text: string): string {
   return text.replace(/[_*[\]()~`>#+\-=|{}.!\\]/g, (c) => `\\${c}`);
 }
 
+/**
+ * Escaping INSIDE a `code` span follows a different rule, and getting it wrong
+ * is a silent failure: Telegram rejects the whole message with a 400 and the
+ * alert simply never arrives.
+ *
+ * Per Telegram's MarkdownV2 spec, inside `code` and `pre` entities only the
+ * backtick and the backslash may be escaped — escaping anything else there is
+ * invalid. The first version of formatAlert ran the full escape set over the
+ * `source` field and then wrapped it in backticks, so any source containing a
+ * dot, dash or underscore — i.e. every route path this thing reports on —
+ * produced an invalid message.
+ */
+export function escapeCodeSpan(text: string): string {
+  return text.replace(/[`\\]/g, (c) => `\\${c}`);
+}
+
 export type AlertLevel = 'critical' | 'error' | 'warning' | 'info';
 
 const LEVEL_ICON: Record<AlertLevel, string> = {
@@ -97,7 +113,10 @@ export function formatAlert(input: AlertInput): string {
     '',
     escapeMarkdownV2(input.detail),
   ];
-  if (input.source) lines.push('', `📍 \`${escapeMarkdownV2(input.source)}\``);
+  // escapeCodeSpan, NOT escapeMarkdownV2 — see the note on that function. Every
+  // route path contains dots and slashes, so the full escape set inside these
+  // backticks made Telegram 400 the entire message.
+  if (input.source) lines.push('', `📍 \`${escapeCodeSpan(input.source)}\``);
   if (typeof input.count === 'number' && input.count > 1) {
     lines.push(`🔁 ${input.count} times`);
   }
@@ -146,6 +165,20 @@ export async function sendTelegram(
 /** Convenience: format + send, no-op when Telegram is not configured. */
 export async function alert(input: AlertInput): Promise<boolean> {
   const config = telegramConfigFromEnv();
-  if (!config) return false;
+  if (!config) {
+    // SAY SO. The first version returned false in silence, which produced a
+    // genuinely confusing hour: a test alert reached the server, logged
+    // normally, and vanished — with no way to tell "Telegram refused it" from
+    // "Telegram was never configured". Those need completely different fixes.
+    console.warn(
+      '[telegram] alert NOT sent — not configured',
+      JSON.stringify({
+        has_bot_token: !!process.env.TELEGRAM_BOT_TOKEN,
+        has_chat_id: !!process.env.TELEGRAM_ALERT_CHAT_ID,
+        title: input.title,
+      })
+    );
+    return false;
+  }
   return sendTelegram(config, formatAlert(input));
 }

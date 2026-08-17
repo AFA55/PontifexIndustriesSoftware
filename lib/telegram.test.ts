@@ -1,9 +1,31 @@
 import {
   escapeMarkdownV2,
+  escapeCodeSpan,
   formatAlert,
   alertFingerprint,
   telegramConfigFromEnv,
 } from './telegram';
+
+describe('escapeCodeSpan', () => {
+  it('escapes ONLY backtick and backslash', () => {
+    // Telegram's MarkdownV2 allows only these two inside a `code` entity.
+    // Escaping anything else there makes it reject the whole message with a
+    // 400 — and the alert silently never arrives, which is the worst possible
+    // failure for an alerting channel.
+    expect(escapeCodeSpan('a`b\\c')).toBe('a\\`b\\\\c');
+  });
+
+  it('leaves a route path alone', () => {
+    // Every source this reports on is a path full of dots, dashes, slashes and
+    // brackets. Running the full escape set over these was the bug.
+    expect(escapeCodeSpan('/api/admin/jobs/[id]/work-ticket')).toBe(
+      '/api/admin/jobs/[id]/work-ticket'
+    );
+    expect(escapeCodeSpan('https://www.pontifexindustries.com/x_y.z')).toBe(
+      'https://www.pontifexindustries.com/x_y.z'
+    );
+  });
+});
 
 describe('escapeMarkdownV2', () => {
   it('escapes every character Telegram rejects a message for', () => {
@@ -48,7 +70,7 @@ describe('formatAlert', () => {
       source: '/api/admin/jobs/[id]/helper-logs',
       count: 64,
     });
-    expect(msg).toContain('helper\\-logs');
+    expect(msg).toContain('/api/admin/jobs/[id]/helper-logs');
     expect(msg).toContain('64 times');
   });
 
