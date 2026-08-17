@@ -48,6 +48,72 @@
 - [ ] **Both nudge routes use the idiom `api-auth.ts` documents as unsafe** — `if (tenantId) q = q.eq('tenant_id', tenantId)` (a NULL tenant bypasses the filter). No live exposure: prod has zero null-`tenant_id` profiles across all five guard roles, and it matches `/api/admin/jobs/[id]/summary`, which feeds the same page. Move both to `resolveTenantScope`.
 - [ ] **`JobDocuments` collapses its whole list on one failed document open** (`error ? <p> : <ul>`), and nothing clears the error until `jobId` changes. Pre-existing.
 
+### 🆕 AUG 16/17 — the day of silent failures, and what it changed
+
+**FIVE separate faults, one disease: something built to tell us what is happening
+failed quietly and returned success.** Three of the five were written that same
+day, hours after an audit warned about exactly this pattern. Worth remembering
+the next time a write is left unchecked.
+
+- [x] **"Work performed saved!" when nothing saved** — the `!res.ok` branch fell
+      through to the success toast and navigated on. An operator in a parking
+      garage lost a day of cutting and was told it saved.
+- [x] **The backup ran three times and nothing recorded it** — two CHECK
+      constraints rejected every `backup_logs` insert; the route destructured
+      only `data`, never `error`. 410 objects landed in R2 while the log said
+      "never ran".
+- [x] **Alerts formatted so Telegram would reject them** — the full MarkdownV2
+      escape set applied inside a code span is invalid; Telegram 400s the whole
+      message. Every alert naming a route path would have died silently.
+- [x] **Alerts never actually sent** — `void alert(...)` in a serverless
+      function. The send WAS attempted; the instance froze once the response
+      returned and killed the fetch. Fire-and-forget network calls do not work
+      on Vercel. Now awaited.
+- [x] **`/api/log-error` had never stored a single row** — `error_logs.endpoint`
+      and `.method` are NOT NULL with no default. Every insert rejected, caught,
+      printed to a console nobody reads, 200 returned. The endpoint built to
+      capture crashes had captured none in months.
+
+**Also that day:**
+- [x] **3.5-hour production outage** — all 60 Postgres connections held, nothing
+      reaping them (`idle_in_transaction_session_timeout = 0`). Restart cleared
+      it; **zero data loss**, every row count matched. Now self-heals in ~1 min.
+      Support ticket raised; the restart destroyed the evidence so the mechanism
+      is inferred, not proven.
+- [x] **`get-tenant-id.ts` fail-open FIXED** — `catch { return null }` across 101
+      callers written `if (tenantId) query.eq(...)`, i.e. **no filter at all**. A
+      database hiccup silently turned company-scoped queries into platform-wide
+      ones, on updates and deletes too. Now throws.
+- [x] **Supabase↔GitHub auto-deploy of migrations turned OFF** — it was ON,
+      pointed at `main`, with 261 files against a mismatched ledger. Auto-branching
+      also off (its compute sits outside the org spend cap).
+- [x] **Abandoned Supabase project deleted** (37 rows, billing since Sept 2025).
+- [x] **`super@pontifex.com` deactivated** — a published-password super_admin
+      inside the paying tenant. Hard delete declined: FKs would wipe 73 audit
+      rows and 156 notifications block it. Inactive is the full security fix.
+- [x] **Off-site backup LIVE** — Cloudflare R2, nightly 08:00 UTC, verified.
+- [x] **Crash → Telegram ALERTING LIVE** — verified end to end Aug 17 01:44 UTC.
+
+#### Open — next session
+- [ ] **Monitoring + feedback card + agent loop** → `docs/plans/MONITORING_FEEDBACK_AND_AGENT_LOOP.md`.
+      Items 1–3 (cron heartbeat, UptimeRobot, health/backup alerts) are ~1 day and
+      would have caught most of Aug 16. Do those before the feedback card.
+- [ ] **Staging** → `docs/plans/STAGING_ENVIRONMENT.md`. Blocked on migration
+      drift: **321 applied vs 262 files**, ledger starts Jan 2026 while the oldest
+      file is Jan 2025 — ~12 months applied outside the ledger, so the database
+      cannot be rebuilt from the repo. Recommendation: baseline dump (3–7 h), not
+      reconciliation (30–50 h). **Note: build costs were refunded and are under
+      $50 since — the cost objection to previews/staging is gone.**
+- [ ] **Hub access** → `docs/plans/PARENT_ORG_AND_HUB_ACCESS.md`. Recommendation:
+      keep one email = one company, add a `/platform` entrance with no company
+      code, and make parent access to a customer explicit, time-boxed and logged.
+- [ ] **Deactivating a user does not end their existing session** — the per-request
+      auth check reads role and tenant but not `active`. A fired employee keeps
+      access until their token expires. Few lines in `lib/api-auth.ts`.
+- [ ] ⚠️ **`admin@pontifex.com` / `PontifexDemo2026!` still published** in
+      `app/login/page.tsx` and is a real admin. Founder is creating a real admin
+      account first, then deleting this one.
+
 ### 🆕 AUG 15 PM — founder testing batch (filed, not built)
 
 - [ ] **💡 "This Week's Highlights" — an internal feed that showcases good work.** Founder's own idea, Aug 15, explicitly NOT a priority: *"lets add a place where we can showcase the work of operators when they do a good job — we can have a 'this week's highlights', incorporate features, and make it like a little feed within our company. I think this would be a good idea… no need to work on it right now, not priority, but definitely something I think would be a great add."*
