@@ -65,20 +65,54 @@ export function isSessionExpired(e: unknown): e is SessionExpiredError {
 }
 
 /**
- * The current access token, or null if there isn't a usable one.
+ * Did the refresh fail because the SERVICE could not be reached, rather than
+ * because the session is no good?
+ *
+ * This distinction is the difference between two sentences a person reads at
+ * the worst moment. "Your session expired — sign in again" sends someone to a
+ * login page served by the same GoTrue that just refused to answer; they type
+ * their password, it fails, and now they believe their ACCOUNT is broken. A
+ * network blip must not be dressed up as a credential problem.
+ *
+ * auth-js raises `AuthRetryableFetchError` for exactly this class (offline, DNS,
+ * 5xx from GoTrue). We match on the name rather than importing the constructor
+ * so the check survives a version bump, and we accept the two shapes that reach
+ * us before auth-js can wrap them: a raw status, and a bare fetch TypeError from
+ * the iOS webview.
+ *
+ * An invalid/expired refresh token comes back as a 400 with a real message —
+ * that is NOT retryable, and it correctly means "sign in again".
+ */
+function isRetryableAuthFailure(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const e = error as { name?: string; status?: number; message?: string };
+  if (e.name === 'AuthRetryableFetchError') return true;
+  if (typeof e.status === 'number' && (e.status === 0 || e.status >= 500)) return true;
+  if (e.name === 'TypeError') return true;
+  return /failed to fetch|networkerror|network request failed|load failed/i.test(e.message || '');
+}
+
+type TokenResult = {
+  token: string | null;
+  /** True when there is no token because the sign-in service was unreachable. */
+  unavailable: boolean;
+};
+
+/**
+ * The current access token plus WHY it is missing when it is.
  *
  * `getSession()` already refreshes an EXPIRED token by itself. What it does not
  * do is notice that the thing it handed back isn't a JWT — so we check, and if
  * the shape is wrong we force a refresh to replace it.
  */
-export async function currentAccessToken(
+async function accessTokenResult(
   opts: { forceRefresh?: boolean } = {}
-): Promise<string | null> {
+): Promise<TokenResult> {
   if (!opts.forceRefresh) {
     try {
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token ?? null;
-      if (looksLikeJwt(token)) return token;
+      if (looksLikeJwt(token)) return { token, unavailable: false };
     } catch {
       /* fall through to the refresh */
     }
@@ -88,12 +122,29 @@ export async function currentAccessToken(
   // storage was not a JWT. One refresh, and we take the answer as final.
   try {
     const { data, error } = await supabase.auth.refreshSession();
-    if (error) return null;
+    if (error) return { token: null, unavailable: isRetryableAuthFailure(error) };
     const token = data.session?.access_token ?? null;
-    return looksLikeJwt(token) ? token : null;
-  } catch {
-    return null;
+    // A well-formed answer that isn't a JWT is a real session problem, not an
+    // outage — do not soften it into "try again in a moment".
+    return looksLikeJwt(token)
+      ? { token, unavailable: false }
+      : { token: null, unavailable: false };
+  } catch (e) {
+    return { token: null, unavailable: isRetryableAuthFailure(e) };
   }
+}
+
+/**
+ * The current access token, or null if there isn't a usable one.
+ *
+ * Kept as the plain-token API for callers that only need "can I authenticate
+ * right now"; `authedFetch` uses `accessTokenResult` so it can tell an outage
+ * apart from a dead session.
+ */
+export async function currentAccessToken(
+  opts: { forceRefresh?: boolean } = {}
+): Promise<string | null> {
+  return (await accessTokenResult(opts)).token;
 }
 
 function withAuth(init: RequestInit, token: string): RequestInit {
@@ -153,8 +204,15 @@ export function isAuthServiceUnavailable(e: unknown): e is AuthServiceUnavailabl
 }
 
 export async function authedFetch(input: string, init: RequestInit = {}): Promise<Response> {
-  const token = await currentAccessToken();
-  if (!token) throw new SessionExpiredError();
+  const first = await accessTokenResult();
+  // No token can mean two different things and they need different sentences:
+  // the sign-in service was unreachable (their login is fine, retry), or the
+  // session is genuinely dead (sign in again). Saying the second when the first
+  // is true sends someone to a login page that will also fail.
+  if (!first.token) {
+    throw first.unavailable ? new AuthServiceUnavailableError() : new SessionExpiredError();
+  }
+  const token = first.token;
 
   const res = await fetch(input, withAuth(init, token));
 
@@ -177,10 +235,12 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   // 401 — the token was refused. Replace it and try exactly once more.
   if (!isReplayable(init.body)) throw new SessionExpiredError();
 
-  const fresh = await currentAccessToken({ forceRefresh: true });
-  if (!fresh) throw new SessionExpiredError();
+  const fresh = await accessTokenResult({ forceRefresh: true });
+  if (!fresh.token) {
+    throw fresh.unavailable ? new AuthServiceUnavailableError() : new SessionExpiredError();
+  }
 
-  const retry = await fetch(input, withAuth(init, fresh));
+  const retry = await fetch(input, withAuth(init, fresh.token));
   if (retry.status === 401) throw new SessionExpiredError();
   return retry;
 }

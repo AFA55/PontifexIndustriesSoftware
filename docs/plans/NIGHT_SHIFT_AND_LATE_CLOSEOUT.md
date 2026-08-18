@@ -102,19 +102,59 @@ class should be shrinking, but the historical rows remain.
    person at two jobs in a day; combining hours must not collapse the job
    attribution behind a single number.
 
-### The questions that must be answered before building
+### Answered by the founder, Aug 18 2026
 
-1. **What marks a cycle as night shift?** The operator choosing it at clock-in,
-   the office scheduling it, or a wall-clock rule (e.g. any cycle starting after
-   18:00)? A flag someone must remember to set will be forgotten; a wall-clock
-   rule will occasionally be wrong. This decides the whole design.
-2. **Does the premium multiply the rate, or add hours?** `night_shift_multiplier`
-   1.25 suggests a rate multiplier, but the column is named
-   `night_shift_premium_hours`. Those are different numbers on a paycheque.
-3. **How does night premium interact with overtime?** If a night cycle is also
-   overtime, do they stack (1.25 × 1.5), or does the higher apply?
-4. **Does the customer pay the premium too**, or is it cost-only? This decides
-   whether it belongs in job P&L revenue or only in labour cost.
+**1. Declared by the operator, approved by an admin — and only asked after 11:00.**
+
+> "It can ask an operator and admin must approve, but only ask after 11am clock-in
+> so it's not asking people that clock in between 7-11am."
+
+Two-step, so nobody awards themselves a premium: the operator declares it at
+clock-in, an admin confirms it. The 11:00 gate keeps the question away from the
+normal 7-to-11 start and means the crew only sees it when it might plausibly be
+true. Design consequences:
+
+- A declared-but-unapproved cycle must be **visible and pending**, never silently
+  paid or silently dropped. It needs a place an admin actually looks.
+- A day job that runs unexpectedly into the night starts before 11:00, so it is
+  never asked. The office must be able to mark a cycle night AFTER the fact.
+- The 11:00 threshold is tenant configuration, not a constant.
+
+**2. Rate multiplier.** 10 night hours at $26 → 10 × 26 × 1.25 = $325. The column
+`night_shift_premium_hours` is therefore misleading and should either be repurposed
+to hold the premium *amount* or left unused with the multiplier applied at cost
+time. Do not let the name drive the maths.
+
+**3. Higher one wins — they do NOT stack.**
+
+> "Higher one wins."
+
+Overtime is 1.5×, night is 1.25×, so **1.5 always beats 1.25**. Applied per hour:
+the first 8 hours of a night shift earn 1.25×, and every hour past 8 earns 1.5×
+and no night premium. **Consequence worth stating plainly: the night premium can
+never apply to an overtime hour.** A 12-hour night is 8 × 1.25 + 4 × 1.5, not
+12 × 1.25 and not 12 × 1.875. Confirm this per-hour reading before building —
+the alternative (whole-shift, one multiplier chosen once) pays differently.
+
+**4. The customer already pays for it — in the quote, not as a line item.**
+
+> "That's on [the] estimating side. Software right now doesn't mention or deal
+> with this, but yes we bill different to clients, but we know night work
+> beforehand."
+
+So: **cost side yes, revenue side no.** The premium raises labour cost in job
+P&L; it must NOT be added to revenue, because the quoted price already carries
+it. Adding it both places would double-count the margin.
+
+But it exposes a gap: **the estimate has no concept of night work.** The office
+knows beforehand and prices for it, and the software never records that. Worth
+capturing on the job at quote time so that (a) the ticket tells the crew it is a
+night job, (b) the premium is expected rather than a surprise at payroll, and
+(c) the estimate itself carries the reason its price is higher. That is a
+separate, smaller piece of work than the payroll maths.
+
+### Still open
+
 5. **Lunch on a night shift** — same 30 minutes after 5 hours, or different?
 
 ### What has to be true first

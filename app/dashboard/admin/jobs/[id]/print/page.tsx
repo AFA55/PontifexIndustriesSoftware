@@ -2,8 +2,12 @@
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState, use } from 'react';
-import { authedFetch, isSessionExpired } from '@/lib/authed-fetch';
+import { useCallback, useEffect, useState, use } from 'react';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+import { authedFetch } from '@/lib/authed-fetch';
+import { describePrintError } from '@/lib/print-failure';
+import { currentPathForNext, loginHrefForPath } from '@/lib/login-redirect';
 import { useBranding } from '@/lib/branding-context';
 // The measurement + equipment + conditions wording is SHARED with the crew's
 // digital ticket (components/ScopeDetailsDisplay). See lib/job-ticket-format.ts
@@ -106,32 +110,48 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
   const [scope, setScope] = useState<PrintScopeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expired, setExpired] = useState(false);
+  const [loginHref, setLoginHref] = useState('/company-login');
 
   useEffect(() => {
-    (async () => {
-      try {
-        // Opened in a new tab from the job view — same session-recovery reason
-        // as the work ticket. See lib/authed-fetch.ts.
-        const res = await authedFetch(`/api/admin/jobs/${jobId}/summary`);
-        if (!res.ok) {
-          setError('Could not load job ticket.');
-          return;
-        }
-        const json = await res.json();
-        const data = json.data;
-        setJob(data?.job ?? null);
-        setScope(Array.isArray(data?.scope?.items) ? data.scope.items : []);
-      } catch (e) {
-        setError(
-          isSessionExpired(e)
-            ? 'Your session expired in this tab. Sign in again and re-open the job order — nothing has been lost.'
-            : 'Could not load job ticket.'
-        );
-      } finally {
-        setLoading(false);
+    setLoginHref(loginHrefForPath(currentPathForNext()));
+  }, []);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    setExpired(false);
+    try {
+      // This page now opens in the SAME tab (the job page's print link no
+      // longer sets target="_blank"), so it inherits the session it was
+      // launched from. authedFetch stays because the session can still be
+      // genuinely expired, or the token malformed — see lib/authed-fetch.ts.
+      const res = await authedFetch(`/api/admin/jobs/${jobId}/summary`);
+      if (!res.ok) {
+        setError('Could not load job ticket.');
+        return;
       }
-    })();
+      const json = await res.json();
+      const data = json.data;
+      setJob(data?.job ?? null);
+      setScope(Array.isArray(data?.scope?.items) ? data.scope.items : []);
+    } catch (e) {
+      // Three outcomes, three remedies — the same split the work ticket makes,
+      // via the same helper so the two sheets cannot describe one failure two
+      // different ways. Only a real SessionExpiredError offers a sign-in: an
+      // auth-service outage is not a bad login, and sending someone to a login
+      // page during one sends them somewhere that also will not work.
+      const described = describePrintError(e);
+      setExpired(described.needsLogin);
+      setError(described.message);
+    } finally {
+      setLoading(false);
+    }
   }, [jobId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   // Auto-open the browser print dialog once the ticket has rendered.
   useEffect(() => {
@@ -146,7 +166,46 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
   }
 
   if (error || !job) {
-    return <div className="p-8 text-sm text-red-600">{error || 'Job not found.'}</div>;
+    // A job order that won't load is someone in the office standing at a
+    // printer. Say which of the problems it is and give them the button that
+    // fixes it — this used to be one red sentence with nowhere to go.
+    return (
+      <div className="p-6">
+        <Link
+          href={`/dashboard/admin/jobs/${jobId}`}
+          className="inline-flex items-center gap-1.5 mb-4 min-h-[44px] px-3 text-sm font-semibold text-slate-700 hover:text-slate-900"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to job
+        </Link>
+        <div className="max-w-[560px] rounded-xl border border-amber-300 bg-amber-50 p-5 text-amber-900">
+          <p className="text-[15px] font-bold mb-1.5">
+            {expired ? 'Your session expired' : "This job order didn't load"}
+          </p>
+          <p className="text-[13px] leading-relaxed mb-3.5">
+            {expired
+              ? 'You were signed out, so the job order could not be fetched. Signing in again brings you straight back to this sheet — nothing has been lost.'
+              : error || 'Job not found.'}
+          </p>
+          <div className="flex flex-wrap gap-2.5">
+            <button
+              type="button"
+              onClick={() => void load()}
+              className="min-h-[44px] px-4 rounded-lg bg-amber-600 text-white text-sm font-bold hover:bg-amber-700"
+            >
+              Try again
+            </button>
+            {expired && (
+              <Link
+                href={loginHref}
+                className="inline-flex items-center min-h-[44px] px-4 rounded-lg border border-amber-600 text-amber-800 text-sm font-bold hover:bg-amber-100"
+              >
+                Sign in again
+              </Link>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const arrival = formatTime(job.arrival_time);
@@ -211,11 +270,23 @@ export default function PrintJobTicketPage({ params }: { params: Promise<{ id: s
       `}</style>
 
       {/* On-screen print button (hidden when printing) */}
-      <div className="no-print bg-gray-100 border-b border-gray-300 px-6 py-3 flex items-center justify-between">
-        <span className="text-sm text-gray-600">Job ticket — {job.job_number}</span>
+      <div className="no-print bg-gray-100 border-b border-gray-300 px-6 py-3 flex items-center justify-between gap-3">
+        {/* BACK TO JOB. This sheet used to open in its own tab, so closing it was
+            the way back and it needed no control of its own. It now prints in
+            the tab you came from — because a new tab does not inherit the
+            session (see the job page's print link) — so the way back has to be
+            on the page. Left of the title: it is the first thing you reach for
+            once the print dialog has been dismissed. */}
+        <Link
+          href={`/dashboard/admin/jobs/${jobId}`}
+          className="inline-flex items-center gap-1.5 min-h-[44px] px-2 -ml-2 text-sm font-semibold text-gray-700 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to job
+        </Link>
+        <span className="text-sm text-gray-600 truncate">Job ticket — {job.job_number}</span>
         <button
           onClick={() => window.print()}
-          className="px-4 py-2 bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800"
+          className="px-4 py-2 min-h-[44px] bg-gray-900 text-white text-sm font-semibold rounded-lg hover:bg-gray-800"
         >
           Print
         </button>

@@ -1443,10 +1443,36 @@ export default function AdminJobDetailPage({
               {/* Two distinct printouts, so the label says which is which:
                   "Job Order" = the dispatch sheet (scope + equipment, printed
                   BEFORE the job), "Work Ticket" = the customer/payroll ticket
-                  of work performed per day per operator (printed DURING/AFTER). */}
+                  of work performed per day per operator (printed DURING/AFTER).
+
+                  SAME TAB, NOT `target="_blank"` (founder, Aug 18: "it sends her
+                  to a new tab, changes her profile picture, and just says session
+                  expired"). These are authenticated app pages, and a new tab is
+                  where our session ISN'T:
+
+                  With "Remember me" off — the DEFAULT — `rememberAwareStorage`
+                  (lib/supabase.ts) keeps the Supabase session in sessionStorage,
+                  which is per-tab. A modern browser treats `target="_blank"` on
+                  an anchor as implicitly `noopener`, and a new top-level context
+                  with no opener does NOT inherit sessionStorage. VERIFIED in
+                  Chrome 151, the browser the office runs: a plain
+                  `<a target="_blank">` lands with `sessionStorage.length === 0`.
+                  So the print tab opened with no session at all, and every
+                  symptom followed — "Your session expired", a sidebar stripped
+                  to nothing by feature flags that timed out, and the initials
+                  circle that replaced Amanda's photo.
+
+                  The fix people reach for first — `window.open` without
+                  `noopener`, which DOES clone sessionStorage — is worse, and the
+                  same test showed why: the clone is a SNAPSHOT that then
+                  diverges. Two tabs would each hold their own copy of one
+                  rotating refresh token, refresh independently, and invalidate
+                  each other. That is the `Invalid Refresh Token: Refresh Token
+                  Not Found` already in the auth log; it would be the norm.
+                  Printing in this tab keeps one session and one refresher.
+                  Both print pages have a "Back to job" control. */}
               <Link
                 href={`/dashboard/admin/jobs/${job.id}/print`}
-                target="_blank"
                 className="
                   inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
                   text-slate-700 bg-white border border-slate-200 hover:bg-slate-50
@@ -1458,7 +1484,6 @@ export default function AdminJobDetailPage({
               </Link>
               <Link
                 href={`/dashboard/admin/jobs/${job.id}/work-ticket`}
-                target="_blank"
                 className="
                   inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors
                   text-slate-700 bg-white border border-slate-200 hover:bg-slate-50
@@ -1590,7 +1615,8 @@ export default function AdminJobDetailPage({
                         ? `&date=${dailyLogs[dailyLogs.length - 1].log_date}`
                         : ''
                     }`}
-                    target="_blank"
+                    /* Same tab — see the note on the Print Job Order link
+                       above: a new tab does not inherit the session. */
                     className="
                       inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-lg
                       min-h-[32px] transition-colors
@@ -1695,7 +1721,8 @@ export default function AdminJobDetailPage({
                           {log.log_date && (
                             <Link
                               href={`/dashboard/admin/jobs/${job.id}/work-ticket?mode=day&date=${log.log_date}`}
-                              target="_blank"
+                              /* Same tab — see the note on the Print Job Order
+                                 link above: a new tab has no session. */
                               title={`Print the ticket for ${logDate}`}
                               className="
                                 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full flex-shrink-0

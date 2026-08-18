@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { Building2, ArrowRight, Loader2, CheckCircle, X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { PLATFORM_TENANT_ID } from '@/lib/rbac';
+import { safeNextPath, withNext } from '@/lib/login-redirect';
 import SplashIntro from '@/components/SplashIntro';
 
 /**
@@ -60,6 +61,15 @@ function CompanyLoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const activated = searchParams.get('activated') === 'true';
+  /**
+   * Where the visitor was headed before being asked to sign in — set by the
+   * print pages' "Sign in again". This page is the entry point for a person who
+   * has no tenant context, so it is also the page that must CARRY the
+   * destination onward to /login rather than dropping it (dropping it is how an
+   * office admin ended up on the operator dashboard). Validated, never
+   * interpolated raw — see lib/login-redirect.ts.
+   */
+  const nextPath = safeNextPath(searchParams.get('next'));
   const [showActivatedBanner, setShowActivatedBanner] = useState(activated);
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -172,7 +182,11 @@ function CompanyLoginContent() {
             }
           } catch { /* biometric plugin absent — silent resume */ }
           setView('resuming');
-          router.replace('/dashboard');
+          // Resume to where they were interrupted when we know it. `/dashboard`
+          // is the FIELD dashboard — for an office admin it renders a
+          // placeholder name and then bounces to /dashboard/admin, which is
+          // what the founder described as "changes her profile picture".
+          router.replace(nextPath ?? '/dashboard');
           return;
         }
         // Session truly gone (signed out / refresh token revoked) — the stale
@@ -188,7 +202,7 @@ function CompanyLoginContent() {
             const { hasEnrolledBiometric } = await import('@/lib/biometric');
             const last = readLastCompany();
             if (last?.tenantId && (await within(hasEnrolledBiometric(), 2500, false))) {
-              router.replace(`/login?tenant_id=${last.tenantId}`);
+              router.replace(withNext(`/login?tenant_id=${last.tenantId}`, nextPath));
               return;
             }
           }
@@ -200,12 +214,12 @@ function CompanyLoginContent() {
     })();
 
     return () => { cancelled = true; clearTimeout(watchdog); };
-  }, [router]);
+  }, [router, nextPath]);
 
   const handleContinue = () => {
     if (!lastCompany) return;
     setContinuing(true);
-    router.push(`/login?tenant_id=${lastCompany.tenantId}`);
+    router.push(withNext(`/login?tenant_id=${lastCompany.tenantId}`, nextPath));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -258,7 +272,7 @@ function CompanyLoginContent() {
       }
 
       // Navigate before clearing loading — router.push triggers navigation immediately
-      router.push(`/login?tenant_id=${tenant.id}`);
+      router.push(withNext(`/login?tenant_id=${tenant.id}`, nextPath));
       // setLoading(false) intentionally omitted — page unmounts on navigation
     } catch (err: any) {
       console.error('[company-login] unexpected error:', err?.message);

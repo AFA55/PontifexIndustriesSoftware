@@ -807,7 +807,11 @@ export default function CompletedJobsArchivePage() {
                         <div className="ml-auto flex flex-wrap items-center gap-2">
                           <Link
                             href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/print`}
-                            target="_blank"
+                            /* Same tab, deliberately. A new tab does not inherit
+                               sessionStorage, which is where the session lives
+                               unless "Remember me" was ticked — so these printed
+                               one "session expired" panel instead of a sheet.
+                               Full reasoning on the job page's print link. */
                             className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
                             title="Print the job order sheet (scope, equipment, site details) for this job"
                           >
@@ -816,7 +820,6 @@ export default function CompletedJobsArchivePage() {
                           </Link>
                           <Link
                             href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/work-ticket?mode=week`}
-                            target="_blank"
                             className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
                             title="Print the work ticket for this job"
                           >

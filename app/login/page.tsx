@@ -12,6 +12,7 @@ import { Eye, EyeOff, Mail, Lock, ChevronDown, ChevronUp, Shield, ArrowLeft, Sca
 import { motion } from 'framer-motion';
 import { BIOMETRIC_DECLINED_KEY, biometricAvailable, biometryLabel, disableBiometric, enrolledBiometricEmail, enrollBiometric, hasEnrolledBiometric, verifyAndGetSession } from '@/lib/biometric';
 import { isNativeApp } from '@/lib/is-native';
+import { resolveLoginTarget, safeNextPath } from '@/lib/login-redirect';
 import PasskeySignInButton from '@/components/auth/PasskeySignInButton';
 
 /**
@@ -115,6 +116,10 @@ function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const tenantId = searchParams.get('tenant_id');
+  // Where the user was headed before we asked them to sign in. Set by the print
+  // pages' "Sign in again" and forwarded by /company-login. Validated (never
+  // interpolated) — see lib/login-redirect.ts for the open-redirect reasoning.
+  const nextPath = safeNextPath(searchParams.get('next'));
   // NOTE: deliberately do NOT fall back to the global `useBranding()` context here.
   // That context defaults to one tenant and would briefly render the wrong company's
   // branding ("pops Patriot first") before this page's per-tenant fetch resolves.
@@ -153,13 +158,16 @@ function LoginPageInner() {
         try { storedTenant = JSON.parse(storedUser)?.tenant_id ?? null; } catch { /* treat as unverifiable */ }
         if (!storedTenant || storedTenant !== tenantId) return;
         const { data: { session } } = await supabase.auth.getSession();
-        if (!cancelled && session) router.replace('/dashboard');
+        // A remembered session that lands here with a `next` was sent here BY
+        // that page — resume to it, not to the generic dashboard.
+        if (!cancelled && session) router.replace(nextPath ?? '/dashboard');
       } catch {
         /* fall through to the normal login form */
       }
     })();
     return () => { cancelled = true; };
-  }, [router]);
+    // `nextPath` is read inside — company-login lists it for the same reason.
+  }, [router, nextPath]);
 
   // STICKY "Remember me" (founder bug Jul 11): the checkbox used to reset to
   // unchecked on every visit, so the NEXT login silently overwrote the flag to
@@ -388,6 +396,10 @@ function LoginPageInner() {
         setLoading(false);
         return;
       }
+      // A `next` the user was interrupted from beats the role landing page.
+      // The role default remains the fallback, and every page still runs its
+      // own role guard, so this cannot grant access a URL wouldn't.
+      target = resolveLoginTarget(target, nextPath);
 
       // NATIVE APP: after a successful PASSWORD login, offer to enable biometric
       // sign-in ONCE — if biometrics are available, the user isn't already enrolled,
@@ -507,7 +519,10 @@ function LoginPageInner() {
       else if (['operator', 'apprentice'].includes(role)) target = '/dashboard';
       else target = '/dashboard'; // safe default; the dashboard re-guards by role
 
-      navigateAfterLogin(target);
+      // Same rule as the password path: a person sent here from a specific page
+      // is trying to get back to it. Signing in with Face ID instead of a
+      // password does not make her want a different destination.
+      navigateAfterLogin(resolveLoginTarget(target, nextPath));
     } catch {
       setError('Biometric sign-in failed. Please sign in with your password.');
       setLoading(false);
@@ -542,7 +557,8 @@ function LoginPageInner() {
       let target = '/dashboard';
       if (role === 'super_admin') target = tenantIdForLanding === PLATFORM_TENANT_ID ? '/dashboard/platform' : '/dashboard/admin';
       else if (['admin', 'salesman', 'operations_manager', 'supervisor', 'shop_manager', 'shop_help', 'inventory_manager'].includes(role)) target = '/dashboard/admin';
-      navigateAfterLogin(target);
+      // The `next` she arrived with beats the role landing page here too.
+      navigateAfterLogin(resolveLoginTarget(target, nextPath));
     } catch {
       setError('Passkey sign-in failed. Please sign in with your password.');
       setLoading(false);

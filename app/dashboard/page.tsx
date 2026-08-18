@@ -876,16 +876,29 @@ export default function Dashboard() {
                 className="hidden sm:flex items-center gap-3 bg-gray-50 dark:bg-white/[0.05] px-4 py-2 rounded-xl border border-gray-200 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-500 hover:bg-gray-100 dark:hover:bg-white/[0.08] transition-colors"
               >
                 <div className="w-10 h-10 bg-gradient-to-br from-cyan-400 via-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white font-bold shadow-lg overflow-hidden flex-shrink-0">
+                  {/* NEVER invent an identity (founder, Aug 18: "it… changes her
+                      profile picture"). When this page is reached without a
+                      loaded profile — which is what happened to the office admin
+                      after a print tab bounced her through login — the avatar
+                      fell back to a generated 'D' circle and the name below read
+                      "Demo Operator". She reasonably read that as the software
+                      having changed who she was. An unknown user now renders as
+                      nothing at all: an empty avatar and no name is honestly
+                      "we don't know yet", where a demo name is a false claim. */}
                   {operatorAvatarUrl ? (
                     <img src={operatorAvatarUrl} alt={user?.name || ''} className="w-full h-full object-cover" />
                   ) : (
-                    user?.name?.charAt(0) || 'D'
+                    user?.name?.charAt(0) || ''
                   )}
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900 dark:text-white">{user?.name || 'Demo Operator'}</p>
-                  <p className="text-xs text-cyan-600 dark:text-cyan-400 capitalize font-medium">My Profile</p>
-                </div>
+                {/* Conditional render, not `hidden` — a `hidden` prop loses to
+                    the parent's flex at equal specificity. */}
+                {user?.name && (
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-gray-900 dark:text-white">{user.name}</p>
+                    <p className="text-xs text-cyan-600 dark:text-cyan-400 capitalize font-medium">My Profile</p>
+                  </div>
+                )}
               </Link>
 
               {/* Dark Mode Toggle */}

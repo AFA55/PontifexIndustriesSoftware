@@ -37,6 +37,7 @@ import { reportClientFailure } from '@/lib/report-error';
 import { useBranding } from '@/lib/branding-context';
 import { workItemDetailLine, workItemQuickNote, type WorkItemLike } from '@/lib/work-items-format';
 import { formatDay, formatTime, parseYMDLocal, toLocalYMD } from '@/lib/dates';
+import { currentPathForNext, loginHrefForPath } from '@/lib/login-redirect';
 import {
   CREW_ROLE_LABEL,
   allPrintedWork,
@@ -438,6 +439,19 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   const [ready, setReady] = useState(false);
   // Distinguished from a plain error: a dead session needs a login, not a retry.
   const [expired, setExpired] = useState(false);
+  /**
+   * Where "Sign in again" goes. It used to be a bare `/login`, which has no
+   * tenant, so it bounced to /company-login → /dashboard — the OPERATOR
+   * dashboard for an office admin, complete with its "Demo Operator"
+   * placeholder — and never came back to the ticket. This carries the ticket's
+   * own path AND its query (?mode=week&date=…) through the login chain, so
+   * signing in returns to the exact sheet she was trying to print.
+   *
+   * In state rather than computed inline: it reads window.location, and the URL
+   * is rewritten by the replaceState effect below whenever the day/week picker
+   * moves — so it is recomputed on the same inputs.
+   */
+  const [loginHref, setLoginHref] = useState('/company-login');
 
   // Read initial state off the URL (?mode=week&date=YYYY-MM-DD&notes=1). Done in
   // an effect rather than useSearchParams so the page needs no Suspense island.
@@ -447,6 +461,13 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
     const d = q.get('date');
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setAnchor(d);
     if (q.get('notes') === '0') setShowNotes(false);
+    // Set the return destination HERE, unconditionally, not only in the URL-sync
+    // effect below — that one returns early until `anchor` is filled, and
+    // `anchor` is only filled by a SUCCESSFUL load. On the failure this panel
+    // exists for (expired session → fetch throws → no anchor), the href would
+    // still be its bare '/company-login' default and the sign-in would land her
+    // on /dashboard/admin instead of the ticket. Same shape as print/page.tsx.
+    setLoginHref(loginHrefForPath(currentPathForNext()));
     setReady(true);
   }, []);
 
@@ -515,6 +536,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
     const q = new URLSearchParams({ mode, date: anchor });
     if (!showNotes) q.set('notes', '0');
     window.history.replaceState(null, '', `${window.location.pathname}?${q.toString()}`);
+    setLoginHref(loginHrefForPath(currentPathForNext()));
   }, [ready, mode, anchor, showNotes]);
 
   const step = (dir: -1 | 1) => {
@@ -743,7 +765,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             </button>
             {expired && (
               <Link
-                href="/login"
+                href={loginHref}
                 style={{
                   minHeight: 44,
                   display: 'inline-flex',

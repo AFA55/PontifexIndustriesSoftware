@@ -299,9 +299,15 @@ function NewJobSuccessBanner({ jobId, jobNumber, onDismiss }: { jobId: string; j
         <span className="text-sm text-green-300">
           Created <span className="font-bold">{jobNumber}</span>
         </span>
+        {/*
+          NO target="_blank". A new tab does NOT inherit sessionStorage, and
+          "Remember me" defaults OFF — which puts the Supabase session in
+          sessionStorage — so a link that opens a tab hands the reader a page
+          with no session and a "sign in again" panel. Verified in Chrome 151.
+          Every in-app link stays in this tab.
+        */}
         <Link
           href={`/dashboard/admin/jobs/${jobId}`}
-          target="_blank"
           className="flex items-center gap-1 text-xs font-bold text-indigo-300 hover:text-indigo-200 underline underline-offset-2"
         >
           View New Job <ExternalLink className="w-3 h-3" />

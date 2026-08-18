@@ -249,6 +249,55 @@ describe('authedFetch — the sign-in service itself is down', () => {
     expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
+  it('calls a FAILED REFRESH an outage, not an expired session', async () => {
+    // The refresh itself could not reach GoTrue — auth-js's own word for it.
+    // Reporting this as "your session expired" sends someone to a login page
+    // served by the service that just failed to answer; they type a password,
+    // it fails too, and now they believe their ACCOUNT is broken.
+    auth.getSession.mockResolvedValue(sessionWith(null));
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: { name: 'AuthRetryableFetchError', message: 'Failed to fetch', status: 0 },
+    });
+
+    const err = await authedFetch('/api/x').catch((e) => e);
+
+    expect(isAuthServiceUnavailable(err)).toBe(true);
+    expect(isSessionExpired(err)).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('treats a 5xx from the refresh endpoint the same way', async () => {
+    auth.getSession.mockResolvedValue(sessionWith(null));
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: { name: 'AuthApiError', message: 'Service unavailable', status: 503 },
+    });
+
+    expect(isAuthServiceUnavailable(await authedFetch('/api/x').catch((e) => e))).toBe(true);
+  });
+
+  it('still says SIGN IN AGAIN when the refresh token is genuinely invalid', async () => {
+    // A 400 with a real answer is the service working correctly and telling us
+    // the session is dead. That one must NOT be softened into "try again".
+    auth.getSession.mockResolvedValue(sessionWith(null));
+    auth.refreshSession.mockResolvedValue({
+      data: { session: null },
+      error: { name: 'AuthApiError', message: 'Invalid Refresh Token', status: 400 },
+    });
+
+    const err = await authedFetch('/api/x').catch((e) => e);
+    expect(isSessionExpired(err)).toBe(true);
+    expect(isAuthServiceUnavailable(err)).toBe(false);
+  });
+
+  it('calls a THROWN network failure during refresh an outage too', async () => {
+    auth.getSession.mockResolvedValue(sessionWith(null));
+    auth.refreshSession.mockRejectedValue(new TypeError('Failed to fetch'));
+
+    expect(isAuthServiceUnavailable(await authedFetch('/api/x').catch((e) => e))).toBe(true);
+  });
+
   it('leaves an ordinary 503 alone', async () => {
     // Not every 503 is an auth outage. A PDF renderer falling over is a 503
     // the caller needs to read, not a login story.
