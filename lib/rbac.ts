@@ -163,6 +163,21 @@ export const ADMIN_CARDS: AdminCard[] = [
     features: ['Service monitoring', 'Error tracking', 'User activity', 'Backup status'],
   },
   {
+    // Sibling of system_health, and deliberately NOT merged into it. That card
+    // answers "is the platform up?"; this one answers "is the PROCESS working?"
+    // — are jobs getting signed, closed out, costed and staffed. Every leak
+    // found on Aug 17 was of the second kind, and none of them would ever have
+    // shown on an infrastructure dashboard.
+    key: 'workflow_health',
+    title: 'Workflow Health',
+    description: 'Where the job-to-invoice funnel is leaking, and whether it is getting better',
+    icon: '📉',
+    href: '/dashboard/admin/workflow-health',
+    bgColor: 'from-sky-600 to-blue-700',
+    iconBg: 'bg-sky-600',
+    features: ['Signature rate', 'Stuck closeouts', 'Job costing gaps', 'Week-over-week trend'],
+  },
+  {
     key: 'settings',
     title: 'Settings',
     description: 'Configure schedule board, capacity, and system preferences',
@@ -459,6 +474,14 @@ export const ROLE_PERMISSION_PRESETS: Record<string, Record<string, PermissionLe
     employee_reviews: 'view',
     hiring: 'full',
     contracts: 'full',
+    // Office staff can OPEN this page (the page guard and requireAdmin both
+    // admit 'admin'), so the card has to be here or the card menu and the URL
+    // disagree — visible to whoever guesses the path, invisible to everyone
+    // else. Read-only, and it is their own tenant's funnel: chasing the
+    // missing signature or the un-invoiced job IS the office's job.
+    // NOTE this is deliberately unlike `system_health`, which is super_admin
+    // only on the page itself and correctly absent from this preset.
+    workflow_health: 'view',
   }),
   supervisor: preset({
     schedule_form: 'submit',

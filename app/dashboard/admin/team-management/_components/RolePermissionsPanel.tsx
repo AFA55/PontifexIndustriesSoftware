@@ -44,7 +44,7 @@ const CARD_GROUPS: { label: string; keys: string[] }[] = [
   },
   {
     label: 'Admin & Tools',
-    keys: ['operations_hub', 'tenant_management', 'system_health', 'settings'],
+    keys: ['operations_hub', 'tenant_management', 'system_health', 'workflow_health', 'settings'],
   },
 ];
 

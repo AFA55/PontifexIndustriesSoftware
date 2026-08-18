@@ -79,6 +79,9 @@
     },
     "app/api/cron/missing-ticket-reminders/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/workflow-health/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
@@ -141,6 +144,10 @@
     {
       "path": "/api/cron/missing-ticket-reminders",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/cron/workflow-health",
+      "schedule": "30 12 * * *"
     }
   ],
   "git": {
