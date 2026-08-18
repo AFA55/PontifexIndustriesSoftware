@@ -169,13 +169,51 @@ send customer notifications, must not require a waiver or signature, and must no
 appear in customer-facing surfaces (the portal, invoices as a billable job).
 Distinguish by type at those boundaries — not by suppressing it from the board.
 
+## Answered — shop hours are cost, and the ticket is for insight
+
+> "we need to be able to [distinguish] shop hours from regular hours, so our
+> software should distinguish the 2 — and the ticket is so they can tell us what
+> they did and we have insight in what they did."
+>
+> "shop hours still cost Patriot, and we need to see how many people are working
+> shop hours."
+
+| | |
+|---|---|
+| **Shop hours** | Real, paid, **cost with no customer revenue**. Must be visibly separate from job hours everywhere hours appear. |
+| **The ticket itself** | Exists so the crew says what they did. The value is the narrative, not the number — consistent with the founder's standing position that operator field data is the *story*, not just quantities. |
+| **The report** | "How many people are working shop hours" is a first-class question, so the Shop Tickets tab needs a roll-up by person and by period, not just a list. |
+
+So shop time must never inflate a job's profit, and must never vanish either —
+it is a real cost against the tenant. Same shape as the supervisor case below.
+
+## The supervisor exception (task #17)
+
+> "once he completes a job, the rest of his time is supervisor duties, not to
+> continue billing that job… our supervisor at least for us is paid hourly."
+
+A supervisor's day does not end when the job does. So R1's clock-out boundary
+does **not** apply to them: for `role = 'supervisor'` the job's billable window
+ends at **job completion**, and the balance of the card is non-job supervisor
+time.
+
+That is the *same* shape as a shop ticket — real paid time belonging to no
+customer job — so the two must be solved once, not twice. Whatever bucket holds
+"paid, but not billable to a customer" needs to exist for both.
+
+> "this can be a question when they set up an account for their team — if
+> supervisor is salary or hourly… so when other companies start using it no
+> errors would occur."
+
+Pay basis becomes a team-setup question. Patriot's supervisor is **hourly**. A
+salaried supervisor's cost must not attach per-job at an hourly rate, or a
+tenant with salaried supervisors gets wrong job costs from an assumption we made
+about Patriot.
+
 ## Still open
 
 1. **Does a shop ticket's time reach payroll**, or is the timecard still the
    payroll record and the shop ticket only the description of what was done?
-2. **Does shop time bill to anything?** It has an internal customer (Patriot), so
-   presumably it is cost without revenue — confirm it should be excluded from
-   job P&L revenue while still counting as labour cost somewhere.
 
 ---
 

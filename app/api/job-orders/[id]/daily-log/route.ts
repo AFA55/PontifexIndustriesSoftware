@@ -11,6 +11,13 @@ import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { boundedJobHours, clampDailyLogHours, MAX_DAILY_LOG_HOURS } from '@/lib/labor-cost';
 import { dayCompletePermission } from '@/lib/day-complete-auth';
+import {
+  planDayCloseout,
+  continueConfirmMessage,
+  continueNextDayJobUpdate,
+  finalCompletionJobUpdate,
+  CONTINUE_CONFIRMATION_REQUIRED,
+} from '@/lib/day-closeout';
 
 export async function POST(
   request: NextRequest,
@@ -166,6 +173,40 @@ export async function POST(
         ? requestedWorkDate
         : todayTz;
     const isBackfill = effectiveDate !== todayTz;
+
+    // ─── A one-day job may not become a multi-day job on one tap ─────────────
+    //
+    // "Done for Today" writes `is_multi_day: true` + `status: 'scheduled'`. On
+    // a job the office booked for a single day that quietly changes what kind
+    // of job it is: it overruns end_date, falls out of the operator's day list
+    // (that query needs end_date >= today), reschedules itself indefinitely,
+    // never completes and never reaches invoicing. JOB-2026-160762 went that
+    // way on Aug 14 and had to be rescued by hand.
+    //
+    // The UI asks first (components/DayCloseoutChoice). This is the backstop
+    // for a stale schedule read on the phone, and it is deliberately placed
+    // BEFORE the first write in this handler: a refusal must cost the operator
+    // nothing but a tap, never a lost day's work.
+    if (continueNextDay) {
+      const plan = planDayCloseout({
+        // The TENANT's calendar, matching every other date in this handler.
+        // Never effectiveDate: a backfilled log books work to a past day but
+        // the question — "are you coming back tomorrow" — is about today.
+        today: todayTz,
+        scheduledDate: job.scheduled_date ?? null,
+        scheduledEndDate: job.scheduled_end_date ?? job.end_date ?? null,
+      });
+      if (plan.requiresContinueConfirmation && body.confirm_continue_next_day !== true) {
+        return NextResponse.json(
+          {
+            error: CONTINUE_CONFIRMATION_REQUIRED,
+            message: plan.confirm ? continueConfirmMessage(plan.confirm) : undefined,
+            confirm: plan.confirm,
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     // ─── Subsistence (out-of-town overnight) — fire-and-forget side effect ───
     // Never trust the client for the out-of-town gate: re-derive from the DB job.
@@ -465,18 +506,15 @@ export async function POST(
       // reached total_days_worked = 2 off a single log row: the triggers set it
       // to 1, then this added 1 to a stale read, and a one-day job printed as
       // two. Reset the timestamps for tomorrow; leave the counting alone.
+      //
+      // The exact fields live in lib/day-closeout.ts and are asserted in
+      // lib/day-closeout.test.ts — `is_multi_day: true` is the line that costs
+      // money when it is wrong, so it is pinned by a test rather than reviewed
+      // by eye. Nothing reaches here without clearing the confirmation gate
+      // above.
       const { error: updateError } = await supabaseAdmin
         .from('job_orders')
-        .update({
-          is_multi_day: true,
-          status: 'scheduled', // Reset to scheduled for next day
-          route_started_at: null, // Clear timestamps for next day
-          work_started_at: null,
-          route_start_latitude: null,
-          route_start_longitude: null,
-          work_start_latitude: null,
-          work_start_longitude: null
-        })
+        .update(continueNextDayJobUpdate())
         .eq('id', jobId);
 
       if (updateError) {
@@ -537,24 +575,27 @@ export async function POST(
           // stress test, Jul 12). Matches the DB trigger's definition.
           const totalDays = new Set((allLogs || []).map((l: any) => String(l.log_date))).size;
 
-          // Fire-and-forget — don't block the response
-          Promise.resolve(
-            supabaseAdmin
-              .from('job_orders')
-              .update({
-                status: 'completed',
-                work_completed_at: now,
-                total_hours_worked: Number(totalHours.toFixed(2)),
-                // total_days_worked stays trigger-owned (see above) — writing
-                // a locally-counted value here would overwrite the derived one
-                // moments after the trigger set it.
-                is_multi_day: totalDays > 1,
-                completion_signer_name: signerName,
+          // AWAITED, deliberately — this used to be fire-and-forget, which does
+          // not work on Vercel: the instance freezes once the response is sent
+          // and the in-flight write is killed. This is the write that corrects a
+          // wrongly-converted one-day job (`is_multi_day` derived from the
+          // distinct days actually logged), so it has to actually land. One
+          // extra round-trip on a once-per-job request is a fair price.
+          // total_days_worked stays trigger-owned (see above) — writing a
+          // locally-counted value here would overwrite the derived one moments
+          // after the trigger set it.
+          const { error: cErr } = await supabaseAdmin
+            .from('job_orders')
+            .update(
+              finalCompletionJobUpdate({
+                nowIso: now,
+                totalHours,
+                distinctDays: totalDays,
+                signerName,
               })
-              .eq('id', jobId)
-          ).then(({ error: cErr }) => {
-            if (cErr) console.warn('Fallback completion update failed:', cErr.message);
-          }).catch(() => {});
+            )
+            .eq('id', jobId);
+          if (cErr) console.warn('Fallback completion update failed:', cErr.message);
         } catch (finalErr) {
           console.warn('Fallback completion aggregation failed:', finalErr);
         }

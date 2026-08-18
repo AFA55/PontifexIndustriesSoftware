@@ -23,6 +23,16 @@ export const dynamic = 'force-dynamic';
  * past that, management gets one escalation per worker per shift. Pure logic
  * lives in lib/clock-out-reminder.ts (unit-tested).
  *
+ * SUPERVISORS (and any SHIFT_WINDOW_ROLES) are the exception to all of the
+ * above: their day doesn't end when a job ends — they finish a ticket and
+ * carry on supervising — and a 6:30 AM start would put the "10h" nudge at
+ * 4:30 PM. They get exactly ONE wall-clock nudge at the end of their standard
+ * shift (profiles.clock_out_reminder_time, else the 6:30 PM role default in
+ * lib/clock-out-reminder.ts — pulled earlier when the tenant auto-closes cards
+ * before that), evaluated in the TENANT's timezone, and are
+ * skipped by the completion-aware pass, the elapsed thresholds and the
+ * pre-auto-clockout warning. operator/apprentice behaviour is unchanged.
+ *
  * Dedup via reminder_log (sendReminderOnce). Keys are keyed off the timecard's
  * clock-in DATE so the three reminders group per shift and survive midnight.
  *
@@ -42,6 +52,9 @@ import {
   isJobUnfinished,
   reminderDelayMinutes,
   resolveCompletionInstant,
+  resolveWallClockReminderMinutes,
+  shiftEndReminderDue,
+  usesShiftWindowReminders,
   type CompletionCandidate,
   type ReminderJob,
 } from '@/lib/clock-out-reminder';
@@ -184,20 +197,48 @@ export async function GET(request: NextRequest) {
       const nowMinTz = nowMinutesInTz(tz);
 
       for (const tc of openCards) {
-        const personalMin = personalOutMap.get(tc.user_id);
-        if (personalMin != null && middayReminderDue(nowMinTz, personalMin)) {
+        // SHIFT-WINDOW ROLES (supervisors): a finished job is not the end of
+        // their day, and their clock-in-relative thresholds land mid-
+        // afternoon. They get ONE wall-clock nudge at the end of their
+        // standard shift and nothing else — see SHIFT_WINDOW_ROLES.
+        const shiftWindowRole = usesShiftWindowReminders(roleMap.get(tc.user_id));
+        const personalMin = personalOutMap.get(tc.user_id) ?? null;
+        // Personal override first; shift-window roles fall back to the role
+        // default (6:30 PM), pulled EARLIER on a tenant whose auto-clockout
+        // closes cards before then — otherwise the nudge fires into a card that
+        // no longer exists and the supervisor loses the time he was working.
+        // See resolveWallClockReminderMinutes.
+        const targetMin = resolveWallClockReminderMinutes({
+          personalMinutes: personalMin,
+          usesShiftWindow: shiftWindowRole,
+          autoClockoutMinutes: autoEnabled ? autoMinutes : null,
+          warnBeforeAutoClockoutMinutes: PRE_AUTOCLOCKOUT_WARN_MINUTES,
+        });
+        const targetDue =
+          targetMin != null &&
+          (shiftWindowRole
+            // Hard lower bound at the shift end — never nudge them early.
+            ? shiftEndReminderDue(nowMinTz, targetMin)
+            : middayReminderDue(nowMinTz, targetMin));
+
+        if (targetMin != null && targetDue) {
           const res = await sendReminderOnce(`clock_out_personal:${tc.date}`, {
             userId: tc.user_id,
             tenantId: tenant.id,
             category: 'clock_in_reminder',
             inAppType: 'reminder',
             title: 'Time to clock out',
-            message: `It's ${fmt12h(personalMin)} and you're still on the clock. Clock out if your day is done.`,
+            message: `It's ${fmt12h(targetMin)} and you're still on the clock. Clock out if your day is done.`,
             actionUrl: '/dashboard/timecard',
             smsPhone: phoneMap.get(tc.user_id) ?? null,
           });
           if (res) remindersSent++;
         }
+
+        // Everything below is clock-in-relative or auto-clockout-relative and
+        // can fire during a supervisor's working day, so it stops here for
+        // them. (The completion-aware pass skips them too.)
+        if (shiftWindowRole) continue;
 
         // Pre-auto-clockout warning (day/shop cards only — night shifts keep the
         // noon close). Fires once per shift via reminder_log dedup.
@@ -283,9 +324,10 @@ interface DailyLogRow {
 }
 
 /** Field roles that get the ticket-completion nudge (never admins). */
-// Anyone who can be put on a crew — a supervisor or ops manager who worked a
-// job owes the same ticket as the crew, and used to be dropped before the
-// slot-aware logic below ever ran.
+// Anyone who can be put on a crew — an ops manager who worked a job owes the
+// same ticket as the crew, and used to be dropped before the slot-aware logic
+// below ever ran. SHIFT_WINDOW_ROLES (supervisors) are filtered out again
+// below: they can crew a job, but finishing one doesn't end their day.
 const REMINDED_ROLES = CREW_SLOT_ROLES as readonly string[];
 
 const JOB_SELECT =
@@ -313,7 +355,13 @@ async function processCompletionAwareReminders(args: {
   // Only field workers; one card per user (deterministic if dupes ever exist).
   const cardByUser = new Map<string, OpenCardRow>();
   for (const tc of openCards) {
-    if (!REMINDED_ROLES.includes(roleMap.get(tc.user_id) || '')) continue;
+    const role = roleMap.get(tc.user_id) || '';
+    if (!REMINDED_ROLES.includes(role)) continue;
+    // Shift-window roles (supervisors) are deliberately excluded: finishing a
+    // job doesn't end their day, so neither the nudge nor the management
+    // escalation should fire off a completion. They get the wall-clock
+    // shift-end nudge in the main loop instead.
+    if (usesShiftWindowReminders(role)) continue;
     if (!cardByUser.has(tc.user_id)) cardByUser.set(tc.user_id, tc);
   }
   if (cardByUser.size === 0) return 0;

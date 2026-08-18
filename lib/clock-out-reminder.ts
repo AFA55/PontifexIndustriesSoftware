@@ -178,6 +178,111 @@ export function reminderDelayMinutes(driveMinutes: number | null | undefined): n
   );
 }
 
+// ── Shift-window roles (a job ending ≠ their day ending) ─────────────────────
+
+/**
+ * Roles whose workday does NOT end when a job ends.
+ *
+ * A supervisor finishes a ticket and carries on supervising — running the
+ * other crews, the shop, tomorrow's schedule. Reminding them to clock out
+ * because a job completed is simply wrong for the role, and it nags someone
+ * who is still working. Same reasoning kills the clock-in-relative 10/12/15h
+ * thresholds for them: a 6:30 AM start means the 10h nudge lands at 4:30 PM,
+ * mid-afternoon.
+ *
+ * So these roles get exactly ONE clock-out nudge, on the wall clock, at the
+ * end of their standard day — nothing job-driven, nothing elapsed-driven.
+ *
+ * Role-driven, never person-driven: any tenant's supervisors get this
+ * behaviour out of the box.
+ */
+export const SHIFT_WINDOW_ROLES = ['supervisor'] as const;
+
+/**
+ * End of the standard shift for those roles, as tenant-LOCAL
+ * minutes-since-midnight. Patriot's supervisors work 6:30 AM → 6:30 PM.
+ *
+ * This is a DEFAULT, not a setting: a per-person override already exists
+ * (`profiles.clock_out_reminder_time`, honoured first). If shift windows ever
+ * need to vary per tenant, this constant is the single place a tenant-level
+ * column would be read into.
+ */
+export const DEFAULT_SHIFT_END_MINUTES = 18 * 60 + 30; // 18:30 → 1110
+
+/**
+ * How long past the shift-end minute the nudge stays due.
+ *
+ * TWO cron periods, not one. The cron runs every 15 minutes, so a 14-minute
+ * window left exactly ONE qualifying tick (18:30 — 18:45 is already outside
+ * it, being minute 1125 against a window ending at 1124). A tick
+ * delayed by ten seconds, which Vercel does, meant the supervisor's ONLY
+ * clock-out reminder never arrived at all: the elapsed 10/12/15h thresholds and
+ * the pre-auto-clockout warning are deliberately skipped for these roles, so
+ * there is no second chance behind it.
+ *
+ * Widening is free — sendReminderOnce dedups on `clock_out_personal:<date>`, so
+ * the extra qualifying tick can only ever re-send an already-sent reminder,
+ * which it won't. The lower bound stays hard at the shift end: never early.
+ */
+export const SHIFT_END_WINDOW_MINUTES = 29;
+
+/**
+ * The wall-clock minute a worker's clock-out nudge should fire at, or null when
+ * they get no wall-clock nudge at all.
+ *
+ * WHY THIS IS NOT JUST `DEFAULT_SHIFT_END_MINUTES` (multi-tenant correctness):
+ * the 6:30 PM default is a constant, but `auto_clockout_time` is per-tenant
+ * config and defaults to 18:00. On a tenant that leaves it there, the
+ * supervisor's card is auto-closed at 6:00 PM — so at 6:30 there is no open
+ * timecard for the cron to find, the one nudge he gets never fires, AND he was
+ * silently clocked out of the half hour he was still working. Patriot is safe
+ * (19:00), but "it works for the next company out of the box" is the rule.
+ *
+ * So the role default is pulled EARLIER when the tenant closes cards before it,
+ * landing `warnBeforeAutoClockoutMinutes` ahead of the auto-clockout — the same
+ * warning distance operators get. It is only ever pulled earlier, never later.
+ *
+ * A personal override (`profiles.clock_out_reminder_time`) still wins outright:
+ * it is a deliberate per-person decision, not a default to be second-guessed.
+ *
+ * @param autoClockoutMinutes minutes-since-midnight, or null when the tenant
+ *   has auto-clockout DISABLED (nothing to race, so the default stands).
+ */
+export function resolveWallClockReminderMinutes(opts: {
+  personalMinutes: number | null;
+  usesShiftWindow: boolean;
+  autoClockoutMinutes: number | null;
+  warnBeforeAutoClockoutMinutes: number;
+}): number | null {
+  if (opts.personalMinutes != null) return opts.personalMinutes;
+  if (!opts.usesShiftWindow) return null;
+  if (opts.autoClockoutMinutes == null) return DEFAULT_SHIFT_END_MINUTES;
+  return Math.max(
+    0,
+    Math.min(
+      DEFAULT_SHIFT_END_MINUTES,
+      opts.autoClockoutMinutes - opts.warnBeforeAutoClockoutMinutes
+    )
+  );
+}
+
+/** Does this role get shift-window (wall-clock only) clock-out reminders? */
+export function usesShiftWindowReminders(role: string | null | undefined): boolean {
+  return !!role && (SHIFT_WINDOW_ROLES as readonly string[]).includes(role);
+}
+
+/**
+ * Is the wall-clock shift-end nudge due right now?
+ * `nowMinutesLocal` and `shiftEndMinutes` are both minutes-since-midnight in
+ * the TENANT's timezone — never UTC (see lib/reminder-timing.ts#nowMinutesInTz).
+ */
+export function shiftEndReminderDue(nowMinutesLocal: number, shiftEndMinutes: number): boolean {
+  return (
+    nowMinutesLocal >= shiftEndMinutes &&
+    nowMinutesLocal <= shiftEndMinutes + SHIFT_END_WINDOW_MINUTES
+  );
+}
+
 // ── Copy helpers ─────────────────────────────────────────────────────────────
 
 /** "about 35 minutes ago" / "about an hour ago" / "about 3 hours ago". */

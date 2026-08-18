@@ -34,7 +34,13 @@ import PhotoUploader from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey';
 import JobProgressLogger from '@/components/JobProgressLogger';
+import DayCloseoutChoice from '@/components/DayCloseoutChoice';
 import { toLocalYMD } from '@/lib/dates';
+import {
+  planDayCloseout,
+  CONTINUE_CONFIRMATION_REQUIRED,
+  type ContinueConfirmCopy,
+} from '@/lib/day-closeout';
 
 // Shop location for "Directions back to shop". Hardcoded for now — Patriot's
 // verified shop coordinates. TODO: make tenant-configurable (e.g. read from
@@ -84,8 +90,36 @@ export default function DayCompletePage() {
     unit?: string; depth?: string | number; notes?: string;
   }>>([]);
 
-  // ─── Smart last-day detection ────────────────────────────────────────────
+  // ─── What the OFFICE actually booked ─────────────────────────────────────
+  // The booked span — not job_orders.is_multi_day — decides whether "Done for
+  // Today" is the expected action or a job-shape change that has to be
+  // confirmed. is_multi_day is the field the wrong tap corrupts, so it can
+  // never be the thing that authorises the next wrong tap.
+  const [booking, setBooking] = useState<{
+    scheduledDate: string | null;
+    scheduledEndDate: string | null;
+  } | null>(null);
   const [isLastScheduledDay, setIsLastScheduledDay] = useState<boolean | null>(null);
+  /** Set when the SERVER refuses an unconfirmed "Done for Today" (409). */
+  const [continueBlockedMessage, setContinueBlockedMessage] = useState<string | null>(null);
+  /** The 409's structured copy, when it sent one — title AND body from the server. */
+  const [continueBlockedCopy, setContinueBlockedCopy] = useState<ContinueConfirmCopy | null>(null);
+
+  // `booking` is null until fetchScheduleInfo resolves (and on a fetch failure),
+  // so this plan is built from nulls in that window — which reads as "the office
+  // booked one day" and would put that warning in front of a genuine 8-day job.
+  // planPending below suppresses the question until the dates are known; the
+  // server re-evaluates the same rule against the real ones either way.
+  const bookingUnknown = booking === null;
+  const closeoutPlan = planDayCloseout({
+    // Device-local calendar. The server evaluates the same rule in the TENANT's
+    // timezone, so an out-of-town crew near midnight can disagree with it — that
+    // disagreement lands as the 409 below, which is handled, so the worst case
+    // is one extra question rather than a wrong write.
+    today: toLocalYMD(),
+    scheduledDate: booking?.scheduledDate ?? null,
+    scheduledEndDate: booking?.scheduledEndDate ?? null,
+  });
 
   // ─── Subsistence (out-of-town overnight) ─────────────────────────────────
   // Only relevant when the job is flagged out_of_town in scheduling_flexibility.
@@ -252,14 +286,21 @@ export default function DayCompletePage() {
         const json = await res.json();
         // LOCAL day — toISOString() is UTC and flips at ~8pm ET.
         const today = toLocalYMD();
-        const endDate = json.data?.scheduled_end_date;
-        const scheduledDate = json.data?.scheduled_date;
+        // LOAD-BEARING, and invisible here: the route already coalesces
+        // `scheduled_end_date ?? end_date` (app/api/jobs/[id]/schedule-info),
+        // so this single field covers the legacy multi-day column too. Drop that
+        // coalesce and every legacy multi-day job starts asking to continue.
+        const endDate = json.data?.scheduled_end_date ?? null;
+        const scheduledDate = json.data?.scheduled_date ?? null;
+        setBooking({ scheduledDate, scheduledEndDate: endDate });
         const isLast = endDate ? endDate === today : scheduledDate === today;
         setIsLastScheduledDay(isLast);
       } else {
+        setBooking(null);
         setIsLastScheduledDay(null);
       }
     } catch {
+      setBooking(null);
       setIsLastScheduledDay(null);
     }
   };
@@ -358,7 +399,12 @@ export default function DayCompletePage() {
   };
 
   // ─── DONE FOR TODAY (Continue Tomorrow) ───────────────────────────────────
-  const handleDoneForToday = async () => {
+  //
+  // `confirmed` is true only when the crew went through the confirmation in
+  // DayCloseoutChoice. It is forwarded to the API so the SERVER can refuse a
+  // request that never asked the question — the client's schedule read can be
+  // stale, and `is_multi_day: true` is too expensive to take on trust.
+  const handleDoneForToday = async (confirmed: boolean) => {
     // Required: today's work. PHOTOS ARE NOT REQUIRED TO CLOSE OUT A DAY on a
     // multi-day job (founder, Aug 3 2026) — the crew is coming back tomorrow,
     // nothing is being handed to the customer, and nobody is signing anything.
@@ -401,6 +447,7 @@ export default function DayCompletePage() {
           notes: `Day complete. Continuing tomorrow.`,
           work_date: lateWorkDate,
           continueNextDay: true,
+          confirm_continue_next_day: confirmed,
           latitude: null,
           longitude: null,
           stayed_overnight: stayedOvernight,
@@ -410,9 +457,19 @@ export default function DayCompletePage() {
       if (res.ok) {
         localStorage.removeItem(`work-performed-${jobId}`);
         localStorage.removeItem(`work-draft-${jobId}`);
+        setContinueBlockedMessage(null);
+        setContinueBlockedCopy(null);
         setSuccessMode('done_for_day');
       } else {
         const data = await res.json();
+        // The server holds the same rule and says no: this job was not booked
+        // past today. Nothing was written — put the question in front of the
+        // crew instead of a red toast they'd have to interpret.
+        if (res.status === 409 && data?.error === CONTINUE_CONFIRMATION_REQUIRED) {
+          setContinueBlockedCopy((data.confirm as ContinueConfirmCopy) ?? null);
+          setContinueBlockedMessage(data.message || 'This job was not booked past today.');
+          return;
+        }
         showNotif(data.error || 'Failed to save daily log', 'error');
       }
     } catch (err) {
@@ -1359,68 +1416,27 @@ export default function DayCompletePage() {
 
         {/* ── Main Decision ─────────────────────────────────────────────────── */}
         {!showSignature ? (
-          <div className="space-y-4">
-            <h2 className="text-center text-lg font-semibold text-gray-800 dark:text-gray-100">
-              Is the job finished, or are you coming back?
-            </h2>
-            {isLastScheduledDay === true && (
-              <p className="-mt-2 text-center text-sm text-gray-500 dark:text-gray-400">
-                This was the last day on the schedule — but if there&apos;s still work
-                left, choose &ldquo;Done for Today&rdquo; and pick it back up tomorrow.
-              </p>
-            )}
-
-            {/* Option 1 — Done for Today.
-                ALWAYS AVAILABLE (founder, Aug 2026). This used to be hidden on
-                the final scheduled day, which forced an operator whose job ran
-                long to either complete a job that wasn't finished or get stuck.
-                Jobs run long; the schedule is a plan, not a fact. Choosing this
-                keeps the job open and lets them submit more work tomorrow. */}
-            <button
-                onClick={handleDoneForToday}
-                disabled={submitting || subsistenceUnanswered}
-                className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-amber-500 via-amber-500 to-orange-500 text-left shadow-lg shadow-amber-500/30 ring-1 ring-amber-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-amber-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
-                  <Sun className="w-6 h-6 text-white" />
-                </div>
-                <div className="flex-1">
-                  <p className="font-bold text-white text-base">Done for Today</p>
-                  <p className="text-sm text-white/85 mt-0.5">Job continues tomorrow. Progress saved.</p>
-                </div>
-                {submitting && <Loader2 className="w-5 h-5 animate-spin text-white" />}
-            </button>
-
-            {/* Option 2 — Complete Job (on-site signature) */}
-            <button
-              onClick={() => setShowSignature(true)}
-              disabled={submitting || subsistenceUnanswered}
-              className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-emerald-500 via-emerald-500 to-teal-500 text-left shadow-lg shadow-emerald-500/30 ring-1 ring-emerald-400/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-emerald-500/40 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
-                <Trophy className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-white text-base">Complete Job — Get Signature On Site</p>
-                <p className="text-sm text-white/85 mt-0.5">Customer is here — get their signature to complete the job.</p>
-              </div>
-            </button>
-
-            {/* Option 3 — Send remote link */}
-            <button
-              onClick={() => { setRemoteError(null); setShowRemotePanel(true); }}
-              disabled={submitting || subsistenceUnanswered}
-              className="group w-full flex items-center gap-4 p-5 rounded-2xl bg-gradient-to-r from-brand to-brand-accent text-left shadow-lg shadow-brand/30 ring-1 ring-brand/30 transition-all hover:scale-[1.01] active:scale-[0.99] hover:shadow-xl hover:shadow-brand/40 disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              <div className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 bg-white/25 backdrop-blur-sm ring-1 ring-white/30">
-                <Send className="w-6 h-6 text-white" />
-              </div>
-              <div className="flex-1">
-                <p className="font-bold text-white text-base">Send Completion Link &amp; Finish Job</p>
-                <p className="text-sm text-white/85 mt-0.5">Customer isn&apos;t here — send them a signature link via SMS.</p>
-              </div>
-            </button>
-          </div>
+          /* The terminal choice. "Done for Today" stays ALWAYS AVAILABLE
+             (founder, Aug 2026) — jobs run long and the schedule is a plan, not
+             a fact — but it is no longer a sibling of "Complete Job", and on a
+             job the office booked for a single day it now names its own cost
+             before it changes the job's shape. See components/DayCloseoutChoice
+             and lib/day-closeout. */
+          <DayCloseoutChoice
+            plan={closeoutPlan}
+            disabled={subsistenceUnanswered}
+            submitting={submitting}
+            planPending={bookingUnknown}
+            onContinue={handleDoneForToday}
+            onSignOnSite={() => setShowSignature(true)}
+            onSendLink={() => { setRemoteError(null); setShowRemotePanel(true); }}
+            serverConfirmMessage={continueBlockedMessage}
+            serverConfirmCopy={continueBlockedCopy}
+            onServerConfirmDismissed={() => {
+              setContinueBlockedMessage(null);
+              setContinueBlockedCopy(null);
+            }}
+          />
         ) : (
           /* ── On-site Sign-Off Document ────────────────────────────────────── */
           <div className="space-y-4">
@@ -1705,16 +1721,22 @@ export default function DayCompletePage() {
           </div>
         )}
 
-        {/* Warning */}
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4">
-          <div className="flex gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              <strong>Done for Today</strong> saves your progress and resets the job for tomorrow.{' '}
-              <strong>Complete Job</strong> submits to your supervisor for approval.
-            </p>
+        {/* The one difference that costs money, said plainly and at a size a
+            gloved operator can read in the sun. The old version of this box
+            said "Complete Job submits to your supervisor for approval", which
+            was both wrong and no help in telling the two apart. */}
+        {!showSignature && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 rounded-xl p-4">
+            <div className="flex gap-2">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed">
+                Only <strong>Complete Job</strong> finishes a job — it takes the customer&apos;s
+                signature and lets the office bill it. <strong>Done for Today</strong> leaves the
+                job open and brings it back tomorrow.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* ── Remote Signature Panel (modal) ─────────────────────────────────── */}
