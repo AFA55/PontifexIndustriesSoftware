@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import { authedFetchQuiet } from '@/lib/authed-fetch';
 import type { JobCardData } from './JobCard';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────
@@ -33,12 +34,36 @@ export async function getToken() {
   return data.session?.access_token || '';
 }
 
+/**
+ * The board's call to its own API.
+ *
+ * WHY authedFetchQuiet (Aug 17): this used to read the session and post
+ * whatever `access_token` it found. When that value was malformed — the exact
+ * failure in the Supabase auth log, "token contains an invalid number of
+ * segments" — every call the board made on mount 401ed together, which is what
+ * a clump of ten simultaneous 401s in the Vercel log is. The board is where
+ * that happens precisely because the board fires the most calls at once.
+ *
+ * Quiet, not throwing: ~60 call sites here read `res.ok`, and every one of them
+ * still gets a Response. What changes is that a non-JWT is never sent, and a
+ * 401 buys one refresh and one retry before the board decides anything is
+ * wrong. Its `Content-Type` default is unchanged.
+ */
 export async function apiFetch(url: string, opts?: RequestInit) {
-  const token = await getToken();
-  return fetch(url, {
-    ...opts,
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...opts?.headers },
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(opts?.headers as Record<string, string> | undefined),
+  };
+
+  // If the caller brought its own Authorization we stay out of the way — plain
+  // fetch, no session read, no refresh. Replacing a credential somebody chose
+  // deliberately is not ours to do; `lib/api-client.ts` already declines to,
+  // and the two should not disagree. No board site does this today, which is
+  // exactly why it should be settled before one does.
+  const hasAuthHeader = Object.keys(headers).some((k) => k.toLowerCase() === 'authorization');
+  if (hasAuthHeader) return fetch(url, { ...opts, headers });
+
+  return authedFetchQuiet(url, { ...opts, headers });
 }
 
 // ─── Convert API job to JobCardData ──────────────────────────────────────

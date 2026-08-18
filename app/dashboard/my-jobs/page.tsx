@@ -14,6 +14,7 @@ import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import SubmitRatingModal from './_components/SubmitRatingModal';
 import { formatMaybeDateTime } from '@/lib/dates';
 import { getCardPermission } from '@/lib/rbac';
+import { useMyCardPermissions } from '@/lib/use-card-permissions';
 import { resolveScheduleBanners, type DispatchBannerStatus } from '@/lib/schedule-banners';
 
 interface PendingRating {
@@ -39,6 +40,10 @@ export default function MyJobsPage() {
   const [error, setError] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string>('operator');
   const [userId, setUserId] = useState<string>('');
+  // Per-user card grants. This screen only READS them to decide whether to show
+  // the "back to management" door, so a late answer costs nothing and no
+  // redirect depends on it.
+  const { permissions: cardPermissions } = useMyCardPermissions();
   const [continuingProjects, setContinuingProjects] = useState<any[]>([]);
   const [multiDayScheduled, setMultiDayScheduled] = useState<any[]>([]);
   const [activeShopTicket, setActiveShopTicket] = useState<any>(null);
@@ -150,7 +155,7 @@ export default function MyJobsPage() {
    * never disagree — change the preset in lib/rbac.ts and both follow.
    */
   const isManagementViewer =
-    !!userRole && getCardPermission(null, 'operator_view', userRole) !== 'none';
+    !!userRole && getCardPermission(cardPermissions, 'operator_view', userRole) !== 'none';
 
   // Check which of today's jobs have a "Done for Today" log (day_completed_at set today)
   const fetchDoneTodayStatus = useCallback(async (jobList: any[]) => {

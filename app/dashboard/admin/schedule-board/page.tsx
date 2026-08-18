@@ -33,6 +33,7 @@ import { OPERATOR_COLORS, SALESMEN } from './_components/constants';
 import { parseLocalDate, toDateString, formatDisplayDate, daysAgo, apiFetch, toJobCard } from './_components/helpers';
 import type { ConflictData, RowChangeConflict } from './_components/types';
 import { useModuleGate } from '@/components/ModuleGuard';
+import { fetchPrintPdf, openPrintBlob } from '@/lib/print-failure';
 
 // ─── Heavy components — dynamic-imported (rendered conditionally) ─────────
 const PendingQueueSidebar = dynamic(() => import('./_components/PendingQueueSidebar'), { ssr: false, loading: () => null });
@@ -319,29 +320,31 @@ export default function ScheduleBoardPage() {
   const handlePrintTicket = useCallback(async (job: JobCardData) => {
     setPrintingJobId(job.id);
     try {
-      const res = await apiFetch(`/api/job-orders/${job.id}/dispatch-pdf`);
-      if (!res.ok) {
-        let msg = 'Could not generate the ticket.';
-        try { msg = (await res.json())?.error || msg; } catch { /* not json */ }
-        addToast('error', 'Print Failed', msg);
+      const result = await fetchPrintPdf(`/api/job-orders/${job.id}/dispatch-pdf`, {
+        surface: 'schedule-board:card',
+        role: userRole,
+      });
+      if (!result.ok) {
+        // Three different situations, three different things to do about them:
+        // sign in again / wait for the sign-in service / it's the ticket that
+        // failed. They used to arrive as one sentence.
+        addToast(
+          'error',
+          result.needsLogin ? 'Session Expired' : 'Print Failed',
+          result.message
+        );
         return;
       }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const win = window.open(url, '_blank');
-      if (!win) {
+      const blocked = openPrintBlob(result.blob);
+      if (blocked) {
         addToast('error', 'Popup Blocked', 'Allow popups for this site, then press Print again.');
         return;
       }
-      // Revoke late so the new tab has finished loading the blob.
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
       addToast('success', 'Ticket Ready', `${job.job_number || 'Ticket'} opened in a new tab — print it from there.`);
-    } catch {
-      addToast('error', 'Print Failed', 'Could not reach the server. Check your connection.');
     } finally {
       setPrintingJobId(null);
     }
-  }, [addToast]);
+  }, [addToast, userRole]);
 
   // ═══ FETCH OPERATORS/HELPERS ═══
   useEffect(() => {

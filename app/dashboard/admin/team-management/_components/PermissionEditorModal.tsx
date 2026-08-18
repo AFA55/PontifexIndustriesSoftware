@@ -11,6 +11,7 @@ import {
   getRoleLabel,
   type PermissionLevel,
 } from '@/lib/rbac';
+import { STORABLE_CARD_LEVELS, toStorableOverrides } from '@/lib/card-permissions';
 
 // ============================================================
 // Types
@@ -90,9 +91,12 @@ export default function PermissionEditorModal({
 
   // Count permission summary
   const fullCount = Object.values(permissions).filter(v => v === 'full').length;
-  const submitCount = Object.values(permissions).filter(v => v === 'submit').length;
   const viewCount = Object.values(permissions).filter(v => v === 'view').length;
   const noneCount = Object.values(permissions).filter(v => v === 'none').length;
+  // Cards whose ROLE PRESET is 'submit' — a level the per-user table cannot
+  // hold. They are shown as "role default" and left out of the saved payload,
+  // so the preset keeps supplying them.
+  const presetOnlyCount = Object.values(permissions).filter(v => v === 'submit').length;
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -209,25 +213,28 @@ export default function PermissionEditorModal({
                   <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full font-semibold">
                     {fullCount} Full
                   </span>
-                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">
-                    {submitCount} Submit
-                  </span>
                   <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-full font-semibold">
                     {viewCount} View
                   </span>
                   <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full font-semibold">
                     {noneCount} None
                   </span>
+                  {presetOnlyCount > 0 && (
+                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-semibold">
+                      {presetOnlyCount} Role Default
+                    </span>
+                  )}
                 </div>
               </div>
 
-              {/* Column headers */}
+              {/* Column headers. Three levels, matching the user_card_permissions
+                  CHECK exactly — a fourth column the table rejects made ONE bad
+                  entry reject the whole batch, so no grant landed at all. */}
               <div className="grid grid-cols-[1fr,auto] gap-2 mb-2 px-3">
                 <div></div>
-                <div className="grid grid-cols-4 gap-1 text-center">
+                <div className="grid grid-cols-3 gap-1 text-center">
                   <span className="text-[10px] font-bold text-gray-400 uppercase w-14">None</span>
                   <span className="text-[10px] font-bold text-gray-400 uppercase w-14">View</span>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase w-14">Submit</span>
                   <span className="text-[10px] font-bold text-gray-400 uppercase w-14">Full</span>
                 </div>
               </div>
@@ -254,12 +261,17 @@ export default function PermissionEditorModal({
                         <span className="text-lg flex-shrink-0">{card.icon}</span>
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-gray-800 truncate">{card.title}</p>
+                          {level === 'submit' && (
+                            <p className="text-[10px] text-blue-600 truncate">
+                              Submit — from the {getRoleLabel(selectedRole)} role. Left as-is unless you pick one.
+                            </p>
+                          )}
                         </div>
                       </div>
 
                       {/* Radio buttons */}
-                      <div className="grid grid-cols-4 gap-1">
-                        {(['none', 'view', 'submit', 'full'] as PermissionLevel[]).map(opt => (
+                      <div className="grid grid-cols-3 gap-1">
+                        {STORABLE_CARD_LEVELS.map(opt => (
                           <button
                             key={opt}
                             onClick={() => handlePermissionChange(card.key, opt)}
@@ -267,15 +279,13 @@ export default function PermissionEditorModal({
                               level === opt
                                 ? opt === 'full'
                                   ? 'bg-green-500 text-white shadow-sm'
-                                  : opt === 'submit'
-                                  ? 'bg-blue-500 text-white shadow-sm'
                                   : opt === 'view'
                                   ? 'bg-yellow-500 text-white shadow-sm'
                                   : 'bg-gray-400 text-white shadow-sm'
                                 : 'bg-white border border-gray-200 text-gray-400 hover:border-gray-300'
                             }`}
                           >
-                            {opt === 'none' ? 'None' : opt === 'view' ? 'View' : opt === 'submit' ? 'Submit' : 'Full'}
+                            {opt === 'none' ? 'None' : opt === 'view' ? 'View' : 'Full'}
                           </button>
                         ))}
                       </div>
@@ -337,7 +347,13 @@ export default function PermissionEditorModal({
             Cancel
           </button>
           <button
-            onClick={() => onSave(selectedRole, permissions)}
+            // `permissions` is SEEDED from the role preset, and several presets
+            // carry `submit` (admin.schedule_form, supervisor.site_visits, …) —
+            // a level the user_card_permissions CHECK rejects. Sending it made
+            // Postgres reject the whole batch, so the grant the office actually
+            // came here to make never landed. Drop those entries; with no
+            // override row the preset keeps supplying them unchanged.
+            onClick={() => onSave(selectedRole, toStorableOverrides(permissions))}
             disabled={saving}
             className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-blue-700 transition-all disabled:opacity-50 shadow-lg"
           >

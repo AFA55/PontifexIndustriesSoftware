@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Printer, Check, X, FileText, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { fetchPrintPdf, isAuthPrintFailure } from '@/lib/print-failure';
 
 interface BatchPrintModalProps {
   jobs: Array<{
@@ -51,16 +51,22 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
     setError(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        setError('Not authenticated. Please log in and try again.');
-        setPrinting(false);
-        return;
-      }
-
       const selected = jobs.filter(j => selectedIds.has(j.id));
       const results: { id: string; job_number: string; blob: Blob }[] = [];
       const errors: string[] = [];
+
+      // AN AUTH FAILURE STOPS THE WHOLE BATCH.
+      //
+      // Not an optimisation — a correctness rule. If the session is dead or the
+      // sign-in service is down, none of the remaining tickets will print
+      // either, and letting the loop run on would mean N refresh attempts, N
+      // rows in error_logs and one error string repeating the same sentence a
+      // dozen times. One cause, one message, said once.
+      //
+      // (The first failure still costs one refresh: authedFetch retries once,
+      // and supabase-js single-flights the refresh internally, so the two other
+      // workers in flight at that moment share it rather than stampeding.)
+      let authFailure: string | null = null;
 
       // THREE AT A TIME, not all of them at once.
       //
@@ -77,30 +83,41 @@ export default function BatchPrintModal({ jobs, onClose }: BatchPrintModalProps)
       let cursor = 0;
       const printWorker = async () => {
         for (;;) {
+          if (authFailure) return;
           const i = cursor;
           cursor += 1;
           if (i >= selected.length) return;
           const job = selected[i];
-          try {
-            // eslint-disable-next-line no-await-in-loop
-            const res = await fetch(`/api/job-orders/${job.id}/dispatch-pdf`, {
-              headers: { Authorization: `Bearer ${session.access_token}` },
-            });
-            if (!res.ok) {
-              errors.push(`${job.job_number}: ${res.statusText}`);
-              continue;
-            }
-            // eslint-disable-next-line no-await-in-loop
-            const blob = await res.blob();
-            results.push({ id: job.id, job_number: job.job_number, blob });
-          } catch {
-            errors.push(`${job.job_number}: Network error`);
+          // eslint-disable-next-line no-await-in-loop
+          const result = await fetchPrintPdf(`/api/job-orders/${job.id}/dispatch-pdf`, {
+            surface: 'schedule-board:batch-print',
+          });
+          if (result.ok) {
+            results.push({ id: job.id, job_number: job.job_number, blob: result.blob });
+            continue;
           }
+          if (isAuthPrintFailure(result)) {
+            // Whichever worker gets here first owns the message; the others see
+            // the flag and stop without adding their own copy of it.
+            authFailure ??= result.message;
+            return;
+          }
+          errors.push(`${job.job_number}: ${result.message}`);
         }
       };
       await Promise.all(
         Array.from({ length: Math.min(CONCURRENT_PRINTS, selected.length) }, printWorker)
       );
+
+      if (authFailure) {
+        // The exact distinction that matters: "sign in again" when the session
+        // is dead, "your login is fine, try again shortly" when the sign-in
+        // service is the thing that is down. Both arrive here as the sentence
+        // already written for the person reading it.
+        setError(authFailure);
+        setPrinting(false);
+        return;
+      }
 
       if (results.length === 0) {
         setError(`Failed to generate PDFs. ${errors.join('; ')}`);

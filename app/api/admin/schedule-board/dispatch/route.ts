@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { supabaseAdmin } from '@/lib/supabase-admin';
-import { getCardPermission, type PermissionLevel } from '@/lib/rbac';
+import { requireCardLevel } from '@/lib/card-permissions-server';
 import { dispatchJobsForTenant } from '@/lib/dispatch';
 
 /**
@@ -20,24 +20,15 @@ export async function POST(request: NextRequest) {
   if (!auth.authorized) return auth.response;
 
   // Only users with full schedule_board access can dispatch.
+  //
+  // The office (`admin`) keeps its explicit allowance here — dispatching the
+  // day's tickets is their job and has been since this route shipped, even
+  // though the role preset says `schedule_board: 'view'`. Everyone else goes
+  // through the shared per-user lookup (lib/card-permissions-server.ts), which
+  // is the same one the timecard gates and /api/card-permissions/me use.
   if (!['super_admin', 'operations_manager', 'admin'].includes(auth.role)) {
-    const { data: permRows } = await supabaseAdmin
-      .from('user_card_permissions')
-      .select('card_key, permission_level')
-      .eq('user_id', auth.userId);
-
-    const userPermissions: Record<string, PermissionLevel> | null =
-      permRows && permRows.length > 0
-        ? permRows.reduce((acc, r) => { acc[r.card_key] = r.permission_level as PermissionLevel; return acc; }, {} as Record<string, PermissionLevel>)
-        : null;
-
-    const effectiveLevel = getCardPermission(userPermissions, 'schedule_board', auth.role);
-    if (effectiveLevel !== 'full') {
-      return NextResponse.json(
-        { error: 'Forbidden. Full schedule board access required to dispatch jobs.' },
-        { status: 403 }
-      );
-    }
+    const denied = await requireCardLevel(auth, 'schedule_board', 'full', 'Dispatching jobs');
+    if (denied) return denied;
   }
 
   try {

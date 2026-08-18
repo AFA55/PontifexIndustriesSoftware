@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
 import { useFeatureFlags } from '@/lib/feature-flags';
 import { getCardPermission } from '@/lib/rbac';
+import { useMyCardPermissions } from '@/lib/use-card-permissions';
 import {
   ArrowLeft, Clock, CheckCircle, Calendar,
   User as UserIcon, FileText, Download,
@@ -203,6 +204,18 @@ export default function AdminTimecardsPage() {
     window.location.href = '/login';
   }, []);
 
+  // Per-user grants from `user_card_permissions`. Passing null here (which this
+  // page did) meant an override was read from nowhere: Team Management could
+  // save "full access to timecards" and the page would keep answering from the
+  // role preset. See lib/card-permissions.ts.
+  const {
+    permissions: cardPermissions,
+    loading: cardPermissionsLoading,
+    role: serverRole,
+    error: cardPermissionsError,
+    reload: reloadCardPermissions,
+  } = useMyCardPermissions();
+
   useEffect(() => {
     const currentUser = getCurrentUser();
     if (!currentUser) { router.push('/login'); return; }
@@ -210,12 +223,24 @@ export default function AdminTimecardsPage() {
     // salesman onto a page they have no card for and whose every request 403s.
     // The card permission is the same thing that decides whether the tile is on
     // their dashboard, so the door and the tile can no longer disagree.
-    if (getCardPermission(null, 'timecards', currentUser.role) === 'none') {
+    //
+    // WAIT for the overrides before REDIRECTING. Bouncing someone whose only
+    // way in is an override, purely because the fetch had not landed yet, would
+    // be the same silent failure wearing a different hat.
+    //
+    // Same for a FAILED read: we do not know what they have, so we do not
+    // throw them off the page over it. The buttons stay gated (fail closed),
+    // the banner explains why, and nobody is silently ejected.
+    if (cardPermissionsLoading) return;
+    if (
+      !cardPermissionsError &&
+      getCardPermission(cardPermissions, 'timecards', serverRole || currentUser.role) === 'none'
+    ) {
       router.push('/dashboard');
       return;
     }
     setUser(currentUser);
-  }, [router]);
+  }, [router, cardPermissions, cardPermissionsLoading, cardPermissionsError, serverRole]);
 
   // Feature flag guard
   useEffect(() => {
@@ -320,8 +345,19 @@ export default function AdminTimecardsPage() {
   // the crew's hours, he does not approve them. Showing him buttons that 403
   // would recreate the exact defect this page was just fixed for: an action
   // offered and then refused.
+  //
+  // The per-user override is what makes this reachable for someone whose ROLE
+  // says view: Amanda is `admin` (preset `timecards: 'view'`) and runs payroll,
+  // so she carries an explicit `timecards: 'full'` row. The same level is
+  // re-checked server-side on approve / no-show, so this is a matching pair of
+  // gates, not a hidden button.
+  //
+  // The role comes from the SERVER (profiles.role) when the hook has it —
+  // `getCurrentUser()` reads a localStorage copy written at login, so a demoted
+  // user would keep the buttons until their next sign-in.
+  const effectiveRole = serverRole || user?.role || '';
   const canManageTimecards =
-    !!user?.role && getCardPermission(null, 'timecards', user.role) === 'full';
+    !!effectiveRole && getCardPermission(cardPermissions, 'timecards', effectiveRole) === 'full';
 
   const handleBulkApproveAll = async () => {
     if (!canManageTimecards) return;
@@ -341,12 +377,23 @@ export default function AdminTimecardsPage() {
       if (!result.success) return;
 
       const pendingCards = result.data.timecards;
+      // Surface the FIRST refusal instead of finishing the loop silently. The
+      // approve route now enforces `timecards: 'full'` server-side, and a 403
+      // that produces no visible change reads as "the button did nothing" —
+      // the same defect in a new place.
+      let firstFailure: string | null = null;
       for (const tc of pendingCards) {
-        await fetch(`/api/admin/timecards/${tc.id}/approve`, {
+        const r = await fetch(`/api/admin/timecards/${tc.id}/approve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
+        if (!r.ok && !firstFailure) {
+          const j = await r.json().catch(() => ({}));
+          firstFailure = j.error || `Approval failed (${r.status}).`;
+          if (r.status === 403) break; // every remaining call would fail identically
+        }
       }
+      if (firstFailure) addToast('error', 'Timecards Not Approved', firstFailure);
       fetchTeamSummary();
     } catch (error) {
       console.error('Error bulk approving:', error);
@@ -371,15 +418,23 @@ export default function AdminTimecardsPage() {
       const result = await res.json();
       if (!result.success) return;
 
+      let firstFailure: string | null = null;
       for (const tc of result.data.timecards) {
-        await fetch(`/api/admin/timecards/${tc.id}/approve`, {
+        const r = await fetch(`/api/admin/timecards/${tc.id}/approve`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
         });
+        if (!r.ok && !firstFailure) {
+          const j = await r.json().catch(() => ({}));
+          firstFailure = j.error || `Approval failed (${r.status}).`;
+          if (r.status === 403) break;
+        }
       }
+      if (firstFailure) addToast('error', 'Timecards Not Approved', firstFailure);
       fetchTeamSummary();
     } catch (error) {
       console.error('Error approving user timecards:', error);
+      addToast('error', 'Timecards Not Approved', 'Network error occurred.');
     }
   };
 
@@ -485,6 +540,10 @@ export default function AdminTimecardsPage() {
   }, [showCorrections]);
 
   const handleReviewCorrection = async (id: string, action: 'approve' | 'reject') => {
+    // Approving OR rejecting a correction rewrites clock times and recomputes
+    // total_hours — the same payroll authority as approving a week, so the same
+    // gate. The server re-checks; this only stops a pointless round trip.
+    if (!canManageTimecards) return;
     setReviewingCorrection(id);
     try {
       const token = await getSessionToken();
@@ -966,12 +1025,36 @@ export default function AdminTimecardsPage() {
           </div>
         </div>
 
+        {/* Permissions could not be read. Without this the page just quietly
+            drops to the role preset — every payroll control disappears and
+            nothing on screen says why. Fail closed, but say so. */}
+        {cardPermissionsError && (
+          <div className="mb-4 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-400/30">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-800 dark:text-amber-200 flex-1 min-w-[16rem]">
+              We could not load your permissions, so approval controls are hidden for now.
+              This is not a change to your access.
+            </p>
+            <button
+              onClick={reloadCardPermissions}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {/* ── Batch Actions Bar ───────────────────────────── */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
-          {totals.pendingApprovals > 0 && (
+          {/* CONDITIONAL RENDER, not `hidden={!canManageTimecards}`. Tailwind's
+              preflight emits `[hidden]{display:none}` at specificity (0,1,0) and
+              the `flex` utility is also (0,1,0), but `@tailwind utilities` comes
+              AFTER `@tailwind base` in app/globals.css — so `display:flex` wins
+              and the attribute hides nothing. Every gate on this page is a real
+              render gate for that reason. */}
+          {canManageTimecards && totals.pendingApprovals > 0 && (
             <button
               onClick={handleBulkApproveAll}
-              hidden={!canManageTimecards}
               disabled={bulkApproving}
               className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition-all disabled:opacity-50 shadow-lg shadow-emerald-600/20"
             >
@@ -1290,24 +1373,29 @@ export default function AdminTimecardsPage() {
                               <Eye size={11} />
                               View
                             </button>
-                            {member.pendingCount > 0 && (
+                            {canManageTimecards && member.pendingCount > 0 && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
-                                hidden={!canManageTimecards}
                                 className="flex items-center gap-1 px-2 py-1 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 rounded-md text-[11px] font-semibold border border-emerald-200 dark:border-emerald-400/30 transition-all"
                               >
                                 <Shield size={11} />
                                 Approve
                               </button>
                             )}
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleNoShow(member.userId, member.fullName); }}
-                              className="flex items-center gap-1 px-2 py-1 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 rounded-md text-[11px] font-semibold border border-rose-200 dark:border-rose-400/30 transition-all"
-                              aria-label="Record no-show"
-                            >
-                              <UserX size={11} />
-                              No-Show
-                            </button>
+                            {/* handleNoShow already returns early without 'full'
+                                — so this button was VISIBLE and did nothing when
+                                clicked. Same defect as the one this page is being
+                                fixed for, one layer down. */}
+                            {canManageTimecards && (
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleNoShow(member.userId, member.fullName); }}
+                                className="flex items-center gap-1 px-2 py-1 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 text-rose-700 dark:text-rose-300 rounded-md text-[11px] font-semibold border border-rose-200 dark:border-rose-400/30 transition-all"
+                                aria-label="Record no-show"
+                              >
+                                <UserX size={11} />
+                                No-Show
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1444,13 +1532,17 @@ export default function AdminTimecardsPage() {
                           {subsistenceRate > 0 && ` · $${((member.subsistenceNights ?? 0) * subsistenceRate).toFixed(0)}`}
                         </span>
                       )}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleNoShow(member.userId, member.fullName); }}
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-400/30"
-                      >
-                        <UserX size={11} /> No-Show
-                      </button>
-                      {member.pendingCount > 0 && (
+                      {/* Mobile card view — same gate as the desktop table, which
+                          it had been missing entirely. */}
+                      {canManageTimecards && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleNoShow(member.userId, member.fullName); }}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-rose-50 dark:bg-rose-500/10 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-400/30"
+                        >
+                          <UserX size={11} /> No-Show
+                        </button>
+                      )}
+                      {canManageTimecards && member.pendingCount > 0 && (
                         <button
                           onClick={(e) => { e.stopPropagation(); handleApproveUser(member.userId); }}
                           className="ml-auto inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-400/30"
@@ -1618,34 +1710,41 @@ export default function AdminTimecardsPage() {
                       />
                     </div>
 
-                    {/* Approve / Reject buttons */}
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleReviewCorrection(req.id, 'approve')}
-                        hidden={!canManageTimecards}
-                        disabled={reviewingCorrection === req.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-sm shadow-emerald-500/20"
-                      >
-                        {reviewingCorrection === req.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <CheckSquare size={12} />
-                        )}
-                        Approve
-                      </button>
-                      <button
-                        onClick={() => handleReviewCorrection(req.id, 'reject')}
-                        disabled={reviewingCorrection === req.id}
-                        className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-bold border border-red-200 dark:border-red-700/40 transition-all disabled:opacity-50"
-                      >
-                        {reviewingCorrection === req.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <XSquare size={12} />
-                        )}
-                        Reject
-                      </button>
-                    </div>
+                    {/* Approve / Reject buttons. REJECT is gated too: rejecting
+                        closes out a payroll dispute, and the PATCH behind both
+                        rewrites clock times — same authority, same gate. */}
+                    {canManageTimecards ? (
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleReviewCorrection(req.id, 'approve')}
+                          disabled={reviewingCorrection === req.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all disabled:opacity-50 shadow-sm shadow-emerald-500/20"
+                        >
+                          {reviewingCorrection === req.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <CheckSquare size={12} />
+                          )}
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleReviewCorrection(req.id, 'reject')}
+                          disabled={reviewingCorrection === req.id}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-50 dark:bg-red-900/20 hover:bg-red-100 dark:hover:bg-red-900/30 text-red-700 dark:text-red-300 rounded-lg text-xs font-bold border border-red-200 dark:border-red-700/40 transition-all disabled:opacity-50"
+                        >
+                          {reviewingCorrection === req.id ? (
+                            <Loader2 size={12} className="animate-spin" />
+                          ) : (
+                            <XSquare size={12} />
+                          )}
+                          Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-gray-500 dark:text-white/40">
+                        View only — deciding correction requests needs full access to Timecards.
+                      </p>
+                    )}
                   </div>
                 ))
               )}

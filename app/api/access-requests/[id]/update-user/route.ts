@@ -11,9 +11,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireOpsManager } from '@/lib/api-auth';
 import { ROLES_WITH_LABELS, ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
+import { STORABLE_CARD_LEVELS } from '@/lib/card-permissions';
 
 const VALID_ROLES = ROLES_WITH_LABELS.map(r => r.value);
-const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'submit', 'full'];
+// Mirrors the user_card_permissions CHECK — 'submit' is a role-preset level and
+// is not storable per-user. See lib/card-permissions.ts.
+const VALID_LEVELS: PermissionLevel[] = STORABLE_CARD_LEVELS;
 
 export async function POST(
   request: NextRequest,
@@ -54,6 +57,17 @@ export async function POST(
 
     // Validate card_permissions if provided
     if (card_permissions && typeof card_permissions === 'object') {
+      // A NULL tenant_id makes the row invisible to every reader: the
+      // RESTRICTIVE policy hides it and `loadUserCardPermissions` filters on
+      // tenant_id. The grant would save, report success, and do nothing.
+      // `requireOpsManager` admits a tenant-less super_admin, so refuse rather
+      // than write a dead row. (Mirrors /api/admin/card-permissions.)
+      if (Object.keys(card_permissions).length > 0 && !tenantId) {
+        return NextResponse.json(
+          { error: 'Tenant scope required to set card permissions. Nothing was changed.' },
+          { status: 400 }
+        );
+      }
       for (const [key, level] of Object.entries(card_permissions)) {
         if (!ALL_CARD_KEYS.includes(key)) {
           return NextResponse.json(
@@ -130,10 +144,14 @@ export async function POST(
 
     // Upsert card permissions if provided
     if (card_permissions && typeof card_permissions === 'object' && Object.keys(card_permissions).length > 0) {
+      // tenant_id is required for the row to sit inside the table's tenant
+      // isolation; the cross-tenant guard above already proved this user is in
+      // `tenantId`, and the validation block rejected a null one.
       const permRows = Object.entries(card_permissions).map(([card_key, permission_level]) => ({
         user_id: user.id,
         card_key,
         permission_level: permission_level as string,
+        tenant_id: tenantId,
         updated_by: auth.userId,
         updated_at: new Date().toISOString(),
       }));

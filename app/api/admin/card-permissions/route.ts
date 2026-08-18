@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic';
 /**
  * API Route: GET/POST /api/admin/card-permissions
  * Admin-only CRUD for dashboard card permissions per user.
- * Uses 4-level permission_level: 'none' | 'view' | 'submit' | 'full'
+ * permission_level: 'none' | 'view' | 'full' — the three the table's CHECK
+ * accepts. `submit` is a role-preset level only; see STORABLE_CARD_LEVELS.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -11,8 +12,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireOpsManager } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { ALL_CARD_KEYS, type PermissionLevel } from '@/lib/rbac';
+import { STORABLE_CARD_LEVELS } from '@/lib/card-permissions';
 
-const VALID_LEVELS: PermissionLevel[] = ['none', 'view', 'submit', 'full'];
+// Mirrors the production CHECK on user_card_permissions exactly. Accepting a
+// level the table refuses turns one bad entry into a rejected BATCH — no grant
+// lands and the caller is told only "Failed to update card permissions".
+const VALID_LEVELS: PermissionLevel[] = STORABLE_CARD_LEVELS;
 
 // GET: Get card permissions for a specific user (returns Record<string, PermissionLevel>)
 export async function GET(request: NextRequest) {
@@ -123,11 +128,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert each card_key -> permission_level mapping
+    // Upsert each card_key -> permission_level mapping.
+    // tenant_id is NOT optional: the table's RLS treats a NULL tenant as
+    // "belongs to nobody", which the permissive admin policy then lets ANY
+    // tenant's admin read and write. Every row written here has been NULL since
+    // the table was created, so this is the hole being closed. The target user
+    // was already proven to be in `tenantId` above.
     const upsertRows = Object.entries(permissions).map(([card_key, permission_level]) => ({
       user_id,
       card_key,
       permission_level: permission_level as string,
+      tenant_id: tenantId,
       updated_by: auth.userId,
       updated_at: new Date().toISOString(),
     }));

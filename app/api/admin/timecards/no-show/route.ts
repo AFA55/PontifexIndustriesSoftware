@@ -28,12 +28,18 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { requireCardLevel } from '@/lib/card-permissions-server';
 import { sendPushToUser } from '@/lib/send-push';
 
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
   if (!auth.tenantId) return NextResponse.json({ error: 'Tenant required' }, { status: 400 });
+
+  // Recording a no-show writes the operator's attendance record and their pay —
+  // `timecards: 'full'`, checked here and not only where the button is drawn.
+  const denied = await requireCardLevel(auth, 'timecards', 'full', 'Recording a no-show');
+  if (denied) return denied;
 
   let body: any;
   try { body = await request.json(); } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }); }
@@ -221,6 +227,10 @@ export async function DELETE(request: NextRequest) {
   const auth = await requireAdmin(request);
   if (!auth.authorized) return auth.response;
   if (!auth.tenantId) return NextResponse.json({ error: 'Tenant required' }, { status: 400 });
+
+  // Undoing a no-show is the same power as recording one.
+  const denied = await requireCardLevel(auth, 'timecards', 'full', 'Removing a no-show');
+  if (denied) return denied;
 
   const sp = request.nextUrl.searchParams;
   const id = sp.get('id');

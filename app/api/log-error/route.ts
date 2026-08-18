@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
       component_stack: (body.componentStack || '').slice(0, 5000),
       url: reportedUrl,
       user_agent: (body.userAgent || request.headers.get('user-agent') || '').slice(0, 500),
+      // `status_code` and `user_role` are REAL COLUMNS on this table (it was
+      // built for API errors first). Reporters that carry them should fill them
+      // in rather than bury them in jsonb: the question actually asked after an
+      // incident is "what failed for the office admin last Tuesday", and that
+      // should be a WHERE clause, not a jsonb dig. Both are nullable, so a
+      // reporter that has neither is unaffected.
+      status_code: typeof body.extra?.status === 'number' ? body.extra.status : null,
+      user_role: typeof body.extra?.role === 'string' ? body.extra.role.slice(0, 50) : null,
       metadata: {
         timestamp: body.timestamp || new Date().toISOString(),
         extra: body.extra || null,
@@ -109,7 +117,12 @@ export async function POST(request: NextRequest) {
     if (shouldAlert(fingerprint)) {
       await alert({
         level: 'error',
-        title: 'App crashed for a user',
+        // Not everything reported here is a crash. A print that failed is a
+        // person blocked, not a white screen, and calling it a crash is how an
+        // alert channel stops meaning anything.
+        title: errorLog.type.startsWith('boundary:')
+          ? 'App crashed for a user'
+          : 'A user action failed',
         detail: errorLog.error_message.slice(0, 400),
         source: errorLog.url || errorLog.type,
         url: errorLog.url || undefined,

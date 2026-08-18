@@ -17,6 +17,7 @@ import {
   PERMISSION_LABELS,
   type PermissionLevel,
 } from '@/lib/rbac';
+import { STORABLE_CARD_LEVELS, toStorableOverrides } from '@/lib/card-permissions';
 import PermissionEditorModal from './_components/PermissionEditorModal';
 import UserAvatar from '@/components/UserAvatar';
 import RolePermissionsPanel from './_components/RolePermissionsPanel';
@@ -458,7 +459,12 @@ export default function TeamManagementPage() {
           password: newUser.password,
           full_name: newUser.full_name.trim(),
           role: newUser.role,
-          card_permissions: newUser.showPermissions ? newUser.card_permissions : undefined,
+          // Seeded from the role preset, which carries `submit` for some cards
+          // — a level user_card_permissions rejects, taking the whole batch
+          // down with it. Drop those; the preset still supplies them.
+          card_permissions: newUser.showPermissions
+            ? toStorableOverrides(newUser.card_permissions)
+            : undefined,
         }),
       });
       const json = await res.json();
@@ -1194,8 +1200,11 @@ export default function TeamManagementPage() {
                         return (
                           <div key={card.key} className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 border border-gray-200">
                             <span className="text-xs font-semibold text-gray-700 truncate mr-3">{card.title}</span>
+                            {/* Three levels only — the user_card_permissions
+                                CHECK accepts none/view/full. Offering a fourth
+                                made one entry reject the entire upsert. */}
                             <div className="flex gap-1 flex-shrink-0">
-                              {(['none', 'view', 'submit', 'full'] as PermissionLevel[]).map(pl => (
+                              {STORABLE_CARD_LEVELS.map(pl => (
                                 <button
                                   key={pl}
                                   type="button"
@@ -1206,13 +1215,12 @@ export default function TeamManagementPage() {
                                   className={`px-2 py-1 rounded-lg text-[10px] font-bold uppercase transition-all ${
                                     level === pl
                                       ? pl === 'full' ? 'bg-emerald-500 text-white shadow-sm'
-                                        : pl === 'submit' ? 'bg-blue-500 text-white shadow-sm'
                                         : pl === 'view' ? 'bg-amber-500 text-white shadow-sm'
                                         : 'bg-gray-400 text-white shadow-sm'
                                       : 'bg-white text-gray-400 border border-gray-200 hover:bg-gray-100'
                                   }`}
                                 >
-                                  {pl === 'none' ? 'None' : pl === 'view' ? 'View' : pl === 'submit' ? 'Submit' : 'Full'}
+                                  {pl === 'none' ? 'None' : pl === 'view' ? 'View' : 'Full'}
                                 </button>
                               ))}
                             </div>

@@ -11,6 +11,7 @@ import {
 import type { JobCardData } from './JobCard';
 import { EQUIPMENT_ABBREVIATIONS, getDisplayName } from '@/lib/equipment-map';
 import SkillMatchIndicator from './SkillMatchIndicator';
+import { fetchPrintPdf, openPrintBlob, printFailureAlertText } from '@/lib/print-failure';
 
 interface Contact {
   id: string;
@@ -267,28 +268,23 @@ export default function EditJobPanel({
   const handlePrintDispatch = async () => {
     setPrintingPdf(true);
     try {
-      const { supabase } = await import('@/lib/supabase');
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { alert('Your session expired. Log in again, then press Print.'); return; }
-      const res = await fetch(`/api/job-orders/${job.id}/dispatch-pdf`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+      // Was: read the session, and if there wasn't one say "your session
+      // expired" — which was a guess. A malformed token IS a session, so this
+      // path sailed past the check and then 401ed with no retry. fetchPrintPdf
+      // refreshes once and distinguishes a dead session from an unreachable
+      // sign-in service, which need opposite advice.
+      const result = await fetchPrintPdf(`/api/job-orders/${job.id}/dispatch-pdf`, {
+        surface: 'schedule-board:edit-job',
+        role: userRole,
       });
-      if (!res.ok) {
+      if (!result.ok) {
         // Was `if (res.ok)` with no else: a failed ticket looked exactly like a
         // working one that printed nothing.
-        let msg = 'Could not generate the ticket.';
-        try { msg = (await res.json())?.error || msg; } catch { /* not json */ }
-        alert(`Print failed — ${msg}`);
+        alert(printFailureAlertText(result));
         return;
       }
-      const blob = await res.blob();
-      const pdfUrl = URL.createObjectURL(blob);
-      const win = window.open(pdfUrl, '_blank');
-      if (!win) alert('Your browser blocked the popup. Allow popups for this site, then press Print again.');
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
-    } catch (err) {
-      console.error('Error generating dispatch PDF:', err);
-      alert('Print failed — could not reach the server. Check your connection.');
+      const blocked = openPrintBlob(result.blob);
+      if (blocked) alert(blocked);
     } finally {
       setPrintingPdf(false);
     }

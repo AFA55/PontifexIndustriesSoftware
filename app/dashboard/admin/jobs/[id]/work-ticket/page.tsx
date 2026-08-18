@@ -31,7 +31,9 @@ export const dynamic = 'force-dynamic';
 import { useCallback, useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { Printer, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
-import { authedFetch, isSessionExpired } from '@/lib/authed-fetch';
+import { authedFetch } from '@/lib/authed-fetch';
+import { describePrintError } from '@/lib/print-failure';
+import { reportClientFailure } from '@/lib/report-error';
 import { useBranding } from '@/lib/branding-context';
 import { workItemDetailLine, workItemQuickNote, type WorkItemLike } from '@/lib/work-items-format';
 import { formatDay, formatTime, parseYMDLocal, toLocalYMD } from '@/lib/dates';
@@ -440,7 +442,16 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
       });
       const json = await res.json();
       if (!res.ok || !json?.success) {
-        setError(json?.error || 'Could not load the ticket.');
+        const message = json?.error || 'Could not load the ticket.';
+        reportClientFailure({
+          type: 'print_failure',
+          endpoint: `/api/admin/jobs/${jobId}/work-ticket`,
+          status: res.status,
+          errorClass: 'HttpError',
+          message,
+          surface: 'work-ticket:page',
+        });
+        setError(message);
         return;
       }
       setData(json.data as TicketPayload);
@@ -448,12 +459,23 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
       // adopt it so the picker and the URL agree with what is on the page.
       if (!anchor && json.data?.anchor_date) setAnchor(json.data.anchor_date);
     } catch (e) {
-      if (isSessionExpired(e)) {
-        setExpired(true);
-        setError('Your session has expired.');
-      } else {
-        setError('Could not load the ticket.');
-      }
+      // Three outcomes, three different things for the reader to do. The middle
+      // one used to be invisible: during an auth outage this said "could not
+      // load the ticket", which reads as a broken ticket and sends whoever is
+      // holding the phone looking for a problem with the JOB.
+      const described = describePrintError(e);
+      reportClientFailure({
+        type: 'print_failure',
+        endpoint: `/api/admin/jobs/${jobId}/work-ticket`,
+        status: null,
+        errorClass: described.errorClass,
+        message: described.message,
+        surface: 'work-ticket:page',
+      });
+      setExpired(described.needsLogin);
+      setError(
+        described.errorClass === 'NetworkError' ? 'Could not load the ticket.' : described.message
+      );
     } finally {
       setLoading(false);
     }

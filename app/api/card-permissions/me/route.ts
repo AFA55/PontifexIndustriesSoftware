@@ -7,9 +7,9 @@ export const dynamic = 'force-dynamic';
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { loadUserCardPermissionsResult } from '@/lib/card-permissions-server';
 import type { PermissionLevel } from '@/lib/rbac';
 
 // GET: Current user's card permissions as a map
@@ -19,25 +19,24 @@ export async function GET(request: NextRequest) {
     if (!auth.authorized) return auth.response;
     const tenantId = await getTenantId(auth.userId);
 
-    // Query is already user-scoped (eq user_id), tenant_id available for future use
-    const { data: rows, error } = await supabaseAdmin
-      .from('user_card_permissions')
-      .select('card_key, permission_level')
-      .eq('user_id', auth.userId);
+    // Same loader the API guards use (lib/card-permissions-server.ts), so what
+    // the browser is told and what the server will enforce can never disagree —
+    // including the tenant scoping, which matters because supabaseAdmin bypasses
+    // RLS.
+    const { permissions, lookupFailed } = await loadUserCardPermissionsResult(auth.userId, tenantId);
 
-    if (error) {
-      console.error('[card-permissions/me GET] Fetch error:', error);
+    // A failed READ must not be reported as "you have no overrides". That is
+    // indistinguishable, to the browser, from a real empty result — and the
+    // page would quietly drop to the role preset and take Amanda's payroll
+    // controls away with no explanation. Say so instead; the hook retries.
+    if (lookupFailed) {
       return NextResponse.json(
-        { error: 'Failed to fetch card permissions' },
-        { status: 500 }
+        { error: 'Could not read card permissions', code: 'card_permission_unavailable' },
+        { status: 503 }
       );
     }
 
-    // Convert rows into a Record<string, PermissionLevel> map
-    const permMap: Record<string, PermissionLevel> = {};
-    (rows || []).forEach((r: { card_key: string; permission_level: string }) => {
-      permMap[r.card_key] = r.permission_level as PermissionLevel;
-    });
+    const permMap: Record<string, PermissionLevel> = permissions ?? {};
 
     return NextResponse.json({
       success: true,

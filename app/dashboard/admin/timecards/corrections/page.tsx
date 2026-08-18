@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { getCurrentUser, type User } from '@/lib/auth';
+import { getCardPermission } from '@/lib/rbac';
+import { useMyCardPermissions } from '@/lib/use-card-permissions';
 import { supabase } from '@/lib/supabase';
 import { formatDay } from '@/lib/dates';
 import { useBranding } from '@/lib/branding-context';
@@ -193,6 +195,26 @@ export default function TimecardCorrectionsPage() {
     setUser(u);
   }, [router]);
 
+  /**
+   * DECIDING a correction rewrites clock times and recomputes total_hours — the
+   * same payroll authority as approving a week. `ALLOWED_ROLES` admits every
+   * `admin`, whose preset is `timecards: 'view'`, so this page had no card check
+   * at all: an office admin who could not approve a timecard could rewrite the
+   * hours on one from here. The PATCH now enforces `timecards: 'full'`; this is
+   * the matching client half so nobody is offered a button that 403s.
+   *
+   * Role comes from the SERVER when available — `getCurrentUser()` reads a
+   * localStorage copy, so a demoted user would keep the buttons until re-login.
+   */
+  const {
+    permissions: cardPermissions,
+    role: serverRole,
+    error: cardPermissionsError,
+    reload: reloadCardPermissions,
+  } = useMyCardPermissions();
+  const canManageTimecards =
+    getCardPermission(cardPermissions, 'timecards', serverRole || user?.role || '') === 'full';
+
   const getToken = useCallback(async (): Promise<string | null> => {
     if (isRedirecting.current) return null;
     try {
@@ -359,6 +381,10 @@ export default function TimecardCorrectionsPage() {
     action: 'approve' | 'reject',
     opts: { reviewerNotes?: string; overrideIn?: string | null; overrideOut?: string | null } = {}
   ) => {
+    if (!canManageTimecards) {
+      showToast('Deciding a correction needs full access to Timecards', 'err');
+      return;
+    }
     setSubmittingId(req.id);
     try {
       const token = await getToken();
@@ -399,7 +425,7 @@ export default function TimecardCorrectionsPage() {
     } finally {
       setSubmittingId(null);
     }
-  }, [getToken, showToast, fetchRequests, tab, refreshPendingCount]);
+  }, [getToken, showToast, fetchRequests, tab, refreshPendingCount, canManageTimecards]);
 
   const openModify = (req: CorrectionRequest) => {
     setDenyingId(null);
@@ -698,6 +724,24 @@ export default function TimecardCorrectionsPage() {
               })}
             </div>
           )
+        )}
+
+        {/* Permissions could not be read — decide controls are hidden (fail
+            closed), so the page has to say why rather than look view-only. */}
+        {cardPermissionsError && (
+          <div className="mb-5 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-400/30">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-800 dark:text-amber-200 flex-1 min-w-[16rem]">
+              We could not load your permissions, so the approve and deny controls are hidden for
+              now. This is not a change to your access.
+            </p>
+            <button
+              onClick={reloadCardPermissions}
+              className="min-h-[44px] px-4 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+            >
+              Try again
+            </button>
+          </div>
         )}
 
         {/* ── Correction Requests Tabs (pending/approved/rejected/all) ── */}
@@ -1021,8 +1065,15 @@ export default function TimecardCorrectionsPage() {
                           </div>
                         )}
 
-                        {/* Primary action row */}
-                        {denyingId !== req.id && modifyingId !== req.id && (
+                        {/* Primary action row. Gated on the same card level the
+                            PATCH enforces — an admin with `timecards: 'view'`
+                            reads the queue, they do not decide it. */}
+                        {!canManageTimecards && (
+                          <p className="mt-4 text-xs text-gray-500 dark:text-white/40">
+                            View only — deciding correction requests needs full access to Timecards.
+                          </p>
+                        )}
+                        {canManageTimecards && denyingId !== req.id && modifyingId !== req.id && (
                           <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2">
                             <button
                               onClick={() => submitReview(req, 'approve')}

@@ -20,6 +20,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { sendNotification } from '@/lib/send-reminder';
 import {
+  CREW_REPLY_NOTE_TYPE,
   filterVisibleNotes,
   isOfficeRole,
   normalizeNoteAudience,
@@ -126,7 +127,7 @@ export async function POST(
     // crew fan-out below.
     const { data: jobOrder } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, tenant_id, assigned_to, helper_assigned_to')
+      .select('id, job_number, tenant_id, assigned_to, helper_assigned_to, project_manager_id')
       .eq('id', jobOrderId)
       .maybeSingle();
 
@@ -153,10 +154,23 @@ export async function POST(
     // `noteType` stays the note's KIND ('manual', 'amendment', 'completion', …).
     // Audience is a separate column precisely so this list never has to be
     // consulted to answer "who can see it".
-    const noteType =
+    //
+    // ONE EXCEPTION, AND IT IS A SECURITY BOUNDARY. `crew_reply` is the only
+    // kind that widens who may READ a note: `canViewNote` lets the whole crew
+    // on a job see a crew reply, even though the reply itself stays
+    // `audience: 'internal'`. So the kind has to be earned, not claimed — an
+    // office author who set `noteType: 'crew_reply'` on an internal note would
+    // hand the crew a note written for the office, using the one field this
+    // route otherwise passes through untouched.
+    //
+    // Only a non-office author may write it. The office addresses the crew with
+    // `audience: 'operator'`, which is the mechanism built for that.
+    const requestedType =
       typeof body.noteType === 'string' && !['internal', 'operator'].includes(body.noteType)
         ? body.noteType
         : 'manual';
+    const noteType =
+      requestedType === CREW_REPLY_NOTE_TYPE && office ? 'manual' : requestedType;
 
     // Get author name from profile
     const { data: profile } = await supabaseAdmin
@@ -188,19 +202,76 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to create note' }, { status: 500 });
     }
 
-    // ── Fire-and-forget notification ─────────────────────────────────────────
-    // A note the crew is never told about is the same as no note at all — that
-    // is half of what the founder asked for here. Everything goes through
+    // ── Notification — AWAITED, NOT FIRE-AND-FORGET ──────────────────────────
+    // A note nobody is told about is the same as no note at all — that is half
+    // of what the founder asked for here. Everything goes through
     // `sendNotification`, the ONE dispatcher (bell + push, honouring each
     // user's preferences). No smsPhone is passed: a text per note would be a
     // billed surprise, and these are not time-critical the way a dispatch is.
-    Promise.resolve((async () => {
+    //
+    // This block used to float (`Promise.resolve(...).catch()`). On Vercel the
+    // function's execution context can be frozen the moment the response is
+    // returned, so a floating promise is a notification that sometimes simply
+    // never happens — and "sometimes" is the worst possible property for the
+    // office finding out the crew answered. It is awaited, wrapped in its own
+    // try/catch: a failed bell must never fail a note that is already written.
+    await (async () => {
       try {
         const jobNumber = jobOrder.job_number ?? jobOrderId;
         const preview = notePreview(content);
         const withPhotos = photoUrls.length
           ? ` (${photoUrls.length} attachment${photoUrls.length === 1 ? '' : 's'})`
           : '';
+
+        // ── Crew → office ────────────────────────────────────────────────
+        // The other half of the conversation. A reply stays `internal`, so it
+        // is caught by KIND here, before the generic operator-note fan-out
+        // below — which mails every admin in the tenant and would bury the one
+        // person actually waiting on this answer.
+        if (noteType === CREW_REPLY_NOTE_TYPE) {
+          // Scoped by job_order_id, which was tenant-verified above (the parent
+          // job was fetched and its tenant_id checked against the caller's), so
+          // this cannot reach another tenant's rows. A tenant_id filter is
+          // deliberately NOT added on top: notes written before this route
+          // stamped a tenant have tenant_id NULL, and excluding them would
+          // silently drop the very office author we are trying to notify.
+          const { data: officeNotes } = await supabaseAdmin
+            .from('job_notes')
+            .select('author_id')
+            .eq('job_order_id', jobOrderId)
+            .eq('audience', 'operator')
+            .order('created_at', { ascending: false })
+            .limit(25);
+
+          const recipients = resolveNoteNotifyRecipients(
+            {
+              officeNoteAuthorIds: (officeNotes ?? []).map(
+                (n: { author_id: string | null }) => n.author_id,
+              ),
+              projectManagerId: jobOrder.project_manager_id ?? null,
+            },
+            { audience, authorId: auth.userId, noteType },
+          );
+
+          await Promise.all(
+            recipients.map((userId) =>
+              sendNotification({
+                userId,
+                tenantId: jobOrder.tenant_id ?? auth.tenantId ?? null,
+                category: 'general',
+                notificationType: 'crew_note_reply',
+                inAppType: 'info',
+                title: `Crew replied — ${jobNumber}`,
+                message: `${authorName}: "${preview}"${withPhotos}`,
+                jobOrderId,
+                relatedEntityType: 'job_note',
+                relatedEntityId: note.id,
+                actionUrl: `/dashboard/admin/jobs/${jobOrderId}`,
+              }),
+            ),
+          );
+          return;
+        }
 
         if (audience === 'operator') {
           // The CURRENT crew, from all three assignment paths. Ledger rows are
@@ -225,7 +296,7 @@ export async function POST(
               crew: crewRes.data ?? [],
               dailyAssignments: ledgerRes.data ?? [],
             },
-            { audience, authorId: auth.userId },
+            { audience, authorId: auth.userId, noteType },
           );
 
           await Promise.all(
@@ -281,9 +352,10 @@ export async function POST(
             ),
         );
       } catch {
-        // Non-critical — never block the response
+        // Non-critical — the note is already saved; never turn a failed bell
+        // into a failed note.
       }
-    })()).catch(() => {});
+    })();
 
     return NextResponse.json(
       { success: true, message: 'Note created', data: note },

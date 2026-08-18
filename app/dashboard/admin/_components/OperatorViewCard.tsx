@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { HardHat, ChevronRight } from 'lucide-react';
 import { getCardPermission } from '@/lib/rbac';
+import { useMyCardPermissions } from '@/lib/use-card-permissions';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -34,7 +35,11 @@ export default function OperatorViewCard({ role }: { role: string | undefined })
   // guess and go look. Same endpoint the crew's own My Jobs screen uses, so the
   // count and the list can never disagree.
   const [ticketCount, setTicketCount] = useState<number | null>(null);
-  const visible = !!role && getCardPermission(null, 'operator_view', role) !== 'none';
+  // Per-user grants, so an individual can be given (or denied) this door without
+  // moving their whole role's preset. Passing null here meant a grant made in
+  // Team Management never reached the card.
+  const { permissions: cardPermissions } = useMyCardPermissions();
+  const visible = !!role && getCardPermission(cardPermissions, 'operator_view', role) !== 'none';
 
   useEffect(() => {
     if (!visible) return;
@@ -58,8 +63,8 @@ export default function OperatorViewCard({ role }: { role: string | undefined })
     return () => { cancelled = true; };
   }, [visible]);
 
-  // null user-permissions → falls through to the role preset, which is what we
-  // want: this card follows lib/rbac.ts rather than a hardcoded role list.
+  // No override rows → falls through to the role preset, which is what we want:
+  // this card follows lib/rbac.ts rather than a hardcoded role list.
   if (!visible) return null;
 
   const hasTickets = (ticketCount ?? 0) > 0;

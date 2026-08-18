@@ -11,6 +11,8 @@ import {
   Navigation, Hammer, Flag, X, Save, ChevronDown, ChevronUp,
   RefreshCw, DollarSign, Zap, Timer, Camera, Plus, Minus, FileBarChart, Trash2, Layers } from 'lucide-react';
 import { getCurrentUser, isAdmin, type User } from '@/lib/auth';
+import { getCardPermission } from '@/lib/rbac';
+import { useMyCardPermissions } from '@/lib/use-card-permissions';
 import { isApprovedCard } from '@/lib/timecard-delete';
 import { supabase } from '@/lib/supabase';
 import { getGoogleMapsLink } from '@/lib/geolocation';
@@ -433,6 +435,27 @@ function OperatorTimecardDetailPageInner() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  /**
+   * Say what the server said.
+   *
+   * Every payroll action on this page used to be `if (response.ok) fetchData()`
+   * with no else, which was survivable while the only failures were bugs. Now
+   * that approve / reject / no-show can be REFUSED, a swallowed response means
+   * the button visibly does nothing and the carefully-worded 403 — the one that
+   * names the permission to ask for — is read by no one.
+   */
+  const reportActionFailure = useCallback(async (response: Response, title: string) => {
+    const body = await response.json().catch(() => ({} as { error?: string }));
+    addToast(
+      'error',
+      title,
+      body.error ||
+        (response.status === 403
+          ? 'You do not have permission to do that.'
+          : `The server refused this request (${response.status}).`)
+    );
+  }, [addToast]);
+
   // Night shift multiplier (fetched from settings for display)
   const [nightShiftMultiplier, setNightShiftMultiplier] = useState(1.25);
 
@@ -486,6 +509,30 @@ function OperatorTimecardDetailPageInner() {
   }
 
   const isRedirecting = useRef(false);
+
+  /**
+   * WHO MAY ACT ON PAYROLL HERE, not merely read it.
+   *
+   * Approve entry / approve week / reject week / no-show all now check
+   * `timecards: 'full'` on the SERVER (see lib/card-permissions-server.ts). This
+   * is the matching client half, so a viewer never gets a button that 403s —
+   * the defect this codebase keeps producing in the other direction.
+   *
+   * `admin` presets to 'view'; the office person who runs payroll carries an
+   * explicit per-user grant, and super_admin / operations_manager bypass.
+   */
+  const {
+    permissions: cardPermissions,
+    role: serverRole,
+    error: cardPermissionsError,
+    reload: reloadCardPermissions,
+  } = useMyCardPermissions();
+  // Prefer the role the SERVER just reported over `getCurrentUser()`, which
+  // reads a localStorage copy written at login. A demoted user keeps the cached
+  // role — and the buttons that go with it — until they sign in again.
+  const effectiveRole = serverRole || user?.role || '';
+  const canManageTimecards =
+    !!effectiveRole && getCardPermission(cardPermissions, 'timecards', effectiveRole) === 'full';
 
   // Auth guard
   useEffect(() => {
@@ -663,9 +710,14 @@ function OperatorTimecardDetailPageInner() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }
       });
+      // A silent `if (response.ok)` turns the new 403 into "the button did
+      // nothing" — the exact illusion this change exists to remove. The server's
+      // refusal copy names the permission to ask for; show it.
       if (response.ok) fetchData();
+      else await reportActionFailure(response, 'Entry Not Approved');
     } catch (error) {
       console.error('Error approving entry:', error);
+      addToast('error', 'Entry Not Approved', 'Network error occurred.');
     } finally {
       setActionLoading(null);
     }
@@ -769,8 +821,10 @@ function OperatorTimecardDetailPageInner() {
         body: JSON.stringify({ timecard_id: entryId, approved }),
       });
       if (response.ok) fetchData();
+      else await reportActionFailure(response, 'Clock-Out Not Updated');
     } catch (error) {
       console.error('Error verifying clock-out:', error);
+      addToast('error', 'Clock-Out Not Updated', 'Network error occurred.');
     } finally {
       setActionLoading(null);
     }
@@ -787,8 +841,10 @@ function OperatorTimecardDetailPageInner() {
         body: JSON.stringify({ weekStart, action: 'approve_week', admin_notes: weekNotes })
       });
       if (response.ok) fetchData();
+      else await reportActionFailure(response, 'Week Not Approved');
     } catch (error) {
       console.error('Error approving week:', error);
+      addToast('error', 'Week Not Approved', 'Network error occurred.');
     } finally {
       setActionLoading(null);
     }
@@ -808,9 +864,12 @@ function OperatorTimecardDetailPageInner() {
         setShowRejectModal(false);
         setRejectReason('');
         fetchData();
+      } else {
+        await reportActionFailure(response, 'Week Not Rejected');
       }
     } catch (error) {
       console.error('Error rejecting week:', error);
+      addToast('error', 'Week Not Rejected', 'Network error occurred.');
     } finally {
       setActionLoading(null);
     }
@@ -1261,7 +1320,11 @@ function OperatorTimecardDetailPageInner() {
 
           {/* Header actions */}
           <div className="flex items-center gap-2 flex-shrink-0">
-            {stats && stats.pendingCount > 0 && (
+            {/* Payroll sign-off. Rendered CONDITIONALLY rather than with the
+                `hidden` attribute — these carry `hidden sm:flex`, and Tailwind's
+                `sm:flex` beats `[hidden]{display:none}` at ≥640px, so the
+                attribute would have kept showing them on every desktop. */}
+            {canManageTimecards && stats && stats.pendingCount > 0 && (
               <button
                 onClick={handleApproveWeek}
                 disabled={actionLoading === 'approve_week'}
@@ -1272,13 +1335,15 @@ function OperatorTimecardDetailPageInner() {
               </button>
             )}
 
-            <button
-              onClick={() => setShowRejectModal(true)}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all text-xs font-bold border border-gray-200 dark:border-white/10"
-            >
-              <XCircle size={13} />
-              Reject
-            </button>
+            {canManageTimecards && (
+              <button
+                onClick={() => setShowRejectModal(true)}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-white/5 hover:bg-red-50 dark:hover:bg-red-900/30 text-gray-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-all text-xs font-bold border border-gray-200 dark:border-white/10"
+              >
+                <XCircle size={13} />
+                Reject
+              </button>
+            )}
 
             <button
               onClick={async () => {
@@ -1907,14 +1972,17 @@ function OperatorTimecardDetailPageInner() {
                         ))}
                         {/* No-Show — records a zero-hour no-show on the timecard +
                             callout ledger for THIS day. Calls the dedicated no-show API
-                            (not /manual, which forces 0.25–16 hrs). */}
-                        <button
-                          type="button"
-                          onClick={() => handleNoShow(date)}
-                          className="px-2.5 py-2 rounded-lg border text-xs font-semibold transition bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border-rose-200 dark:border-rose-500/30"
-                        >
-                          + No-Show
-                        </button>
+                            (not /manual, which forces 0.25–16 hrs). Payroll action:
+                            same `timecards: 'full'` gate the API now enforces. */}
+                        {canManageTimecards && (
+                          <button
+                            type="button"
+                            onClick={() => handleNoShow(date)}
+                            className="px-2.5 py-2 rounded-lg border text-xs font-semibold transition bg-rose-50 dark:bg-rose-900/30 text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 border-rose-200 dark:border-rose-500/30"
+                          >
+                            + No-Show
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -2183,7 +2251,7 @@ function OperatorTimecardDetailPageInner() {
                                   Edit
                                 </button>
 
-                                {!entry.is_approved && (
+                                {!entry.is_approved && canManageTimecards && (
                                   <button
                                     onClick={() => handleApproveEntry(entry.id)}
                                     disabled={actionLoading === entry.id}
@@ -2419,8 +2487,26 @@ function OperatorTimecardDetailPageInner() {
           )}
         </div>
 
+        {/* Permissions could not be read — approval controls are hidden (fail
+            closed) and the page must say so rather than look normal-but-empty. */}
+        {cardPermissionsError && (
+          <div className="mb-5 flex flex-wrap items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-400/30">
+            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 flex-shrink-0" />
+            <p className="text-xs text-amber-800 dark:text-amber-200 flex-1 min-w-[16rem]">
+              We could not load your permissions, so approval controls are hidden for now.
+              This is not a change to your access.
+            </p>
+            <button
+              onClick={reloadCardPermissions}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white transition-colors"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
         {/* ── Mobile Week Actions ──────────────────────────── */}
-        {stats && stats.pendingCount > 0 && (
+        {canManageTimecards && stats && stats.pendingCount > 0 && (
           <div className="sm:hidden flex gap-2 mb-5">
             <button
               onClick={handleApproveWeek}

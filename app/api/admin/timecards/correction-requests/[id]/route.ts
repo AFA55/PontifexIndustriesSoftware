@@ -28,6 +28,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { requireCardLevel } from '@/lib/card-permissions-server';
 import { parseYMDLocal } from '@/lib/dates';
 import { recomputeLateForEdit } from '@/lib/timecard-start';
 
@@ -46,6 +47,15 @@ export async function PATCH(
         { status: 400 }
       );
     }
+
+    // Deciding a correction rewrites clock_in_time / clock_out_time and
+    // recomputes total_hours — identical payroll authority to approving a week,
+    // so it needs the identical gate. `requireAdmin` alone left this the one
+    // unlocked door into payroll: an office admin with `timecards: 'view'`
+    // could not approve a timecard but could rewrite the hours on it.
+    // Reject is gated too — closing out a worker's dispute is the same power.
+    const denied = await requireCardLevel(auth, 'timecards', 'full', 'Deciding a time correction');
+    if (denied) return denied;
 
     const { id: correctionId } = await params;
     const body = await request.json();

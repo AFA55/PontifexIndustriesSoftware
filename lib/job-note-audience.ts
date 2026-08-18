@@ -33,6 +33,28 @@ export function isOfficeRole(role: string | null | undefined): boolean {
 }
 
 /**
+ * The crew's half of the conversation.
+ *
+ * A crew reply is `audience: 'internal'` — only the office may address a crew,
+ * and that rule does not move. But a reply typed into the crew-facing thread is
+ * ALSO readable by the rest of the crew on that job: a two-man crew that cannot
+ * see what its own operator already told the office asks the office the same
+ * question twice.
+ *
+ * That widening is scoped to this ONE note_type on purpose. An operator's
+ * workflow notes ('amendment', 'completion', 'done_for_day') stay author-only —
+ * a day-complete note about a helper must not become readable by that helper.
+ *
+ * Only a NON-office author may write it (enforced in the POST route), so the
+ * office cannot hand a crew an internal note by mislabelling its kind.
+ */
+export const CREW_REPLY_NOTE_TYPE = 'crew_reply';
+
+export function isCrewReply(note: NoteVisibilityRecord): boolean {
+  return note.note_type === CREW_REPLY_NOTE_TYPE;
+}
+
+/**
  * Anything that is not explicitly `operator` is `internal`.
  *
  * The asymmetry is deliberate and is the whole safety property: a typo, a stale
@@ -58,15 +80,20 @@ export interface NoteViewer {
 
 /**
  * THE VISIBILITY RULE, in one place:
- * the office sees every note; everyone else sees only their own notes plus
- * `operator`-audience notes on a job they are crewed on.
+ * the office sees every note; everyone else sees only their own notes, plus
+ * `operator`-audience notes and crew replies on a job they are crewed on.
  */
 export function canViewNote(viewer: NoteViewer, note: NoteVisibilityRecord): boolean {
   // change_log rows are machine chatter — no longer written, never shown.
   if (note.note_type === 'change_log') return false;
   if (note.author_id && note.author_id === viewer.userId) return true;
   if (isOfficeRole(viewer.role)) return true;
-  return normalizeNoteAudience(note.audience) === 'operator' && viewer.isCrewOnJob;
+  if (!viewer.isCrewOnJob) return false;
+  // The crew's own thread — see CREW_REPLY_NOTE_TYPE. Deliberately keyed off the
+  // note KIND, never off `audience`: a reply stays `internal`, so nothing here
+  // widens who may be ADDRESSED, only who may read the crew's own words.
+  if (isCrewReply(note)) return true;
+  return normalizeNoteAudience(note.audience) === 'operator';
 }
 
 export function filterVisibleNotes<T extends NoteVisibilityRecord>(
@@ -111,15 +138,68 @@ export function resolveJobCrewUserIds(sources: CrewSources): string[] {
 }
 
 /**
- * Who is notified when a note is posted.
+ * The office side of the conversation — who, in the office, owns this job.
  *
- * `internal` notifies NOBODY on the crew — that is the point of it. The author
- * is never notified about their own note.
+ * A crew reply must NOT go to "every admin". The office bell is only read while
+ * it is worth reading; nine people getting a notification meant for one is how
+ * it stops being read, and then the reply may as well not have been written.
+ */
+export interface OfficeSources {
+  /**
+   * Author ids of the office→crew notes already on this job. Whoever asked the
+   * question is who is waiting on the answer, so they are notified first.
+   */
+  officeNoteAuthorIds?: Array<string | null | undefined> | null;
+  /**
+   * `job_orders.project_manager_id` — the job's owner. The fallback for a
+   * reply on a job where no office note survives to name an asker.
+   */
+  projectManagerId?: string | null;
+}
+
+/**
+ * Who hears a crew reply: the office people who wrote to this crew, or failing
+ * that the job's project manager. Never the replier themselves.
+ */
+export function resolveCrewReplyNotifyRecipients(
+  sources: OfficeSources,
+  opts: { authorId?: string | null },
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (id: string | null | undefined) => {
+    if (!id || seen.has(id)) return;
+    seen.add(id);
+    out.push(id);
+  };
+  for (const id of sources.officeNoteAuthorIds ?? []) add(id);
+  // Only when nobody in the office has spoken on this job — a PM who is already
+  // one of the askers is not notified twice, and a PM who never wrote to this
+  // crew is not pulled into a thread somebody else is holding.
+  if (out.length === 0) add(sources.projectManagerId);
+  return out.filter((id) => id !== opts.authorId);
+}
+
+/**
+ * Who is notified when a note is posted. BOTH DIRECTIONS:
+ *
+ *   • office → crew (`audience: 'operator'`) — the whole crew on the job.
+ *   • crew  → office (`note_type: 'crew_reply'`) — the office people who wrote
+ *     to this crew, else the project manager.
+ *
+ * Any other `internal` note notifies NOBODY here — that is the point of it.
+ * The author is never notified about their own note.
+ *
+ * The crew-reply branch is keyed off the note KIND, not the audience, because a
+ * reply deliberately stays `audience: 'internal'` (see CREW_REPLY_NOTE_TYPE).
  */
 export function resolveNoteNotifyRecipients(
-  sources: CrewSources,
-  opts: { audience: unknown; authorId?: string | null },
+  sources: CrewSources & OfficeSources,
+  opts: { audience: unknown; authorId?: string | null; noteType?: string | null },
 ): string[] {
+  if (opts.noteType === CREW_REPLY_NOTE_TYPE) {
+    return resolveCrewReplyNotifyRecipients(sources, opts);
+  }
   if (normalizeNoteAudience(opts.audience) !== 'operator') return [];
   return resolveJobCrewUserIds(sources).filter((id) => id !== opts.authorId);
 }

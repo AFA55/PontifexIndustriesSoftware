@@ -18,6 +18,8 @@ import OfficeCloseJob from '@/components/OfficeCloseJob';
 import { formatMaybeDateTime } from '@/lib/dates';
 import { asArray } from '@/lib/job-arrays';
 import { officeCloseAffordance } from '@/lib/office-completion';
+import { fetchPrintPdf, openPrintBlob, printFailureAlertText } from '@/lib/print-failure';
+import { isCrewReply } from '@/lib/job-note-audience';
 
 const WorkHistoryTimeline = lazy(() => import('./WorkHistoryTimeline'));
 const OfficeDocumentsPanel = lazy(() => import('@/components/admin/OfficeDocumentsPanel'));
@@ -94,6 +96,11 @@ interface JobNote {
   author_name: string;
   /** 'internal' = office only · 'operator' = the crew sees it. */
   audience?: string | null;
+  /**
+   * The note's KIND. A crew reply is `internal` by audience but belongs in the
+   * crew conversation, not in the office's private column — see isCrewReply.
+   */
+  note_type?: string | null;
   photo_urls?: string[] | null;
 }
 
@@ -518,27 +525,24 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
   const handlePrintDispatch = async () => {
     setPrintingPdf(true);
     try {
-      const token = await getToken();
-      const res = await fetch(`/api/job-orders/${job.id}/dispatch-pdf`, {
-        headers: { Authorization: `Bearer ${token}` },
+      // fetchPrintPdf, not a hand-built Bearer: this button sent whatever was in
+      // storage and gave up on the first 401, which is why the office could
+      // print from the job page and not from the board. It now shape-checks the
+      // token, refreshes once, tells the user WHICH kind of failure this is, and
+      // leaves a row in error_logs.
+      const result = await fetchPrintPdf(`/api/job-orders/${job.id}/dispatch-pdf`, {
+        surface: 'schedule-board:job-detail',
+        role: userRole,
       });
-      if (!res.ok) {
+      if (!result.ok) {
         // Was `if (res.ok)` with no else: a failed ticket looked exactly like a
         // working one that printed nothing, and whoever pressed it stood at the
         // printer waiting for paper that was never coming.
-        let msg = 'Could not generate the ticket.';
-        try { msg = (await res.json())?.error || msg; } catch { /* not json */ }
-        alert(`Print failed — ${msg}`);
+        alert(printFailureAlertText(result));
         return;
       }
-      const blob = await res.blob();
-      const pdfUrl = URL.createObjectURL(blob);
-      const win = window.open(pdfUrl, '_blank');
-      if (!win) alert('Your browser blocked the popup. Allow popups for this site, then press Print again.');
-      setTimeout(() => URL.revokeObjectURL(pdfUrl), 60_000);
-    } catch (err) {
-      console.error('Error generating dispatch PDF:', err);
-      alert('Print failed — could not reach the server. Check your connection.');
+      const blocked = openPrintBlob(result.blob);
+      if (blocked) alert(blocked);
     } finally {
       setPrintingPdf(false);
     }
@@ -1820,8 +1824,8 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                     {([
                       {
                         key: 'operator' as const,
-                        heading: 'For the crew',
-                        blurb: 'Visible to the operators on this job',
+                        heading: 'Crew conversation',
+                        blurb: 'What you sent the crew — and what they sent back',
                         empty: 'Nothing sent to the crew yet',
                         headCls: 'text-amber-700 dark:text-amber-300',
                         ruleCls: 'bg-amber-300/60 dark:bg-amber-400/30',
@@ -1837,10 +1841,16 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                         cardCls: 'bg-white dark:bg-white/5 border-gray-200 dark:border-white/10',
                       },
                     ]).map((section) => {
+                      // A crew reply belongs in the CREW column, not the
+                      // office's private one — it is the answer to what was
+                      // sent there, and filing it among internal asides is how
+                      // an answer goes unread. The reply itself stays
+                      // `audience: 'internal'`; only its KIND moves it here,
+                      // and only a non-office author may write that kind.
                       const rows = jobNotes.filter((n) =>
                         section.key === 'operator'
-                          ? n.audience === 'operator'
-                          : n.audience !== 'operator',
+                          ? n.audience === 'operator' || isCrewReply(n)
+                          : n.audience !== 'operator' && !isCrewReply(n),
                       );
                       return (
                         <div key={section.key}>
@@ -1858,9 +1868,23 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
                           ) : (
                             <div className="space-y-2">
                               {rows.map((note) => (
-                                <div key={note.id} className={`rounded-lg border p-3 ${section.cardCls}`}>
+                                <div
+                                  key={note.id}
+                                  className={`rounded-lg border p-3 ${
+                                    isCrewReply(note)
+                                      ? 'bg-sky-50 dark:bg-sky-500/10 border-sky-200 dark:border-sky-500/25'
+                                      : section.cardCls
+                                  }`}
+                                >
                                   <div className="flex items-center justify-between mb-1 gap-2">
-                                    <span className="text-[10px] font-bold text-brand dark:text-brand truncate">{note.author_name}</span>
+                                    <span className="flex items-center gap-1.5 min-w-0">
+                                      {isCrewReply(note) && (
+                                        <span className="flex-shrink-0 text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-sky-600 text-white">
+                                          Crew reply
+                                        </span>
+                                      )}
+                                      <span className="text-[10px] font-bold text-brand dark:text-brand truncate">{note.author_name}</span>
+                                    </span>
                                     <span className="text-[10px] text-gray-400 dark:text-slate-500 flex-shrink-0">
                                       {new Date(note.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       {' '}

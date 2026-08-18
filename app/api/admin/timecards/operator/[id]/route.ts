@@ -19,6 +19,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { tenantWeekStartFor } from '@/lib/payroll-week';
 import { signTimecardPhoto } from '@/lib/timecard-photos';
 import { requireAdmin, isTableNotFoundError } from '@/lib/api-auth';
+import { requireCardLevel } from '@/lib/card-permissions-server';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
 import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
@@ -411,6 +412,20 @@ export async function PATCH(
 
     if (!weekStart) {
       return NextResponse.json({ error: 'weekStart is required' }, { status: 400 });
+    }
+
+    // Signing off (or rejecting) a whole payroll week is the bulk form of
+    // approving a timecard, so it carries the same `timecards: 'full'` gate —
+    // enforced on the SERVER, not merely where the button is drawn. Leaving a
+    // note is not a payroll decision and stays open to any admin viewer.
+    if (action === 'approve_week' || action === 'reject_week') {
+      const denied = await requireCardLevel(
+        auth,
+        'timecards',
+        'full',
+        action === 'approve_week' ? 'Approving a payroll week' : 'Rejecting a payroll week'
+      );
+      if (denied) return denied;
     }
 
     // Upsert into timecard_weeks

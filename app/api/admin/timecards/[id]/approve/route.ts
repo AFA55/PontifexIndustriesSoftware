@@ -9,6 +9,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { requireCardLevel } from '@/lib/card-permissions-server';
 
 export async function POST(
   request: NextRequest,
@@ -17,6 +18,15 @@ export async function POST(
   try {
     const auth = await requireAdmin(request);
     if (!auth.authorized) return auth.response;
+
+    // Approving payroll is `timecards: 'full'`, and the SERVER decides that —
+    // the timecards page hides the Approve button at anything less, and a gate
+    // that only hides a button stops nobody who can type a URL. The role preset
+    // for `admin` is 'view'; the office person who actually runs payroll carries
+    // an explicit per-user grant (lib/card-permissions.ts). super_admin and
+    // operations_manager bypass and never hit the lookup.
+    const denied = await requireCardLevel(auth, 'timecards', 'full', 'Approving a timecard');
+    if (denied) return denied;
 
     const { id: timecardId } = await params;
     const tenantId = auth.tenantId;

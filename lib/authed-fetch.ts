@@ -98,7 +98,13 @@ export async function currentAccessToken(
 
 function withAuth(init: RequestInit, token: string): RequestInit {
   const headers = new Headers(init.headers);
-  headers.set('Authorization', `Bearer ${token}`);
+  // An empty token means we have nothing to send. `Bearer ` with nothing after
+  // it is a header claiming a credential that isn't there — the server trims it
+  // to empty and 401s cleanly either way, but omitting it is the honest
+  // description of the request and reads correctly in a network log. Whatever
+  // the caller put there is left alone: replacing a credential somebody chose
+  // deliberately is not ours to do (same rule as lib/api-client.ts).
+  if (token) headers.set('Authorization', `Bearer ${token}`);
   return { ...init, headers };
 }
 
@@ -177,4 +183,39 @@ export async function authedFetch(input: string, init: RequestInit = {}): Promis
   const retry = await fetch(input, withAuth(init, fresh));
   if (retry.status === 401) throw new SessionExpiredError();
   return retry;
+}
+
+/**
+ * The same recovery as `authedFetch`, but it NEVER throws — it always hands
+ * back a Response.
+ *
+ * WHY BOTH EXIST: `authedFetch` throwing a typed error is right for a single
+ * button, where the handler can say "sign in again" versus "the login service
+ * is down". It is wrong for a caller whose entire contract is `const res =
+ * await apiFetch(url); if (!res.ok) …` — the schedule board has roughly sixty
+ * of those, and converting them all to try/catch during an outage is how you
+ * turn a one-line fix into a regression hunt.
+ *
+ * So the board keeps its Response contract and still gets the two things that
+ * actually matter: never send a non-JWT, and refresh once on a 401. When the
+ * session is genuinely dead the caller sees the server's own 401, exactly as
+ * it did before.
+ *
+ * At most ONE forced refresh per call: if `currentAccessToken()` already tried
+ * and failed we do not ask again, we let the server answer.
+ */
+export async function authedFetchQuiet(input: string, init: RequestInit = {}): Promise<Response> {
+  const token = await currentAccessToken();
+
+  // No usable token AND the refresh inside currentAccessToken already failed.
+  // Asking a second time would just fail a second time; let the server say so.
+  if (!token) return fetch(input, withAuth(init, ''));
+
+  const res = await fetch(input, withAuth(init, token));
+  if (res.status !== 401) return res;
+  if (!isReplayable(init.body)) return res;
+
+  const fresh = await currentAccessToken({ forceRefresh: true });
+  if (!fresh) return res;
+  return fetch(input, withAuth(init, fresh));
 }
