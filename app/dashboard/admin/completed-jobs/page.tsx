@@ -7,6 +7,8 @@ import JobDocuments from '@/components/JobDocuments';
 import { supabase } from '@/lib/supabase';
 import { useModuleGate } from '@/components/ModuleGuard';
 import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCostBreakdown';
+import OfficeCloseJob from '@/components/OfficeCloseJob';
+import { officeCloseAffordance } from '@/lib/office-completion';
 import { parseYMDLocal, formatDay, formatMaybeDateTime } from '@/lib/dates';
 import { quotedAmount, QUOTED_AMOUNT_LABEL } from '@/lib/job-quoted-amount';
 import {
@@ -108,6 +110,15 @@ interface CompletedJob {
   permits: unknown;
   po_number: string | null;
   directions: string | null;
+  /**
+   * THE OFFICE CLOSE, and its undo. A job the office closed (rather than the
+   * crew signing it off) lands here carrying the reason someone typed. This is
+   * the only surface where the REVERSE matters: a job that still needs an
+   * office close is by definition not in this list yet, but a job closed by
+   * mistake is, and until now there was no way back out of it.
+   */
+  office_completed_at: string | null;
+  office_completion_reason: string | null;
 }
 
 interface JobDetails {
@@ -154,6 +165,9 @@ export default function CompletedJobsArchivePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [jobs, setJobs] = useState<CompletedJob[]>([]);
+  /** Drives the office-close undo — the API refuses salesmen, so the button
+   *  must not be drawn for them either. */
+  const [viewerRole, setViewerRole] = useState<string | null>(null);
   const [selectedJobDetails, setSelectedJobDetails] = useState<JobDetails | null>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -230,7 +244,9 @@ export default function CompletedJobsArchivePage() {
     // the set that may already see these jobs elsewhere.
     if (!['admin', 'super_admin', 'salesman', 'operations_manager', 'supervisor'].includes(profile?.role || '')) {
       router.push('/dashboard');
+      return;
     }
+    setViewerRole(profile?.role || null);
   };
 
   const loadCompletedJobs = async () => {
@@ -733,6 +749,17 @@ export default function CompletedJobsArchivePage() {
                               </span>
                             )}
                           </div>
+                          {/* Says how the job got here. Without it, a job the
+                              office closed reads identically to one the crew
+                              signed off on site — and the one you can reopen is
+                              exactly the one you need to be able to pick out. */}
+                          {job.office_completed_at && (
+                            <div className="mt-1.5">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-300 dark:ring-sky-400/30">
+                                Closed by the office
+                              </span>
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -819,6 +846,47 @@ export default function CompletedJobsArchivePage() {
                       {deleteError && (
                         <div className="mb-3 px-3 py-2 rounded-lg text-xs font-semibold bg-rose-50 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-300 dark:ring-rose-400/30">
                           {deleteError}
+                        </div>
+                      )}
+
+                      {/* CLOSED BY THE OFFICE — and the way back out.
+                          The founder asked for the close-out here too. What it
+                          is worth on a COMPLETED job is the reverse: this is
+                          the only place a job closed by mistake can be found
+                          again, and reopening is a long way short of Delete,
+                          which is the only other exit this page offers. It
+                          renders solely when the office closed this job —
+                          `officeCloseAffordance` returns 'none' for the crew's
+                          own sign-offs and for the 8 production jobs that
+                          reached `completed` by some other route, so nobody is
+                          invited to "complete" a job that is already done. */}
+                      {officeCloseAffordance(
+                        {
+                          status: 'completed',
+                          officeCompletedAt: selectedJobDetails.job.office_completed_at,
+                          operatorCompletedAt: selectedJobDetails.job.completion_signed_at,
+                        },
+                        viewerRole
+                      ) === 'reopen' && (
+                        <div className="mb-4">
+                          <OfficeCloseJob
+                            jobId={selectedJobDetails.job.id}
+                            jobNumber={selectedJobDetails.job.job_number}
+                            customerName={
+                              selectedJobDetails.job.customer ||
+                              selectedJobDetails.job.customer_name
+                            }
+                            officeCompletedAt={selectedJobDetails.job.office_completed_at}
+                            officeCompletedReason={selectedJobDetails.job.office_completion_reason}
+                            operatorCompletedAt={selectedJobDetails.job.completion_signed_at}
+                            onChanged={() => {
+                              // Reopening moves the job back to in_progress, so
+                              // it leaves this list entirely — drop the open
+                              // record rather than leave a stale panel behind.
+                              setSelectedJobDetails(null);
+                              loadCompletedJobs();
+                            }}
+                          />
                         </div>
                       )}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">

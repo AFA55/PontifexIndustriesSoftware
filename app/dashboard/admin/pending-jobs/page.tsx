@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { getCurrentUser } from '@/lib/auth';
 import { PhotoViewer } from '@/components/PhotoUploader';
+import OfficeCloseJob from '@/components/OfficeCloseJob';
+import { officeCloseAffordance, type OfficeCloseAffordance } from '@/lib/office-completion';
 import {
   ArrowLeft, Home, Inbox, Loader2, AlertTriangle, MapPin, Calendar,
   UserCog, PenLine, ArrowUpCircle, ChevronDown, ChevronUp,
@@ -30,17 +32,49 @@ interface PendingJob {
   address: string | null;
   location: string | null;
   job_type: string | null;
+  status: string | null;
   scheduled_date: string | null;
   end_date: string | null;
   on_hold_reason: string | null;
   on_hold_placed_at: string | null;
   project_manager_name: string | null;
   not_ready: NotReady | null;
+  completion_signed_at: string | null;
+  office_completed_at: string | null;
+  office_completion_reason: string | null;
 }
 
 function fmtDate(d: string | null) {
   if (!d) return '—';
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+/**
+ * Whether to offer the office close-out on a parked job.
+ *
+ * A parked job is one of the places the founder's stuck tickets hide — the
+ * Active Jobs list deliberately excludes `on_hold`, so without this the only
+ * way to reach one is the job detail page (which he never found) or the date it
+ * sits on in the schedule board. That is the same as having no button.
+ *
+ * The presence check is not paranoia. If the list API ever stops selecting
+ * these columns, `completion_signed_at` arrives `undefined`, which the shared
+ * rule reads as "the crew never signed off" and cheerfully offers a close on a
+ * job that is already properly closed. A missing column is NOT a null one, so
+ * draw nothing rather than guess.
+ */
+function closeAffordanceFor(job: PendingJob, role: string): OfficeCloseAffordance {
+  if (!('status' in job) || !('completion_signed_at' in job) || !('office_completed_at' in job)) {
+    return 'none';
+  }
+  return officeCloseAffordance(
+    {
+      status: job.status,
+      officeCompletedAt: job.office_completed_at,
+      operatorCompletedAt: job.completion_signed_at,
+    },
+    role
+  );
 }
 
 export default function PendingJobsPage() {
@@ -50,6 +84,9 @@ export default function PendingJobsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [rescheduleDate, setRescheduleDate] = useState('');
   const [busyId, setBusyId] = useState<string | null>(null);
+  // Empty, never a role name: an unknown viewer must not be treated as the most
+  // privileged one for the render that happens before the profile arrives.
+  const [role, setRole] = useState('');
 
   const fetchJobs = useCallback(async () => {
     setLoading(true);
@@ -70,6 +107,7 @@ export default function PendingJobsPage() {
       const user = await getCurrentUser();
       if (!user) { router.push('/login'); return; }
       if (!OFFICE_ROLES.includes(user.role)) { router.push('/dashboard'); return; }
+      setRole(user.role);
       fetchJobs();
     })();
   }, [router, fetchJobs]);
@@ -203,6 +241,25 @@ export default function PendingJobsPage() {
                           Push ticket back up
                         </button>
                       </div>
+
+                      {/* Some parked tickets are never coming back — the PM
+                          entered them to print a ticket, or the crew finished
+                          the work after it was parked and nobody closed it in
+                          here. "Push ticket back up" is the wrong tool for
+                          those; this is the other half of the page. */}
+                      {closeAffordanceFor(job, role) !== 'none' && (
+                        <div className="rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2">
+                          <OfficeCloseJob
+                            jobId={job.id}
+                            jobNumber={job.job_number}
+                            customerName={job.customer_name}
+                            officeCompletedAt={job.office_completed_at ?? null}
+                            officeCompletedReason={job.office_completion_reason ?? null}
+                            operatorCompletedAt={job.completion_signed_at ?? null}
+                            onChanged={fetchJobs}
+                          />
+                        </div>
+                      )}
 
                       <Link href={`/dashboard/admin/jobs/${job.id}`} className="block text-center text-sm text-brand font-semibold hover:underline">
                         Open full job →

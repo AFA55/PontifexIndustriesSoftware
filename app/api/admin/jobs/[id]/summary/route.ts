@@ -134,6 +134,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
         arrived_at_jobsite_at,
         route_started_at,
         work_started_at,
+        office_completed_at,
+        office_completed_by,
+        office_completion_reason,
         work_completed_at
       `)
       .eq('id', jobId);

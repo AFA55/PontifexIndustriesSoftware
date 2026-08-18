@@ -49,6 +49,7 @@ import EditTimestampModal from '@/components/admin/EditTimestampModal';
 import SendOptInRequestButton from '@/components/SendOptInRequestButton';
 import ScopeDetailsDisplay from '@/components/ScopeDetailsDisplay';
 import OfficeCloseJob from '@/components/OfficeCloseJob';
+import { officeCloseAffordance } from '@/lib/office-completion';
 import WorkItemsSummary, { type WorkItemRow } from '@/components/WorkItemsSummary';
 import { getCurrentUser } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
@@ -495,7 +496,12 @@ export default function AdminJobDetailPage({
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [crLoading, setCrLoading] = useState(false);
   const [crReviewing, setCrReviewing] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string>('admin');
+  // Empty, NOT 'admin'. Every read of this is a membership check, so seeding it
+  // with the most privileged value means a salesman's first render computes
+  // every gate on this page as an admin's. It resolves a tick later, but
+  // "assume admin until told otherwise" is the wrong default to leave lying
+  // around in a file where new gates keep getting added.
+  const [userRole, setUserRole] = useState<string>('');
 
   // Completion request detail
   const [completionRequest, setCompletionRequest] = useState<CompletionRequest | null>(null);
@@ -3067,16 +3073,31 @@ export default function AdminJobDetailPage({
                 {/* Close a job the crew finished but nobody closed in the app —
                     the PMs' print-only tickets, which no operator is ever
                     assigned to. The API has existed since early August with no
-                    button attached to it. */}
-                <OfficeCloseJob
-                  jobId={jobId}
-                  jobNumber={job.job_number}
-                  customerName={job.customer_name}
-                  officeCompletedAt={(job as any).office_completed_at ?? null}
-                  officeCompletedReason={(job as any).office_completion_reason ?? null}
-                  operatorCompletedAt={(job as any).completion_signed_at ?? null}
-                  onChanged={() => fetchJob()}
-                />
+                    button attached to it.
+
+                    Gated by the shared rule now that the same control sits on
+                    three other surfaces. It also fixes two quiet mismatches
+                    here: a SALESMAN can open this page and was being offered a
+                    button the API refuses, and a job already `completed` by
+                    some other route was being offered "mark complete". */}
+                {officeCloseAffordance(
+                  {
+                    status: job.status,
+                    officeCompletedAt: (job as any).office_completed_at,
+                    operatorCompletedAt: (job as any).completion_signed_at,
+                  },
+                  userRole
+                ) !== 'none' && (
+                  <OfficeCloseJob
+                    jobId={jobId}
+                    jobNumber={job.job_number}
+                    customerName={job.customer_name}
+                    officeCompletedAt={(job as any).office_completed_at ?? null}
+                    officeCompletedReason={(job as any).office_completion_reason ?? null}
+                    operatorCompletedAt={(job as any).completion_signed_at ?? null}
+                    onChanged={() => fetchJob()}
+                  />
+                )}
               </div>
             </div>
           </div>

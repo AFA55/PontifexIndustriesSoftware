@@ -20,23 +20,26 @@ export const dynamic = 'force-dynamic';
  * Closing the office side must never cost us the work record — collecting that
  * record is the whole point of the ticket.
  *
- * DELETE /api/admin/jobs/[id]/office-complete reverses it (closed by mistake).
+ * POST runs the SHARED rule from lib/office-completion.ts — role AND state — so
+ * it refuses exactly what the buttons decline to draw. Before that it checked
+ * `office_completed_at` alone and would happily stamp a job the crew had
+ * properly signed off, overwriting their real `work_completed_at` with "now".
+ * DELETE checks the role list and then filters on `office_completed_at IS NOT
+ * NULL` in the UPDATE itself, so an undo of something that was never
+ * office-closed touches no row.
+ *
+ * DELETE /api/admin/jobs/[id]/office-complete reverses it (closed by mistake),
+ * restoring the status recorded in the close's audit row rather than assuming
+ * the job was in progress.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { canOfficeClose, officeCloseAffordance } from '@/lib/office-completion';
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-/**
- * Who may close a job on the office's behalf.
- * Supervisors are included on the founder's instruction — they are on site and
- * usually the first to know a job actually finished. Operators are NOT: the
- * whole point is that this is the path for when the operator didn't do it.
- */
-const CAN_OFFICE_COMPLETE = ['admin', 'super_admin', 'operations_manager', 'supervisor'];
 
 const MAX_REASON = 1000;
 
@@ -45,7 +48,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
 
-    if (!CAN_OFFICE_COMPLETE.includes(auth.role || '')) {
+    if (!canOfficeClose(auth.role)) {
       return NextResponse.json(
         { error: 'Only office staff, an operations manager or a supervisor can close a job this way.' },
         { status: 403 }
@@ -74,17 +77,35 @@ export async function POST(request: NextRequest, context: RouteContext) {
 
     let jobQuery = supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, status, assigned_to, tenant_id, office_completed_at')
+      .select(
+        'id, job_number, status, assigned_to, tenant_id, office_completed_at, completion_signed_at'
+      )
       .eq('id', jobId);
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
     const { data: job } = await jobQuery.maybeSingle();
 
     if (!job) return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-    if (job.office_completed_at) {
-      return NextResponse.json(
-        { error: 'This job has already been closed by the office.' },
-        { status: 409 }
-      );
+
+    // The SAME rule the buttons are drawn from — role AND state, not role alone.
+    // Checking only `office_completed_at` here let a direct POST land on a job
+    // the operator had properly signed off, and the unconditional
+    // `work_completed_at: now` below overwrote his real completion timestamp
+    // with the current time. The UI never offered it; the route allowed it.
+    const affordance = officeCloseAffordance(
+      {
+        status: job.status,
+        officeCompletedAt: job.office_completed_at,
+        operatorCompletedAt: job.completion_signed_at,
+      },
+      auth.role
+    );
+    if (affordance !== 'close') {
+      const message = job.office_completed_at
+        ? 'This job has already been closed by the office.'
+        : job.completion_signed_at
+          ? 'The crew already closed this job out. Their completion stands — nothing to close from the office.'
+          : 'This job is already finished. Closing it from the office is not the fix.';
+      return NextResponse.json({ error: message }, { status: 409 });
     }
 
     const now = new Date().toISOString();
@@ -162,12 +183,41 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
   try {
     const auth = await requireAuth(request);
     if (!auth.authorized) return auth.response;
-    if (!CAN_OFFICE_COMPLETE.includes(auth.role || '')) {
+    if (!canOfficeClose(auth.role)) {
       return NextResponse.json({ error: 'Not permitted' }, { status: 403 });
     }
 
     const { id: jobId } = await context.params;
     const tenantId = await getTenantId(auth.userId);
+
+    // Put the job back where it came FROM, not where we guessed.
+    //
+    // Hardcoding 'in_progress' was fine while the only thing ever closed this
+    // way was a job a crew had actually worked. Now that the founder closes
+    // print-only tickets that sat at `scheduled` and never had a crew, an undo
+    // was inventing work that never happened: the job leaves the billing queue
+    // (app/api/admin/billing/route.ts lists `completed`), the customer portal
+    // flips a job they were shown as complete back to "In Progress", Active
+    // Jobs paints it with the in-progress accent, and an assigned one re-enters
+    // the nightly clock-out reminder population. The close already recorded
+    // where it came from — read it back.
+    const { data: lastClose } = await supabaseAdmin
+      .from('job_orders_history')
+      .select('changes')
+      .eq('job_order_id', jobId)
+      .eq('change_type', 'office_completed')
+      .order('changed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const previousStatus = (lastClose?.changes as { previous_status?: unknown } | null | undefined)
+      ?.previous_status;
+    // Jobs closed before the audit row carried a status, or whose history was
+    // pruned, still have to go somewhere sane.
+    const restoredStatus =
+      typeof previousStatus === 'string' && previousStatus.trim()
+        ? previousStatus.trim()
+        : 'in_progress';
 
     let q = supabaseAdmin
       .from('job_orders')
@@ -175,7 +225,7 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
         office_completed_at: null,
         office_completed_by: null,
         office_completion_reason: null,
-        status: 'in_progress',
+        status: restoredStatus,
         work_completed_at: null,
       })
       .eq('id', jobId)

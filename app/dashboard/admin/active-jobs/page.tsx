@@ -24,6 +24,8 @@ import {
   Copy,
 } from 'lucide-react';
 import WorkItemsSummary, { type WorkItemRow } from '@/components/WorkItemsSummary';
+import OfficeCloseJob from '@/components/OfficeCloseJob';
+import { officeCloseAffordance } from '@/lib/office-completion';
 
 interface ActiveJob {
   id: string;
@@ -43,6 +45,10 @@ interface ActiveJob {
   pending_change_requests?: number;
   pending_completion_approval?: boolean;
   operator_notes_count?: number;
+  /** The operator's own sign-off. Present → the office has nothing to close. */
+  completion_signed_at?: string | null;
+  office_completed_at?: string | null;
+  office_completion_reason?: string | null;
 }
 
 interface ScopeMeta {
@@ -864,12 +870,24 @@ export default function ActiveJobsPage() {
               const progress = progressMap[job.id];
               const pct = progress?.pct ?? 0;
               const progressLoading = progress?.loading ?? true;
+              // "The 5 stuck jobs I need to be able to mark them as completed"
+              // (founder, Aug 17). This list is where he first notices a job
+              // still sitting at `scheduled` after the crew has finished, so
+              // the close-out belongs on the card — not two clicks away on the
+              // job page, where it lived unnoticed for three days.
+              const closeAffordance = officeCloseAffordance(
+                {
+                  status: job.status,
+                  officeCompletedAt: job.office_completed_at,
+                  operatorCompletedAt: job.completion_signed_at,
+                },
+                user?.role
+              );
               return (
-                <Link
+                <div
                   key={job.id}
-                  href={`/dashboard/admin/jobs/${job.id}`}
                   className="
-                    group relative block w-full overflow-hidden rounded-2xl p-4 pt-5 text-left transition-all
+                    group relative w-full overflow-hidden rounded-2xl transition-all
                     bg-white border border-slate-200 hover:border-slate-300 shadow-sm hover:shadow-md
                     dark:bg-gradient-to-br dark:from-[#180c2c]/80 dark:to-[#0e0720]/80
                     dark:border-white/10 dark:hover:border-white/20 dark:backdrop-blur
@@ -882,6 +900,10 @@ export default function ActiveJobsPage() {
                     `}
                     aria-hidden
                   />
+                <Link
+                  href={`/dashboard/admin/jobs/${job.id}`}
+                  className="block w-full p-4 pt-5 text-left"
+                >
 
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -1074,6 +1096,25 @@ export default function ActiveJobsPage() {
                     )}
                   </div>
                 </Link>
+
+                {/* Office close-out — deliberately OUTSIDE the <Link>. A
+                    textarea and a set of reason chips are not legal content
+                    inside an anchor, and a stray click while typing would
+                    navigate away from the reason half-written. */}
+                {closeAffordance !== 'none' && (
+                  <div className="border-t border-slate-200 dark:border-white/10 px-2 py-1.5">
+                    <OfficeCloseJob
+                      jobId={job.id}
+                      jobNumber={job.job_number}
+                      customerName={job.customer_name || job.title}
+                      officeCompletedAt={job.office_completed_at ?? null}
+                      officeCompletedReason={job.office_completion_reason ?? null}
+                      operatorCompletedAt={job.completion_signed_at ?? null}
+                      onChanged={fetchJobs}
+                    />
+                  </div>
+                )}
+                </div>
               );
             })}
           </div>

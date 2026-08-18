@@ -18,6 +18,15 @@
  *
  * The reason is required, because a job that vanishes with no explanation is
  * indistinguishable from a job that was lost.
+ *
+ * WHERE IT RENDERS (Aug 17): the job detail page, the schedule board's job
+ * panel, each Active Jobs card, each Pending Jobs card (Active Jobs excludes
+ * `on_hold`, so a parked ticket was reachable from nowhere else), and — as the
+ * undo — the Completed Jobs record. It was on the job detail page alone for
+ * three days and the founder never found it, which is the same failure as
+ * having no button at all. Every host gates on `officeCloseAffordance()`
+ * (lib/office-completion.ts), and so does the POST route before it writes, so
+ * the control never appears on — nor reaches — a job it cannot help.
  */
 
 import { useState } from 'react';
@@ -36,9 +45,15 @@ interface Props {
   onChanged?: () => void;
 }
 
+/**
+ * Kept short on purpose. These are pills on a 375px phone; the 59-character
+ * version of the print-only reason wrapped to three lines inside a
+ * `rounded-full` chip and read as a broken layout. They are also the text the
+ * operator sees in his notification, so they have to survive being quoted.
+ */
 const QUICK_REASONS = [
   'Finished on site — never closed out in the app',
-  'Ticket was entered for printing only; no crew was dispatched',
+  'Print-only ticket — no crew dispatched',
   'Customer confirmed complete',
   'Cancelled after the ticket was created',
 ];
@@ -102,17 +117,17 @@ export default function OfficeCloseJob({
               Closed by the office
             </p>
             {officeCompletedReason ? (
-              <p className="mt-0.5 break-words text-xs text-emerald-700/90 dark:text-emerald-200/75">
+              <p className="mt-0.5 break-words text-sm text-emerald-700/90 dark:text-emerald-200/75">
                 {officeCompletedReason}
               </p>
             ) : null}
             <button
               onClick={() => send('DELETE')}
               disabled={busy}
-              className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900 disabled:opacity-50 dark:text-emerald-300 dark:hover:text-emerald-100"
+              className="mt-1 inline-flex min-h-[44px] items-center gap-1.5 text-sm font-semibold text-emerald-700 underline underline-offset-2 hover:text-emerald-900 disabled:opacity-50 dark:text-emerald-300 dark:hover:text-emerald-100"
             >
-              {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : <Undo2 className="h-3 w-3" />}
-              Reopen it
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Undo2 className="h-4 w-4" />}
+              Reopen this job
             </button>
             {error ? (
               <p className="mt-1 text-xs text-rose-600 dark:text-rose-300">{error}</p>
@@ -128,13 +143,13 @@ export default function OfficeCloseJob({
       <button
         onClick={() => setOpen(true)}
         className="
-          flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors
+          flex min-h-[44px] w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm transition-colors
           text-slate-700 hover:bg-slate-50
           dark:text-white/80 dark:hover:bg-white/5
         "
       >
         <span className="flex items-center gap-2">
-          <CheckCircle2 className="h-4 w-4 text-slate-400 dark:text-white/45" />
+          <CheckCircle2 className="h-4 w-4 flex-shrink-0 text-slate-400 dark:text-white/45" />
           Mark complete (office)
         </span>
       </button>
@@ -157,7 +172,7 @@ export default function OfficeCloseJob({
         <button
           onClick={() => { setOpen(false); setError(null); }}
           aria-label="Cancel"
-          className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white/70"
+          className="flex min-h-[44px] min-w-[44px] flex-shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white/70"
         >
           <X className="h-4 w-4" />
         </button>
@@ -168,7 +183,7 @@ export default function OfficeCloseJob({
           <button
             key={r}
             onClick={() => setReason(r)}
-            className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+            className={`min-h-[44px] rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${
               reason === r
                 ? 'bg-brand text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-white/10 dark:text-white/70 dark:hover:bg-white/15'
@@ -192,7 +207,7 @@ export default function OfficeCloseJob({
       <button
         onClick={() => send('POST')}
         disabled={busy || reason.trim().length === 0}
-        className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
         Close the job

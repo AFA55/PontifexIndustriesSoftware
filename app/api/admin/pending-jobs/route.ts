@@ -18,7 +18,12 @@ export async function GET(request: NextRequest) {
 
     let query = supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, customer_contact, site_contact_phone, address, location, job_type, scheduled_date, end_date, arrival_time, on_hold_reason, on_hold_placed_at, on_hold_placed_by, project_manager_id, assigned_to')
+      // status + the three office-close columns feed `officeCloseAffordance()`
+      // on the page. They are NOT optional: a card that renders with
+      // `completion_signed_at` undefined offers "mark complete" on a job the
+      // crew already signed off, which is the exact false affordance the shared
+      // rule exists to prevent.
+      .select('id, job_number, customer_name, customer_contact, site_contact_phone, address, location, job_type, status, scheduled_date, end_date, arrival_time, on_hold_reason, on_hold_placed_at, on_hold_placed_by, project_manager_id, assigned_to, completion_signed_at, office_completed_at, office_completion_reason')
       .eq('status', 'on_hold')
       .order('on_hold_placed_at', { ascending: false, nullsFirst: false });
     if (auth.tenantId) query = query.eq('tenant_id', auth.tenantId);

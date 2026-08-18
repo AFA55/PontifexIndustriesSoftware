@@ -14,8 +14,10 @@ import type { JobCardData } from './JobCard';
 import { getDisplayName } from '@/lib/equipment-map';
 import JobCrewPanel from '@/components/JobCrewPanel';
 import PhotoUploader, { PhotoViewer } from '@/components/PhotoUploader';
+import OfficeCloseJob from '@/components/OfficeCloseJob';
 import { formatMaybeDateTime } from '@/lib/dates';
 import { asArray } from '@/lib/job-arrays';
+import { officeCloseAffordance } from '@/lib/office-completion';
 
 const WorkHistoryTimeline = lazy(() => import('./WorkHistoryTimeline'));
 const OfficeDocumentsPanel = lazy(() => import('@/components/admin/OfficeDocumentsPanel'));
@@ -202,6 +204,9 @@ function StatusTimeline({ data }: { data: FullJobData }) {
 export default function JobDetailView({ job, operatorName, helperName, rowIndex, userRole, boardDate, canReassign, focusCrew, onClose, onEdit, onRemove, onSaved }: JobDetailViewProps) {
   const [fullData, setFullData] = useState<FullJobData | null>(null);
   const [loading, setLoading] = useState(true);
+  // Bumped after an office close/reopen so the panel re-reads the job rather
+  // than showing the state it was opened with.
+  const [reloadTick, setReloadTick] = useState(0);
   // "+" on the card → scroll the crew panel into view once loaded.
   const crewSectionRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
@@ -359,7 +364,7 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
     };
     fetchData();
     return () => { cancelled = true; };
-  }, [job.id]);
+  }, [job.id, reloadTick]);
 
   // Fetch job notes
   useEffect(() => {
@@ -819,6 +824,46 @@ export default function JobDetailView({ job, operatorName, helperName, rowIndex,
 
                   {/* Status Timeline */}
                   {d && <StatusTimeline data={d} />}
+
+                  {/* ---- Office close-out ----------------------------------
+                      "Some jobs on the schedule board waiting to be assigned
+                      that will never get assigned" (founder, Aug 17). Twelve
+                      unassigned `scheduled` tickets were sitting on this board
+                      with no way off it — the PMs enter them to print a sheet,
+                      no crew is ever dispatched, and no operator will ever
+                      press Complete. The close lives HERE, on the panel that
+                      opens when you click one of those cards, because this is
+                      where the office is standing when it notices.
+
+                      `d` (the full job record) is required before rendering:
+                      the control's whole correctness rests on knowing whether
+                      the operator already signed off, and a props object built
+                      from the board card alone would not know. */}
+                  {d && officeCloseAffordance(
+                    {
+                      status: d.status,
+                      officeCompletedAt: d.office_completed_at,
+                      operatorCompletedAt: d.completion_signed_at,
+                    },
+                    userRole
+                  ) !== 'none' && (
+                    <div className="rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.03] p-2">
+                      <OfficeCloseJob
+                        jobId={job.id}
+                        jobNumber={d.job_number ?? job.job_number}
+                        customerName={d.customer_name ?? job.customer_name}
+                        officeCompletedAt={d.office_completed_at ?? null}
+                        officeCompletedReason={d.office_completion_reason ?? null}
+                        operatorCompletedAt={d.completion_signed_at ?? null}
+                        onChanged={() => {
+                          setReloadTick((t) => t + 1);
+                          // The board itself has to redraw — closing a job is
+                          // exactly the act of taking it off the schedule.
+                          onSaved?.();
+                        }}
+                      />
+                    </div>
+                  )}
 
                   {/* ---- Job Info Card ---- */}
                   <SectionCard

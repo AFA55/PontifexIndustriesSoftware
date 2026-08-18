@@ -22,6 +22,72 @@
  * always look back at what he did.
  */
 
+/**
+ * Who may close a job on the office's behalf.
+ *
+ * Supervisors are included on the founder's instruction — they are on site and
+ * usually the first to know a job actually finished. Operators are NOT: the
+ * whole point is that this is the path for when the operator didn't do it.
+ *
+ * The API route imports this list, and so does every surface that decides
+ * whether to draw the button, so a role can never be permitted in one place and
+ * refused in the other. The route also runs the full `officeCloseAffordance()`
+ * below before it writes — role AND state — so a hand-rolled POST cannot reach
+ * a job the buttons would never have offered.
+ */
+export const OFFICE_CLOSE_ROLES = [
+  'admin',
+  'super_admin',
+  'operations_manager',
+  'supervisor',
+] as const;
+
+export function canOfficeClose(role?: string | null): boolean {
+  return (OFFICE_CLOSE_ROLES as readonly string[]).includes(role || '');
+}
+
+/** What, if anything, the office-close control should offer on a given job. */
+export type OfficeCloseAffordance = 'close' | 'reopen' | 'none';
+
+export interface OfficeCloseSubject {
+  /** job_orders.status */
+  status?: string | null;
+  /** job_orders.office_completed_at */
+  officeCompletedAt?: string | null;
+  /** job_orders.completion_signed_at — the operator's own sign-off. */
+  operatorCompletedAt?: string | null;
+}
+
+/**
+ * WHY THIS IS A FUNCTION AND NOT AN INLINE `&&` PER PAGE.
+ *
+ * The control now lives on five surfaces (job detail, schedule board, Active
+ * Jobs, Pending Jobs, Completed Jobs) and the POST route runs it too before it
+ * writes. Drawing "Mark complete (office)" on a job that is
+ * already finished is a false affordance — the button either does nothing or,
+ * worse, invites someone to re-close work that was closed properly. The rule
+ * has to be identical everywhere, so it is written once:
+ *
+ *   • the office already closed it        → offer REOPEN (the undo path)
+ *   • the operator signed it off          → nothing; his close is the real one
+ *   • it is finished/cancelled some other
+ *     way (8 such jobs in production)     → nothing; "complete" is not the fix
+ *   • the viewer cannot close jobs        → nothing
+ *   • otherwise                           → offer CLOSE
+ */
+const ALREADY_SETTLED = new Set(['completed', 'cancelled', 'archived']);
+
+export function officeCloseAffordance(
+  job: OfficeCloseSubject,
+  viewerRole?: string | null
+): OfficeCloseAffordance {
+  if (!canOfficeClose(viewerRole)) return 'none';
+  if (job.officeCompletedAt) return 'reopen';
+  if (job.operatorCompletedAt) return 'none';
+  if (ALREADY_SETTLED.has((job.status || '').toLowerCase())) return 'none';
+  return 'close';
+}
+
 export interface OfficeCompletionState {
   /** When the office closed the job, if they have. */
   officeCompletedAt?: string | null;

@@ -50,7 +50,10 @@ export async function GET(request: NextRequest) {
         assigned_to,
         helper_assigned_to,
         created_by,
-        priority
+        priority,
+        completion_signed_at,
+        office_completed_at,
+        office_completion_reason
       `)
       .eq('tenant_id', auth.tenantId)
       // Exclude on_hold too — parked jobs live in the Pending Jobs page, not here.
@@ -189,6 +192,13 @@ export async function GET(request: NextRequest) {
       pending_change_requests: changeRequestCounts[j.id] || 0,
       pending_completion_approval: completionPendingSet.has(j.id),
       operator_notes_count: notesCounts[j.id] || 0,
+      // Office close-out state. The list draws a "Mark complete (office)"
+      // control per card, and it must know whether the OPERATOR already signed
+      // the job off — without `completion_signed_at` the button would appear on
+      // a properly-closed job, which is a false affordance.
+      completion_signed_at: j.completion_signed_at ?? null,
+      office_completed_at: j.office_completed_at ?? null,
+      office_completion_reason: j.office_completion_reason ?? null,
       };
     });
 
