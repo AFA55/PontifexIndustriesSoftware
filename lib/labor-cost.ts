@@ -57,6 +57,80 @@ export interface JobWindow {
   work_started_at: string | null;
   route_started_at: string | null;
   work_completed_at: string | null;
+  /** `job_orders.status`. Optional — omitted, the booked-span guard never fires. */
+  status?: string | null;
+  /**
+   * The last day the OFFICE BOOKED this job for, bare 'YYYY-MM-DD'. Build it
+   * with `bookedEndDateOf(scheduled_end_date, end_date, scheduled_date)` — the
+   * LATEST of the three, not the first non-null. Optional, and only ever
+   * consulted when there is no `work_completed_at` — see `bookedSpanEndDay`.
+   */
+  booked_end_date?: string | null;
+}
+
+const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A FINISHED JOB WITH NO RECORDED END MUST NOT STAY OPEN FOREVER.
+ *
+ * `work_completed_at` is NULL on 7 of the 16 completed production jobs
+ * (audited Aug 17 2026) — including JOB-2026-277097, which the office marked
+ * complete but which never got its closing stamp. Everywhere below, a missing
+ * completion timestamp degrades the window's end to the CARD's own end, which
+ * is not a bound at all: the window silently runs to the end of time. Any card
+ * that survives attribution on a later day then books in FULL against a job
+ * that finished days earlier. Dante's Wednesday was one office-board gap away
+ * from exactly that — 10.37 hours onto a two-day job that ended Tuesday.
+ *
+ * So when the office has already declared the job COMPLETE and the timestamp is
+ * missing, the job's booked span supplies the end instead. That is the office's
+ * own record of when the job ran — the same class of evidence as the placement
+ * ledger, which this codebase already lets outrank a filed log.
+ *
+ * DELIBERATELY NARROW, because the opposite error is worse. A job still running
+ * routinely overruns its booked end (5 of 107 production assignments and 6 of
+ * 60 daily logs sit past it), and zeroing those would delete real work. So the
+ * fallback fires ONLY on `status = 'completed'`: a job that is not finished has
+ * a booked end that is a PLAN, not a record, and is left alone. Verified
+ * against production before shipping — across all 7 completed-with-no-timestamp
+ * jobs, zero timecards and zero assignments fall after the booked end, so this
+ * changes no existing figure. It is a guard against the next one.
+ *
+ * Returns null (no guard) whenever a real completion timestamp exists — that
+ * case is already handled by the interval intersection.
+ */
+/**
+ * The office's booked END for a job, out of the three columns that can carry
+ * one — `scheduled_end_date`, `end_date`, `scheduled_date`.
+ *
+ * TAKE THE LATEST, NOT THE FIRST NON-NULL. First-non-null was safe against
+ * today's data (audited Aug 17 2026: no row has `scheduled_end_date` earlier
+ * than its `end_date`, and the only two rows missing both are not completed),
+ * but it is safe by luck. A multi-day job completed with ONLY `scheduled_date`
+ * populated — the start day — would hand `bookedSpanEndDay` a one-day window
+ * and zero out every later day of real, paid work. The MAX can only ever widen
+ * the window, and a window that is too wide merely declines to guard; a window
+ * that is too narrow deletes hours off an invoice.
+ *
+ * Non-YMD and null candidates are ignored. Returns null when none survive, in
+ * which case the guard does not fire at all.
+ */
+export function bookedEndDateOf(
+  ...candidates: (string | null | undefined)[]
+): string | null {
+  let latest: string | null = null;
+  for (const c of candidates) {
+    if (typeof c !== 'string' || !YMD_RE.test(c)) continue;
+    if (!latest || c > latest) latest = c;
+  }
+  return latest;
+}
+
+export function bookedSpanEndDay(job: JobWindow): string | null {
+  if (job.work_completed_at) return null;
+  if (String(job.status || '').toLowerCase() !== 'completed') return null;
+  const booked = job.booked_end_date;
+  return typeof booked === 'string' && YMD_RE.test(booked) ? booked : null;
 }
 
 function toMs(v: string | null | undefined): number | null {
@@ -190,13 +264,14 @@ export function cardDayIsInsideJobWindow(
 ): boolean {
   const startMs = toMs(job.work_started_at) ?? toMs(job.route_started_at);
   const endMs = toMs(job.work_completed_at);
-  if (startMs == null && endMs == null) return false; // no window to clip against
+  // A completed job with no closing stamp still has an end: its booked span.
+  const endDay = endMs != null ? dayInTz(endMs, timeZone) : bookedSpanEndDay(job);
+  if (startMs == null && endDay == null) return false; // no window to clip against
 
   const cardDay = cardPayrollDay(card, timeZone);
   if (cardDay == null) return false;
 
   const startDay = startMs != null ? dayInTz(startMs, timeZone) : null;
-  const endDay = endMs != null ? dayInTz(endMs, timeZone) : null;
   if (startDay && cardDay < startDay) return false;
   if (endDay && cardDay > endDay) return false;
   return true;
@@ -302,6 +377,16 @@ export function jobHoursForCard(
    *  the window's own days are derived in. Defaults to the platform default. */
   timeZone: string = DEFAULT_TENANT_TZ
 ): number {
+  // THE JOB WAS OVER. A card dated after the last day a COMPLETED job was
+  // booked for contributes nothing to it, linked or attributed alike — see
+  // `bookedSpanEndDay` for why this fires only when the closing timestamp is
+  // missing, and only on a job the office has already marked complete.
+  const bookedEnd = bookedSpanEndDay(job);
+  if (bookedEnd) {
+    const cardDay = cardPayrollDay(card, timeZone);
+    if (cardDay && cardDay > bookedEnd) return 0;
+  }
+
   const clipToWindow = !attributed || cardDayIsInsideJobWindow(card, job, timeZone);
   const window: JobWindow = clipToWindow
     ? job

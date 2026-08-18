@@ -24,7 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { attributableTimecards } from '@/lib/job-clock-attribution';
-import { dropHelperDoubleCountedCards } from '@/lib/labor-cost';
+import { bookedEndDateOf, dropHelperDoubleCountedCards } from '@/lib/labor-cost';
 import {
   buildCompletedJobDays,
   paidOrLiveCardHours,
@@ -243,6 +243,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
         work_started_at: jobAny.work_started_at ?? null,
         route_started_at: jobAny.route_started_at ?? null,
         work_completed_at: jobAny.work_completed_at ?? null,
+        // Gives the window a real end when the closing stamp is missing on an
+        // already-completed job — otherwise it runs forever. See
+        // `bookedSpanEndDay` in lib/labor-cost.ts.
+        status: jobAny.status ?? null,
+        booked_end_date: bookedEndDateOf(
+          jobAny.scheduled_end_date,
+          jobAny.end_date,
+          jobAny.scheduled_date
+        ),
       },
     });
 

@@ -341,6 +341,32 @@ export interface TicketPersonDay {
    * filed nothing" — the opposite of the truth.
    */
   measurements_by_lead?: boolean;
+  /**
+   * The date this person's paperwork for this job was FILED, when that is not
+   * the day they were on the job. Set when a closeout filed from another job's
+   * day was folded onto their last real day here (see `offJobPersonDays`), so
+   * the sheet can say the measurements arrived later instead of implying they
+   * were all cut on the day they print under.
+   */
+  work_filed_on?: string | null;
+  /**
+   * `work_filed_on` describes SOME of this block's bullets, not all of them.
+   *
+   * Set when the fold landed on a day that had filed rows of its own, or when a
+   * SECOND off-job day folded in behind the first. Either way the stamped date
+   * is not true of every line printed here — JOB-2026-631148's Aug 4 block has
+   * four bullets, two genuinely filed that day and two folded from Aug 5. The
+   * sheet must under-claim rather than assert something untrue about recorded
+   * rows, so the printed line becomes "Additional measurements filed at closeout
+   * on …".
+   */
+  work_filed_on_partial?: boolean;
+  /**
+   * This person-day is a CLOSEOUT filed from somewhere else, kept only because
+   * there was no on-job day in the printed range to fold it onto. It carries
+   * the work but never hours — the office must not read it as a day worked.
+   */
+  filed_off_job?: boolean;
 }
 
 export interface TicketDay {
@@ -388,9 +414,62 @@ export interface BuildTicketDaysInput {
    * enough. Falls back to whoever `roles` marks 'lead'.
    */
   leadByDate?: Map<string, string>;
+  /**
+   * DAYS THIS CREW PROVABLY SPENT ON ANOTHER JOB — `user_id|YYYY-MM-DD` keys
+   * straight out of `attributableTimecards` (the office's own placement ledger).
+   *
+   * WHY (founder, Aug 17, running payroll). Dante's printed Southern Basements
+   * ticket read 10.13 + 10.64 + **0.09** = 20.86 for the week. The 0.09 sat on
+   * WEDNESDAY, a day his timecard says he was at AM King from start to finish.
+   *
+   * It was never a rounding artefact or a window clip. His clock card for that
+   * day was correctly excluded — the ledger placed him at AM King, so the card
+   * rule dropped it. What got through was the DAILY LOG: at 07:00 Wednesday, in
+   * the truck, he closed out Monday–Tuesday's Southern Basements job. The app
+   * timed that five-minute closeout session and wrote
+   * `daily_job_logs.hours_worked = 0.09` on a row dated Wednesday. Step 2 below
+   * then used it as the day's hours, because no card had claimed the day — and
+   * in doing so invented a Wednesday work block on a job he never visited.
+   *
+   * Five minutes of paperwork is not five minutes of job labor, and the day it
+   * was typed is not a day worked. So on these person-days:
+   *   • the log's `hours_worked` NEVER becomes the day's hours, and neither
+   *     does a helper log's — nothing recorded says they worked here;
+   *   • the day does not survive as a work block. Its WORK is folded onto the
+   *     person's last real day on this job inside the printed range, stamped
+   *     `work_filed_on` so the sheet says when it actually arrived.
+   *
+   * The fold matters as much as the drop. On JOB-2026-277097 that Wednesday
+   * closeout is the ONLY record of what was cut — all three `work_items` and
+   * the log's `work_performed` copy carry Wednesday's date. Deleting the day
+   * outright would have removed the whole job's scope from the sheet the office
+   * hand-writes the invoice from: a blank ticket instead of a wrong one, which
+   * is the worse of the two failures. When there is no on-job day in range to
+   * fold onto, the day is kept with NO hours and `filed_off_job` set, so the
+   * measurements survive and the sheet still refuses to call it a day worked.
+   *
+   * A card LINKED to this job outranks the ledger and is untouched: step 1 runs
+   * first, and a person-day it gave hours to is never treated as off-job. That
+   * is real production data — Zack's Aug 14 card carries JOB-2026-424813's id
+   * while the board placed him on JOB-2026-675188.
+   */
+  offJobPersonDays?: Set<string>;
 }
 
 const UNASSIGNED = '__unassigned__';
+
+/**
+ * Two day-notes that both belong on one printed block, joined rather than
+ * chosen between. Used only by the off-job fold, where the target day and the
+ * closeout each carry a note the office wrote and neither is a copy of the
+ * other. Identical text collapses — a re-saved closeout should not print twice.
+ */
+function joinNotes(a: string | null, b: string | null): string | null {
+  const parts = [a, b].map((s) => (s || '').trim()).filter(Boolean);
+  const seen = new Set<string>();
+  const unique = parts.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
+  return unique.length > 0 ? unique.join(' · ') : null;
+}
 
 function blankPerson(userId: string, input: BuildTicketDaysInput): TicketPersonDay {
   return {
@@ -419,6 +498,22 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
   const { range } = input;
   const byDate = new Map<string, Map<string, TicketPersonDay>>();
 
+  const dayKey = (userId: string, date: string) => `${userId}|${date}`;
+  /** The office placed this person on another job that day. See `offJobPersonDays`. */
+  const isOffJob = (userId: string, date: string) =>
+    input.offJobPersonDays?.has(dayKey(userId, date)) === true;
+  /**
+   * Person-days a CLOCK CARD reached — the recorded fact that outranks the
+   * ledger. Filled by step 1 only, so a linked card always wins the tie.
+   *
+   * With ONE deliberate exception: a SHOP card never lands here, because step 1
+   * skips it before this line. Shop time is not job labour, so a shop card is no
+   * evidence the person was on this job that day, and letting it protect an
+   * off-job filing day would resurrect exactly the phantom hours the guard
+   * exists to kill. A shop card is the one linked card that does not win.
+   */
+  const cardBacked = new Set<string>();
+
   const bucket = (date: string, userId: string): TicketPersonDay => {
     let day = byDate.get(date);
     if (!day) {
@@ -436,8 +531,13 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
   // 1. Clock times — the payroll truth for Start / End / Lunch / Total.
   for (const tc of input.timecards) {
     if (!inRange(tc.date, range) || !tc.user_id) continue;
-    if (isShopCard(tc)) continue; // shop time is not job labor — never bill it here
+    // Shop time is not job labor — never bill it here, and (see `cardBacked`)
+    // never let it vouch for a person being on this job that day either.
+    if (isShopCard(tc)) continue;
     const p = bucket(tc.date as string, tc.user_id);
+    // A card got this far only by being linked to this job or attributed to it,
+    // both of which outrank the placement ledger for this person-day.
+    cardBacked.add(dayKey(tc.user_id, tc.date as string));
     if (tc.clock_in_time && (!p.clock_in || tc.clock_in_time < p.clock_in)) p.clock_in = tc.clock_in_time;
     if (tc.clock_out_time && (!p.clock_out || tc.clock_out_time > p.clock_out)) p.clock_out = tc.clock_out_time;
     const lunch = tc.lunch_duration_minutes ?? tc.break_minutes;
@@ -457,7 +557,12 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     const userId = log.operator_id || input.fallbackOperatorId || UNASSIGNED;
     const p = bucket(log.log_date as string, userId);
     if (log.notes && String(log.notes).trim()) p.log_note = String(log.notes).trim();
-    if (p.hours == null && log.hours_worked != null && Number.isFinite(Number(log.hours_worked))) {
+    // NOT on a day the office placed them elsewhere and no card ties them here.
+    // `hours_worked` on such a row is the length of the CLOSEOUT SESSION, not of
+    // a day's work — 0.09h for Dante's five minutes in the truck. See
+    // `offJobPersonDays`.
+    const offJob = isOffJob(userId, log.log_date as string) && !cardBacked.has(dayKey(userId, log.log_date as string));
+    if (!offJob && p.hours == null && log.hours_worked != null && Number.isFinite(Number(log.hours_worked))) {
       p.hours = round2(Number(log.hours_worked));
     }
   }
@@ -476,7 +581,10 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     const p = bucket(hl.log_date as string, hl.helper_id);
     const text = (hl.work_description || '').trim();
     if (text) p.helper_note = text;
-    if (p.hours == null && hl.hours_worked != null && Number.isFinite(Number(hl.hours_worked))) {
+    // Same guard as the operator log above — a helper who filed this job's
+    // paperwork from another job's day did not work here that day.
+    const offJob = isOffJob(hl.helper_id, hl.log_date as string) && !cardBacked.has(dayKey(hl.helper_id, hl.log_date as string));
+    if (!offJob && p.hours == null && hl.hours_worked != null && Number.isFinite(Number(hl.hours_worked))) {
       p.hours = round2(Number(hl.hours_worked));
     }
   }
@@ -495,6 +603,109 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     const logged = normalizeLoggedWork(log.work_performed);
     if (p.work_items.length === 0) p.logged_work = logged;
     else p.work_items = enrichFromLoggedWork(p.work_items, logged);
+  }
+
+  // 5b. OFF-JOB FILING DAYS — the phantom Wednesday.
+  //
+  //     A person-day that exists ONLY because someone filed this job's
+  //     paperwork on a day the office had them somewhere else is not a day
+  //     worked here, and the printed sheet must not carry it as one. Its hours
+  //     are already gone (steps 2 and 4 refused the fallback); what remains is
+  //     to stop the DAY itself from printing, without losing the work it
+  //     carries. Full reasoning on `offJobPersonDays`.
+  //
+  //     The work moves to the person's last real day on this job at or before
+  //     the filing date — the closest thing the sheet knows to when it was
+  //     actually done — and the filing date rides along on `work_filed_on` so
+  //     nothing is silently re-dated. With no such day in the printed range the
+  //     block stays put, hours-less and flagged, because losing the only record
+  //     of what was cut is worse than printing a labelled paperwork entry.
+  //
+  //     THE FOLD MUST NOT MAKE ANYONE A LEAD-WITH-WORK THEY WEREN'T.
+  //
+  //     Step 6 below blanks every non-lead's quantities on any day the LEAD
+  //     filed work, and deliberately stands down when the lead filed nothing.
+  //     Folding a closeout onto a day the lead had no work of his own flips that
+  //     test — and step 6 would then erase a second crew member's genuine
+  //     footage for that day, replacing distinct measurements with a
+  //     "measured by lead" flag. On JOB-2026-277097 Dante is lead and filed
+  //     nothing on 8/11 (all three rows carry 8/12), so the fold would have made
+  //     him lead-with-work there; only the fact that nobody else filed on 8/11
+  //     kept it from costing real footage off the invoice.
+  //
+  //     So days whose ONLY work arrived by fold are recorded here, and step 6
+  //     treats them the way it treated them before the fold existed: as a lead
+  //     who filed nothing, leaving the crew's own numbers alone.
+  const foldOnlyWorkDays = new Set<string>();
+
+  if (input.offJobPersonDays && input.offJobPersonDays.size > 0) {
+    // Every person-day currently on the sheet that is NOT an off-job filing —
+    // i.e. the days each person was really here.
+    const onJobDates = new Map<string, string[]>();
+    for (const [date, people] of byDate) {
+      for (const userId of people.keys()) {
+        if (isOffJob(userId, date) && !cardBacked.has(dayKey(userId, date))) continue;
+        const list = onJobDates.get(userId) ?? [];
+        list.push(date);
+        onJobDates.set(userId, list);
+      }
+    }
+    for (const list of onJobDates.values()) list.sort();
+
+    for (const [date, people] of Array.from(byDate)) {
+      for (const [userId, person] of Array.from(people)) {
+        if (!isOffJob(userId, date) || cardBacked.has(dayKey(userId, date))) continue;
+
+        // Latest real day on this job at or before the filing date. A closeout
+        // describes work already done, so never fold it FORWARD onto a day the
+        // work could not yet have happened on.
+        const candidates = (onJobDates.get(userId) ?? []).filter((d) => d <= date);
+        const targetDate = candidates.length > 0 ? candidates[candidates.length - 1] : null;
+        const target = targetDate ? byDate.get(targetDate)?.get(userId) : null;
+
+        if (!target) {
+          // Nothing to fold onto — keep the work, refuse the day.
+          person.hours = null;
+          person.filed_off_job = true;
+          continue;
+        }
+
+        // Whether the target day stood on its own measurements BEFORE the fold.
+        // Read now, because the merge below is about to make it true either way,
+        // and both the `work_filed_on` wording and step 6's lead test hang on
+        // the answer.
+        const targetHadOwnWork = target.work_items.length > 0 || target.logged_work.length > 0;
+        const foldCarriesWork = person.work_items.length > 0 || person.logged_work.length > 0;
+
+        target.work_items = [...target.work_items, ...person.work_items];
+        // Step 5 leaves `logged_work` non-empty only when the person filed no
+        // structured rows, so these two can never be the same submission twice.
+        target.logged_work = [...target.logged_work, ...person.logged_work];
+        // JOIN, never first-wins. Both notes are real and neither is a copy of
+        // the other: on JOB-2026-631148 the 8/04 log already reads "Job
+        // complete. Remote signature link sent to …", so keeping only the first
+        // would drop "Final day. Job complete." off the printed sheet outright.
+        // Every other line of this fold is additive; this one has to be too.
+        target.log_note = joinNotes(target.log_note, person.log_note);
+        target.helper_note = joinNotes(target.helper_note, person.helper_note);
+        if (foldCarriesWork) {
+          // The stamp must not over-claim. It is true of the WHOLE block only
+          // when the block had nothing of its own and nothing else has folded
+          // in; otherwise some bullets here really were filed on their own day,
+          // and the sheet says "Additional …" instead. Keep the LATEST filing
+          // date so a second fold is deterministic rather than
+          // iteration-order-dependent.
+          if (targetHadOwnWork || target.work_filed_on) target.work_filed_on_partial = true;
+          if (!target.work_filed_on || date > target.work_filed_on) target.work_filed_on = date;
+          if (!targetHadOwnWork && targetDate) {
+            foldOnlyWorkDays.add(dayKey(userId, targetDate));
+          }
+        }
+
+        people.delete(userId);
+      }
+      if (people.size === 0) byDate.delete(date);
+    }
   }
 
   // 6. LEAD-ONLY MEASUREMENTS (print mode).
@@ -517,9 +728,15 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
       if (!leadId) continue;
 
       const lead = people.get(leadId);
-      const leadHasWork =
-        !!lead && (lead.work_items.length > 0 || lead.logged_work.length > 0);
-      if (!leadHasWork) continue;
+      // Work that ARRIVED HERE BY FOLD does not make this a day the lead
+      // measured the scope — it describes a different day, filed late. Counting
+      // it would blank a second crew member's genuine footage for this day and
+      // print the fold's scope in its place. See `foldOnlyWorkDays`.
+      const leadHasOwnWork =
+        !!lead &&
+        (lead.work_items.length > 0 || lead.logged_work.length > 0) &&
+        !foldOnlyWorkDays.has(dayKey(leadId, date));
+      if (!leadHasOwnWork) continue;
 
       for (const [userId, person] of people) {
         if (userId === leadId) continue;

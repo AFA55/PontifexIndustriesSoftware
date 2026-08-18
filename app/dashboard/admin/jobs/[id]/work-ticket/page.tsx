@@ -295,6 +295,30 @@ function PersonBlock({
         )}
       </div>
 
+      {/* ── WHERE THESE NUMBERS CAME FROM, WHEN IT ISN'T THIS DAY ────────────
+          A closeout typed from the next job's truck used to print as a work
+          day here (Dante, 0.09 hrs on a Wednesday he spent at AM King). The
+          hours are gone; these two lines are what replaced them, because the
+          measurements in that closeout are real and often the job's only
+          record of what was cut. Say plainly when they were filed rather than
+          re-dating them silently. */}
+      {person.filed_off_job && (
+        <div style={{ margin: '2px 0 0 0', fontSize: 9.5, fontStyle: 'italic' }}>
+          Closeout paperwork filed this day — hours worked on another job.
+        </div>
+      )}
+      {person.work_filed_on && (
+        <div style={{ margin: '2px 0 0 0', fontSize: 9.5, fontStyle: 'italic' }}>
+          {/* "Additional" when only SOME of the bullets below arrived with the
+              closeout — the rest were genuinely filed on this day, and a flat
+              "Measurements filed at closeout on X" would assert something
+              untrue about them. Under-claim, never over-claim. */}
+          {person.work_filed_on_partial ? 'Additional measurements' : 'Measurements'} filed at
+          closeout on{' '}
+          {formatDay(person.work_filed_on, { weekday: 'short', month: 'numeric', day: 'numeric' })}.
+        </div>
+      )}
+
       {(work || []).length > 0 ? (
         <ul style={{ margin: '2px 0 0 14px', listStyle: 'disc' }}>
           {(work || []).map((item, i) => (
@@ -526,7 +550,15 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
       : '';
 
   // Flatten to the paper's day blocks: one row per person per day.
-  const hourRows = (days || []).flatMap((d) => (d.people || []).map((p) => ({ date: d.date, p })));
+  //
+  // `filed_off_job` days are deliberately absent: the office had that person on
+  // another job that day and they only filed this job's closeout paperwork from
+  // it. The work still prints in the day blocks (it is often the job's only
+  // record of what was cut), but a line in the HOURS table — even one with a
+  // blank Total — is a line payroll and invoicing read as a day worked here.
+  const hourRows = (days || []).flatMap((d) =>
+    (d.people || []).filter((p) => !p.filed_off_job).map((p) => ({ date: d.date, p }))
+  );
   // The paper form has FOUR day blocks — always print at least four so the crew
   // can add days by hand on a light week.
   // Two spare write-in rows, not four — the old count came from the paper

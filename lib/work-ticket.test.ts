@@ -721,3 +721,320 @@ describe('totalsByWorkType — the number the office invoices from', () => {
     expect(totalsByWorkType([])).toEqual([]);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// THE PHANTOM WEDNESDAY (founder, Aug 17 2026 — found while running payroll).
+//
+// Dante's printed Southern Basements ticket (JOB-2026-277097, WEEK mode) read
+//   10.13 + 10.64 + 0.09 = 20.86
+// The 0.09 sat on WEDNESDAY 8/12 — a day his timecard says he was at AM King
+// (JOB-2026-914932) from start to finish, 10.37 hours.
+//
+// It was NOT a window clip and NOT a rounding artefact. His Wednesday clock
+// card was correctly dropped by the attribution rule (the office's ledger put
+// him at AM King). What got through was `daily_job_logs.hours_worked = 0.09`:
+// at 07:00 that morning, in the truck, he closed out Monday–Tuesday's job, and
+// the app timed the five-minute closeout session and stored it as the day's
+// hours. With no card claiming the day, the ticket's log fallback promoted that
+// paperwork into a work day.
+//
+// Every figure below is the real production row.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildTicketDays — a day spent on another job is not this job\'s day', () => {
+  const DANTE = '8baa4e85-39dc-4ec8-b80e-464c041ba310';
+  const danteNames = new Map<string, string | null>([[DANTE, 'Dante burgess']]);
+  const danteRoles = resolveCrewRoles({ assigned_to: DANTE });
+
+  // Mon + Tue reached the ticket (Mon attributed off the ledger, Tue linked).
+  // Wednesday's card is absent because attribution already put it at AM King.
+  const timecards: TicketTimecardRow[] = [
+    { id: 'tc-mon', user_id: DANTE, date: '2026-08-10', clock_in_time: '2026-08-10T11:43:00Z', clock_out_time: '2026-08-10T22:31:00Z', lunch_duration_minutes: 30, net_hours: 10.13, total_hours: 10.13 },
+    { id: 'tc-tue', user_id: DANTE, date: '2026-08-11', clock_in_time: '2026-08-11T11:30:00Z', clock_out_time: '2026-08-11T22:38:00Z', lunch_duration_minutes: 30, net_hours: 10.64, total_hours: 10.64 },
+  ];
+
+  // The job's ONLY daily log — filed Wednesday morning, day_number 3 on a
+  // two-day job, carrying the whole scope and a 5-minute "hours_worked".
+  const logs: TicketDailyLog[] = [
+    {
+      id: '7e5e9f13-4805-4561-899b-ab01698be059',
+      operator_id: DANTE,
+      log_date: '2026-08-12',
+      day_number: 3,
+      hours_worked: 0.09,
+      work_performed: [
+        { type: 'WALL SAW', depth: 15, quantity: 25.4, notes: 'Hung poly' },
+        { type: 'CORE DRILL', depth: 15, quantity: 1 },
+        { type: 'HAND SAW', depth: 10, quantity: 8 },
+      ],
+      notes: 'Job complete. Remote signature link sent to 678-897-0900.',
+    },
+  ];
+
+  // All three work_items carry work_date 2026-08-12 — they were written by the
+  // same Wednesday closeout.
+  const workItems: TicketWorkItem[] = [
+    { id: 'wi-hand', operator_id: DANTE, day_number: 3, work_date: '2026-08-12', work_type: 'HAND SAW', quantity: 8, linear_feet_cut: 8, cut_depth_inches: 10 },
+    { id: 'wi-wall', operator_id: DANTE, day_number: 3, work_date: '2026-08-12', work_type: 'WALL SAW', quantity: 25.4, linear_feet_cut: 25.4, cut_depth_inches: 15 },
+    { id: 'wi-core', operator_id: DANTE, day_number: 3, work_date: '2026-08-12', work_type: 'CORE DRILL', quantity: 1, core_quantity: 1 },
+  ];
+
+  // What `attributableTimecards` now returns: the ledger placed Dante on AM
+  // King on 8/12 and not on this job.
+  const offJobPersonDays = new Set([`${DANTE}|2026-08-12`]);
+
+  const build = (over: Partial<Parameters<typeof buildTicketDays>[0]> = {}) =>
+    buildTicketDays({
+      range: ticketRange('week', '2026-08-12'),
+      timecards,
+      logs,
+      workItems,
+      roles: danteRoles,
+      names: danteNames,
+      fallbackOperatorId: DANTE,
+      quantitiesFrom: 'lead',
+      offJobPersonDays,
+      ...over,
+    });
+
+  it('THE BUG: without the guard, Wednesday printed 0.09 hours', () => {
+    const days = build({ offJobPersonDays: undefined });
+    const wed = days.find((d) => d.date === '2026-08-12');
+    expect(wed?.total_hours).toBe(0.09);
+    expect(grandTotalHours(days)).toBe(20.86); // the founder's printed sheet
+  });
+
+  it('drops the phantom Wednesday from the sheet entirely', () => {
+    const days = build();
+    expect(days.map((d) => d.date)).toEqual(['2026-08-10', '2026-08-11']);
+  });
+
+  it('0.09 appears nowhere — not as a day, a person, or a remnant', () => {
+    const days = build();
+    const everyHours = days.flatMap((d) => [d.total_hours, ...d.people.map((p) => p.hours)]);
+    expect(everyHours).not.toContain(0.09);
+  });
+
+  it('TOTAL TIME (WEEK) is Monday + Tuesday only', () => {
+    expect(grandTotalHours(build())).toBe(20.77);
+  });
+
+  it('keeps Monday and Tuesday exactly as they were', () => {
+    const days = build();
+    expect(days.find((d) => d.date === '2026-08-10')?.total_hours).toBe(10.13);
+    expect(days.find((d) => d.date === '2026-08-11')?.total_hours).toBe(10.64);
+  });
+
+  it('does NOT lose the job\'s only record of what was cut', () => {
+    // Deleting the Wednesday block outright would blank the whole scope — this
+    // log and these rows are the ONLY measurements JOB-2026-277097 has.
+    const totals = totalsByWorkType(allPrintedWork(build()));
+    expect(totals).toEqual(
+      expect.arrayContaining([
+        { workType: 'WALL SAW', quantity: 25.4, unit: 'LF' },
+        { workType: 'HAND SAW', quantity: 8, unit: 'LF' },
+        { workType: 'CORE DRILL', quantity: 1, unit: 'holes' },
+      ])
+    );
+  });
+
+  it('folds the closeout onto the last real day and says when it was filed', () => {
+    const tue = build().find((d) => d.date === '2026-08-11')!;
+    const dante = tue.people.find((p) => p.user_id === DANTE)!;
+    expect(dante.work_items.map((w) => w.work_type).sort()).toEqual([
+      'CORE DRILL',
+      'HAND SAW',
+      'WALL SAW',
+    ]);
+    // Labelled, never silently re-dated.
+    expect(dante.work_filed_on).toBe('2026-08-12');
+    // And the hours are still Tuesday's own, untouched by the fold.
+    expect(dante.hours).toBe(10.64);
+  });
+
+  it('carries the closeout note across with the work', () => {
+    const tue = build().find((d) => d.date === '2026-08-11')!;
+    expect(tue.people[0].log_note).toContain('Job complete.');
+  });
+
+  it('keeps the work when there is no on-job day to fold onto, hours-less and flagged', () => {
+    // Printing Wednesday on its own (day mode): nothing to fold onto, so the
+    // measurements survive rather than vanishing — but the day still refuses to
+    // call itself worked.
+    const days = build({ range: ticketRange('day', '2026-08-12') });
+    const wed = days.find((d) => d.date === '2026-08-12')!;
+    const dante = wed.people.find((p) => p.user_id === DANTE)!;
+    expect(dante.hours).toBeNull();
+    expect(dante.filed_off_job).toBe(true);
+    expect(wed.total_hours).toBe(0);
+    expect(totalsByWorkType(allPrintedWork(days)).length).toBe(3);
+  });
+
+  it('a LINKED card outranks the ledger — Zack\'s real Aug 14 day survives', () => {
+    // Production row `60dab8ce-7457-4e30-be26-c30a30206eb5`: Zack's Aug 14 card
+    // carries JOB-2026-424813's id while the placement ledger put him on
+    // JOB-2026-675188. A recorded link is not an inference, and 9.73 real hours
+    // must not be deleted by a stale board.
+    const ZACK_DAY = '2026-08-14';
+    const days = buildTicketDays({
+      range: ticketRange('day', ZACK_DAY),
+      timecards: [
+        { id: 'tc-zack', user_id: ZACK, date: ZACK_DAY, clock_in_time: `${ZACK_DAY}T11:00:00Z`, clock_out_time: `${ZACK_DAY}T20:44:00Z`, net_hours: 9.73, total_hours: 9.73 },
+      ],
+      logs: [{ id: 'l', operator_id: ZACK, log_date: ZACK_DAY, day_number: 1, hours_worked: 9.73, work_performed: [] }],
+      workItems: [],
+      roles,
+      names,
+      fallbackOperatorId: ZACK,
+      offJobPersonDays: new Set([`${ZACK}|${ZACK_DAY}`]),
+    });
+    expect(days[0].total_hours).toBe(9.73);
+    expect(days[0].people[0].filed_off_job).toBeUndefined();
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // THE FOLD MUST NOT TRIGGER LEAD-DEDUP ON THE DAY IT LANDS ON.
+  //
+  // Step 6 blanks every non-lead's quantities on days the lead filed work, and
+  // stands down when he filed nothing. The fold moves the lead's closeout onto
+  // his last real day — on this job, 8/11, a day he filed nothing on. If that
+  // counted as "the lead measured the scope", step 6 would wipe a second crew
+  // member's genuine 8/11 footage and print the 8/12 closeout's scope in its
+  // place. The two describe DIFFERENT work, so the footage would not be
+  // double-counted away — it would be gone from the totals the office invoices
+  // from. Nobody else filed on 8/11 in production, so this was one crew member
+  // away from being live.
+  // ───────────────────────────────────────────────────────────────────────────
+  it('does not blank a second crew member\'s real measurements on the fold target day', () => {
+    const DEVIN = '44444444-4444-4444-4444-444444444444';
+    const crewNames = new Map<string, string | null>([
+      [DANTE, 'Dante burgess'],
+      [DEVIN, 'Devin'],
+    ]);
+    const crewRoles = resolveCrewRoles({ assigned_to: DANTE, crew: [{ user_id: DEVIN, role: 'operator' }] });
+
+    const days = buildTicketDays({
+      range: ticketRange('week', '2026-08-12'),
+      timecards: [
+        ...timecards,
+        { id: 'tc-devin-tue', user_id: DEVIN, date: '2026-08-11', clock_in_time: '2026-08-11T11:30:00Z', clock_out_time: '2026-08-11T22:00:00Z', lunch_duration_minutes: 30, net_hours: 10.0, total_hours: 10.0 },
+      ],
+      logs,
+      workItems: [
+        ...workItems,
+        // Devin's own Tuesday footage — filed on the day, on the job.
+        { id: 'wi-devin', operator_id: DEVIN, day_number: 2, work_date: '2026-08-11', work_type: 'SLAB SAW', quantity: 140, linear_feet_cut: 140, cut_depth_inches: 6 },
+      ],
+      roles: crewRoles,
+      names: crewNames,
+      fallbackOperatorId: DANTE,
+      quantitiesFrom: 'lead',
+      offJobPersonDays,
+    });
+
+    const tue = days.find((d) => d.date === '2026-08-11')!;
+    const devin = tue.people.find((p) => p.user_id === DEVIN)!;
+    // His measurements stand — exactly as they did before the fold existed.
+    expect(devin.work_items.map((w) => w.work_type)).toEqual(['SLAB SAW']);
+    expect(devin.measurements_by_lead).toBeUndefined();
+
+    // And the closeout's scope is still there, on Dante, alongside it.
+    const dante = tue.people.find((p) => p.user_id === DANTE)!;
+    expect(dante.work_items.length).toBe(3);
+
+    // The number the office prices: all four cuts, none swallowed.
+    const totals = totalsByWorkType(allPrintedWork(days));
+    expect(totals).toEqual(
+      expect.arrayContaining([
+        { workType: 'SLAB SAW', quantity: 140, unit: 'LF' },
+        { workType: 'WALL SAW', quantity: 25.4, unit: 'LF' },
+        { workType: 'HAND SAW', quantity: 8, unit: 'LF' },
+        { workType: 'CORE DRILL', quantity: 1, unit: 'holes' },
+      ])
+    );
+  });
+
+  // Lead-dedup is still ON when the lead's work is genuinely his own that day.
+  it('still defers to the lead on a day he filed his own measurements', () => {
+    const DEVIN = '44444444-4444-4444-4444-444444444444';
+    const days = buildTicketDays({
+      range: ticketRange('week', '2026-08-12'),
+      timecards,
+      logs,
+      workItems: [
+        ...workItems,
+        { id: 'wi-dante-tue', operator_id: DANTE, day_number: 2, work_date: '2026-08-11', work_type: 'WALL SAW', quantity: 60, linear_feet_cut: 60 },
+        { id: 'wi-devin-tue', operator_id: DEVIN, day_number: 2, work_date: '2026-08-11', work_type: 'WALL SAW', quantity: 60, linear_feet_cut: 60 },
+      ],
+      roles: resolveCrewRoles({ assigned_to: DANTE, crew: [{ user_id: DEVIN, role: 'operator' }] }),
+      names: new Map<string, string | null>([[DANTE, 'Dante burgess'], [DEVIN, 'Devin']]),
+      fallbackOperatorId: DANTE,
+      quantitiesFrom: 'lead',
+      offJobPersonDays,
+    });
+
+    const tue = days.find((d) => d.date === '2026-08-11')!;
+    const devin = tue.people.find((p) => p.user_id === DEVIN)!;
+    expect(devin.work_items).toEqual([]);
+    expect(devin.measurements_by_lead).toBe(true);
+  });
+
+  // The stamp must describe the block honestly. When the target day filed rows
+  // of its own, only SOME of the bullets arrived at closeout.
+  it('marks the filing stamp PARTIAL when the target day had work of its own', () => {
+    const days = buildTicketDays({
+      range: ticketRange('week', '2026-08-12'),
+      timecards,
+      logs,
+      workItems: [
+        ...workItems,
+        { id: 'wi-dante-tue', operator_id: DANTE, day_number: 2, work_date: '2026-08-11', work_type: 'WALL SAW', quantity: 60, linear_feet_cut: 60 },
+      ],
+      roles: danteRoles,
+      names: danteNames,
+      fallbackOperatorId: DANTE,
+      quantitiesFrom: 'lead',
+      offJobPersonDays,
+    });
+    const dante = days.find((d) => d.date === '2026-08-11')!.people[0];
+    expect(dante.work_filed_on).toBe('2026-08-12');
+    expect(dante.work_filed_on_partial).toBe(true);
+  });
+
+  it('does NOT mark it partial when the whole block arrived by fold', () => {
+    const dante = build().find((d) => d.date === '2026-08-11')!.people[0];
+    expect(dante.work_filed_on).toBe('2026-08-12');
+    expect(dante.work_filed_on_partial).toBeUndefined();
+  });
+
+  // JOB-2026-631148's real failure: the target day already carried a closeout
+  // note, so first-wins silently dropped the folded one off the sheet.
+  it('JOINS the two day notes instead of keeping only the first', () => {
+    const days = buildTicketDays({
+      range: ticketRange('week', '2026-08-12'),
+      timecards,
+      logs: [
+        {
+          id: 'log-tue',
+          operator_id: DANTE,
+          log_date: '2026-08-11',
+          day_number: 2,
+          hours_worked: null,
+          work_performed: [],
+          notes: 'Job complete. Remote signature link sent to 8645353695.',
+        },
+        ...logs,
+      ],
+      workItems,
+      roles: danteRoles,
+      names: danteNames,
+      fallbackOperatorId: DANTE,
+      quantitiesFrom: 'lead',
+      offJobPersonDays,
+    });
+    const note = days.find((d) => d.date === '2026-08-11')!.people[0].log_note!;
+    // Both closeouts survive — the target's own and the folded one.
+    expect(note).toContain('8645353695');
+    expect(note).toContain('678-897-0900');
+    expect(note.split(' · ').length).toBe(2);
+  });
+});

@@ -15,7 +15,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { buildLaborBreakdown, getTenantLaborBurdenPct } from '@/lib/labor-cost-server';
 import { attributableTimecards } from '@/lib/job-clock-attribution';
-import { dropHelperDoubleCountedCards } from '@/lib/labor-cost';
+import { bookedEndDateOf, dropHelperDoubleCountedCards } from '@/lib/labor-cost';
 import { quotedAmount } from '@/lib/job-quoted-amount';
 
 export async function GET(
@@ -34,7 +34,7 @@ export async function GET(
     // Fetch job details (tenant-scoped — this response includes payroll/hourly-rate data)
     let jobQuery = supabaseAdmin
       .from('job_orders')
-      .select('id, tenant_id, job_number, title, customer_name, status, scheduled_date, job_quote, estimated_cost, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate, work_started_at, route_started_at, work_completed_at')
+      .select('id, tenant_id, job_number, title, customer_name, status, scheduled_date, scheduled_end_date, end_date, job_quote, estimated_cost, estimated_hours, assigned_to, helper_assigned_to, track_financials, drive_distance_miles, mileage_rate, work_started_at, route_started_at, work_completed_at')
       .eq('id', jobId)
       .is('deleted_at', null);
     if (authResult.role !== 'super_admin') {
@@ -177,6 +177,15 @@ export async function GET(
         work_started_at: (job as any).work_started_at ?? null,
         route_started_at: (job as any).route_started_at ?? null,
         work_completed_at: (job as any).work_completed_at ?? null,
+        // Gives the window a real end when the closing stamp is missing on an
+        // already-completed job — otherwise it runs forever. See
+        // `bookedSpanEndDay` in lib/labor-cost.ts.
+        status: (job as any).status ?? null,
+        booked_end_date: bookedEndDateOf(
+          (job as any).scheduled_end_date,
+          (job as any).end_date,
+          (job as any).scheduled_date
+        ),
       },
       timecards: timecards || [],
       helperLogs: helperLogs || [],

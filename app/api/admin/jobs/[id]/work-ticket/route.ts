@@ -181,7 +181,7 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // RLS): a second tenant's placement on the same date can make one of these
     // people look "placed on 2 jobs" and their card is dropped — a silent
     // cross-tenant UNDER-count on the sheet the office files.
-    const { cards: attributedCards } = await attributableTimecards(
+    const { cards: attributedCards, offJobPersonDays } = await attributableTimecards(
       jobId,
       ticketUserIds,
       ticketDates,
@@ -265,6 +265,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // on `quantitiesFrom`. Everyone else keeps their name and hours.
       quantitiesFrom: 'lead',
       leadByDate,
+      // Days the office's own ledger puts these people on OTHER jobs. Without
+      // this the daily log's `hours_worked` becomes the day's hours whenever no
+      // card claimed the day, and a five-minute closeout typed from the next
+      // job's truck printed as a work day — Dante's 0.09 Wednesday on
+      // JOB-2026-277097. See `offJobPersonDays` in lib/work-ticket.ts.
+      offJobPersonDays,
     });
 
     // ── 6. Standby / subsistence inside the printed range ──────────────────

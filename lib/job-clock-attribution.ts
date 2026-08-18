@@ -112,6 +112,21 @@ export interface AttributedClockCards {
    * two is how a guess acquires the authority of a measurement.
    */
   attributedIds: Set<string>;
+  /**
+   * `user_id|YYYY-MM-DD` keys the office's own ledger places on OTHER jobs and
+   * NOT on this one — the days these people provably spent somewhere else.
+   *
+   * The card rule above already uses this to DROP a card. It is returned as
+   * well because a card is not the only way a day's hours reach a screen: a
+   * `daily_job_logs` row filed on such a day carries an `hours_worked` figure
+   * that some callers fall back to when no card was attributed, and that
+   * fallback is how a day spent entirely elsewhere printed 0.09 hours against
+   * JOB-2026-277097 (see lib/work-ticket.ts, `offJobPersonDays`).
+   *
+   * Derived from data these queries already hold, so it costs nothing and
+   * cannot drift from the card rule it mirrors.
+   */
+  offJobPersonDays: Set<string>;
 }
 
 /**
@@ -149,6 +164,7 @@ export async function attributableTimecards(
 ): Promise<AttributedClockCards> {
   const splitDates = new Set<string>();
   const attributedIds = new Set<string>();
+  const offJobPersonDays = new Set<string>();
 
   // Each query is hoisted and the tenant filter applied with a plain `if`.
   // A generic `scoped(q)` helper reads better but its type parameter is
@@ -185,7 +201,9 @@ export async function attributableTimecards(
   userIds = Array.from(userSet);
   dates = Array.from(dateSet);
 
-  if (userIds.length === 0 || dates.length === 0) return { cards, splitDates, attributedIds };
+  if (userIds.length === 0 || dates.length === 0) {
+    return { cards, splitDates, attributedIds, offJobPersonDays };
+  }
 
   let byCrewQuery = supabaseAdmin.from(from).select(select).in('user_id', userIds).in('date', dates);
   if (tenantId) byCrewQuery = byCrewQuery.eq('tenant_id', tenantId);
@@ -251,6 +269,13 @@ export async function attributableTimecards(
     place(a.helper_id, a.assignment_date, a.job_order_id);
   }
 
+  // The office placed these people somewhere, and it was not here. Recorded
+  // once, so the card rule below and every hours fallback downstream read the
+  // SAME judgement instead of each re-deriving it from the ledger.
+  for (const [key, jobs] of placed) {
+    if (jobs.size > 0 && !jobs.has(jobId)) offJobPersonDays.add(key);
+  }
+
   const seen = new Set(cards.map((c) => c.id));
   for (const t of byCrew) {
     if (seen.has(t.id)) continue;
@@ -282,7 +307,7 @@ export async function attributableTimecards(
 
   await backfillShopFlags(from, cards, tenantId);
 
-  return { cards, splitDates, attributedIds };
+  return { cards, splitDates, attributedIds, offJobPersonDays };
 }
 
 /**

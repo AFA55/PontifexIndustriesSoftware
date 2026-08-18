@@ -258,3 +258,93 @@ describe('round2', () => {
     expect(round2(2.675)).toBe(2.68);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A FINISHED JOB WITH NO CLOSING STAMP MUST NOT STAY OPEN FOREVER.
+//
+// `work_completed_at` is NULL on 7 of 16 completed production jobs, including
+// JOB-2026-277097 (Southern Basements, booked 8/10 → 8/11). With no end, the
+// window degrades to the CARD's own end — no bound at all — so any card that
+// survives attribution on a later day books in FULL against a job that finished
+// days earlier. Dante's 10.37h Wednesday was one blank board cell away from it.
+//
+// The guard is deliberately narrow: `status = 'completed'` only, because a job
+// still running routinely overruns its booked end (5 of 107 production
+// assignments, 6 of 60 daily logs) and zeroing those would delete real work.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('bookedSpanEndDay — the open-ended window guard', () => {
+  // Southern Basements: marked complete, never stamped, booked Mon–Tue.
+  const southernBasements = {
+    work_started_at: '2026-08-10T11:43:56Z',
+    route_started_at: '2026-08-10T11:43:54Z',
+    work_completed_at: null,
+    status: 'completed',
+    booked_end_date: '2026-08-11',
+  };
+  // Dante's Wednesday: a whole day at AM King, 10.37 paid hours.
+  const wednesdayCard = {
+    date: '2026-08-12',
+    clock_in_time: '2026-08-12T11:19:00Z',
+    clock_out_time: '2026-08-12T22:01:00Z',
+    net_hours: 10.37,
+    total_hours: 10.37,
+  };
+
+  it('THE HAZARD: an unbounded window swallows a whole later day', () => {
+    const unbounded = { ...southernBasements, status: null, booked_end_date: null };
+    expect(jobHoursForCard(wednesdayCard, unbounded, true)).toBe(10.37);
+    expect(jobHoursForCard(wednesdayCard, unbounded, false)).toBe(10.37);
+  });
+
+  it('books nothing on a day after the job\'s last booked day', () => {
+    expect(jobHoursForCard(wednesdayCard, southernBasements, true)).toBe(0);
+    // Linked cards too — the job was over for everyone.
+    expect(jobHoursForCard(wednesdayCard, southernBasements, false)).toBe(0);
+  });
+
+  it('leaves the days the job WAS booked for untouched', () => {
+    const tuesday = {
+      date: '2026-08-11',
+      clock_in_time: '2026-08-11T11:30:00Z',
+      clock_out_time: '2026-08-11T22:38:00Z',
+      net_hours: 10.64,
+      total_hours: 10.64,
+    };
+    expect(jobHoursForCard(tuesday, southernBasements, false)).toBe(10.64);
+    expect(jobHoursForCard(tuesday, southernBasements, true)).toBe(10.64);
+  });
+
+  it('does NOT fire on a job that is still running — overrun is real work', () => {
+    // Production, today: Keontre on QA-2026-533392, booked 8/17, still
+    // pending_completion, clocked in 8/18. A hard booked-span bound would
+    // delete a live day.
+    const stillRunning = { ...southernBasements, status: 'pending_completion' };
+    const nextDay = {
+      date: '2026-08-18',
+      clock_in_time: '2026-08-18T11:00:00Z',
+      clock_out_time: '2026-08-18T20:00:00Z',
+      net_hours: 8.5,
+      total_hours: 8.5,
+    };
+    expect(jobHoursForCard(nextDay, stillRunning, true)).toBe(8.5);
+  });
+
+  it('never overrides a REAL completion timestamp', () => {
+    const stamped = { ...southernBasements, work_completed_at: '2026-08-12T22:00:00Z' };
+    // The recorded end wins; the booked span is not consulted at all.
+    expect(jobHoursForCard(wednesdayCard, stamped, false)).toBeGreaterThan(0);
+  });
+
+  it('is inert when the caller supplies no status or booked span', () => {
+    // Every pre-existing call site omits both fields — behaviour must not move.
+    const legacy = { ...southernBasements, status: undefined, booked_end_date: undefined };
+    expect(jobHoursForCard(wednesdayCard, legacy, true)).toBe(10.37);
+  });
+
+  it('gives the day-coverage test a real end too', () => {
+    expect(cardDayIsInsideJobWindow(wednesdayCard, southernBasements)).toBe(false);
+    expect(
+      cardDayIsInsideJobWindow({ ...wednesdayCard, date: '2026-08-11' }, southernBasements)
+    ).toBe(true);
+  });
+});
