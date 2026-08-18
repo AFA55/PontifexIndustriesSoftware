@@ -127,6 +127,19 @@ export async function GET(request: NextRequest) {
     const toEntry = (p: { id: string; full_name: string | null; nickname: string | null; email: string | null; role: string | null; avatar_url: string | null }) => ({
       id: p.id,
       name: buildName(p),
+      /**
+       * THE RAW NAMES, separately — not just baked into `name`.
+       *
+       * Aug 18: the board labels its rows with `profiles.full_name` ("Conrade
+       * Richardson") while this endpoint's `name` carries the nickname
+       * ("Conrade Richardson (Nate)"). The client's name→id map was keyed on
+       * `name` alone, so the row label resolved to `undefined`, the client
+       * read that as "nobody", and a helper change stripped the operator off
+       * three live jobs. The client now indexes every alias a person answers
+       * to (lib/crew-assignment.ts) — which it can only do if it is told them.
+       */
+      fullName: p.full_name ?? null,
+      nickname: p.nickname ?? null,
       /** Both names, so a search box can match either without re-fetching. */
       searchText: [p.full_name ?? '', p.nickname ?? '', p.email ?? ''].join(' ').toLowerCase(),
       avatarUrl: p.avatar_url || null,

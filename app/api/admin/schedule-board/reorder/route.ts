@@ -60,6 +60,9 @@ export async function PATCH(request: NextRequest) {
           tenantId,
           actor: { userId: auth.userId, userEmail: auth.userEmail, role: auth.role },
           request,
+          // Dragging a LIVE job to the unassigned pool now needs a confirmed
+          // yes (block_type 'live_job_unassign'), same as every other path.
+          force: body.force === true,
         });
 
         if (!result.ok) {
@@ -76,6 +79,7 @@ export async function PATCH(request: NextRequest) {
           ...result.job,
           day_sequence: result.day_sequence,
           operator_day_job_count: result.operator_day_job_count,
+          crew_change: result.crew_change,
         };
       } else {
         // Legacy (no date supplied): direct job_orders write — tenant-scoped

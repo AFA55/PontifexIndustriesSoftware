@@ -34,6 +34,7 @@ import { parseLocalDate, toDateString, formatDisplayDate, daysAgo, apiFetch, toJ
 import type { ConflictData, RowChangeConflict } from './_components/types';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { fetchPrintPdf, openPrintBlob } from '@/lib/print-failure';
+import { buildCrewNameIndex, resolveCrewId, isLiveJobStatus, type CrewNameIndex } from '@/lib/crew-assignment';
 
 // ─── Heavy components — dynamic-imported (rendered conditionally) ─────────
 const PendingQueueSidebar = dynamic(() => import('./_components/PendingQueueSidebar'), { ssr: false, loading: () => null });
@@ -206,6 +207,12 @@ export default function ScheduleBoardPage() {
   const [notesTarget, setNotesTarget] = useState<JobCardData | null>(null);
   const [conflictData, setConflictData] = useState<ConflictData | null>(null);
   const [rowChangeConflict, setRowChangeConflict] = useState<RowChangeConflict | null>(null);
+  /** Alias-aware name→id resolver for every spelling of a crew member. */
+  const [crewNameIndex, setCrewNameIndex] = useState<CrewNameIndex>(() => new Map());
+  /** A crew clear the server refused because a crew is on the job right now. */
+  const [liveUnassignConfirm, setLiveUnassignConfirm] = useState<
+    { title: string; detail: string; onConfirm: () => void } | null
+  >(null);
   const [jobDetailTarget, setJobDetailTarget] = useState<{ job: JobCardData; rowIndex: number | null; operatorName?: string | null; helperName?: string | null; focusCrew?: boolean } | null>(null);
 
   // ═══ SMS CONFIG WARNING STATE ═══
@@ -353,8 +360,8 @@ export default function ScheduleBoardPage() {
         const res = await apiFetch('/api/admin/schedule-board/operators');
         if (res.ok) {
           const json = await res.json();
-          const ops: { id: string; name: string; avatarUrl?: string | null; slotNote?: string | null }[] = json.data?.operators || [];
-          const helpers: { id: string; name: string; avatarUrl?: string | null }[] = json.data?.helpers || [];
+          const ops: { id: string; name: string; fullName?: string | null; nickname?: string | null; avatarUrl?: string | null; slotNote?: string | null }[] = json.data?.operators || [];
+          const helpers: { id: string; name: string; fullName?: string | null; nickname?: string | null; avatarUrl?: string | null }[] = json.data?.helpers || [];
           setAllOperatorsList(ops.map(o => o.name));
           setAllHelpersList(helpers.map(h => h.name));
           // For operator-slot names whose day job is something else, what to
@@ -374,6 +381,18 @@ export default function ScheduleBoardPage() {
           const helpMap: Record<string, string> = {};
           helpers.forEach(h => { helpMap[h.name] = h.id; });
           setHelperIdMap(helpMap);
+
+          // ── THE NAME→ID INDEX THE BOARD ACTUALLY NEEDS ──────────────────
+          // `operatorIdMap` / `helperIdMap` above are keyed on the picker's
+          // DISPLAY name ("Conrade Richardson (Nate)"). Board ROWS are labelled
+          // with `profiles.full_name` ("Conrade Richardson"), so looking a row
+          // label up in those maps returns undefined for anyone with a
+          // nickname. On Aug 18 a helper change read that undefined as
+          // "nobody" and stripped Conrade off three jobs, two of them
+          // `in_route`. This index answers to every spelling, and returns null
+          // — meaning "I don't know who that is", never "nobody" — when a name
+          // is unknown or shared by two people.
+          setCrewNameIndex(buildCrewNameIndex([...ops, ...helpers]));
         }
       } catch (err) {
         console.error('Failed to fetch crew:', err);
@@ -445,7 +464,7 @@ export default function ScheduleBoardPage() {
     } else {
       for (let i = 0; i < NUM_ROWS; i++) {
         const opName = rowAssignments[i]?.operator;
-        if (opName && operatorIdMap[opName] === targetOperatorId) {
+        if (opName && resolveCrewId(crewNameIndex, opName) === targetOperatorId) {
           targetRowIndex = i;
           break;
         }
@@ -459,6 +478,32 @@ export default function ScheduleBoardPage() {
 
     // Same location — no change needed
     if (sourceRowIndex === targetRowIndex) return false;
+
+    // ── RESOLVE THE TARGET CREW BEFORE TOUCHING ANYTHING ────────────────────
+    // Resolved FIRST so an unresolvable row can be refused without a UI move to
+    // undo. `resolveCrewId` returns null for BOTH "unknown" and "ambiguous",
+    // and ambiguous is real here: two active profiles share the full name
+    // "Andres Altamirano", and that string was a ledger row label as recently
+    // as Aug 15. `targetOpId || null` turned that refusal back into "nobody" —
+    // the job would be written unassigned while the board optimistically drew
+    // it sitting on the row. Same lesson as the Aug 18 wipe: a name we cannot
+    // identify is never a statement that the seat is empty.
+    const targetOp = targetRowIndex !== null ? rowAssignments[targetRowIndex]?.operator : null;
+    const targetOpId = targetOp ? resolveCrewId(crewNameIndex, targetOp) : null;
+    const targetHelpName = targetRowIndex !== null ? rowAssignments[targetRowIndex]?.helper : null;
+    const targetHelpId = targetHelpName ? resolveCrewId(crewNameIndex, targetHelpName) : null;
+
+    if (targetOp && !targetOpId) {
+      addToast(
+        'error',
+        'Move Failed',
+        `"${targetOp}" can't be matched to exactly one person in the crew roster — the job was not moved. Refresh the board and try again.`
+      );
+      return false;
+    }
+    // An unidentifiable HELPER must not become "no helper" either — omit the
+    // key and the API keeps whoever is on the job (same seat, same lesson).
+    const helperField = targetHelpName && !targetHelpId ? {} : { newHelperId: targetHelpId };
 
     // Optimistic update: move in UI immediately
     // Remove from source
@@ -482,18 +527,13 @@ export default function ScheduleBoardPage() {
     }
 
     // Call API
-    const targetOp = targetRowIndex !== null ? rowAssignments[targetRowIndex]?.operator : null;
-    const targetOpId = targetOp ? operatorIdMap[targetOp] : null;
-    const targetHelpName = targetRowIndex !== null ? rowAssignments[targetRowIndex]?.helper : null;
-    const targetHelpId = targetHelpName ? operatorIdMap[targetHelpName] : null;
-
     try {
       const res = await apiFetch('/api/admin/schedule-board/reorder', {
         method: 'PATCH',
         body: JSON.stringify({
           jobId: jobId,
-          newOperatorId: targetOpId || null,
-          newHelperId: targetHelpId || null,
+          newOperatorId: targetOpId,
+          ...helperField,
           // Anchor on the board's viewed date. Scope defaults to 'day'
           // server-side, so this states who is on the job THAT day; the lead
           // is also written when the anchor is today.
@@ -555,7 +595,10 @@ export default function ScheduleBoardPage() {
       addToast('error', 'Move Failed', 'An error occurred');
       return false;
     }
-  }, [operatorJobs, unassignedJobs, rowAssignments, operatorIdMap, addToast, selectedDate, NUM_ROWS]);
+    // crewNameIndex — not the legacy operatorIdMap — is what this callback
+    // resolves names through now. A stale index here would resolve a nicknamed
+    // operator to null, which is the whole class of bug being fixed.
+  }, [operatorJobs, unassignedJobs, rowAssignments, crewNameIndex, addToast, selectedDate, NUM_ROWS]);
 
   // ═══ FETCH SCHEDULE DATA ═══
   const fetchScheduleData = useCallback(async (date: string) => {
@@ -988,8 +1031,8 @@ export default function ScheduleBoardPage() {
       // Get target operator ID
       const targetOperator = rowAssignments[targetRowIndex]?.operator;
       const targetHelper = rowAssignments[targetRowIndex]?.helper;
-      const targetOperatorId = targetOperator ? operatorIdMap[targetOperator] : null;
-      const targetHelperId = targetHelper ? operatorIdMap[targetHelper] : null;
+      const targetOperatorId = targetOperator ? resolveCrewId(crewNameIndex, targetOperator) : null;
+      const targetHelperId = targetHelper ? resolveCrewId(crewNameIndex, targetHelper) : null;
 
       // Update backend. Scope defaults to 'day' server-side (founder, Aug 11):
       // a slot drag means "this operator runs the job THIS day", not from here
@@ -1241,8 +1284,8 @@ export default function ScheduleBoardPage() {
 
   const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string, position?: 'first' | 'last') => {
     const operatorName = explicitOperatorName ?? rowAssignments[rowIndex]?.operator;
-    const operatorId = operatorName ? operatorIdMap[operatorName] : null;
-    const helperId = helperName ? helperIdMap[helperName] : null;
+    const operatorId = operatorName ? resolveCrewId(crewNameIndex, operatorName) : null;
+    const helperId = helperName ? resolveCrewId(crewNameIndex, helperName) : null;
 
     if (!operatorId && operatorName) {
       console.warn('operatorIdMap missing entry for:', operatorName, 'map:', operatorIdMap);
@@ -1395,6 +1438,13 @@ export default function ScheduleBoardPage() {
         body: JSON.stringify(apiPayload),
       });
       if (!res.ok) throw new Error('Failed to save');
+      // A date move can legitimately take the crew off (crew is a per-day
+      // assignment). It must never do so silently — that was half of what made
+      // the Aug 18 incident invisible.
+      const saveJson = await res.json().catch(() => null);
+      if (saveJson?.notice) {
+        addToast('info', 'Crew Removed', `${job.customer_name}: ${saveJson.notice}`);
+      }
     } catch {
       addToast('error', 'Save Failed', 'Could not update job');
       return;
@@ -1406,15 +1456,8 @@ export default function ScheduleBoardPage() {
     // board GET, so the edit looked like it reverted.
     if (operatorChanged || helperChanged) {
       const explicitUnassign = operatorChanged && !newOpName;
-      const newOperatorId = newOpName ? (operatorIdMap[newOpName] ?? null) : null;
-      // Keep-operator comes from the JOB RECORD (assigned_to, post-overlay) —
-      // NEVER from board-row state, which is null via the preview path and
-      // would silently unassign every remaining day (guardian B3).
-      const keepOperatorId = job.assigned_to ?? null;
-      const effectiveOperatorId = operatorChanged
-        ? (explicitUnassign ? null : newOperatorId)
-        : keepOperatorId;
-      const newHelperId = newHelperName ? (helperIdMap[newHelperName] ?? null) : null;
+      const newOperatorId = newOpName ? resolveCrewId(crewNameIndex, newOpName) : null;
+      const newHelperId = newHelperName ? resolveCrewId(crewNameIndex, newHelperName) : null;
 
       // Unresolvable operator (roster map miss) → NEVER unassign implicitly:
       // keep the PATCH-only save and tell the admin.
@@ -1424,6 +1467,21 @@ export default function ScheduleBoardPage() {
         setEditTarget(null);
         return;
       }
+      // Same for the helper seat — a name we can't identify must not silently
+      // become "no helper" (Aug 18, other seat, same lesson).
+      if (helperChanged && newHelperName && !newHelperId) {
+        addToast('error', 'Helper Not Changed', `"${newHelperName}" isn't in the crew roster — other changes were saved. Refresh and try the helper change again.`);
+        fetchScheduleData(selectedDate);
+        setEditTarget(null);
+        return;
+      }
+
+      // Untouched seats are OMITTED, not restated. Reading the current lead
+      // back out of local state and echoing it was how a change to one seat
+      // could speak for the other — and speak wrongly when a lookup missed.
+      const crewFields: Record<string, string | null> = {};
+      if (operatorChanged) crewFields.operatorId = explicitUnassign ? null : newOperatorId;
+      if (helperChanged) crewFields.helperId = newHelperName ? newHelperId : null;
 
       // Anchor on the board's viewed date when the job spans it, otherwise the
       // job's (possibly just-edited) start date.
@@ -1436,15 +1494,18 @@ export default function ScheduleBoardPage() {
           method: 'POST',
           body: JSON.stringify({
             jobOrderId: job.id,
-            operatorId: effectiveOperatorId,
-            helperId: newHelperId,
+            ...crewFields,
             assignment_date: anchorDate,
             scope: 'remaining',
           }),
         });
         if (!res.ok) {
           const errJson = await res.json().catch(() => null);
-          addToast('error', 'Reassign Failed', errJson?.details || errJson?.error || 'Could not change operator');
+          addToast(
+            'error',
+            errJson?.block_type === 'live_job_unassign' ? 'Crew Still On This Job' : 'Reassign Failed',
+            errJson?.details || errJson?.error || 'Could not change operator'
+          );
           fetchScheduleData(selectedDate);
           setEditTarget(null);
           return;
@@ -1622,7 +1683,7 @@ export default function ScheduleBoardPage() {
   // ── Time-off handlers ────────────────────────────────────────────────────
   const handleAddTimeOff = async (rowIdx: number, type: string, notes: string) => {
     const opName = rowAssignments[rowIdx]?.operator;
-    const opId = opName ? operatorIdMap[opName] : null;
+    const opId = opName ? resolveCrewId(crewNameIndex, opName) : null;
     if (!opId) return;
     try {
       const res = await apiFetch('/api/admin/schedule-board/time-off', {
@@ -1642,7 +1703,7 @@ export default function ScheduleBoardPage() {
 
   const handleRemoveTimeOff = async (rowIdx: number) => {
     const opName = rowAssignments[rowIdx]?.operator;
-    const opId = opName ? operatorIdMap[opName] : null;
+    const opId = opName ? resolveCrewId(crewNameIndex, opName) : null;
     if (!opId) return;
     const entry = timeOffMap[opId];
     if (!entry?.id) return;
@@ -1657,7 +1718,7 @@ export default function ScheduleBoardPage() {
 
   const handleMarkUnavailable = async (rowIdx: number, reason: string, notes?: string) => {
     const opName = rowAssignments[rowIdx]?.operator;
-    const opId = opName ? operatorIdMap[opName] : null;
+    const opId = opName ? resolveCrewId(crewNameIndex, opName) : null;
     if (!opId || !opName) throw new Error('Operator not found');
 
     const res = await apiFetch('/api/admin/schedule-board/time-off', {
@@ -1683,7 +1744,7 @@ export default function ScheduleBoardPage() {
 
   const handleSaveRowNote = async (rowIdx: number, note: string) => {
     const opName = rowAssignments[rowIdx]?.operator;
-    const opId = opName ? operatorIdMap[opName] : null;
+    const opId = opName ? resolveCrewId(crewNameIndex, opName) : null;
     if (!opId) return;
     try {
       await apiFetch('/api/admin/schedule-board/row-notes', {
@@ -1809,9 +1870,20 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Make will call ---
-  const handleMakeWillCall = async () => {
-    if (!editTarget) return;
-    const { job, rowIndex } = editTarget;
+  //
+  // ── THIS BUTTON STRIPS A CREW, SO IT HAS TO ASK ──────────────────────────
+  // It PATCHes `{ is_will_call: true, assigned_to: null, helper_assigned_to:
+  // null, status: 'scheduled' }` straight at /api/admin/job-orders/[id], and
+  // that route carries NO crew guard on this path — the `movingStart` logic
+  // only runs when the scheduled_date changes, which it doesn't here. So one
+  // click took the crew off an `in_route` job AND downgraded its status, with
+  // nothing said. Pre-existing rather than a regression, but it is the same
+  // shape the office just lived through, and the rule is already a pure
+  // function. Confirmed clears still go through — deliberately.
+  //
+  // (Job cancel is a different thing: it only sets status 'cancelled' and never
+  // touches the crew, so it is left alone.)
+  const applyWillCall = async (job: JobCardData, rowIndex: number | null) => {
     try {
       await apiFetch(`/api/admin/job-orders/${job.id}`, {
         method: 'PATCH', body: JSON.stringify({ is_will_call: true, assigned_to: null, helper_assigned_to: null, status: 'scheduled' }),
@@ -1827,6 +1899,33 @@ export default function ScheduleBoardPage() {
     setEditTarget(null);
   };
 
+  const handleMakeWillCall = async () => {
+    if (!editTarget) return;
+    const { job, rowIndex } = editTarget;
+
+    const hasCrew =
+      !!job.assigned_to ||
+      !!job.operator_name ||
+      !!job.helper_name ||
+      (job.helper_names?.length ?? 0) > 0 ||
+      rowIndex !== null;
+
+    if (isLiveJobStatus(job.status) && hasCrew) {
+      setEditTarget(null);
+      setLiveUnassignConfirm({
+        title: 'A crew is on this job right now',
+        detail: `${job.customer_name} is ${(job.status || 'live').replace(/_/g, ' ')} — someone is en route or working it. Moving it to Will Call takes the crew off and puts the job back to scheduled, so the office can no longer see who is on site. Do it anyway?`,
+        onConfirm: () => {
+          setLiveUnassignConfirm(null);
+          void applyWillCall(job, rowIndex);
+        },
+      });
+      return;
+    }
+
+    await applyWillCall(job, rowIndex);
+  };
+
   // --- Assign job to available operator ---
   const handleAssignToAvailableOperator = (_rowIndex: number) => {
     if (unassignedJobs.length > 0) {
@@ -1838,27 +1937,90 @@ export default function ScheduleBoardPage() {
     }
   };
 
+  // --- Take every job in a row off its crew for the board date ---
+  //
+  // Split out of handleChangeRowOperator so the "clear the row" action has ONE
+  // implementation and one place that handles the server's live-job refusal.
+  // `force` is only ever true on the second pass, after the office has been
+  // shown which jobs have someone standing on them and said yes.
+  //
+  // Returns TRUE when the row is actually clear (nothing was blocked), so a
+  // caller can tell "done" from "waiting on the office to confirm".
+  const clearRowJobs = useCallback(async (rowIndex: number, force: boolean): Promise<boolean> => {
+    const rowJobs = operatorJobs[rowIndex] || [];
+    if (rowJobs.length === 0) {
+      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { operator: null, helper: null } : r));
+      return true;
+    }
+
+    const blocked: { job: JobCardData; detail: string }[] = [];
+    const failures: string[] = [];
+
+    for (const j of rowJobs) {
+      try {
+        const res = await apiFetch('/api/admin/schedule-board/assign', {
+          method: 'POST',
+          body: JSON.stringify({
+            jobOrderId: j.id,
+            operatorId: null,
+            helperId: null,
+            assignment_date: selectedDate,
+            scope: 'day',
+            ...(force ? { force: true } : {}),
+          }),
+        });
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => null);
+          if (errJson?.block_type === 'live_job_unassign') {
+            blocked.push({ job: j, detail: errJson?.details || errJson?.error || '' });
+          } else {
+            failures.push(`${j.customer_name}: ${errJson?.details || errJson?.error || 'failed'}`);
+          }
+        }
+      } catch {
+        failures.push(`${j.customer_name}: network error`);
+      }
+    }
+
+    if (failures.length > 0) addToast('error', 'Some Jobs Not Cleared', failures.join(' · '));
+
+    // BLOCKED → the row is NOT clear, so do not draw it clear. Emptying the row
+    // locally and refetching here meant the office watched the row go blank
+    // while the modal was still asking whether to take the crew off — the
+    // answer rendered before the question was answered. Both are deferred to
+    // the confirmed second pass.
+    if (blocked.length > 0) {
+      setLiveUnassignConfirm({
+        title: blocked.length > 1 ? `${blocked.length} jobs have a crew on them` : 'A crew is on this job right now',
+        detail: `${blocked.map(b => b.job.customer_name).join(', ')} — someone is en route or working. Leaving ${blocked.length > 1 ? 'them' : 'it'} with nobody assigned means the office can't see who is on site. Take the crew off anyway?`,
+        onConfirm: () => {
+          setLiveUnassignConfirm(null);
+          void clearRowJobs(rowIndex, true);
+        },
+      });
+      return false;
+    }
+
+    setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { operator: null, helper: null } : r));
+    // AWAITED. This refetch used to be fired and forgotten, so a caller that
+    // awaited clearRowJobs and then set the TARGET row's operator lost it: the
+    // in-flight fetch landed afterwards and setRowAssignments rebuilt every row
+    // from the server, discarding the move that had just been made.
+    await fetchScheduleData(selectedDate);
+    return true;
+  }, [operatorJobs, selectedDate, addToast, fetchScheduleData]);
+
   // --- Row dropdown: change operator (with conflict detection) ---
   const handleChangeRowOperator = async (rowIndex: number, newOperator: string | null) => {
     if (!newOperator) {
       // Clearing operator — unassign all jobs in this row from the DB first.
       // scope 'day': clearing a row only vacates the BOARD DATE, not the
       // remaining days of a multi-day job.
-      const rowJobs = operatorJobs[rowIndex] || [];
-      for (const j of rowJobs) {
-        try {
-          await apiFetch('/api/admin/schedule-board/assign', {
-            method: 'POST',
-            body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate, scope: 'day' }),
-          });
-        } catch { /* continue */ }
-      }
-      // Move jobs back to unassigned pool
-      if (rowJobs.length > 0) {
-        setUnassignedJobs(prev => [...prev, ...rowJobs.map(j => ({ ...j, helper_names: [] }))]);
-        setOperatorJobs(prev => ({ ...prev, [rowIndex]: [] }));
-      }
-      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { operator: null, helper: null } : r));
+      //
+      // The API refuses to empty the crew off a job that is `in_route` /
+      // being worked (block_type 'live_job_unassign'). That is a job someone
+      // is standing on — the office may still mean it, but it has to say so.
+      await clearRowJobs(rowIndex, false);
       return;
     }
 
@@ -1884,14 +2046,21 @@ export default function ScheduleBoardPage() {
     // (scope 'day': this board date only; use the Edit panel or a drag for
     // "this and remaining days").
     const rowJobs = operatorJobs[rowIndex] || [];
-    const newOperatorId = operatorIdMap[newOperator];
+    const newOperatorId = resolveCrewId(crewNameIndex, newOperator);
     if (rowJobs.length > 0 && !newOperatorId) {
       addToast('error', 'Change Failed', `Operator "${newOperator}" not found in crew roster. Please refresh the page.`);
       return;
     }
     if (rowJobs.length > 0) {
+      // The row's helper rides along with an operator change — but ONLY when we
+      // can actually identify them. An unresolvable helper name used to become
+      // `null` here, i.e. "take the helper off", which is not what a row
+      // operator change says. Omit the key instead and the API keeps whoever
+      // is on it (same lesson as the Aug 18 operator wipe, other seat).
       const rowHelperName = rowAssignments[rowIndex]?.helper ?? null;
-      const rowHelperId = rowHelperName ? (helperIdMap[rowHelperName] ?? null) : null;
+      const rowHelperId = rowHelperName ? resolveCrewId(crewNameIndex, rowHelperName) : null;
+      const helperField =
+        rowHelperName && !rowHelperId ? {} : { helperId: rowHelperId };
       const failures: string[] = [];
       for (const j of rowJobs) {
         try {
@@ -1900,7 +2069,7 @@ export default function ScheduleBoardPage() {
             body: JSON.stringify({
               jobOrderId: j.id,
               operatorId: newOperatorId,
-              helperId: rowHelperId,
+              ...helperField,
               assignment_date: selectedDate,
               scope: 'day',
             }),
@@ -1933,24 +2102,22 @@ export default function ScheduleBoardPage() {
     if (!rowChangeConflict) return;
     const { operatorName, sourceRowIndex, targetRowIndex } = rowChangeConflict;
 
-    const existingJobs = operatorJobs[sourceRowIndex] || [];
-    for (const j of existingJobs) {
-      try {
-        await apiFetch('/api/admin/schedule-board/assign', {
-          method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: null, helperId: null, assignment_date: selectedDate, scope: 'day' }),
-        });
-      } catch { /* continue */ }
-    }
-    setUnassignedJobs(prev => [...prev, ...existingJobs.map(j => ({ ...j, helper_names: [] }))]);
-    setOperatorJobs(prev => ({ ...prev, [sourceRowIndex]: [] }));
+    // Same single implementation as the row-clear dropdown, so a live job
+    // cannot be emptied here without the same confirmation. Awaited to
+    // completion (refetch included) so the target-row write below survives it.
+    const cleared = await clearRowJobs(sourceRowIndex, false);
 
     setRowAssignments(prev => prev.map((r, i) =>
-      i === sourceRowIndex ? { operator: null, helper: null } :
       i === targetRowIndex ? { ...r, operator: operatorName } : r
     ));
 
-    addToast('success', `${operatorName} Moved`, `Moved to row ${targetRowIndex + 1} — previous jobs unassigned`);
+    addToast(
+      'success',
+      `${operatorName} Moved`,
+      cleared
+        ? `Moved to row ${targetRowIndex + 1} — previous jobs unassigned`
+        : `Moved to row ${targetRowIndex + 1}. Their previous jobs still have a crew on them — answer the prompt to take it off.`
+    );
     setRowChangeConflict(null);
   };
 
@@ -1968,22 +2135,69 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Row dropdown: change helper ---
+  //
+  // ── THE AUG 18 CREW WIPE STARTED HERE ────────────────────────────────────
+  // This used to send `operatorId: operatorIdMap[rowOperatorName] || null` on
+  // every job in the row. Two faults compounded:
+  //
+  //   1. It RESTATED the operator at all. Changing a helper is not a statement
+  //      about who the operator is, and a write that says more than the user
+  //      meant can only ever be wrong.
+  //   2. `operatorIdMap` is keyed on the picker's display name ("Conrade
+  //      Richardson (Nate)"); rows are labelled with the bare full name
+  //      ("Conrade Richardson"). The lookup missed, `undefined || null` became
+  //      null, and three jobs — two of them `in_route` — lost their operator
+  //      in four seconds with no toast, no refetch, and a board still drawing
+  //      the old name.
+  //
+  // Now: the operator key is OMITTED entirely (the API treats an absent
+  // `operatorId` as "leave the operator alone"), failures are reported, and
+  // the board refetches so what is drawn is what was saved.
   const handleChangeRowHelper = async (rowIndex: number, newHelper: string | null) => {
-    const operatorName = rowAssignments[rowIndex]?.operator;
-    const operatorId = operatorName ? operatorIdMap[operatorName] : null;
-    const newHelperId = newHelper ? helperIdMap[newHelper] : null;
+    const newHelperId = newHelper ? resolveCrewId(crewNameIndex, newHelper) : null;
+
+    // A helper we cannot identify must not become "no helper".
+    if (newHelper && !newHelperId) {
+      addToast('error', 'Helper Not Changed', `"${newHelper}" isn't in the crew roster. Refresh the board and try again.`);
+      return;
+    }
 
     const rowJobs = operatorJobs[rowIndex] || [];
+    const failures: string[] = [];
     for (const j of rowJobs) {
       try {
-        await apiFetch('/api/admin/schedule-board/assign', {
+        const res = await apiFetch('/api/admin/schedule-board/assign', {
           method: 'POST',
-          body: JSON.stringify({ jobOrderId: j.id, operatorId: operatorId || null, helperId: newHelperId, assignment_date: selectedDate, scope: 'day' }),
+          body: JSON.stringify({
+            jobOrderId: j.id,
+            // operatorId deliberately ABSENT — this call is about the helper.
+            helperId: newHelperId,
+            assignment_date: selectedDate,
+            scope: 'day',
+          }),
         });
-      } catch { /* continue */ }
+        if (!res.ok) {
+          const errJson = await res.json().catch(() => null);
+          failures.push(`${j.customer_name}: ${errJson?.details || errJson?.error || 'failed'}`);
+        }
+      } catch {
+        failures.push(`${j.customer_name}: network error`);
+      }
     }
 
     setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, helper: newHelper } : r));
+
+    if (failures.length > 0) {
+      addToast('error', 'Some Jobs Not Updated', failures.join(' · '));
+    } else if (rowJobs.length > 0) {
+      addToast(
+        'success',
+        newHelper ? `Helper → ${newHelper}` : 'Helper Removed',
+        `${rowJobs.length} job${rowJobs.length > 1 ? 's' : ''} updated for ${formatDisplayDate(selectedDate)}`
+      );
+    }
+    // Always refetch: silence is what made the Aug 18 damage invisible.
+    if (rowJobs.length > 0) fetchScheduleData(selectedDate);
   };
 
   // --- Daily Code ---
@@ -2201,9 +2415,9 @@ export default function ScheduleBoardPage() {
                 onChangeOperator={(name) => handleChangeRowOperator(idx, name)}
                 onChangeHelper={(name) => handleChangeRowHelper(idx, name)}
                 onDropJob={handleDropJob}
-                operatorId={rowAssignments[idx]?.operator ? (operatorIdMap[rowAssignments[idx].operator!] ?? null) : null}
-                timeOff={(() => { const opId = rowAssignments[idx]?.operator ? operatorIdMap[rowAssignments[idx].operator!] : null; return opId ? (timeOffMap[opId] ?? null) : null; })()}
-                rowNote={(() => { const opId = rowAssignments[idx]?.operator ? operatorIdMap[rowAssignments[idx].operator!] : null; return opId ? (rowNotesMap[opId] ?? '') : ''; })()}
+                operatorId={rowAssignments[idx]?.operator ? resolveCrewId(crewNameIndex, rowAssignments[idx].operator) : null}
+                timeOff={(() => { const opId = resolveCrewId(crewNameIndex, rowAssignments[idx]?.operator); return opId ? (timeOffMap[opId] ?? null) : null; })()}
+                rowNote={(() => { const opId = resolveCrewId(crewNameIndex, rowAssignments[idx]?.operator); return opId ? (rowNotesMap[opId] ?? '') : ''; })()}
                 onAddTimeOff={(type, notes) => handleAddTimeOff(idx, type, notes)}
                 onRemoveTimeOff={() => handleRemoveTimeOff(idx)}
                 onSaveRowNote={(note) => handleSaveRowNote(idx, note)}
@@ -2414,6 +2628,34 @@ export default function ScheduleBoardPage() {
           onMakeFirst={handleConflictMakeFirst}
           onClose={() => setConflictData(null)}
         />
+      )}
+      {/* ═══ LIVE-JOB UNASSIGN CONFIRMATION ═══════════════════════════════
+          The API refuses to leave a job that is in_route / being worked with
+          nobody on it. The office may still mean exactly that — but it has to
+          be a decision, not a side effect of pressing something else. */}
+      {liveUnassignConfirm && (
+        <div className="fixed inset-0 z-[130] flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="mb-2 text-lg font-bold text-amber-300">{liveUnassignConfirm.title}</h3>
+            <p className="mb-6 text-sm leading-relaxed text-slate-300">{liveUnassignConfirm.detail}</p>
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              <button
+                type="button"
+                onClick={liveUnassignConfirm.onConfirm}
+                className="min-h-[44px] flex-1 rounded-lg bg-amber-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-amber-500"
+              >
+                Take the crew off anyway
+              </button>
+              <button
+                type="button"
+                onClick={() => { setLiveUnassignConfirm(null); fetchScheduleData(selectedDate); }}
+                className="min-h-[44px] flex-1 rounded-lg border border-slate-600 px-4 py-2.5 text-sm font-semibold text-slate-200 transition hover:bg-slate-800"
+              >
+                Keep them on it
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {rowChangeConflict && (
         <ConflictModal

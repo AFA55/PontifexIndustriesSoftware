@@ -13,6 +13,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { sendNotification } from '@/lib/send-reminder';
+import { shouldClearCrewOnDateMove, summarizeCrewChange, describeCrewClear } from '@/lib/crew-assignment';
 
 /**
  * Numeric fields that must be coerced to a number-or-null. A cleared field
@@ -167,7 +168,13 @@ export async function PATCH(
       // Working-day duration — the fact end_date is derived FROM. Without it on
       // this list a long job's length silently reverted on every edit.
       'duration_working_days',
-      'estimated_hours', 'estimated_cost', 'operator_name', 'status', 'priority',
+      // NOTE: `operator_name` is deliberately ABSENT. There is no such column on
+      // job_orders (information_schema, Aug 18) — it lives on
+      // job_daily_assignments / schedule_board_view. While it sat on this list a
+      // client that sent it would have put a non-existent column into the UPDATE
+      // and hard-failed the whole save with "column does not exist". Nothing
+      // sends it today; it was a loaded gun.
+      'estimated_hours', 'estimated_cost', 'status', 'priority',
       'is_will_call', 'difficulty_rating',
       'ppe_required', 'additional_safety_requirements',
       // Direct column names that the schedule-form + schedule-board edit panels
@@ -260,6 +267,11 @@ export async function PATCH(
       updateFields.scheduled_date &&
       updateFields.scheduled_date !== oldJobOrder.scheduled_date;
 
+    // Set only when the date move ACTUALLY took a crew off — the per-day ledger
+    // cleanup below keys off this, not off `movingStart`, or a live job whose
+    // crew we just protected would lose them again by the back door.
+    let crewClearedByDateMove = false;
+
     if (movingStart) {
       const oldStart = oldJobOrder.scheduled_date as string | null;
       const oldEnd = (oldJobOrder.end_date as string | null) || oldStart;
@@ -279,8 +291,45 @@ export async function PATCH(
         }
       }
 
-      if (!('assigned_to' in updateFields)) updateFields.assigned_to = null;
-      if (!('helper_assigned_to' in updateFields)) updateFields.helper_assigned_to = null;
+      // …BUT NOT OFF A JOB SOMEONE IS STANDING ON (Aug 18).
+      //
+      // The rule above describes a job nobody has started: whoever was free on
+      // Monday is not necessarily free on Thursday. It stops describing a job
+      // that is `in_route` or being worked, where a date edit is nearly always
+      // a correction — fixing an end date, nudging a span — and the crew on it
+      // is a fact about right now, not a guess about a future day. Two of the
+      // three jobs stripped on Aug 18 were `in_route`, with crews driving to
+      // jobs the board then said nobody was on.
+      //
+      // Deliberately NOT gated on `dispatched_at`: a dispatched-but-unstarted
+      // job that moves to next week SHOULD go back to the pool for re-picking.
+      // It is being STARTED that makes the crew a fact.
+      const { data: loggedWork } = await supabaseAdmin
+        .from('daily_job_logs')
+        .select('id')
+        .eq('job_order_id', id)
+        .eq('tenant_id', tenantId)
+        .limit(1);
+
+      const mayClearCrew = shouldClearCrewOnDateMove({
+        status: oldJobOrder.status as string | null,
+        hasWorkLogged: !!(loggedWork && loggedWork.length > 0),
+      });
+
+      if (mayClearCrew) {
+        if (!('assigned_to' in updateFields)) {
+          updateFields.assigned_to = null;
+          if (oldJobOrder.assigned_to) crewClearedByDateMove = true;
+        }
+        if (!('helper_assigned_to' in updateFields)) {
+          updateFields.helper_assigned_to = null;
+          if (oldJobOrder.helper_assigned_to) crewClearedByDateMove = true;
+        }
+      } else if (oldJobOrder.assigned_to || oldJobOrder.helper_assigned_to) {
+        console.log(
+          `[job-update] ${id} is ${oldJobOrder.status} with a crew on it — date move kept the crew instead of clearing it`
+        );
+      }
     }
 
     // ── LAST LINE OF DEFENCE: a job may never end before it starts ──────────
@@ -355,11 +404,15 @@ export async function PATCH(
           .delete()
           .eq('job_order_id', id)
           .or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
-        // When the START moved we also dropped the crew above, so EVERY ledger
-        // row describes the old schedule — including any that happens to fall
-        // inside the new window, which would quietly put the old operator back
-        // on the job the founder just asked to see unassigned. Clear them all.
-        if (!movingStart) {
+        // When the date move DROPPED THE CREW, every ledger row describes the
+        // old schedule — including any that happens to fall inside the new
+        // window, which would quietly put the old operator back on the job the
+        // founder just asked to see unassigned. Clear them all.
+        //
+        // Keyed on the crew actually having been cleared, NOT on `movingStart`:
+        // a live job whose crew we deliberately kept must keep its ledger rows
+        // too, or the protection above is undone one query later.
+        if (!crewClearedByDateMove) {
           cleanup = cleanup.or(`assignment_date.lt.${windowStart},assignment_date.gt.${windowEnd}`);
         }
         const { error: ledgerCleanupError } = await cleanup;
@@ -387,7 +440,7 @@ export async function PATCH(
         'scheduled_date',
         'end_date',
         'estimated_hours',
-        'operator_name',
+        // 'operator_name' removed — not a job_orders column (see allowedFields).
         'status',
         'priority',
       ];
@@ -476,10 +529,58 @@ export async function PATCH(
       );
     }
 
+    // ── SAY IT OUT LOUD IF A CREW CAME OFF ──────────────────────────────────
+    // The office pressed a button and three jobs quietly lost their operator;
+    // nothing in the response said so, so nothing in the UI could either.
+    // Whatever the rule ends up being, the answer has to name what it did.
+    const crewChange = summarizeCrewChange(
+      {
+        operatorId: (oldJobOrder.assigned_to as string | null) ?? null,
+        helperId: (oldJobOrder.helper_assigned_to as string | null) ?? null,
+      },
+      {
+        operatorId: (jobOrder?.assigned_to as string | null) ?? null,
+        helperId: (jobOrder?.helper_assigned_to as string | null) ?? null,
+      }
+    );
+    // NAME THE PERSON WHO CAME OFF. This read `oldJobOrder.operator_name`, and
+    // `job_orders` HAS NO SUCH COLUMN (checked against information_schema, Aug
+    // 18 — operator_name lives on job_daily_assignments and schedule_board_view).
+    // `select('*')` therefore handed back `undefined` every time and the notice
+    // always degraded to the generic "the operator was taken off this job",
+    // which is exactly the sentence that needed to carry a name. Resolve it
+    // from the ids we actually cleared.
+    let clearedOperatorName: string | null = null;
+    let clearedHelperName: string | null = null;
+    const clearedOperatorId = crewChange.operator_cleared
+      ? ((oldJobOrder.assigned_to as string | null) ?? null)
+      : null;
+    const clearedHelperId = crewChange.helper_cleared
+      ? ((oldJobOrder.helper_assigned_to as string | null) ?? null)
+      : null;
+    if (clearedOperatorId || clearedHelperId) {
+      const ids = [clearedOperatorId, clearedHelperId].filter(Boolean) as string[];
+      const { data: people } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', ids);
+      const byId = new Map(
+        ((people || []) as { id: string; full_name: string | null }[]).map((p) => [p.id, p.full_name])
+      );
+      clearedOperatorName = clearedOperatorId ? (byId.get(clearedOperatorId) ?? null) : null;
+      clearedHelperName = clearedHelperId ? (byId.get(clearedHelperId) ?? null) : null;
+    }
+    const crewNotice = describeCrewClear(crewChange, {
+      operator: clearedOperatorName,
+      helper: clearedHelperName,
+    });
+
     return NextResponse.json(
       {
         success: true,
         message: 'Job order updated successfully',
+        ...(crewNotice ? { notice: crewNotice } : {}),
+        crew_change: crewChange,
         data: jobOrder,
       },
       { status: 200 }

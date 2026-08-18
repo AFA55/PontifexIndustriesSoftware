@@ -6,8 +6,10 @@ export const dynamic = 'force-dynamic';
  *
  * Body: {
  *   jobOrderId: string,
- *   operatorId: string | null,
- *   helperId?: string | null,
+ *   operatorId?: string | null,   // OMIT to leave the operator unchanged;
+ *                                 // null to deliberately take them off
+ *   helperId?: string | null,     // OMIT to leave the helper unchanged;
+ *                                 // null to deliberately take them off
  *   assignment_date?: 'YYYY-MM-DD',    // the board date the change anchors on
  *   scope?: 'day' | 'remaining',       // DEFAULT 'day' — see below
  *   position?: 'first' | 'last',       // default 'last' — where in the
@@ -29,6 +31,7 @@ import { getTenantId } from '@/lib/get-tenant-id';
 import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
 import { applyReassignment, shouldPromoteToAssigned, shouldDowngradeToScheduled, ordinal } from '@/lib/reassign';
+import { crewClearNeedsConfirmation, crewClearBlockedMessage } from '@/lib/crew-assignment';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,7 +42,27 @@ export async function POST(request: NextRequest) {
 
     if (!tenantId) return NextResponse.json({ error: 'Tenant scope required. super_admin must pass ?tenantId=' }, { status: 400 });
     const body = await request.json();
-    const { jobOrderId, operatorId, helperId, assignment_date, scope, position } = body;
+    const { jobOrderId, assignment_date, scope, position } = body;
+
+    // OMITTING `operatorId` MEANS "LEAVE THE OPERATOR ALONE" — it is not the
+    // same as sending null. On Aug 18 the board's row-helper handler sent
+    // `operatorId: <name lookup> || null` and its lookup missed a nicknamed
+    // operator, so a helper change stripped the lead off three jobs, two of
+    // them `in_route`. `'operatorId' in body` is the distinction that was
+    // missing; `??` alone would have collapsed the two states again.
+    const operatorId: string | null | undefined =
+      'operatorId' in body ? (body.operatorId ?? null) : undefined;
+
+    // THE HELPER SEAT HAS THE SAME THREE STATES, and it has to be read the same
+    // way. `helperId ?? null` collapsed them: an omitted key — which three
+    // callers on the board now send precisely to mean "I am not touching the
+    // helper" — arrived as an explicit `null`, i.e. "take the helper off". The
+    // edit panel changing ONLY the operator would have wiped the helper, and
+    // with scope 'remaining' it would have done it on every remaining day of a
+    // multi-day job. /reorder already reads it this way; /assign did not.
+    const helperId: string | null | undefined =
+      'helperId' in body ? (body.helperId ?? null) : undefined;
+    const force = body.force === true;
 
     if (!jobOrderId) {
       return NextResponse.json(
@@ -52,8 +75,9 @@ export async function POST(request: NextRequest) {
       // ── Per-day path: the shared reassignment write path ────────────────
       const result = await applyReassignment({
         jobOrderId,
-        operatorId: operatorId || null,
-        helperId: helperId ?? null,
+        operatorId,
+        // undefined = keep whoever is on it (applyReassignment honours it).
+        helperId,
         assignmentDate: assignment_date,
         // DEFAULT 'day', not 'remaining' (founder, Aug 11: "I have someone on
         // one job one day — it doesn't mean they're going to be there the next
@@ -68,6 +92,7 @@ export async function POST(request: NextRequest) {
         tenantId,
         actor: { userId: auth.userId, userEmail: auth.userEmail, role: auth.role },
         request,
+        force,
       });
 
       if (!result.ok) {
@@ -90,15 +115,27 @@ export async function POST(request: NextRequest) {
       // helper-only assignment is a real assignment (founder, Aug 13) and
       // reporting it as "unassigned" told the office the opposite of what had
       // just happened.
-      const someoneIsOnIt = !!operatorId || !!helperId;
+      const someoneIsOnIt = !!result.job.assigned_to || !!result.job.helper_assigned_to;
+      // SAY WHAT CAME OFF. The office pressed one control and three jobs lost
+      // their operator with nothing in the response to say so — the board kept
+      // drawing the old name until the next refetch. A crew clear is now part
+      // of the answer, not something the caller has to diff for.
+      const notice = result.crew_change.operator_cleared || result.crew_change.helper_cleared
+        ? `${[
+            result.crew_change.operator_cleared ? 'operator' : null,
+            result.crew_change.helper_cleared ? 'helper' : null,
+          ].filter(Boolean).join(' and ')} removed — check this job still has who it needs.`
+        : null;
       return NextResponse.json({
         success: true,
         message: `Job ${someoneIsOnIt ? 'assigned' : 'unassigned'} successfully${seqNote}`,
+        ...(notice ? { notice } : {}),
         data: {
           ...result.job,
           day_sequence: result.day_sequence,
           operator_day_job_count: result.operator_day_job_count,
           sequences: result.sequences,
+          crew_change: result.crew_change,
         },
       });
     }
@@ -108,7 +145,7 @@ export async function POST(request: NextRequest) {
     // downgraded or re-stamped.)
     const { data: currentJob } = await supabaseAdmin
       .from('job_orders')
-      .select('id, status')
+      .select('id, job_number, status, assigned_to, helper_assigned_to')
       .eq('id', jobOrderId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
@@ -117,17 +154,48 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
+    // Same tri-state as the per-day path: an omitted operator keeps the lead.
+    const effectiveOperatorId: string | null =
+      operatorId === undefined ? (currentJob.assigned_to ?? null) : operatorId;
+    // …and an omitted helper keeps the job's helper. There is no ledger row on
+    // this path by definition (no assignment_date), so the job row IS the
+    // present state here.
+    const effectiveHelperId: string | null =
+      helperId === undefined ? (currentJob.helper_assigned_to ?? null) : helperId;
+
+    // Same live-job guard as the per-day path — a legacy caller must not be a
+    // way around it.
+    if (
+      !force &&
+      crewClearNeedsConfirmation({
+        status: currentJob.status,
+        prevOperatorId: currentJob.assigned_to ?? null,
+        prevHelperId: currentJob.helper_assigned_to ?? null,
+        nextOperatorId: effectiveOperatorId,
+        nextHelperId: effectiveHelperId,
+      })
+    ) {
+      return NextResponse.json(
+        {
+          error: 'This job has a crew on it right now.',
+          details: crewClearBlockedMessage(currentJob.job_number, currentJob.status),
+          block_type: 'live_job_unassign',
+        },
+        { status: 409 }
+      );
+    }
+
     const updateData: Record<string, unknown> = {
-      assigned_to: operatorId || null,
-      helper_assigned_to: helperId || null,
+      assigned_to: effectiveOperatorId,
+      helper_assigned_to: effectiveHelperId,
       updated_at: new Date().toISOString(),
     };
 
     // STATUS GUARD: promote only pre-work statuses; never downgrade a live job.
-    if (shouldPromoteToAssigned(currentJob.status, operatorId || null, helperId ?? null)) {
+    if (shouldPromoteToAssigned(currentJob.status, effectiveOperatorId, effectiveHelperId)) {
       updateData.status = 'assigned';
       updateData.assigned_at = new Date().toISOString();
-    } else if (shouldDowngradeToScheduled(currentJob.status, operatorId || null, helperId ?? null)) {
+    } else if (shouldDowngradeToScheduled(currentJob.status, effectiveOperatorId, effectiveHelperId)) {
       updateData.status = 'scheduled';
       updateData.assigned_at = null;
     }
@@ -155,15 +223,15 @@ export async function POST(request: NextRequest) {
       userId: auth.userId,
       userEmail: auth.userEmail,
       userRole: auth.role,
-      action: operatorId || helperId ? 'assign' : 'unassign',
+      action: effectiveOperatorId || effectiveHelperId ? 'assign' : 'unassign',
       resourceType: 'job_order',
       resourceId: jobOrderId,
-      details: { operatorId, helperId, jobNumber: updated?.job_number },
+      details: { operatorId: effectiveOperatorId, helperId: effectiveHelperId, jobNumber: updated?.job_number },
       request,
     });
 
     // Fire-and-forget: notify assigned operator via in-app notification
-    if (operatorId && updated) {
+    if (effectiveOperatorId && updated) {
       Promise.resolve((async () => {
         const { data: job } = await supabaseAdmin
           .from('job_orders')
@@ -180,7 +248,7 @@ export async function POST(request: NextRequest) {
           : `Job ${updated!.job_number} has been assigned to you.`;
 
         await supabaseAdmin.from('schedule_notifications').insert({
-          recipient_id: operatorId,
+          recipient_id: effectiveOperatorId,
           job_order_id: jobOrderId,
           type: 'job_assigned',
           title: `You've been assigned: ${updated!.job_number}`,
@@ -198,7 +266,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fire-and-forget: notify assigned helper
-    if (helperId && updated) {
+    if (effectiveHelperId && updated) {
       Promise.resolve((async () => {
         const { data: job } = await supabaseAdmin
           .from('job_orders')
@@ -211,7 +279,7 @@ export async function POST(request: NextRequest) {
           : 'TBD';
 
         await supabaseAdmin.from('schedule_notifications').insert({
-          recipient_id: helperId,
+          recipient_id: effectiveHelperId,
           job_order_id: jobOrderId,
           type: 'job_assigned',
           title: `You've been assigned as helper: ${updated!.job_number}`,

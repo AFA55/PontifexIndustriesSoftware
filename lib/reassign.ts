@@ -42,6 +42,12 @@ import { logAuditEvent } from '@/lib/audit';
 import { sendNotification } from '@/lib/send-reminder';
 import { sendSMS } from '@/lib/sms';
 import { enumerateYMDRange } from '@/lib/dates';
+import {
+  crewClearNeedsConfirmation,
+  crewClearBlockedMessage,
+  summarizeCrewChange,
+  type CrewChangeSummary,
+} from '@/lib/crew-assignment';
 
 export type ReassignScope = 'day' | 'remaining';
 export type ReassignPosition = 'first' | 'last';
@@ -229,8 +235,19 @@ export interface ReassignActor {
 
 export interface ReassignParams {
   jobOrderId: string;
-  /** New lead operator (null = unassign). */
-  operatorId: string | null;
+  /**
+   * New lead operator. THREE states, and the difference is the whole reason
+   * three crews vanished off live jobs on Aug 18:
+   *   • a user id → put this person on the job
+   *   • `null`    → deliberately take the operator off
+   *   • `undefined` → I am not changing the operator; keep whoever is on it
+   *
+   * This used to be `string | null`, so a caller that merely wanted to change
+   * the HELPER had no way to say "leave the operator alone" — it restated the
+   * operator, and when its name→id lookup missed it restated it as `null`.
+   * Mirrors the tri-state `helperId` has always had.
+   */
+  operatorId?: string | null;
   /**
    * New helper. `undefined` = keep the job's current helper (reorder path);
    * `null` = clear the helper.
@@ -244,6 +261,12 @@ export interface ReassignParams {
   tenantId: string;
   actor: ReassignActor;
   request?: NextRequest;
+  /**
+   * Proceed even when this write would leave a LIVE job with nobody on it.
+   * Only ever set from a caller that showed the office what it was about to do
+   * and got a yes.
+   */
+  force?: boolean;
 }
 
 export type ReassignResult =
@@ -263,6 +286,12 @@ export type ReassignResult =
       operator_day_job_count: number;
       /** date → day_sequence for every date written. */
       sequences: Record<string, number>;
+      /**
+       * What this write did to the crew. The caller MUST be able to tell the
+       * office when somebody came off — silence is what made the Aug 18
+       * incident invisible until the next refetch.
+       */
+      crew_change: CrewChangeSummary;
     }
   | {
       ok: false;
@@ -270,7 +299,7 @@ export type ReassignResult =
       error: string;
       details?: string;
       conflict_job_id?: string;
-      block_type?: 'sequence_race';
+      block_type?: 'sequence_race' | 'live_job_unassign';
     };
 
 // ─── Small internals ────────────────────────────────────────────────────────
@@ -431,7 +460,7 @@ async function writeLedgerRows(params: {
 // ─── The write path ─────────────────────────────────────────────────────────
 
 export async function applyReassignment(params: ReassignParams): Promise<ReassignResult> {
-  const { jobOrderId, operatorId, assignmentDate, scope, tenantId, actor, request } = params;
+  const { jobOrderId, assignmentDate, scope, tenantId, actor, request } = params;
   const position: ReassignPosition = params.position === 'first' ? 'first' : 'last';
 
   // 1. Fetch the job (tenant-scoped — prevents cross-tenant writes via UUID).
@@ -448,8 +477,88 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
     return { ok: false, status: 404, error: 'Job not found' };
   }
 
+  // ── WHO IS ACTUALLY ON THIS JOB, FOR THIS DATE ──────────────────────────
+  // The anchor date's ledger row, NOT `job_orders.assigned_to`. The board draws
+  // its rows from `job_daily_assignments.operator_id`, and the two disagree
+  // constantly: JOB-2026-402357 is `in_progress` with `assigned_to` NULL,
+  // `helper_assigned_to` NULL, and nine ledger rows putting Aiden on it. Read
+  // the job's lead columns instead and the "before" state of a live job is
+  // (nobody, nobody) — so the live-crew guard below computes `hadSomeone =
+  // false`, never fires, and Aiden comes off an in-progress job with no 409, no
+  // modal, and nothing in the response to say so. That is the incident again.
+  //
+  // Fetched ONCE here and used for both jobs it has to do: resolving an omitted
+  // operator ("keep whoever is on it") and giving the guard the real present
+  // crew. Tenant-filtered per the standing rule — safe because the write path
+  // always stamps tenant_id and production carries zero NULLs (verified Aug 18);
+  // a row it somehow missed falls back to the job's lead, i.e. the old
+  // behaviour, never to "nobody".
+  const { data: anchorRow } = await supabaseAdmin
+    .from('job_daily_assignments')
+    .select('operator_id, helper_id')
+    .eq('job_order_id', jobOrderId)
+    .eq('assignment_date', assignmentDate)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+
+  // The effective PRESENT crew for this date — what a write is about to replace.
+  const presentOperatorId: string | null = anchorRow
+    ? (anchorRow.operator_id ?? null)
+    : (job.assigned_to ?? null);
+  const presentHelperId: string | null = anchorRow
+    ? (anchorRow.helper_id ?? null)
+    : (job.helper_assigned_to ?? null);
+
   // undefined helper = preserve the job's current helper (reorder drag path).
   const helperId = params.helperId === undefined ? (job.helper_assigned_to ?? null) : params.helperId;
+
+  // undefined OPERATOR = preserve whoever is already on it. "Whoever" is the
+  // anchor date's ledger row when one exists — that is the person the board is
+  // showing for this date — and the job's lead otherwise. Reading the job's
+  // lead alone would quietly promote a day-override back to the lead on a
+  // helper-only edit.
+  const operatorId: string | null =
+    params.operatorId === undefined ? presentOperatorId : params.operatorId;
+
+  // ── NOBODY LEAVES A LIVE JOB BY ACCIDENT ────────────────────────────────
+  // Aug 18: two of the three jobs stripped were `in_route` — crews driving to
+  // jobs the board then said nobody was on. Emptying the crew on a job that is
+  // being worked is a real thing the office sometimes means; it is never a
+  // thing they mean as a side effect of changing something else. Blocked
+  // unless the caller confirmed it (`force`).
+  if (!params.force) {
+    // NOT .maybeSingle() — several operators can log the same job on the same
+    // date, and maybeSingle() throws on more than one row. We only need "any".
+    const { data: workedToday } = await supabaseAdmin
+      .from('daily_job_logs')
+      .select('id')
+      .eq('job_order_id', jobOrderId)
+      .eq('log_date', assignmentDate)
+      .eq('tenant_id', tenantId)
+      .limit(1);
+
+    const blocked = crewClearNeedsConfirmation({
+      status: job.status,
+      // The EFFECTIVE present crew (ledger-first), not the job's lead columns —
+      // see the note above. `hasWorkLogged` cannot rescue this: the check
+      // short-circuits on stripsCrew() before it is ever consulted.
+      prevOperatorId: presentOperatorId,
+      prevHelperId: presentHelperId,
+      nextOperatorId: operatorId,
+      nextHelperId: helperId,
+      hasWorkLogged: !!(workedToday && workedToday.length > 0),
+    });
+
+    if (blocked) {
+      return {
+        ok: false,
+        status: 409,
+        error: 'This job has a crew on it right now.',
+        details: crewClearBlockedMessage(job.job_number, job.status),
+        block_type: 'live_job_unassign',
+      };
+    }
+  }
 
   const dates = expandScopeDates(scope, assignmentDate, job.end_date, job.is_multi_day === true);
 
@@ -817,5 +926,9 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
     day_sequence: anchorSequence,
     operator_day_job_count: anchorDayJobCount,
     sequences: ledger.sequences,
+    crew_change: summarizeCrewChange(
+      { operatorId: prevOperatorId, helperId: prevHelperId },
+      { operatorId, helperId }
+    ),
   };
 }
