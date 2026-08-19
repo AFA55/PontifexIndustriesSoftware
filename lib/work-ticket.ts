@@ -1,9 +1,13 @@
 /**
  * lib/work-ticket.ts — pure grouping/total math for the printed WORK TICKET.
  *
- * The founder's paper ticket (Patriot's carbon-copy form) needs work performed
- * separated BY DAY and, within a day, BY OPERATOR — plus a per-day
- * Date/Start/End/Lunch/Total row and a grand TOTAL TIME for a whole week.
+ * THE SHEET HAS TWO COLUMNS (founder, Aug 19): work performed on one side —
+ * cut types, quantities, depths, totals, added up across the WHOLE ticket, not
+ * broken down by day — and on the other, every person's times for every day
+ * plus the grand TOTAL TIME. The per-day/per-operator model below still exists
+ * and still does the attribution work; what changed is that its measurements
+ * are rolled up (aggregateWorkPerformed) instead of printed day by day, and its
+ * day list must be COMPLETE rather than a by-product of who filed paperwork.
  *
  * Everything here is pure (no supabase, no Date.now() except an injectable
  * default) so the rules are unit-tested in lib/work-ticket.test.ts. The API
@@ -21,7 +25,7 @@ import type { WorkItemLike } from './work-items-format';
 
 // ── Modes & ranges ──────────────────────────────────────────────────────────
 
-export type TicketMode = 'day' | 'week';
+export type TicketMode = 'day' | 'week' | 'job';
 
 export interface TicketRange {
   /** inclusive bare 'YYYY-MM-DD' */
@@ -30,12 +34,36 @@ export interface TicketRange {
   to: string;
 }
 
+/** The first→last window a list of bare dates spans, or null when empty. */
+export function spanOf(dates: string[]): TicketRange | null {
+  const clean = dates.filter(Boolean).slice().sort();
+  if (clean.length === 0) return null;
+  return { from: clean[0], to: clean[clean.length - 1] };
+}
+
 /**
  * The date window a ticket covers.
+ *  - job  → EVERY day the crew was on this job (the `jobSpan` the caller
+ *           computed from the ledger + the cards + the filed paperwork)
  *  - day  → just the anchor date
  *  - week → the Mon–Sun week containing the anchor (lib/dates.mondayOf)
+ *
+ * WHY 'job' EXISTS AND IS THE DEFAULT (founder, Aug 19). "Aiden and Javi were
+ * there Monday and Tuesday and right now it's only showing me the time they
+ * were there Tuesday." Nothing was missing from the data: all four clock cards
+ * were attributable and both days were on the job. The sheet was in DAY mode on
+ * an anchor of the last worked day, so it printed one of the two days and the
+ * other simply was not asked for. A ticket whose whole purpose is answering
+ * "who was where and when" cannot open on a window that hides days — so the
+ * default window is the job, and day/week remain for the office deliberately
+ * printing one day's ticket or one payroll week.
  */
-export function ticketRange(mode: TicketMode, anchorYMD: string): TicketRange {
+export function ticketRange(
+  mode: TicketMode,
+  anchorYMD: string,
+  jobSpan?: TicketRange | null
+): TicketRange {
+  if (mode === 'job') return jobSpan ?? { from: anchorYMD, to: anchorYMD };
   if (mode === 'week') {
     const days = weekDatesFrom(mondayOf(anchorYMD));
     return { from: days[0], to: days[days.length - 1] };
@@ -367,6 +395,47 @@ export interface TicketPersonDay {
    * the work but never hours — the office must not read it as a day worked.
    */
   filed_off_job?: boolean;
+  /**
+   * SOME OR ALL OF THESE HOURS WERE INFERRED, NOT READ OFF A TAGGED CARD.
+   *
+   * `attributableTimecards` counts a card against this job either because the
+   * card names the job (`job_order_id`) or because the office's own placement
+   * puts the person here and only here that day. The second kind is a
+   * judgement, and the founder hand-writes invoices off this sheet, so the two
+   * must not print identically: an attributed hour is inferred, a linked hour
+   * is recorded, and a sheet that blurs them hands a guess the authority of a
+   * measurement. Set when ANY card feeding this row carried no job tag.
+   *
+   * Real on JOB-2026-793440 — Monday's two cards carry no `job_order_id` at
+   * all and are on the sheet purely because the board placed the crew there.
+   */
+  hours_attributed?: boolean;
+  /**
+   * THE BOARD PUT THEM HERE AND NOTHING ELSE DID.
+   *
+   * The office's per-day ledger placed this person on this job on this date,
+   * and no clock card, log, work item or helper log for them reached the sheet.
+   * The row still prints, with an empty Total: "who was where and when" is the
+   * question this sheet answers, and "sent here, nothing clocked" is a real
+   * answer to it — a far more useful one than the person silently disappearing
+   * off a day the office knows they were sent to.
+   */
+  scheduled_only?: boolean;
+  /**
+   * THE DAY IS GENUINELY AMBIGUOUS — the board placed this person on this job
+   * AND on another one that date, and their clock card carries no job tag.
+   *
+   * `attributableTimecards` drops such a card rather than guess, which is right;
+   * what was wrong is that the drop left no trace, so the row printed under
+   * `scheduled_only` — "no clock card was recorded" — about a man who clocked
+   * 8.58 hours (Conrade, 8/06, JOB-2026-521763). A card exists and its hours are
+   * real; what cannot be established is how they divide between the two jobs.
+   * The sheet has to say that, not the opposite of it.
+   *
+   * Mutually exclusive with `scheduled_only` on the same row: both describe an
+   * empty Total, and only this one is true when it is set.
+   */
+  hours_split?: boolean;
 }
 
 export interface TicketDay {
@@ -454,6 +523,47 @@ export interface BuildTicketDaysInput {
    * while the board placed him on JOB-2026-675188.
    */
   offJobPersonDays?: Set<string>;
+  /**
+   * EVERY PERSON-DAY THE OFFICE'S OWN BOARD PLACED ON **THIS** JOB —
+   * `user_id|YYYY-MM-DD` keys straight out of `job_daily_assignments`
+   * (operator_id AND helper_id; the board writes both).
+   *
+   * WHY (founder, Aug 19, on JOB-2026-793440). "We need to get this fully
+   * functional and correct so we don't have issues trying to figure out who was
+   * where and when." Until now a day only existed on the sheet if a card, a
+   * log, a work item or a helper log landed on it — every one of which is
+   * something the CREW has to do. A day the board sent two men to and neither
+   * clocked in could not appear, so the sheet answered "who was where and when"
+   * only for the days the crew remembered to file.
+   *
+   * These seed a row with no hours. They never invent hours: steps 1, 2 and 4
+   * are the only things that ever set `hours`, and a seeded day nobody clocked
+   * prints an empty Total and `scheduled_only`.
+   *
+   * This is THIS job's ledger only, so a seed can never collide with
+   * `offJobPersonDays` (which holds keys placed on OTHER jobs and not here).
+   */
+  scheduledPersonDays?: Set<string>;
+  /**
+   * `user_id|YYYY-MM-DD` keys from `attributableTimecards.splitPersonDays` —
+   * days whose clock card was DROPPED because the office placed the person on
+   * this job and another one, with nothing on the card to divide it. Drives
+   * `hours_split`; see that field for why the distinction has to print.
+   */
+  splitPersonDays?: Set<string>;
+  /**
+   * Card ids from `attributableTimecards.attributedIds` — the cards that carry
+   * NO `job_order_id` and are counted here because the office's placement (or a
+   * single-job day) says so. Drives `hours_attributed`. See that field.
+   */
+  attributedCardIds?: Set<string>;
+  /**
+   * Today, local, bare 'YYYY-MM-DD'. Only used to keep a FUTURE scheduled day
+   * off the sheet: the board holds next week's placements, and a printed ticket
+   * asserting a man was on a job he has not been to yet is a lie the office
+   * would file. Omit and no future filter is applied.
+   */
+  todayYMD?: string;
 }
 
 const UNASSIGNED = '__unassigned__';
@@ -469,6 +579,29 @@ function joinNotes(a: string | null, b: string | null): string | null {
   const seen = new Set<string>();
   const unique = parts.filter((s) => (seen.has(s) ? false : (seen.add(s), true)));
   return unique.length > 0 ? unique.join(' · ') : null;
+}
+
+/**
+ * Nothing has landed on this row: no card, no log, no measurement, no note.
+ * Read in two places that must agree — the closeout fold's target selection
+ * (step 5b) and the `scheduled_only` test (step 7). They used to disagree: a
+ * board-seeded row with nothing on it was an eligible FOLD TARGET, so a
+ * closeout's measurements could be re-dated onto a day nobody clocked, and the
+ * arrival of those measurements then cleared the row's own `‡` — the sheet
+ * quietly asserting the crew was here and cut this, on a day the only evidence
+ * for is a line on the board.
+ */
+function isEmptyRow(p: TicketPersonDay): boolean {
+  return (
+    p.clock_in == null &&
+    p.clock_out == null &&
+    p.hours == null &&
+    p.lunch_minutes == null &&
+    p.work_items.length === 0 &&
+    p.logged_work.length === 0 &&
+    !p.log_note &&
+    !p.helper_note
+  );
 }
 
 function blankPerson(userId: string, input: BuildTicketDaysInput): TicketPersonDay {
@@ -528,6 +661,24 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     return person;
   };
 
+  // 0. THE BOARD'S OWN PLACEMENTS — a day exists because the office sent
+  //    someone to it, not only because the crew filed something from it. See
+  //    `scheduledPersonDays`. Seeded FIRST so every later step lands on the row
+  //    rather than creating a second one, and seeded with nothing: a day only
+  //    ever gets hours from a card (step 1) or a log (steps 2/4).
+  const seededOnly = new Set<string>();
+  for (const key of input.scheduledPersonDays ?? []) {
+    const sep = key.lastIndexOf('|');
+    if (sep <= 0) continue;
+    const userId = key.slice(0, sep);
+    const date = key.slice(sep + 1);
+    if (!inRange(date, range)) continue;
+    // Never print a day that has not happened yet.
+    if (input.todayYMD && date > input.todayYMD) continue;
+    bucket(date, userId);
+    seededOnly.add(dayKey(userId, date));
+  }
+
   // 1. Clock times — the payroll truth for Start / End / Lunch / Total.
   for (const tc of input.timecards) {
     if (!inRange(tc.date, range) || !tc.user_id) continue;
@@ -535,6 +686,9 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     // never let it vouch for a person being on this job that day either.
     if (isShopCard(tc)) continue;
     const p = bucket(tc.date as string, tc.user_id);
+    // An INFERRED hour must never print as a recorded one. See
+    // `hours_attributed` — this is the only place the distinction is knowable.
+    if (input.attributedCardIds?.has(tc.id)) p.hours_attributed = true;
     // A card got this far only by being linked to this job or attributed to it,
     // both of which outrank the placement ledger for this person-day.
     cardBacked.add(dayKey(tc.user_id, tc.date as string));
@@ -643,8 +797,16 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     // i.e. the days each person was really here.
     const onJobDates = new Map<string, string[]>();
     for (const [date, people] of byDate) {
-      for (const userId of people.keys()) {
+      for (const [userId, person] of people) {
         if (isOffJob(userId, date) && !cardBacked.has(dayKey(userId, date))) continue;
+        // A day the BOARD alone created, that collected nothing, is not a day
+        // this person provably stood on this job — it is a plan. Folding a
+        // closeout's measurements onto it would date real cuts to a day whose
+        // only evidence is the schedule, and would strip that row's `‡` on the
+        // way (step 7 reads emptiness, and the fold makes it non-empty). The
+        // fold's whole point is landing on the last day the person was REALLY
+        // here; a seeded blank is not one. See `isEmptyRow`.
+        if (seededOnly.has(dayKey(userId, date)) && isEmptyRow(person)) continue;
         const list = onJobDates.get(userId) ?? [];
         list.push(date);
         onJobDates.set(userId, list);
@@ -748,6 +910,32 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
         person.work_items = [];
         person.logged_work = [];
       }
+    }
+  }
+
+  // 7. WHY IS THIS TOTAL BLANK? Two different answers, and the sheet must not
+  //    give the wrong one — the office reads a blank Total and goes looking for
+  //    the card.
+  //
+  //      • `hours_split` — a card EXISTS and was dropped as unattributable,
+  //        because the board had this person on this job and another one that
+  //        day. Real, and worth 8.58 hours on JOB-2026-521763.
+  //      • `scheduled_only` — the board created the row and nothing else ever
+  //        touched it.
+  //
+  //    Split wins the tie: it is the more specific statement, and both cannot
+  //    print against one Total. Read after every step above, because a seeded
+  //    row that later collected a card, a log or a measurement is an ordinary
+  //    worked day and must carry neither flag.
+  for (const [date, people] of byDate) {
+    for (const [userId, p] of people) {
+      const key = dayKey(userId, date);
+      if (p.hours == null && input.splitPersonDays?.has(key)) {
+        p.hours_split = true;
+        continue;
+      }
+      if (!seededOnly.has(key)) continue;
+      if (isEmptyRow(p)) p.scheduled_only = true;
     }
   }
 
@@ -906,6 +1094,102 @@ export function totalsByWorkType(items: WorkItemLike[]): WorkTypeTotal[] {
 
   // Biggest first — the line the office is looking for is usually the big one.
   return Array.from(byType.values()).sort((a, b) => b.quantity - a.quantity);
+}
+
+/**
+ * Every depth this work item records, in inches, ascending and de-duplicated.
+ *
+ * Depth is stored in five different places depending on which modal the crew
+ * used, and the office prices a 12" cut differently from a 4" one — so all five
+ * are read rather than the sheet quietly printing footage with no depth:
+ *   • `cut_depth_inches` / `core_depth_inches` — the flat columns
+ *   • `details_json.cuts[].cutDepth`           — sawing entries
+ *   • `details_json.cuts[].areas[].depth`      — an L×W cut measures depth here
+ *   • `details_json.holes[].depthInches`       — coring entries
+ *   • `details_json.areas[].thickness|depth`   — demolition / removal entries
+ */
+export function workItemDepths(item: WorkItemLike): number[] {
+  const out = new Set<number>();
+  const add = (v: unknown) => {
+    const x = num(v);
+    if (x > 0) out.add(round2(x));
+  };
+  add(item.cut_depth_inches);
+  add(item.core_depth_inches);
+  const d = item.details_json;
+  if (d && typeof d === 'object') {
+    for (const c of Array.isArray(d.cuts) ? d.cuts : []) {
+      add(c?.cutDepth);
+      for (const a of Array.isArray(c?.areas) ? c.areas : []) add(a?.depth);
+    }
+    for (const h of Array.isArray(d.holes) ? d.holes : []) add(h?.depthInches);
+    for (const a of Array.isArray(d.areas) ? d.areas : []) {
+      add(a?.thickness);
+      add(a?.depth);
+    }
+  }
+  return Array.from(out).sort((a, b) => a - b);
+}
+
+/**
+ * THE LEFT-HAND COLUMN OF THE PRINTED SHEET: what was done on this job, added
+ * up across the whole ticket, with the depths.
+ *
+ * FOUNDER, TWICE (Aug 15, then Aug 19): "We don't need to see what they did
+ * every day when we print ticket. We need to see work performed on one side,
+ * and their times for each day and total times on another side."
+ *
+ * So the scope is stated ONCE. Which day a measurement happened to be typed on
+ * is an accident of when the operator opened the app — a man who misses a day
+ * and enters the running total the next morning made the per-day breakdown say
+ * "one day of work" on a two-day job. Quantity, unit and depth are what the
+ * invoice is written from, and they are all here in one block.
+ *
+ * `totalsByWorkType` is the same rollup without depths; this supersedes it for
+ * the printed sheet and delegates the quantity rule to it so the two can never
+ * disagree about a number on the same page.
+ */
+export interface WorkPerformedLine extends WorkTypeTotal {
+  /** Distinct depths in inches, ascending. Empty when none was recorded. */
+  depths: number[];
+}
+
+export function aggregateWorkPerformed(items: WorkItemLike[]): WorkPerformedLine[] {
+  const depthsByType = new Map<string, Set<number>>();
+  for (const item of items) {
+    const key = String(item.work_type || '').trim().toUpperCase();
+    if (!key) continue;
+    const set = depthsByType.get(key) ?? new Set<number>();
+    for (const d of workItemDepths(item)) set.add(d);
+    depthsByType.set(key, set);
+  }
+  return totalsByWorkType(items).map((t) => ({
+    ...t,
+    depths: Array.from(depthsByType.get(t.workType) ?? []).sort((a, b) => a - b),
+  }));
+}
+
+/**
+ * The dates on which measurements printed here were actually FILED, when that
+ * is not a day they were done — the closeout fold's stamp, lifted off the
+ * person-days so it survives the move to an aggregated work column.
+ *
+ * The per-person blocks used to carry "Measurements filed at closeout on …"
+ * next to the bullets they described. Those blocks are gone from the sheet, and
+ * dropping the stamp with them would silently re-date the one thing the fold
+ * exists to be honest about. It becomes a footnote under the work instead.
+ */
+export function closeoutFilingDates(days: TicketDay[]): string[] {
+  const set = new Set<string>();
+  for (const day of days) {
+    for (const p of day.people) {
+      if (p.work_filed_on) set.add(p.work_filed_on);
+      // A block kept in place because there was no on-job day to fold onto is
+      // the same fact stated a different way: this work arrived as paperwork.
+      else if (p.filed_off_job) set.add(day.date);
+    }
+  }
+  return Array.from(set).sort();
 }
 
 /** Every work item (structured + normalized log entries) printed in the range. */

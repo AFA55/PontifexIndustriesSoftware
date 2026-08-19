@@ -1,7 +1,11 @@
 import { workItemDetailLine } from './work-items-format';
 import {
+  aggregateWorkPerformed,
   allPrintedWork,
+  closeoutFilingDates,
+  spanOf,
   totalsByWorkType,
+  workItemDepths,
   buildTicketDays,
   enrichFromLoggedWork,
   isShopCard,
@@ -1038,3 +1042,545 @@ describe('buildTicketDays — a day spent on another job is not this job\'s day'
     expect(note.split(' · ').length).toBe(2);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// JOB-2026-793440 — "Aiden and Javi were there Monday and Tuesday and right now
+// it's only showing me the time they were there Tuesday."
+//
+// PRODUCTION SHAPES, verified against the live database on Aug 19 2026:
+//
+//   Mon 2026-08-17  Aiden 06:36–17:56  10.83 h   card job_order_id = NULL
+//                   Javi  06:35–19:00  11.92 h   card job_order_id = NULL
+//                   job_daily_assignments places BOTH on this job
+//                   daily_job_logs 7.79 h, work_performed = slab saw + hand saw
+//
+//   Tue 2026-08-18  Aiden 09:35–18:13   8.12 h   card job_order_id = THIS JOB
+//                   Javi  07:05–18:13  10.63 h   card job_order_id = THIS JOB
+//                   NO assignment row at all — they are on the job via the
+//                   job-level seats
+//                   daily_job_logs 0.06 h (a closeout session), work_performed
+//                   = hand saw + break & remove
+//
+// Nothing was missing from the data. All four cards were attributable and both
+// days were on the job; the sheet was simply in DAY mode anchored on the last
+// worked day, so it asked for Tuesday and got Tuesday. The fix is the 'job'
+// window, and these tests are what stops it regressing to one day again.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('JOB-2026-793440 — every day the crew was here, on one sheet', () => {
+  const AIDEN = '14cb2d1a-cc88-4c36-a4d5-b2957be858cb';
+  const JAVI = '13777f9b-b681-40b9-985e-836b0c771624';
+  const MON = '2026-08-17';
+  const TUE = '2026-08-18';
+
+  const crewNames = new Map<string, string | null>([
+    [AIDEN, 'Aiden'],
+    [JAVI, 'javier muniz rodriguez'],
+  ]);
+  const crewRoles = resolveCrewRoles({ assigned_to: AIDEN, helper_assigned_to: JAVI });
+
+  const timecards: TicketTimecardRow[] = [
+    {
+      id: 'tc-mon-aiden',
+      user_id: AIDEN,
+      date: MON,
+      clock_in_time: '2026-08-17T10:36:19.276Z',
+      clock_out_time: '2026-08-17T21:56:09.326Z',
+      lunch_duration_minutes: 30,
+      net_hours: 10.83,
+      total_hours: 10.83,
+      is_shop_hours: false,
+      work_location: 'field',
+    },
+    {
+      id: 'tc-mon-javi',
+      user_id: JAVI,
+      date: MON,
+      clock_in_time: '2026-08-17T10:35:00.000Z',
+      clock_out_time: '2026-08-17T23:00:00.000Z',
+      lunch_duration_minutes: 30,
+      net_hours: 11.92,
+      total_hours: 11.92,
+      is_shop_hours: false,
+      work_location: 'field',
+    },
+    {
+      id: 'tc-tue-aiden',
+      user_id: AIDEN,
+      date: TUE,
+      clock_in_time: '2026-08-18T13:35:53.879Z',
+      clock_out_time: '2026-08-18T22:13:08.744Z',
+      lunch_duration_minutes: 30,
+      net_hours: 8.12,
+      total_hours: 8.12,
+      is_shop_hours: false,
+      work_location: 'field',
+    },
+    {
+      id: 'tc-tue-javi',
+      user_id: JAVI,
+      date: TUE,
+      clock_in_time: '2026-08-18T11:05:38.943Z',
+      clock_out_time: '2026-08-18T22:13:17.092Z',
+      lunch_duration_minutes: 30,
+      net_hours: 10.63,
+      total_hours: 10.63,
+      is_shop_hours: false,
+      work_location: 'field',
+    },
+  ];
+
+  // Monday's two cards carry no job tag — the board is the only thing putting
+  // them here, so both must print as attributed rather than recorded.
+  const attributedCardIds = new Set(['tc-mon-aiden', 'tc-mon-javi']);
+
+  const logs: TicketDailyLog[] = [
+    {
+      id: 'log-mon',
+      operator_id: AIDEN,
+      log_date: MON,
+      day_number: 1,
+      hours_worked: 7.79,
+      work_performed: [
+        { type: 'ELECTRIC SLAB SAW', depth: 5, quantity: 162, notes: null },
+        { type: 'HAND SAW', depth: 6, quantity: 45, notes: null },
+      ],
+    },
+    {
+      id: 'log-tue',
+      operator_id: AIDEN,
+      log_date: TUE,
+      day_number: 2,
+      hours_worked: 0.06,
+      work_performed: [
+        { type: 'HAND SAW', depth: 5, quantity: 15, notes: null },
+        { type: 'BREAK & REMOVE', quantity: 4, notes: 'Removed the whole area' },
+      ],
+    },
+  ];
+
+  // The board wrote Monday only. Tuesday has no assignment row.
+  const scheduledPersonDays = new Set([`${AIDEN}|${MON}`, `${JAVI}|${MON}`]);
+  const leadByDate = new Map<string, string>([[MON, AIDEN]]);
+
+  const worked = datesWorked(timecards, logs);
+  const range = ticketRange('job', defaultAnchorDate(worked, '2026-08-19'), spanOf(worked));
+
+  const build = (r = range) =>
+    buildTicketDays({
+      range: r,
+      timecards,
+      logs,
+      workItems: [],
+      roles: crewRoles,
+      names: crewNames,
+      fallbackOperatorId: AIDEN,
+      quantitiesFrom: 'lead',
+      leadByDate,
+      scheduledPersonDays,
+      attributedCardIds,
+      todayYMD: '2026-08-19',
+    });
+
+  it('THE BUG: the old default — day mode on the last worked day — printed Tuesday only', () => {
+    const anchor = defaultAnchorDate(worked, '2026-08-19');
+    expect(anchor).toBe(TUE);
+    const dayOnly = build(ticketRange('day', anchor));
+    expect(dayOnly.map((d) => d.date)).toEqual([TUE]);
+    // Monday's 22.75 hours were never wrong, never missing — never asked for.
+    expect(grandTotalHours(dayOnly)).toBe(18.75);
+  });
+
+  it('the job window spans Monday to Tuesday', () => {
+    expect(range).toEqual({ from: MON, to: TUE });
+  });
+
+  it('ALL FOUR person-days print, with their real clock times', () => {
+    const days = build();
+    expect(days.map((d) => d.date)).toEqual([MON, TUE]);
+
+    const row = (date: string, userId: string) =>
+      days.find((d) => d.date === date)!.people.find((p) => p.user_id === userId)!;
+
+    expect(row(MON, AIDEN)).toMatchObject({
+      clock_in: '2026-08-17T10:36:19.276Z',
+      clock_out: '2026-08-17T21:56:09.326Z',
+      hours: 10.83,
+    });
+    expect(row(MON, JAVI)).toMatchObject({
+      clock_in: '2026-08-17T10:35:00.000Z',
+      clock_out: '2026-08-17T23:00:00.000Z',
+      hours: 11.92,
+    });
+    expect(row(TUE, AIDEN)).toMatchObject({
+      clock_in: '2026-08-18T13:35:53.879Z',
+      clock_out: '2026-08-18T22:13:08.744Z',
+      hours: 8.12,
+    });
+    expect(row(TUE, JAVI)).toMatchObject({
+      clock_in: '2026-08-18T11:05:38.943Z',
+      clock_out: '2026-08-18T22:13:17.092Z',
+      hours: 10.63,
+    });
+    expect(grandTotalHours(days)).toBe(41.5);
+  });
+
+  it("a day's hours do NOT depend on work being filed that day", () => {
+    // Strip every log and work item. The hours are the crew's clock cards and
+    // must survive a job where nobody ever typed a measurement.
+    const days = buildTicketDays({
+      range,
+      timecards,
+      logs: [],
+      workItems: [],
+      roles: crewRoles,
+      names: crewNames,
+      scheduledPersonDays,
+      attributedCardIds,
+      todayYMD: '2026-08-19',
+    });
+    expect(days.map((d) => d.date)).toEqual([MON, TUE]);
+    expect(grandTotalHours(days)).toBe(41.5);
+  });
+
+  it('Tuesday survives on the job-level seats alone — no assignment row exists', () => {
+    const days = build();
+    const tue = days.find((d) => d.date === TUE)!;
+    expect(tue.people.map((p) => p.user_id).sort()).toEqual([AIDEN, JAVI].sort());
+    expect(tue.total_hours).toBe(18.75);
+  });
+
+  it("Monday's untagged hours print as ATTRIBUTED; Tuesday's tagged ones do not", () => {
+    const days = build();
+    const mon = days.find((d) => d.date === MON)!;
+    const tue = days.find((d) => d.date === TUE)!;
+    expect(mon.people.every((p) => p.hours_attributed === true)).toBe(true);
+    expect(tue.people.some((p) => p.hours_attributed)).toBe(false);
+  });
+
+  it('the five-minute closeout never becomes a day of labour', () => {
+    const days = build();
+    // 0.06 is the length of the closeout SESSION on Tuesday's log. Tuesday's
+    // cards claimed the day first, so it is never used — and it appears nowhere.
+    expect(JSON.stringify(days)).not.toContain('0.06');
+    expect(days.find((d) => d.date === TUE)!.total_hours).toBe(18.75);
+  });
+
+  it('WORK PERFORMED is stated ONCE for the ticket, not repeated per day', () => {
+    const lines = aggregateWorkPerformed(allPrintedWork(build()));
+    // Hand saw was filed on BOTH days — one line, 45 + 15.
+    expect(lines).toEqual([
+      { workType: 'ELECTRIC SLAB SAW', quantity: 162, unit: 'LF', depths: [5] },
+      { workType: 'HAND SAW', quantity: 60, unit: 'LF', depths: [5, 6] },
+      { workType: 'BREAK & REMOVE', quantity: 4, unit: null, depths: [] },
+    ]);
+    // One row per work type, whatever the day count.
+    expect(new Set(lines.map((l) => l.workType)).size).toBe(lines.length);
+  });
+});
+
+describe('buildTicketDays — the board put them here and nobody clocked', () => {
+  const DAY = '2026-08-17';
+
+  it('prints the day with an empty Total rather than losing it', () => {
+    const days = buildTicketDays({
+      range: { from: DAY, to: DAY },
+      timecards: [],
+      logs: [],
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|${DAY}`]),
+      todayYMD: '2026-08-19',
+    });
+    expect(days).toHaveLength(1);
+    expect(days[0].people[0]).toMatchObject({
+      user_id: ZACK,
+      hours: null,
+      scheduled_only: true,
+    });
+    expect(days[0].total_hours).toBe(0);
+  });
+
+  it('does NOT flag a scheduled day the crew actually clocked', () => {
+    const days = buildTicketDays({
+      range: { from: DAY, to: DAY },
+      timecards: [
+        {
+          id: 'tc1',
+          user_id: ZACK,
+          date: DAY,
+          clock_in_time: '2026-08-17T11:00:00.000Z',
+          clock_out_time: '2026-08-17T20:00:00.000Z',
+          net_hours: 8.5,
+          total_hours: 8.5,
+        },
+      ],
+      logs: [],
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|${DAY}`]),
+      todayYMD: '2026-08-19',
+    });
+    expect(days[0].people[0].scheduled_only).toBeUndefined();
+    expect(days[0].people[0].hours).toBe(8.5);
+  });
+
+  it('refuses a FUTURE placement — the board holds next week', () => {
+    const days = buildTicketDays({
+      range: { from: '2026-08-17', to: '2026-08-30' },
+      timecards: [],
+      logs: [],
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|2026-08-25`]),
+      todayYMD: '2026-08-19',
+    });
+    expect(days).toHaveLength(0);
+  });
+});
+
+/**
+ * CONRADE, 8/06, JOB-2026-521763 — 8.58 HOURS THE SHEET CALLED ABSENT.
+ *
+ * The board placed him on this job AND on JOB-2026-859542 that day, his card
+ * carried no job tag, and `attributableTimecards` dropped it rather than guess
+ * how the day divided. Correct. But the drop left no trace, so the row printed
+ * under `scheduled_only` — "no clock card was recorded" — about a man with a
+ * ten-hour card in the database. The office reads that and goes looking for a
+ * card that is sitting right there.
+ *
+ * A split day is its own fact and prints its own mark.
+ */
+describe('buildTicketDays — a split day is not a missing card', () => {
+  const DAY = '2026-08-06';
+
+  it('flags the split instead of asserting nothing was clocked', () => {
+    const days = buildTicketDays({
+      range: { from: DAY, to: DAY },
+      timecards: [],
+      logs: [],
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|${DAY}`]),
+      splitPersonDays: new Set([`${ZACK}|${DAY}`]),
+      todayYMD: '2026-08-19',
+    });
+    expect(days[0].people[0]).toMatchObject({ user_id: ZACK, hours: null, hours_split: true });
+    // Mutually exclusive — one blank Total cannot carry two explanations, and
+    // only the split one is true here.
+    expect(days[0].people[0].scheduled_only).toBeUndefined();
+  });
+
+  it('marks only the person whose day was split, not everyone on the date', () => {
+    const days = buildTicketDays({
+      range: { from: DAY, to: DAY },
+      timecards: [],
+      logs: [],
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|${DAY}`, `${LUCAS}|${DAY}`]),
+      // Only Conrade's day was ambiguous. A date-level set could not say that.
+      splitPersonDays: new Set([`${ZACK}|${DAY}`]),
+      todayYMD: '2026-08-19',
+    });
+    const zack = days[0].people.find((p) => p.user_id === ZACK)!;
+    const lucas = days[0].people.find((p) => p.user_id === LUCAS)!;
+    expect(zack.hours_split).toBe(true);
+    expect(lucas.hours_split).toBeUndefined();
+    expect(lucas.scheduled_only).toBe(true);
+  });
+
+  it('never flags a day whose hours DID land — a linked card outranks the ledger', () => {
+    const days = buildTicketDays({
+      range: { from: DAY, to: DAY },
+      timecards: [
+        {
+          id: 'tc-linked',
+          user_id: ZACK,
+          date: DAY,
+          clock_in_time: '2026-08-06T11:00:00.000Z',
+          clock_out_time: '2026-08-06T20:00:00.000Z',
+          net_hours: 8.58,
+          total_hours: 8.58,
+        },
+      ],
+      logs: [],
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|${DAY}`]),
+      splitPersonDays: new Set([`${ZACK}|${DAY}`]),
+      todayYMD: '2026-08-19',
+    });
+    expect(days[0].people[0].hours).toBe(8.58);
+    expect(days[0].people[0].hours_split).toBeUndefined();
+    expect(days[0].people[0].scheduled_only).toBeUndefined();
+  });
+});
+
+/**
+ * THE FOLD MUST NOT LAND ON A DAY NOBODY CLOCKED.
+ *
+ * Seeding the board's placements into `byDate` made every scheduled person-day
+ * an eligible target for the closeout fold. A closeout's measurements could
+ * then be re-dated onto a day whose only evidence is a line on the schedule —
+ * and the arrival of that work cleared the row's own `‡`, so the sheet ended up
+ * asserting the crew was here and cut this, with nothing behind it.
+ */
+describe('buildTicketDays — the closeout fold skips board-seeded blanks', () => {
+  const SEEDED = '2026-08-10';
+  const WORKED = '2026-08-11';
+  const FILED = '2026-08-12';
+
+  const build = () =>
+    buildTicketDays({
+      range: { from: SEEDED, to: FILED },
+      timecards: [
+        {
+          id: 'tc-worked',
+          user_id: ZACK,
+          date: WORKED,
+          clock_in_time: '2026-08-11T11:00:00.000Z',
+          clock_out_time: '2026-08-11T21:00:00.000Z',
+          net_hours: 9.5,
+          total_hours: 9.5,
+        },
+      ],
+      logs: [
+        {
+          id: 'log-closeout',
+          operator_id: ZACK,
+          log_date: FILED,
+          day_number: 3,
+          hours_worked: 0.09,
+          work_performed: [{ type: 'WALL SAW', depth: 12, quantity: 40 }],
+          notes: 'Job complete.',
+        },
+      ],
+      workItems: [],
+      roles,
+      names,
+      fallbackOperatorId: ZACK,
+      quantitiesFrom: 'lead',
+      // The board held 8/10 open for him and he never clocked or filed a thing.
+      scheduledPersonDays: new Set([`${ZACK}|${SEEDED}`]),
+      // 8/12 he was provably on another job; the closeout was typed from it.
+      offJobPersonDays: new Set([`${ZACK}|${FILED}`]),
+      todayYMD: '2026-08-19',
+    });
+
+  it('folds onto the last day he was really here, not the seeded blank', () => {
+    const days = build();
+    const seeded = days.find((d) => d.date === SEEDED)!;
+    const worked = days.find((d) => d.date === WORKED)!;
+
+    expect(worked.people[0].logged_work).toHaveLength(1);
+    expect(worked.people[0].work_filed_on).toBe(FILED);
+    // The seeded day keeps its empty hands AND its honest flag.
+    expect(seeded.people[0].logged_work).toHaveLength(0);
+    expect(seeded.people[0].work_items).toHaveLength(0);
+    expect(seeded.people[0].scheduled_only).toBe(true);
+    expect(seeded.people[0].hours).toBeNull();
+  });
+
+  it('leaves no phantom hours on the filing day', () => {
+    const days = build();
+    expect(days.find((d) => d.date === FILED)).toBeUndefined();
+    expect(grandTotalHours(days)).toBe(9.5);
+  });
+});
+
+describe('workItemDepths / aggregateWorkPerformed', () => {
+  it('reads depth off the flat columns, the cuts, the areas and the holes', () => {
+    expect(workItemDepths({ work_type: 'SAW', cut_depth_inches: 6 })).toEqual([6]);
+    expect(
+      workItemDepths({ work_type: 'SAW', details_json: { cuts: [{ cutDepth: 8 }, { cutDepth: 4 }] } })
+    ).toEqual([4, 8]);
+    expect(
+      workItemDepths({ work_type: 'SAW', details_json: { cuts: [{ areas: [{ depth: 10 }] }] } })
+    ).toEqual([10]);
+    expect(
+      workItemDepths({ work_type: 'CORE', details_json: { holes: [{ depthInches: 12 }] } })
+    ).toEqual([12]);
+    expect(
+      workItemDepths({ work_type: 'BROKK', details_json: { areas: [{ thickness: 5 }] } })
+    ).toEqual([5]);
+  });
+
+  it('de-duplicates one depth recorded twice and sorts ascending', () => {
+    expect(
+      workItemDepths({
+        work_type: 'SAW',
+        cut_depth_inches: 6,
+        details_json: { cuts: [{ cutDepth: 6 }, { cutDepth: 4 }] },
+      })
+    ).toEqual([4, 6]);
+  });
+
+  it('records NO depth rather than inventing one', () => {
+    expect(workItemDepths({ work_type: 'HAULING', quantity: 3 })).toEqual([]);
+    expect(aggregateWorkPerformed([{ work_type: 'HAULING', quantity: 3 }])[0].depths).toEqual([]);
+  });
+
+  it('keeps the quantity rule identical to totalsByWorkType', () => {
+    const items = [
+      { work_type: 'WALL SAW', quantity: 40, cut_depth_inches: 6 },
+      { work_type: 'WALL SAW', quantity: 20, cut_depth_inches: 8 },
+    ];
+    expect(aggregateWorkPerformed(items).map(({ depths, ...rest }) => rest)).toEqual(
+      totalsByWorkType(items)
+    );
+  });
+});
+
+describe('closeoutFilingDates', () => {
+  it('lifts the fold stamp off the person-days so the footnote can print it', () => {
+    expect(
+      closeoutFilingDates([
+        {
+          date: '2026-08-11',
+          total_hours: 10,
+          people: [{ ...blank(ZACK), work_filed_on: '2026-08-13' }],
+        },
+      ])
+    ).toEqual(['2026-08-13']);
+  });
+
+  it('treats a block kept in place as filed on its own date', () => {
+    expect(
+      closeoutFilingDates([
+        {
+          date: '2026-08-13',
+          total_hours: 0,
+          people: [{ ...blank(ZACK), filed_off_job: true }],
+        },
+      ])
+    ).toEqual(['2026-08-13']);
+  });
+
+  it('is empty on an ordinary ticket', () => {
+    expect(closeoutFilingDates([{ date: '2026-08-11', total_hours: 8, people: [blank(ZACK)] }])).toEqual(
+      []
+    );
+  });
+});
+
+function blank(userId: string) {
+  return {
+    user_id: userId,
+    name: 'Zack',
+    role: 'lead' as const,
+    clock_in: null,
+    clock_out: null,
+    lunch_minutes: null,
+    hours: null,
+    work_items: [],
+    logged_work: [],
+    log_note: null,
+    helper_note: null,
+  };
+}

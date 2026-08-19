@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import JobDocuments from '@/components/JobDocuments';
@@ -10,6 +10,18 @@ import LaborCostBreakdown, { type LaborBreakdownDTO } from '@/components/LaborCo
 import OfficeCloseJob from '@/components/OfficeCloseJob';
 import { officeCloseAffordance } from '@/lib/office-completion';
 import { parseYMDLocal, formatDay, formatMaybeDateTime } from '@/lib/dates';
+import {
+  NO_PROJECT_MANAGER,
+  NO_PROJECT_MANAGER_LABEL,
+  completionMoment,
+  isSortDirection,
+  matchesProjectManager,
+  projectManagerOf,
+  projectManagerOptions,
+  sortByCompletion,
+  type CreatorNames,
+  type SortDirection,
+} from '@/lib/completed-jobs-filters';
 import { quotedAmount, QUOTED_AMOUNT_LABEL } from '@/lib/job-quoted-amount';
 import {
   formatScopeDetails,
@@ -119,6 +131,17 @@ interface CompletedJob {
    */
   office_completed_at: string | null;
   office_completion_reason: string | null;
+  /**
+   * WHO QUOTED IT — the field the "Project manager" filter runs on. NOT
+   * `project_manager_id`: that column is NULL on every completed job in
+   * production, so a filter built on it would have shown an empty archive.
+   * `created_by` backs the same fallback the printed ticket uses when
+   * `salesman_name` is blank. See lib/completed-jobs-filters.ts.
+   */
+  salesman_name: string | null;
+  created_by: string | null;
+  /** Bare 'YYYY-MM-DD'. Last-resort date when no completion stamp exists. */
+  end_date: string | null;
 }
 
 interface JobDetails {
@@ -159,6 +182,23 @@ interface JobDetails {
   lastLogDate: string | null;
 }
 
+/**
+ * The date the card PRINTS is the date the list SORTED by — read from the same
+ * completionMoment(). A list ordered by one value and labelled with another is
+ * indistinguishable from a list that is simply shuffled.
+ */
+function completedOnLabel(job: CompletedJob): string {
+  const moment = completionMoment(job);
+  if (moment.kind === 'timestamp') {
+    return formatMaybeDateTime(moment.iso, '—', { dateStyle: 'medium' });
+  }
+  if (moment.kind === 'date') {
+    // A bare 'YYYY-MM-DD' — parsed LOCAL by formatDay, never new Date(str).
+    return formatDay(moment.ymd, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+  return '—';
+}
+
 export default function CompletedJobsArchivePage() {
   const moduleGate = useModuleGate('completed_jobs');
   const router = useRouter();
@@ -172,6 +212,27 @@ export default function CompletedJobsArchivePage() {
   const [loadingDetails, setLoadingDetails] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRating, setFilterRating] = useState<number | null>(null);
+  /**
+   * THE TWO CONTROLS THE FOUNDER ASKED FOR (Aug 19 2026). Both are mirrored into
+   * the URL — the office reopens this screen all day and should not have to
+   * re-pick a manager every time. `null` = every manager.
+   */
+  const [filterPM, setFilterPM] = useState<string | null>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('newest');
+  /**
+   * full_name by profile id, for the jobs whose `salesman_name` is blank. Fills
+   * in the same way the printed ticket fills its "Quoted By" — without it those
+   * jobs would be unfilterable, which on a 17-of-18 column is a real row.
+   */
+  const [creatorNames, setCreatorNames] = useState<CreatorNames>({});
+  /**
+   * The viewer's tenant. `supabase` here is the RLS-enforced client, but the
+   * job_orders SELECT policy deliberately lets a `super_admin` read EVERY
+   * tenant (that is the Platform Hub role). Anyone else gets an explicit
+   * tenant_id on the query so the client can never ask for more than the policy
+   * would have allowed.
+   */
+  const tenantScopeRef = useRef<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [jobNotes, setJobNotes] = useState<Array<{
@@ -221,9 +282,39 @@ export default function CompletedJobsArchivePage() {
   };
 
   useEffect(() => {
-    checkAuth();
-    loadCompletedJobs();
+    // RESTORE THE FILTERS FROM THE URL FIRST. Read straight off `location`
+    // rather than through useSearchParams(): this is a client page and that hook
+    // drags a Suspense-boundary requirement into the build for something a
+    // one-line read already does.
+    const params = new URLSearchParams(window.location.search);
+    const pm = params.get('pm');
+    if (pm) setFilterPM(pm);
+    const sort = params.get('sort');
+    if (isSortDirection(sort)) setSortDirection(sort);
+
+    // Serialized on purpose: the jobs query needs the tenant the auth check
+    // reads, so it can be scoped instead of trusting RLS alone.
+    (async () => {
+      await checkAuth();
+      await loadCompletedJobs();
+    })();
   }, []);
+
+  /** Keep the address bar in step, without pushing history entries. */
+  useEffect(() => {
+    if (loading) return;
+    const params = new URLSearchParams(window.location.search);
+    if (filterPM) params.set('pm', filterPM);
+    else params.delete('pm');
+    if (sortDirection !== 'newest') params.set('sort', sortDirection);
+    else params.delete('sort');
+    const query = params.toString();
+    window.history.replaceState(
+      null,
+      '',
+      query ? `${window.location.pathname}?${query}` : window.location.pathname
+    );
+  }, [filterPM, sortDirection, loading]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -233,7 +324,7 @@ export default function CompletedJobsArchivePage() {
     }
     const { data: profile } = await supabase
       .from('profiles')
-      .select('role')
+      .select('role, tenant_id')
       .eq('id', session.user.id)
       .single();
     // `supervisor` belongs here (founder, Aug 17: project managers and
@@ -247,22 +338,49 @@ export default function CompletedJobsArchivePage() {
       return;
     }
     setViewerRole(profile?.role || null);
+    // A super_admin is NOT clamped to a tenant here. Not because the role means
+    // "platform operator" — it does not, reliably. There are three super_admins
+    // in production and only two of them sit in PONTIFEX: `super@pontifex.com`
+    // (8e696b19-…, "Super Admin (Demo)") belongs to PATRIOT. The reason is the
+    // policy: every job_orders SELECT policy that names the role —
+    // job_orders_select_own_or_admin, operator_can_view_own_jobs and
+    // tenant_isolation, and they are permissive so they OR together — exempts a
+    // super_admin from the tenant check. A filter here would not be enforcing
+    // anything the database is withholding; it would be a second, narrower rule
+    // the server has never agreed to.
+    //
+    // And it would cost the founder his screen. All 18 completed jobs belong to
+    // Patriot; clamping his PONTIFEX account to its own tenant_id empties the
+    // archive he opens this page to read. Everyone else gets an explicit
+    // tenant_id so the client can never ask for more than the policy allows.
+    tenantScopeRef.current =
+      profile?.role === 'super_admin' ? null : (profile?.tenant_id ?? null);
   };
 
   const loadCompletedJobs = async () => {
     setLoading(true);
     setLoadError(false);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('job_orders')
         .select('*')
-        .eq('status', 'completed')
-        .order('work_completed_at', { ascending: false, nullsFirst: false });
+        .eq('status', 'completed');
+      if (tenantScopeRef.current) {
+        query = query.eq('tenant_id', tenantScopeRef.current);
+      }
+      // Sorting the archive is finished on the client (sortByCompletion), which
+      // coalesces four completion columns PostgREST cannot express in one
+      // .order(). This keeps the transport order deterministic.
+      const { data, error } = await query.order('work_completed_at', {
+        ascending: false,
+        nullsFirst: false,
+      });
 
       if (error && error.message) {
         throw error;
       }
       setJobs(data || []);
+      loadCreatorNames(data || []);
     } catch (error: any) {
       if (error?.message) {
         console.error('Error loading completed jobs:', error.message);
@@ -270,6 +388,37 @@ export default function CompletedJobsArchivePage() {
       setLoadError(true);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * Names the jobs that never got a `salesman_name`, from the profile that
+   * filled the form — the same fallback the printed ticket uses. Best-effort:
+   * a failure just leaves those jobs under "No project manager" rather than
+   * costing the office the whole screen.
+   */
+  const loadCreatorNames = async (rows: CompletedJob[]) => {
+    const ids = Array.from(
+      new Set(
+        rows
+          .filter((j) => !String(j.salesman_name ?? '').trim())
+          .map((j) => j.created_by)
+          .filter((id): id is string => Boolean(id))
+      )
+    );
+    if (ids.length === 0) return;
+    try {
+      const { data } = await supabase
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', ids);
+      const names: CreatorNames = {};
+      for (const p of data || []) {
+        if (p?.id && p?.full_name) names[p.id] = p.full_name;
+      }
+      setCreatorNames(names);
+    } catch {
+      /* the archive still works without them */
     }
   };
 
@@ -505,18 +654,40 @@ export default function CompletedJobsArchivePage() {
     }
   };
 
-  const filteredJobs = jobs.filter((job) => {
-    const matchesSearch =
-      job.customer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.job_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      job.job_number?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesRating =
-      filterRating === null ||
-      (job.customer_overall_rating && job.customer_overall_rating >= filterRating);
-    return matchesSearch && matchesRating;
-  });
+  /**
+   * Every manager who HAS a completed job, so the dropdown cannot offer a dead
+   * option. A `?pm=` left over in a bookmarked URL can still name somebody with
+   * nothing here — it is kept in the list (so the control isn't blank and lying)
+   * and the empty state below says so by name instead of reading as a bug.
+   */
+  const pmOptions = useMemo(() => {
+    const options = projectManagerOptions(jobs, creatorNames);
+    if (filterPM && filterPM !== NO_PROJECT_MANAGER && !options.includes(filterPM)) {
+      return [...options, filterPM].sort((a, b) => a.localeCompare(b));
+    }
+    return options;
+  }, [jobs, creatorNames, filterPM]);
+
+  const hasUnnamedJobs = useMemo(
+    () => jobs.some((job) => projectManagerOf(job, creatorNames) === null),
+    [jobs, creatorNames]
+  );
+
+  const filteredJobs = useMemo(() => {
+    const matched = jobs.filter((job) => {
+      const matchesSearch =
+        job.customer?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.job_location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        job.job_number?.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesRating =
+        filterRating === null ||
+        (job.customer_overall_rating && job.customer_overall_rating >= filterRating);
+      return matchesSearch && matchesRating && matchesProjectManager(job, filterPM, creatorNames);
+    });
+    return sortByCompletion(matched, sortDirection);
+  }, [jobs, searchQuery, filterRating, filterPM, creatorNames, sortDirection]);
 
   const averageRating = (() => {
     const rated = jobs.filter((j) => j.customer_overall_rating);
@@ -663,7 +834,13 @@ export default function CompletedJobsArchivePage() {
             </div>
 
             {/* Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+            {/* FOUR CONTROLS NOW, NOT TWO — and the grid has to add up.
+                `md:grid-cols-3` with the search spanning two came to five cells
+                across three columns: a second row holding two selects and a
+                hole. The counts below fill exactly at every breakpoint —
+                5 across on lg (2 + 1 + 1 + 1), and on md two rows of two with
+                the search and the rating each taking a full width. */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 mb-6">
               <div className="md:col-span-2 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-white/40" />
                 <input
@@ -671,19 +848,61 @@ export default function CompletedJobsArchivePage() {
                   placeholder="Search by customer, location, job number..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 rounded-xl text-sm transition-colors
+                  className="w-full min-h-[44px] pl-10 pr-4 py-3 rounded-xl text-sm transition-colors
                     bg-white border border-slate-200 text-slate-900 placeholder-slate-400
                     focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                     dark:bg-white/5 dark:border-white/10 dark:text-white dark:placeholder-white/40
                     dark:focus:border-brand/60 dark:focus:ring-brand/20"
                 />
               </div>
+              {/* PROJECT MANAGER — options come from the jobs on screen, so
+                  every name in this list has at least one job behind it. */}
               <select
+                aria-label="Filter by project manager"
+                value={filterPM ?? ''}
+                onChange={(e) => setFilterPM(e.target.value || null)}
+                className="w-full min-h-[44px] px-4 py-3 rounded-xl text-sm transition-colors
+                  bg-white border border-slate-200 text-slate-900
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white
+                  dark:focus:border-brand/60 dark:focus:ring-brand/20"
+              >
+                <option value="">All Project Managers</option>
+                {pmOptions.map((name) => (
+                  <option key={name} value={name}>
+                    {name}
+                  </option>
+                ))}
+                {/* Also drawn when a bookmarked ?pm= selects it and no job
+                    qualifies any more — a <select> whose value has no option
+                    renders blank, which looks like the control forgot. */}
+                {(hasUnnamedJobs || filterPM === NO_PROJECT_MANAGER) && (
+                  <option value={NO_PROJECT_MANAGER}>{NO_PROJECT_MANAGER_LABEL}</option>
+                )}
+              </select>
+              <select
+                aria-label="Sort by completion date"
+                value={sortDirection}
+                onChange={(e) =>
+                  setSortDirection(isSortDirection(e.target.value) ? e.target.value : 'newest')
+                }
+                className="w-full min-h-[44px] px-4 py-3 rounded-xl text-sm transition-colors
+                  bg-white border border-slate-200 text-slate-900
+                  focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
+                  dark:bg-white/5 dark:border-white/10 dark:text-white
+                  dark:focus:border-brand/60 dark:focus:ring-brand/20"
+              >
+                <option value="newest">Date: Newest first</option>
+                <option value="oldest">Date: Oldest first</option>
+              </select>
+              <select
+                aria-label="Filter by customer rating"
                 value={filterRating || ''}
                 onChange={(e) =>
                   setFilterRating(e.target.value ? Number(e.target.value) : null)
                 }
-                className="px-4 py-3 rounded-xl text-sm transition-colors
+                className="md:col-span-2 lg:col-span-1
+                  w-full min-h-[44px] px-4 py-3 rounded-xl text-sm transition-colors
                   bg-white border border-slate-200 text-slate-900
                   focus:border-brand focus:ring-2 focus:ring-brand/20 focus:outline-none
                   dark:bg-white/5 dark:border-white/10 dark:text-white
@@ -701,9 +920,19 @@ export default function CompletedJobsArchivePage() {
               {/* Jobs List */}
               <div className="lg:col-span-1">
                 <div className="rounded-2xl p-4 bg-white/90 ring-1 ring-slate-200 shadow-sm dark:bg-white/[0.04] dark:ring-white/10">
-                  <h2 className="text-sm font-bold text-slate-900 dark:text-white mb-3 px-1">
-                    Jobs ({filteredJobs.length})
-                  </h2>
+                  <div className="mb-3 px-1">
+                    <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                      Jobs ({filteredJobs.length})
+                    </h2>
+                    {/* Says what you are looking at, so a short list reads as a
+                        filter doing its job and not as missing data. */}
+                    <p className="text-sm text-slate-500 dark:text-white/60 mt-0.5">
+                      {filterPM
+                        ? `${filterPM === NO_PROJECT_MANAGER ? NO_PROJECT_MANAGER_LABEL : filterPM} · `
+                        : ''}
+                      {sortDirection === 'newest' ? 'Newest completed first' : 'Oldest completed first'}
+                    </p>
+                  </div>
                   <div className="space-y-2 max-h-[calc(100vh-400px)] overflow-y-auto pr-1">
                     {filteredJobs.map((job) => {
                       const active = selectedJobDetails?.job.id === job.id;
@@ -736,11 +965,7 @@ export default function CompletedJobsArchivePage() {
                           </div>
                           <div className="flex items-center justify-between text-xs">
                             <span className="text-slate-500 dark:text-white/50">
-                              {formatMaybeDateTime(
-                                job.work_completed_at || job.completion_signed_at || job.completion_submitted_at,
-                                '—',
-                                { dateStyle: 'medium' }
-                              )}
+                              {completedOnLabel(job)}
                             </span>
                             {job.customer_overall_rating && (
                               <span className="px-1.5 py-0.5 rounded-full font-semibold flex items-center gap-1 bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-300 dark:ring-amber-400/30">
@@ -764,8 +989,29 @@ export default function CompletedJobsArchivePage() {
                       );
                     })}
                     {filteredJobs.length === 0 && (
-                      <div className="text-center py-8 text-slate-500 dark:text-white/50 text-sm">
-                        No completed jobs found
+                      <div className="text-center py-8 px-2 text-slate-500 dark:text-white/60 text-sm">
+                        {/* Name the filter that emptied the list. A bookmarked
+                            ?pm= can outlive the last job that manager had, and
+                            a bare "none found" reads as a broken page. */}
+                        {filterPM ? (
+                          <>
+                            <p className="font-semibold text-slate-700 dark:text-white/80">
+                              No completed jobs for{' '}
+                              {filterPM === NO_PROJECT_MANAGER
+                                ? NO_PROJECT_MANAGER_LABEL.toLowerCase()
+                                : filterPM}
+                            </p>
+                            <button
+                              type="button"
+                              onClick={() => setFilterPM(null)}
+                              className="mt-3 inline-flex items-center justify-center min-h-[44px] py-3 px-4 rounded-xl text-sm font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+                            >
+                              Show all project managers
+                            </button>
+                          </>
+                        ) : (
+                          'No completed jobs found'
+                        )}
                       </div>
                     )}
                   </div>
@@ -819,7 +1065,10 @@ export default function CompletedJobsArchivePage() {
                             Print Job Order
                           </Link>
                           <Link
-                            href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/work-ticket?mode=week`}
+                            /* NO ?mode — the ticket opens on the ENTIRE JOB;
+                               `?mode=week` used to hide every day outside one
+                               Mon–Sun window. */
+                            href={`/dashboard/admin/jobs/${selectedJobDetails.job.id}/work-ticket`}
                             className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 ring-1 ring-slate-200 hover:bg-slate-200 dark:bg-white/5 dark:text-white/80 dark:ring-white/10 dark:hover:bg-white/10 transition-colors"
                             title="Print the work ticket for this job"
                           >

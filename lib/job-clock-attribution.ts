@@ -104,6 +104,17 @@ export interface AttributedClockCards {
   /** Dates where someone's hours could NOT be attributed (they split the day). */
   splitDates: Set<string>;
   /**
+   * `user_id|YYYY-MM-DD` — WHOSE day was split, not merely which date it fell
+   * on. Same judgement as `splitDates`, one level finer.
+   *
+   * The date-level set cannot say which of the crew on a two-man day was the
+   * ambiguous one, and the printed ticket has to: a mark against the wrong man's
+   * blank Total is a new false statement in place of the one it was added to
+   * fix. Populated at exactly the two places `splitDates` is, from the card
+   * whose owner and date are both already in hand, so the two can never drift.
+   */
+  splitPersonDays: Set<string>;
+  /**
    * Ids of the cards in `cards` that carry NO `job_order_id` — they are here
    * because the office's placement (or a single-job day) says so, not because
    * anyone tagged them. Callers that put a number on screen the office might
@@ -163,6 +174,7 @@ export async function attributableTimecards(
   tenantId?: string | null
 ): Promise<AttributedClockCards> {
   const splitDates = new Set<string>();
+  const splitPersonDays = new Set<string>();
   const attributedIds = new Set<string>();
   const offJobPersonDays = new Set<string>();
 
@@ -191,6 +203,12 @@ export async function attributableTimecards(
 
   const userSet = new Set(userIds);
   const dateSet = new Set(dates);
+  // A card TAGGED with this job proves the job ran that day, so it widens the
+  // question too. Without this, a day whose only tagged card belongs to the
+  // operator would never be searched for the helper's UNTAGGED card sitting
+  // beside it — the day would print half its crew. The linked query above has
+  // no date filter, so these dates cost nothing to collect.
+  for (const c of cards) if (c?.date) dateSet.add(c.date);
   for (const a of ownAssignments) {
     // Empty skeleton rows hold a date open on the board — nobody was placed.
     if (!a.operator_id && !a.helper_id) continue;
@@ -202,7 +220,7 @@ export async function attributableTimecards(
   dates = Array.from(dateSet);
 
   if (userIds.length === 0 || dates.length === 0) {
-    return { cards, splitDates, attributedIds, offJobPersonDays };
+    return { cards, splitDates, splitPersonDays, attributedIds, offJobPersonDays };
   }
 
   let byCrewQuery = supabaseAdmin.from(from).select(select).in('user_id', userIds).in('date', dates);
@@ -288,14 +306,22 @@ export async function attributableTimecards(
         // The office said where this person was. That outranks whatever
         // paperwork they happened to file from the truck that morning.
         if (placedThatDay.size > 1) {
-          if (placedThatDay.has(jobId)) splitDates.add(t.date);
+          if (placedThatDay.has(jobId)) {
+            splitDates.add(t.date);
+            splitPersonDays.add(key);
+          }
           continue;
         }
         if (!placedThatDay.has(jobId)) continue;
       } else {
         const jobsThatDay = touched.get(key);
         if (!jobsThatDay || jobsThatDay.size !== 1 || !jobsThatDay.has(jobId)) {
-          if (jobsThatDay && jobsThatDay.size > 1) splitDates.add(t.date);
+          if (jobsThatDay && jobsThatDay.size > 1) {
+            splitDates.add(t.date);
+            // Only when THIS job is one of the two — otherwise the day was
+            // ambiguous somewhere else entirely and says nothing about here.
+            if (jobsThatDay.has(jobId)) splitPersonDays.add(key);
+          }
           continue;
         }
       }
@@ -307,7 +333,7 @@ export async function attributableTimecards(
 
   await backfillShopFlags(from, cards, tenantId);
 
-  return { cards, splitDates, attributedIds, offJobPersonDays };
+  return { cards, splitDates, splitPersonDays, attributedIds, offJobPersonDays };
 }
 
 /**

@@ -28,7 +28,9 @@ export default function CompletedPrintRedirect({ params }: { params: Promise<{ i
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(`/dashboard/admin/jobs/${jobId}/work-ticket?mode=week`);
+    // NO ?mode — the ticket opens on the ENTIRE JOB. `?mode=week` sent a
+    // completed job to a single Mon–Sun window and hid the rest of it.
+    router.replace(`/dashboard/admin/jobs/${jobId}/work-ticket`);
   }, [jobId, router]);
 
   return <div className="p-8 text-sm text-gray-600">Opening the work ticket…</div>;

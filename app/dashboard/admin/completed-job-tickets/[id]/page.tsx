@@ -597,7 +597,10 @@ export default function CompletedJobSummaryPage() {
                 Customer Portal
               </button>
               <Link
-                href={`/dashboard/admin/jobs/${jobId}/work-ticket?mode=week`}
+                /* NO ?mode — the ticket now opens on the ENTIRE JOB. This
+                   said `?mode=week`, which on a job that ran across two weeks
+                   printed one of them and silently dropped the rest. */
+                href={`/dashboard/admin/jobs/${jobId}/work-ticket`}
                 /* Same tab — a new tab does not inherit sessionStorage, where
                    the session lives by default. See the job page's print link. */
                 className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors

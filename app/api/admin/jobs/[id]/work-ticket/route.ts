@@ -1,10 +1,23 @@
 export const dynamic = 'force-dynamic';
 
 /**
- * API Route: GET /api/admin/jobs/[id]/work-ticket?mode=day|week&date=YYYY-MM-DD
+ * API Route: GET /api/admin/jobs/[id]/work-ticket?mode=job|day|week&date=YYYY-MM-DD
  *
- * Everything the printed WORK TICKET needs, already grouped BY DAY and, inside
- * each day, BY OPERATOR. Backs app/dashboard/admin/jobs/[id]/work-ticket.
+ * Everything the printed WORK TICKET needs, grouped BY DAY and, inside each
+ * day, BY OPERATOR. Backs app/dashboard/admin/jobs/[id]/work-ticket, whose
+ * sheet prints the work rolled up on one side and these person-days on the
+ * other.
+ *
+ * `mode` DEFAULTS TO 'job' — the whole span the crew was here. It used to
+ * default to 'day', and that is the entire bug behind JOB-2026-793440: two men
+ * worked Monday and Tuesday, all four clock cards were attributable, and the
+ * sheet printed Tuesday because Tuesday was the only day it asked for.
+ *
+ * WHICH DAYS THE JOB RAN is answered from FIVE sources unioned, never one:
+ * clock cards linked to the job, cards attributed to it by the office's
+ * placement, operator daily logs, helper work logs, and the board's own
+ * `job_daily_assignments`. A day the crew worked and never filed paperwork for
+ * used to be invisible no matter how the hours rules read.
  *
  * Tenant scoping: the job row is fetched first and its `tenant_id` becomes the
  * scope for every subsequent query on a table that HAS a tenant_id column. A
@@ -34,6 +47,7 @@ import {
   defaultAnchorDate,
   grandTotalHours,
   resolveCrewRoles,
+  spanOf,
   ticketRange,
   type TicketDailyLog,
   type TicketHelperLog,
@@ -53,7 +67,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     const { id: jobId } = await context.params;
     const url = new URL(request.url);
-    const mode: TicketMode = url.searchParams.get('mode') === 'week' ? 'week' : 'day';
+    // 'job' is the DEFAULT — a ticket that opens on one day cannot answer "who
+    // was where and when". See `ticketRange` in lib/work-ticket.ts.
+    const modeParam = url.searchParams.get('mode');
+    const mode: TicketMode =
+      modeParam === 'week' ? 'week' : modeParam === 'day' ? 'day' : 'job';
     const dateParam = url.searchParams.get('date');
 
     // ── 1. Job (also the tenant scope for everything below) ────────────────
@@ -181,7 +199,15 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // RLS): a second tenant's placement on the same date can make one of these
     // people look "placed on 2 jobs" and their card is dropped — a silent
     // cross-tenant UNDER-count on the sheet the office files.
-    const { cards: attributedCards, offJobPersonDays } = await attributableTimecards(
+    const {
+      cards: attributedCards,
+      attributedIds,
+      offJobPersonDays,
+      // The days whose card was dropped as unattributable. Discarding this was
+      // how a man who clocked 8.58 hours printed as "no clock card was
+      // recorded" — see `hours_split` in lib/work-ticket.ts.
+      splitPersonDays,
+    } = await attributableTimecards(
       jobId,
       ticketUserIds,
       ticketDates,
@@ -190,6 +216,64 @@ export async function GET(request: NextRequest, context: RouteContext) {
       tenantId
     );
     const timecards = attributedCards as TicketTimecardRow[];
+
+    // WHO LED EACH DAY, AND WHO WAS SENT WITH THEM.
+    //
+    // The office reassigns leads mid-job, so the job-level `assigned_to` is not
+    // enough to decide whose measurements the sheet prints. The per-day crew
+    // ledger is the office's own record of it — and of who was on this job on
+    // which date, which is the question the printed sheet exists to answer. The
+    // helper column is read too now: the board writes both seats, and reading
+    // only the operator meant a helper the office SENT could not put a day on
+    // the sheet.
+    //
+    // TENANT-SCOPED like every other read on this route. `supabaseAdmin`
+    // bypasses RLS and this one was running across all tenants.
+    const { data: dayAssignRows, error: dayAssignError } = await scoped(
+      supabaseAdmin
+        .from('job_daily_assignments')
+        .select('assignment_date, operator_id, helper_id, day_sequence')
+        .eq('job_order_id', jobId)
+        // ORDERED so `leadByDate` is DECIDED rather than whatever PostgREST
+        // happened to return. The map takes the FIRST operator it sees for a
+        // date, and with no ORDER BY that was the storage order — a reindex or
+        // a re-save could silently change whose measurements the printed sheet
+        // carries. `day_sequence` is the board's own ordering of a day's jobs;
+        // `assignment_date` breaks the remaining tie. No production job/date
+        // has two operator rows today, so nothing on any sheet moves — this
+        // only stops it moving on its own later.
+        .order('day_sequence', { ascending: true, nullsFirst: false })
+        .order('assignment_date', { ascending: true })
+    );
+    // A dead read here must not present as "nobody was scheduled" — that is the
+    // exact shape of the bug this ticket keeps hitting (a failed select
+    // rendering as an empty job). Answer 500 via the outer catch instead.
+    if (dayAssignError) {
+      throw new Error(
+        `job_daily_assignments read failed: ${dayAssignError.message ?? 'unknown error'}`
+      );
+    }
+    const dayAssignments = (dayAssignRows ?? []) as Array<{
+      assignment_date: string | null;
+      operator_id: string | null;
+      helper_id: string | null;
+      day_sequence: number | null;
+    }>;
+    const leadByDate = new Map<string, string>();
+    // `user_id|YYYY-MM-DD` for everyone the board placed on THIS job.
+    const scheduledPersonDays = new Set<string>();
+    const scheduledDates = new Set<string>();
+    for (const r of dayAssignments) {
+      if (!r.assignment_date) continue;
+      if (r.operator_id) {
+        if (!leadByDate.has(r.assignment_date)) leadByDate.set(r.assignment_date, r.operator_id);
+        scheduledPersonDays.add(`${r.operator_id}|${r.assignment_date}`);
+      }
+      if (r.helper_id) scheduledPersonDays.add(`${r.helper_id}|${r.assignment_date}`);
+      // Skeleton rows hold a date open on the board with nobody on it — they
+      // are not a day anyone was here.
+      if (r.operator_id || r.helper_id) scheduledDates.add(r.assignment_date);
+    }
 
     // ── 3. Names for everyone who can appear on the ticket ─────────────────
     const memberIds = new Set<string>();
@@ -200,6 +284,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
     for (const l of logs) if (l.operator_id) memberIds.add(l.operator_id);
     for (const w of workItems) if (w.operator_id) memberIds.add(w.operator_id);
     for (const h of helperLogs) if (h.helper_id) memberIds.add(h.helper_id);
+    // …and everyone the BOARD placed here. A man scheduled onto this job who
+    // never clocked in still gets a row (see `scheduledPersonDays`), and a row
+    // reading "Crew member" is not an answer to "who was where".
+    for (const key of scheduledPersonDays) memberIds.add(key.slice(0, key.lastIndexOf('|')));
 
     const names = new Map<string, string | null>();
     if (memberIds.size > 0) {
@@ -228,25 +316,22 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .is('deleted_at', null)
     );
 
-    // WHO LED EACH DAY. The office reassigns leads mid-job, so the job-level
-    // `assigned_to` is not enough to decide whose measurements the sheet
-    // prints. The per-day crew ledger is the office's own record of it.
-    const { data: dayLeadRows } = await supabaseAdmin
-      .from('job_daily_assignments')
-      .select('assignment_date, operator_id')
-      .eq('job_order_id', jobId)
-      .not('operator_id', 'is', null);
-    const leadByDate = new Map<string, string>(
-      ((dayLeadRows as Array<{ assignment_date: string; operator_id: string }>) ?? [])
-        .filter((r) => r.assignment_date && r.operator_id)
-        .map((r) => [r.assignment_date, r.operator_id])
-    );
-
     // ── 5. Range + grouping ────────────────────────────────────────────────
-    const worked = datesWorked(timecards, logs, workItems, helperLogs);
     const today = toLocalYMD();
+    // EVERY DAY THIS CREW WAS ON THIS JOB — the five paths, unioned, because a
+    // reader that checks only one has caused this exact bug repeatedly here:
+    // clock cards (linked or attributed), operator logs, work items, helper
+    // logs, and the office's own board. A future placement is excluded: the
+    // board holds next week, and a printed ticket must not claim a day that
+    // has not happened.
+    const worked = Array.from(
+      new Set([
+        ...datesWorked(timecards, logs, workItems, helperLogs),
+        ...Array.from(scheduledDates).filter((d) => d <= today),
+      ])
+    ).sort();
     const anchor = dateParam && YMD.test(dateParam) ? dateParam : defaultAnchorDate(worked, today);
-    const range = ticketRange(mode, anchor);
+    const range = ticketRange(mode, anchor, spanOf(worked));
 
     const days = buildTicketDays({
       range,
@@ -271,6 +356,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // job's truck printed as a work day — Dante's 0.09 Wednesday on
       // JOB-2026-277097. See `offJobPersonDays` in lib/work-ticket.ts.
       offJobPersonDays,
+      // The board's own placements — a day the office SENT someone to is a day
+      // on the sheet even when nobody clocked or filed anything from it.
+      scheduledPersonDays,
+      // Days the board split between this job and another, so the sheet can say
+      // "hours split across jobs" instead of asserting nothing was clocked.
+      splitPersonDays,
+      // Which of these hours are inferred rather than read off a tagged card.
+      // The founder writes invoices from this sheet; the two must not print
+      // identically. See `hours_attributed` in lib/work-ticket.ts.
+      attributedCardIds: attributedIds,
+      todayYMD: today,
     });
 
     // ── 6. Standby / subsistence inside the printed range ──────────────────

@@ -1601,20 +1601,34 @@ export default function AdminJobDetailPage({
                   <Activity className="w-4 h-4" />
                 </span>
                 <h2 className="text-base font-semibold text-slate-900 dark:text-white">Daily Progress</h2>
-                {dailyLogs.length > 0 && (
-                  <span className="ml-auto text-xs font-medium px-2 py-0.5 rounded-full bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand">
-                    {dailyLogs.length} {dailyLogs.length === 1 ? 'day' : 'days'} logged
-                  </span>
-                )}
-                {/* "…or choose a weekly option if they were there the whole
-                    week" — one sheet, every day, for the office to file. */}
-                {dailyLogs.length > 0 && (
+                {/* One right-aligned GROUP, not two `ml-auto` siblings: with
+                    the badge and the button both claiming the free space, flex
+                    splits it between them and the two drift apart. */}
+                <div className="ml-auto flex items-center gap-2">
+                  {dailyLogs.length > 0 && (
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand">
+                      {dailyLogs.length} {dailyLogs.length === 1 ? 'day' : 'days'} logged
+                    </span>
+                  )}
+                {/* "…one sheet, every day, for the office to file." NO ?mode
+                    and no ?date: the ticket now opens on the ENTIRE JOB. It
+                    used to force `?mode=week` anchored on the last logged day,
+                    which is how JOB-2026-793440 printed Tuesday and left
+                    Monday's 22.75 hours off the sheet the office files.
+
+                    UNGATED. This button used to require `dailyLogs.length > 0`
+                    — a job nobody had filed paperwork for could not be printed.
+                    That is precisely backwards now: the ticket seeds a row from
+                    the board's own placements, so a day the office staffed and
+                    the crew never logged is exactly the day the sheet was
+                    rebuilt to surface, and it was the one day unreachable. The
+                    ticket also prints a clean write-in form when it truly knows
+                    nothing, which is the paper behaviour the founder asked for
+                    ("leave space blank … just so that can be our standard
+                    ticket") — so there is no state in which this button opens
+                    something useless. */}
                   <Link
-                    href={`/dashboard/admin/jobs/${job.id}/work-ticket?mode=week${
-                      dailyLogs[dailyLogs.length - 1]?.log_date
-                        ? `&date=${dailyLogs[dailyLogs.length - 1].log_date}`
-                        : ''
-                    }`}
+                    href={`/dashboard/admin/jobs/${job.id}/work-ticket`}
                     /* Same tab — see the note on the Print Job Order link
                        above: a new tab does not inherit the session. */
                     className="
@@ -1625,9 +1639,9 @@ export default function AdminJobDetailPage({
                     "
                   >
                     <Printer className="w-3.5 h-3.5" />
-                    Print week
+                    Print ticket
                   </Link>
-                )}
+                </div>
               </div>
 
               {dailyLogs.length === 0 && workItemsByDay.length === 0 ? (

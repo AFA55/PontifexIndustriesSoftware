@@ -4,16 +4,31 @@ export const dynamic = 'force-dynamic';
 
 /**
  * WORK TICKET — the printable replacement for the customer's carbon-copy field
- * ticket, with a DAY / WEEK toggle.
+ * ticket. TWO COLUMNS: work performed on the left, job hours on the right.
  *
- * Founder's ask (Aug 2026): "clear work performed for EACH DAY separated, so I
- * can print out their ticket in the format Patriot has now… give me the option
- * to print SAME DAY or PRINT ENTIRE WEEK with their TOTAL TIME… and if I
- * duplicate a job it should separate work performed BY OPERATOR."
+ * THE LAYOUT (founder, Aug 19, having asked for it once before):
+ *
+ *   "I told you previously to change layout — work performed on one side and
+ *    time and dates on other. We don't need to see what they did every day when
+ *    we print ticket. We need to see work performed on one side, and their
+ *    times for each day and total times on another side. We need to get this
+ *    fully functional and correct so we don't have issues trying to figure out
+ *    who was where and when."
+ *
+ * LEFT is the scope — cut types, quantities, depths, totals, added up across
+ * the whole ticket. Which day a measurement was typed on is an accident of when
+ * the operator opened the app, so the sheet no longer organises the scope by it.
+ * RIGHT is the roster — every person, every day, in / out / lunch / total, then
+ * the grand total. That is the "who was where and when" answer.
+ *
+ * THE WINDOW is the ENTIRE JOB by default. It used to be a single day, anchored
+ * on the last day worked, and that is the whole of the bug the founder hit:
+ * JOB-2026-793440 printed Tuesday while Monday's 22.75 hours sat untouched in
+ * the database. "Same day" and "Entire week" remain in the toolbar for printing
+ * a slice on purpose.
  *
  * SUPERSEDES app/dashboard/admin/jobs/[id]/completed-print (now a redirect
- * here): same fields, but per-day + per-operator separation, the real paper
- * structure (4 day blocks, three-copy footer), and a range picker.
+ * here): same fields, plus the two-column split and a range picker.
  *
  * FILLED vs BLANK — a carbon form is half pre-printed, half hand-written. What
  * the SYSTEM knows prints FILLED (customer, address, job no., dates, clock
@@ -35,19 +50,17 @@ import { authedFetch } from '@/lib/authed-fetch';
 import { describePrintError } from '@/lib/print-failure';
 import { reportClientFailure } from '@/lib/report-error';
 import { useBranding } from '@/lib/branding-context';
-import { workItemDetailLine, workItemQuickNote, type WorkItemLike } from '@/lib/work-items-format';
+import { workItemQuickNote } from '@/lib/work-items-format';
 import { formatDay, formatTime, parseYMDLocal, toLocalYMD } from '@/lib/dates';
 import { currentPathForNext, loginHrefForPath } from '@/lib/login-redirect';
 import {
   CREW_ROLE_LABEL,
+  aggregateWorkPerformed,
   allPrintedWork,
+  closeoutFilingDates,
   sumFootage,
-  totalsByWorkType,
-  ticketWorkDetail,
-  workTypeUnit,
   type TicketDay,
   type TicketMode,
-  type TicketPersonDay,
   type TicketRange,
 } from '@/lib/work-ticket';
 import { TICKET_COPY_FOOTER } from '@/lib/legal/prework-understandings';
@@ -221,179 +234,26 @@ function SectionBar({ accent, children }: { accent: string; children: React.Reac
   );
 }
 
-/** One work line, rendered with the SHARED formatter (never re-implemented). */
-function WorkLine({ item, showNote }: { item: WorkItemLike; showNote: boolean }) {
-  const detail = ticketWorkDetail(item, workItemDetailLine);
-  const qty = Number(item.quantity);
-  // A bare "×54" tells the customer nothing — label it when the work type
-  // implies the unit (sawing → LF, coring → holes). Never guessed otherwise.
-  const unit = workTypeUnit(item.work_type);
-  const parts = [
-    item.work_type || 'Work',
-    // "1 holes" reads like a bug to the customer holding the sheet.
-    Number.isFinite(qty) && qty > 0
-      ? unit
-        ? `${qty} ${qty === 1 ? unit.replace(/s$/, '') : unit}`
-        : `×${qty}`
-      : null,
-    detail || null,
-  ].filter(Boolean);
-  // The operator's quick note is the INTERNAL conditions narrative. This sheet
-  // is signed by the customer, so it is OFF by default and only shown when the
-  // office explicitly ticks "office notes" in the toolbar.
-  const note = showNote ? workItemQuickNote(item) : '';
-  return (
-    <li style={{ fontSize: 12.5, lineHeight: 1.5 }}>
-      {parts.join(' — ')}
-      {note && (
-        <span style={{ display: 'block', fontSize: 11, fontStyle: 'italic', paddingLeft: 10 }}>
-          office note: {note}
-        </span>
-      )}
-    </li>
-  );
-}
-
-function PersonBlock({
-  person,
-  showNotes,
-  accent,
-}: {
-  person: TicketPersonDay;
-  showNotes: boolean;
-  accent: string;
-}) {
-  const work: WorkItemLike[] = [...person.work_items, ...person.logged_work];
-  const times = [
-    person.clock_in ? formatTime(person.clock_in) : null,
-    person.clock_out ? formatTime(person.clock_out) : null,
-  ];
-  const timeText =
-    times[0] || times[1] ? `${times[0] || '—'} – ${times[1] || 'open'}` : null;
-
-  return (
-    <div style={{ breakInside: 'avoid', paddingLeft: 8, borderLeft: `2px solid ${accent}`, marginBottom: 5 }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 11.5, fontWeight: 800 }}>{person.name}</span>
-        <span
-          style={{
-            fontSize: 8.5,
-            fontWeight: 800,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            border: '1px solid #000',
-            padding: '0 4px',
-          }}
-        >
-          {CREW_ROLE_LABEL[person.role]}
-        </span>
-        {timeText && <span style={{ fontSize: 10 }}>{timeText}</span>}
-        {person.lunch_minutes != null && person.lunch_minutes > 0 && (
-          <span style={{ fontSize: 10 }}>· {person.lunch_minutes} min lunch</span>
-        )}
-        {person.hours != null && (
-          <span style={{ fontSize: 10, fontWeight: 700 }}>· {person.hours.toFixed(2)} hrs</span>
-        )}
-      </div>
-
-      {/* ── WHERE THESE NUMBERS CAME FROM, WHEN IT ISN'T THIS DAY ────────────
-          A closeout typed from the next job's truck used to print as a work
-          day here (Dante, 0.09 hrs on a Wednesday he spent at AM King). The
-          hours are gone; these two lines are what replaced them, because the
-          measurements in that closeout are real and often the job's only
-          record of what was cut. Say plainly when they were filed rather than
-          re-dating them silently. */}
-      {person.filed_off_job && (
-        <div style={{ margin: '2px 0 0 0', fontSize: 9.5, fontStyle: 'italic' }}>
-          Closeout paperwork filed this day — hours worked on another job.
-        </div>
-      )}
-      {person.work_filed_on && (
-        <div style={{ margin: '2px 0 0 0', fontSize: 9.5, fontStyle: 'italic' }}>
-          {/* "Additional" when only SOME of the bullets below arrived with the
-              closeout — the rest were genuinely filed on this day, and a flat
-              "Measurements filed at closeout on X" would assert something
-              untrue about them. Under-claim, never over-claim. */}
-          {person.work_filed_on_partial ? 'Additional measurements' : 'Measurements'} filed at
-          closeout on{' '}
-          {formatDay(person.work_filed_on, { weekday: 'short', month: 'numeric', day: 'numeric' })}.
-        </div>
-      )}
-
-      {(work || []).length > 0 ? (
-        <ul style={{ margin: '2px 0 0 14px', listStyle: 'disc' }}>
-          {(work || []).map((item, i) => (
-            <WorkLine key={(item as { id?: string }).id || `w${i}`} item={item} showNote={false} />
-          ))}
-        </ul>
-      ) : person.measurements_by_lead ? (
-        // They DID submit; the sheet is deliberately not repeating it. The lead
-        // measures the whole scope at the end of the day, so printing a second
-        // crew member's figures counts the same footage twice — Westminster
-        // printed 3,200 LF for 1,100. Ruled lines here would say "filed
-        // nothing", which is the opposite of the truth, so say what happened.
-        <div style={{ margin: '2px 0 0 14px', fontSize: 9.5, fontStyle: 'italic' }}>
-          Assisted — measurements recorded by the lead
-        </div>
-      ) : (
-        // Nothing was submitted digitally for this person on this day — leave the
-        // crew two ruled lines, exactly like the paper ticket.
-        <div style={{ margin: '3px 0 0 14px' }}>
-          <Blank />
-        </div>
-      )}
-
-      {/* ── WHAT THEY TYPED ─────────────────────────────────────────────────
-          Founder, Aug 12: "just add space where the work performed that they
-          typed can be at, and leave space blank if they didn't put anything —
-          just so that can be our standard ticket."
-
-          ALWAYS rendered, filled or empty. That is the point: the sheet has the
-          same shape every time, so the office knows where to look and the crew
-          knows where to write when they had nothing to type. Before this, a
-          typed description either appeared (behind the office-notes toggle) or
-          the row simply vanished, and the layout moved with it.
-
-          Sources, in the order an operator would expect to see them: the per-
-          item note they wrote while entering the work, then the day's own note. */}
-      <TypedNotes person={person} work={work} show={showNotes} />
-    </div>
-  );
+/** `5" · 6"` — the depths recorded against one work type, or '' when none. */
+function depthLabel(depths: number[]): string {
+  return depths.map((d) => `${d}"`).join(' · ');
 }
 
 /**
- * The operator's own words for the day — or ruled lines when there are none.
- * Kept as its own component so the "always present" rule is impossible to
- * accidentally gate behind a condition later.
+ * THE CREW'S OWN WORDS, ONCE FOR THE WHOLE TICKET.
+ *
+ * Collected across every person and every day, de-duplicated, and printed under
+ * the work column — not repeated per day, and never mixed into the hours table.
+ * The same sentence usually sits on the work item AND on the day's log, and on
+ * a two-day job it also sits on both days.
+ *
+ * ALWAYS rendered, filled or empty (founder, Aug 12: "leave space blank if they
+ * didn't put anything — just so that can be our standard ticket"), so the sheet
+ * keeps one shape and the crew knows where to write.
  */
-function TypedNotes({
-  person,
-  work,
-  show,
-}: {
-  person: TicketPersonDay;
-  work: WorkItemLike[];
-  show: boolean;
-}) {
-  const typed = [
-    ...work.map((w) => workItemQuickNote(w)).filter(Boolean),
-    person.log_note || '',
-    person.helper_note || '',
-  ]
-    .map((t) => String(t).trim())
-    .filter(Boolean);
-
-  // De-duplicate: the same sentence often sits on both the item and the day.
-  const seen = new Set<string>();
-  const lines = typed.filter((t) => {
-    const k = t.toLowerCase();
-    if (seen.has(k)) return false;
-    seen.add(k);
-    return true;
-  });
-
+function TicketNotes({ lines, show }: { lines: string[]; show: boolean }) {
   return (
-    <div style={{ margin: '3px 0 0 14px' }}>
+    <div style={{ marginTop: 6 }}>
       <p
         style={{
           fontSize: 8.5,
@@ -408,14 +268,14 @@ function TypedNotes({
       </p>
       {show && lines.length > 0 ? (
         lines.map((t, i) => (
-          <p key={i} style={{ fontSize: 11, lineHeight: 1.4, margin: i === 0 ? 0 : '2px 0 0' }}>
+          <p key={i} style={{ fontSize: 10.5, lineHeight: 1.35, margin: i === 0 ? 0 : '2px 0 0' }}>
             {t}
           </p>
         ))
       ) : (
         <>
           <Blank />
-          <div style={{ height: 5 }} />
+          <div style={{ height: 6 }} />
           <Blank />
         </>
       )}
@@ -427,7 +287,12 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   const { id: jobId } = use(params);
   const { branding } = useBranding();
 
-  const [mode, setMode] = useState<TicketMode>('day');
+  // ENTIRE JOB by default (founder, Aug 19). The sheet used to open on ONE day
+  // — the last one worked — and JOB-2026-793440 printed Tuesday only while
+  // Monday's ten and twelve hours sat in the database untouched. Day and week
+  // are still here for printing a single day's ticket or a payroll week; they
+  // are just no longer what you get without asking.
+  const [mode, setMode] = useState<TicketMode>('job');
   const [anchor, setAnchor] = useState<string>('');
   // Default ON (Aug 12): the founder's standard ticket carries what the crew
   // typed. The toggle now suppresses that text for a customer-facing copy — the
@@ -457,7 +322,8 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   // an effect rather than useSearchParams so the page needs no Suspense island.
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
-    if (q.get('mode') === 'week') setMode('week');
+    const m = q.get('mode');
+    if (m === 'week' || m === 'day' || m === 'job') setMode(m);
     const d = q.get('date');
     if (d && /^\d{4}-\d{2}-\d{2}$/.test(d)) setAnchor(d);
     if (q.get('notes') === '0') setShowNotes(false);
@@ -547,10 +413,38 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   };
 
   const accent = branding.primary_color || '#DC2626';
-  const days = data?.days || [];
-  const footage = useMemo(() => sumFootage(allPrintedWork(days)), [days]);
-  // Totalled across the whole printed range, not per day — see the section below.
-  const workTotals = useMemo(() => totalsByWorkType(allPrintedWork(days)), [days]);
+  // Memoised so the four rollups below key off a stable array — `data?.days ||
+  // []` produces a fresh [] every render and made all of them recompute.
+  const days = useMemo<TicketDay[]>(() => data?.days || [], [data]);
+  const printedWork = useMemo(() => allPrintedWork(days), [days]);
+  const footage = useMemo(() => sumFootage(printedWork), [printedWork]);
+  // THE LEFT COLUMN. Totalled across the whole ticket, never per day — see the
+  // section comment at its render site.
+  const workLines = useMemo(() => aggregateWorkPerformed(printedWork), [printedWork]);
+  // The closeout fold's honesty stamp, moved off the (now deleted) per-person
+  // blocks and onto a footnote under the work column.
+  const filedAtCloseout = useMemo(() => closeoutFilingDates(days), [days]);
+  // The crew's own words, once for the whole sheet rather than once per day.
+  const noteLines = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    const push = (raw: string | null | undefined) => {
+      const t = String(raw || '').trim();
+      if (!t) return;
+      const k = t.toLowerCase();
+      if (seen.has(k)) return;
+      seen.add(k);
+      out.push(t);
+    };
+    for (const item of printedWork) push(workItemQuickNote(item));
+    for (const day of days) {
+      for (const p of day.people) {
+        push(p.log_note);
+        push(p.helper_note);
+      }
+    }
+    return out;
+  }, [days, printedWork]);
 
   const companyLine =
     [branding.company_address, [branding.company_city, branding.company_state, branding.company_zip]
@@ -571,16 +465,57 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
         : `${formatDay(spanFrom, { month: 'short', day: 'numeric' })} – ${formatDay(spanTo, { month: 'short', day: 'numeric', year: 'numeric' })}`
       : '';
 
-  // Flatten to the paper's day blocks: one row per person per day.
+  // THE RIGHT COLUMN: one row per person per day, every day anyone was here.
   //
   // `filed_off_job` days are deliberately absent: the office had that person on
   // another job that day and they only filed this job's closeout paperwork from
-  // it. The work still prints in the day blocks (it is often the job's only
-  // record of what was cut), but a line in the HOURS table — even one with a
-  // blank Total — is a line payroll and invoicing read as a day worked here.
+  // it. Their work still reaches the WORK PERFORMED column (it is often the
+  // job's only record of what was cut), but a line in the HOURS table — even
+  // one with a blank Total — is a line payroll and invoicing read as a day
+  // worked here.
   const hourRows = (days || []).flatMap((d) =>
     (d.people || []).filter((p) => !p.filed_off_job).map((p) => ({ date: d.date, p }))
   );
+  // Footnote markers, printed only when the sheet actually contains one.
+  const hasAttributed = hourRows.some(({ p }) => p.hours_attributed);
+  const hasScheduledOnly = hourRows.some(({ p }) => p.scheduled_only);
+  // A card EXISTS on these days and could not be divided between two jobs. A
+  // different fact from `scheduled_only`, and it needs its own mark — see
+  // `hours_split` in lib/work-ticket.ts.
+  const hasSplit = hourRows.some(({ p }) => p.hours_split);
+
+  /**
+   * ROW DENSITY, MEASURED — NOT GUESSED.
+   *
+   * Letter landscape at the ticket's own 0.3in margin is 998.4 × 758.4 px of
+   * printable area. Measured in a browser against the real production row
+   * counts (Aug 19 2026, 44 jobs that have any hours):
+   *
+   *   comfortable rows (2px padding / 10px / 14px office cell)  → 13 rows fit
+   *   dense rows       (1px padding / 9.5px / no forced height) → 20 rows fit
+   *
+   * 43 of the 44 fit one page on that rule; the 44th (JOB-2026-424813, 28
+   * person-days over twelve days) runs to 1.13 pages — down from 2.76 on the
+   * per-day layout this replaces. Nobody's name clips or wraps at either
+   * density: checked with `scrollWidth > clientWidth` on every employee cell.
+   *
+   * Switching at 10 leaves headroom for the other two variables on the page,
+   * a long scope line and a stack of crew notes.
+   *
+   * THE FLOOR IS 10px, NOT 9.5. On paper a CSS pixel is 3/4 of a point, so 9.5
+   * prints at 7.1 pt — below the 8 pt anyone sets a form in, in the Total column
+   * the office hand-annotates and reads back to run payroll. Only 4 production
+   * jobs cross the >10-row threshold at all, and the floor costs at most one
+   * extra page on the largest of them. An unreadable number on the sheet the
+   * invoice is written from is the more expensive of the two.
+   */
+  const denseRows = hourRows.length > 10;
+  const hourCell: React.CSSProperties = {
+    border: '1px solid #000',
+    padding: denseRows ? '1px 3px' : '2px 3px',
+    fontSize: 10,
+    verticalAlign: 'bottom',
+  };
   // The paper form has FOUR day blocks — always print at least four so the crew
   // can add days by hand on a light week.
   // Two spare write-in rows, not four — the old count came from the paper
@@ -623,7 +558,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
 
           {/* DAY / WEEK — the founder's core control */}
           <div style={{ display: 'inline-flex', border: '1px solid #d4d4d8', borderRadius: 8, overflow: 'hidden' }}>
-            {(['day', 'week'] as TicketMode[]).map((m) => (
+            {(['job', 'day', 'week'] as TicketMode[]).map((m) => (
               <button
                 key={m}
                 onClick={() => setMode(m)}
@@ -640,28 +575,34 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                   color: mode === m ? '#fff' : '#3f3f46',
                 }}
               >
-                {m === 'day' ? 'Same day' : 'Entire week'}
+                {m === 'job' ? 'Entire job' : m === 'day' ? 'Same day' : 'Entire week'}
               </button>
             ))}
           </div>
 
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            <button onClick={() => step(-1)} aria-label="Previous" style={navBtn}>
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <label style={{ fontSize: 12, color: '#52525b' }}>
-              {mode === 'week' ? 'Week of' : 'Date'}{' '}
-              <input
-                type="date"
-                value={anchor}
-                onChange={(e) => setAnchor(e.target.value)}
-                style={{ fontSize: 13, padding: '8px 8px', minHeight: 40, border: '1px solid #d4d4d8', borderRadius: 6 }}
-              />
-            </label>
-            <button onClick={() => step(1)} aria-label="Next" style={navBtn}>
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
+          {/* The date picker only means something when the window is a day or a
+              week. In ENTIRE JOB the range is the job, so it is removed rather
+              than shown doing nothing. Conditional render, never `hidden` —
+              that loses to `display:flex` at equal specificity. */}
+          {mode !== 'job' && (
+            <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <button onClick={() => step(-1)} aria-label="Previous" style={navBtn}>
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <label style={{ fontSize: 12, color: '#52525b' }}>
+                {mode === 'week' ? 'Week of' : 'Date'}{' '}
+                <input
+                  type="date"
+                  value={anchor}
+                  onChange={(e) => setAnchor(e.target.value)}
+                  style={{ fontSize: 13, padding: '8px 8px', minHeight: 40, border: '1px solid #d4d4d8', borderRadius: 6 }}
+                />
+              </label>
+              <button onClick={() => step(1)} aria-label="Next" style={navBtn}>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          )}
 
           <label style={{ fontSize: 12, color: '#52525b', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             <input type="checkbox" checked={showNotes} onChange={(e) => setShowNotes(e.target.checked)} />
@@ -699,7 +640,13 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               return (
                 <button
                   key={d}
-                  onClick={() => setAnchor(d)}
+                  // In ENTIRE JOB every chip is already in range, so a click
+                  // that only moved the anchor would look broken. Treat it as
+                  // "print just this day" and move the toggle with it.
+                  onClick={() => {
+                    if (mode === 'job') setMode('day');
+                    setAnchor(d);
+                  }}
                   style={{
                     padding: '6px 10px',
                     minHeight: 34,
@@ -951,160 +898,268 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             <Field label="Office initials" />
           </div>
 
-          {/* ── Description of work performed — BY DAY, BY OPERATOR ── */}
-          <SectionBar accent={accent}>
-            Description of Work Performed{data.mode === 'week' ? ' — Week' : ''}
-          </SectionBar>
-          {data.job.description && (
-            <p style={{ fontSize: 11.5, fontStyle: 'italic', margin: '0 0 6px' }}>
-              Scope: {data.job.description}
-            </p>
-          )}
+          {/* ══ THE SHEET, IN TWO COLUMNS ═══════════════════════════════════
+              Founder, twice — Aug 15 and again Aug 19:
 
-          {(days || []).length === 0 ? (
-            // Nothing digital in this range — hand the crew a clean write-in area.
-            <div style={{ border: '1px solid #000', padding: 8 }}>
-              {[0, 1, 2, 3, 4, 5].map((i) => (
-                <div key={i} style={{ marginBottom: 9 }}>
-                  <Blank />
-                </div>
-              ))}
-            </div>
-          ) : (
-            /* TWO DAYS ACROSS (founder, Aug 12: "make it landscape mode… we
-               gotta try to fit all of this in one page"). Landscape buys width,
-               not height, so one day per full-width row spent the format's only
-               advantage: a five-day week was five stacked blocks and three
-               pages. Side by side it is three rows and one page. */
-            <div
-              style={{
-                display: 'grid',
-                // Adaptive: one day gets the full width, a short week goes
-                // two across, a full week three. A busy five-day week still
-                // runs to a second page — the work detail is the point of the
-                // sheet and is not worth shrinking to illegibility to save
-                // paper — but a single day and a light week now fit one.
-                gridTemplateColumns:
-                  (days || []).length >= 5 ? '1fr 1fr 1fr'
-                  : (days || []).length > 1 ? '1fr 1fr'
-                  : '1fr',
-                columnGap: 18,
-              }}
-            >
-            {(days || []).map((day) => (
-              <div key={day.date} style={{ breakInside: 'avoid', marginBottom: 9 }}>
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    borderBottom: '1.5px solid #000',
-                    paddingBottom: 2,
-                    marginBottom: 4,
-                  }}
-                >
-                  <span style={{ fontSize: 11.5, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {formatDay(day.date, { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 800 }}>{day.total_hours.toFixed(2)} hrs</span>
-                </div>
-                {(day.people || []).map((p) => (
-                  <PersonBlock key={`${day.date}-${p.user_id}`} person={p} showNotes={showNotes} accent={accent} />
-                ))}
-              </div>
-            ))}
-            </div>
-          )}
+                "I told you previously to change layout — work performed on one
+                 side and time and dates on other. We don't need to see what
+                 they did every day when we print ticket. We need to see work
+                 performed on one side, and their times for each day and total
+                 times on another side. We need to get this fully functional and
+                 correct so we don't have issues trying to figure out who was
+                 where and when."
 
-          {/* ── Day blocks (the paper's Date / Job Hours / Lunch / Total grid) ── */}
-          {/* ── TOTAL WORK PERFORMED ────────────────────────────────────────
-              One place that says what was done on this job, added up across
-              every day, independent of which day it was typed on.
+              LEFT is the SCOPE: what was cut, how much, how deep, totalled
+              across the whole ticket. Which day a measurement was typed on is
+              an accident of when the operator opened the app, and breaking the
+              scope up by that accident is what made a two-day job read as one.
+              This is what the invoice is hand-written from.
 
-              WHY (founder, Aug 15): the office writes the invoice BY HAND from
-              this sheet — the system does not decide what to bill. The per-day
-              blocks above answer "what happened when", but they could not answer
-              "what did we do in total": an operator who misses a day and enters
-              the running total the next day puts all of it under one date, and a
-              reader scanning day by day sees one day of work on a two-day job.
+              RIGHT is the ROSTER: every person, every day, in, out, lunch,
+              total, then the grand total. This is "who was where and when", and
+              it is now driven by the hours themselves — never by whether
+              anybody filed work that day.
 
-              Hours are deliberately NOT in this box. They are in Job Hours
-              below, because a column that is sometimes footage and sometimes
-              time is exactly the confusion this removes. */}
-          {workTotals.length > 0 && (
-            <>
-              <SectionBar accent={accent}>Total Work Performed</SectionBar>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, marginBottom: 8 }}>
-                <tbody>
-                  {workTotals.map((t) => (
-                    <tr key={t.workType}>
-                      <td style={{ ...cell, fontWeight: 700 }}>{t.workType}</td>
-                      <td style={{ ...cell, textAlign: 'right', fontWeight: 800, width: 140 }}>
-                        {t.quantity.toLocaleString(undefined, { maximumFractionDigits: 1 })}
-                        {t.unit ? ` ${t.unit}` : ''}
+              The two are side by side and not interleaved, which is also what
+              buys the page: the old sheet repeated a person's name, role,
+              times, hours AND their measurements inside every day block. */}
+          <div
+            style={{
+              display: 'grid',
+              // The hours side gets the extra width: it carries seven columns and a
+              // full name, while WORK PERFORMED is three short ones. Measured —
+              // at 0.85/1.15 no employee name clips or wraps at either density.
+              gridTemplateColumns: '0.85fr 1.15fr',
+              columnGap: 14,
+              alignItems: 'start',
+            }}
+          >
+            {/* ══ LEFT — WORK PERFORMED ═══════════════════════════════════ */}
+            <div style={{ minWidth: 0 }}>
+              <SectionBar accent={accent}>Work Performed</SectionBar>
+              {data.job.description && (
+                <p style={{ fontSize: 11, fontStyle: 'italic', margin: '0 0 5px' }}>
+                  Scope: {data.job.description}
+                </p>
+              )}
+
+              {workLines.length > 0 ? (
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                  <thead>
+                    <tr>
+                      {['Work Type', 'Quantity', 'Depth'].map((h) => (
+                        <th
+                          key={h}
+                          style={{
+                            border: '1px solid #000',
+                            padding: '2px 4px',
+                            fontSize: 8.5,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            textAlign: h === 'Work Type' ? 'left' : 'right',
+                          }}
+                        >
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {workLines.map((t) => (
+                      <tr key={t.workType}>
+                        <td style={{ ...cell, fontWeight: 700, fontSize: 11 }}>{t.workType}</td>
+                        <td style={{ ...cell, textAlign: 'right', fontWeight: 800, width: 88 }}>
+                          {t.quantity.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+                          {t.unit ? ` ${t.unit}` : ''}
+                        </td>
+                        {/* Depth priced the job as surely as the footage did.
+                            Blank when the crew recorded none — never a guess. */}
+                        <td style={{ ...cell, textAlign: 'right', width: 60 }}>
+                          {depthLabel(t.depths)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr>
+                      <td
+                        style={{
+                          ...cell,
+                          textAlign: 'right',
+                          fontWeight: 800,
+                          textTransform: 'uppercase',
+                          fontSize: 9,
+                        }}
+                      >
+                        Total cut
+                      </td>
+                      <td colSpan={2} style={{ ...cell, textAlign: 'right', fontWeight: 900, fontSize: 11 }}>
+                        {[
+                          footage.linearFeet > 0 ? `${footage.linearFeet} LF` : null,
+                          footage.cores > 0
+                            ? `${footage.cores} core${footage.cores === 1 ? '' : 's'}`
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ') || '—'}
                       </td>
                     </tr>
+                  </tbody>
+                </table>
+              ) : (
+                // Nothing was submitted digitally for this ticket — hand the
+                // crew a clean write-in area, exactly like the paper form.
+                <div style={{ border: '1px solid #000', padding: 8 }}>
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div key={i} style={{ marginBottom: 9 }}>
+                      <Blank />
+                    </div>
                   ))}
+                </div>
+              )}
+
+              {/* WHEN THE MEASUREMENTS ACTUALLY ARRIVED, when it was not the
+                  day they were done. A closeout typed from the next job's truck
+                  used to print as a work day here (Dante, 0.09 hrs on a
+                  Wednesday he spent at AM King). The hours are gone; this line
+                  is what replaced the per-person stamp when the day blocks
+                  came off the sheet. Say it plainly rather than re-dating the
+                  measurements silently. */}
+              {filedAtCloseout.length > 0 && (
+                <p style={{ fontSize: 9, fontStyle: 'italic', margin: '3px 0 0' }}>
+                  Some measurements were filed at closeout on{' '}
+                  {filedAtCloseout
+                    .map((d) => formatDay(d, { weekday: 'short', month: 'numeric', day: 'numeric' }))
+                    .join(', ')}
+                  .
+                </p>
+              )}
+
+              <TicketNotes lines={noteLines} show={showNotes} />
+            </div>
+
+            {/* ══ RIGHT — JOB HOURS ══════════════════════════════════════ */}
+            <div style={{ minWidth: 0 }}>
+              <SectionBar accent={accent}>
+                Job Hours{data.mode === 'week' ? ' — Week' : data.mode === 'day' ? ' — Day' : ''}
+              </SectionBar>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                <thead>
+                  <tr>
+                    {['Date', 'Employee', 'In', 'Out', 'Lunch', 'Total', 'Office'].map((h) => (
+                      <th
+                        key={h}
+                        style={{
+                          border: '1px solid #000',
+                          padding: '2px 3px',
+                          fontSize: 8,
+                          textTransform: 'uppercase',
+                          letterSpacing: '0.04em',
+                          textAlign: h === 'Total' ? 'right' : 'left',
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {(hourRows || []).map(({ date, p }) => (
+                    <tr key={`${date}-${p.user_id}-row`}>
+                      <td style={hourCell}>
+                        {formatDay(date, { weekday: 'short', month: 'numeric', day: 'numeric' })}
+                      </td>
+                      <td style={hourCell}>
+                        {p.name} <span style={{ fontSize: 7.5 }}>({CREW_ROLE_LABEL[p.role]})</span>
+                      </td>
+                      <td style={hourCell}>{p.clock_in ? formatTime(p.clock_in) : ''}</td>
+                      <td style={hourCell}>{p.clock_out ? formatTime(p.clock_out) : ''}</td>
+                      <td style={hourCell}>
+                        {p.lunch_minutes != null && p.lunch_minutes > 0 ? `${p.lunch_minutes}m` : ''}
+                      </td>
+                      <td style={{ ...hourCell, textAlign: 'right', fontWeight: 700 }}>
+                        {p.hours != null ? p.hours.toFixed(2) : ''}
+                        {/* AN INFERRED HOUR IS NOT A RECORDED ONE. The card
+                            carried no job tag and is counted here because the
+                            board placed this person on this job that day. The
+                            founder writes invoices off this sheet, so the two
+                            kinds must not look identical. */}
+                        {p.hours_attributed && <span style={{ fontWeight: 400 }}>&nbsp;†</span>}
+                        {/* Sent here by the board, nothing clocked. The row
+                            prints so the day is not silently missing. */}
+                        {p.scheduled_only && <span style={{ fontWeight: 400 }}>‡</span>}
+                        {/* A card EXISTS for this day and could not be divided
+                            between the two jobs the board sent him to. Its own
+                            mark, because "no card" and "card we cannot split"
+                            send the office to two different places. */}
+                        {p.hours_split && <span style={{ fontWeight: 400 }}>§</span>}
+                      </td>
+                      {/* Payroll/office writes here after the fact — always blank.
+                          The forced write-in height is dropped on a long list; it
+                          is what pushed a twelve-day job onto a second page. */}
+                      <td style={denseRows ? hourCell : { ...hourCell, height: 14 }} />
+                    </tr>
+                  ))}
+                  {Array.from({ length: padRows }).map((_, i) => (
+                    <tr key={`pad-${i}`}>
+                      {Array.from({ length: 7 }).map((__, c) => (
+                        <td key={c} style={{ ...hourCell, height: 16 }} />
+                      ))}
+                    </tr>
+                  ))}
+                  <tr>
+                    <td
+                      colSpan={5}
+                      style={{
+                        ...hourCell,
+                        textAlign: 'right',
+                        fontWeight: 800,
+                        textTransform: 'uppercase',
+                        fontSize: 9,
+                      }}
+                    >
+                      Total time
+                      {data.mode === 'week' ? ' (week)' : data.mode === 'job' ? ' (job)' : ''}
+                    </td>
+                    <td style={{ ...hourCell, textAlign: 'right', fontWeight: 900, fontSize: 12 }}>
+                      {data.totals.hours.toFixed(2)}
+                      {/* THE FIGURE THAT GETS INVOICED carries the mark too when
+                          any part of it was inferred. The row marks alone put
+                          the caveat on the lines, and this is the number the
+                          founder actually writes down — a total that looks
+                          unqualified while its parts are qualified is where the
+                          caveat gets lost. */}
+                      {hasAttributed && <span style={{ fontWeight: 400, fontSize: 10 }}>&nbsp;†</span>}
+                    </td>
+                    <td style={hourCell} />
+                  </tr>
                 </tbody>
               </table>
-            </>
-          )}
 
-          <SectionBar accent={accent}>Job Hours</SectionBar>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr>
-                {['Date', 'Employee', 'Start', 'End', 'Lunch', 'Total', 'Office Use Only'].map((h) => (
-                  <th
-                    key={h}
-                    style={{
-                      border: '1px solid #000',
-                      padding: '2px 4px',
-                      fontSize: 8.5,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      textAlign: h === 'Total' ? 'right' : 'left',
-                    }}
-                  >
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {(hourRows || []).map(({ date, p }) => (
-                <tr key={`${date}-${p.user_id}-row`}>
-                  <td style={cell}>{formatDay(date, { month: 'numeric', day: 'numeric', year: '2-digit' })}</td>
-                  <td style={cell}>
-                    {p.name} <span style={{ fontSize: 8 }}>({CREW_ROLE_LABEL[p.role]})</span>
-                  </td>
-                  <td style={cell}>{p.clock_in ? formatTime(p.clock_in) : ''}</td>
-                  <td style={cell}>{p.clock_out ? formatTime(p.clock_out) : ''}</td>
-                  <td style={cell}>{p.lunch_minutes != null && p.lunch_minutes > 0 ? `${p.lunch_minutes} min` : ''}</td>
-                  <td style={{ ...cell, textAlign: 'right', fontWeight: 700 }}>
-                    {p.hours != null ? p.hours.toFixed(2) : ''}
-                  </td>
-                  {/* Payroll/office writes here after the fact — always blank. */}
-                  <td style={{ ...cell, height: 16 }} />
-                </tr>
-              ))}
-              {Array.from({ length: padRows }).map((_, i) => (
-                <tr key={`pad-${i}`}>
-                  {Array.from({ length: 7 }).map((__, c) => (
-                    <td key={c} style={{ ...cell, height: 18 }} />
-                  ))}
-                </tr>
-              ))}
-              <tr>
-                <td colSpan={5} style={{ ...cell, textAlign: 'right', fontWeight: 800, textTransform: 'uppercase', fontSize: 9 }}>
-                  Total time{data.mode === 'week' ? ' (week)' : ''}
-                </td>
-                <td style={{ ...cell, textAlign: 'right', fontWeight: 900, fontSize: 12 }}>
-                  {data.totals.hours.toFixed(2)}
-                </td>
-                <td style={cell} />
-              </tr>
-            </tbody>
-          </table>
+              {hasAttributed && (
+                <p style={{ fontSize: 8.5, margin: '3px 0 0', lineHeight: 1.35 }}>
+                  † Hours matched to this job from the schedule — the clock card carried no job tag.
+                </p>
+              )}
+              {/* NOT "no clock card was recorded" — that sentence was false on
+                  about ten production person-days and sent payroll hunting for
+                  a card that exists. A blank Total here means the hours could
+                  not be TIED to this job, which covers all three ways it
+                  happens: nothing was clocked at all, the card was tagged to
+                  another job (Aiden 8/04, 9.89 hrs on QA-2026-942182), or the
+                  day was split. The split case gets its own line below, because
+                  it is the one where a card definitely exists. */}
+              {hasScheduledOnly && (
+                <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
+                  ‡ Scheduled on this job; no hours could be tied to it.
+                </p>
+              )}
+              {hasSplit && (
+                <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
+                  § Hours split across jobs that day — the clock card carried no job tag and the
+                  schedule had this person on more than one job.
+                </p>
+              )}
+            </div>
+          </div>
 
           {/* ── "Before You Leave" checklist: REMOVED (founder, Aug 12) ──
               "Before you leave, we don't need that information."
@@ -1120,13 +1175,16 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               The one thing it uniquely surfaced, total footage cut, is already
               on every work line above and in the totals strip below. */}
 
-          {/* ── Totals strip ── */}
+          {/* ── Totals strip ──
+              TOTAL HOURS and TOTAL CUT are NOT here any more. Each is now the
+              closing row of the column it belongs to — hours at the foot of JOB
+              HOURS, footage at the foot of WORK PERFORMED — and a second copy
+              at the bottom of the page is one more number to reconcile when the
+              two ever disagree. What is left is what has no column of its own. */}
           <div
             style={{
               display: 'grid',
-              // Total Cut carries the longest value ("1,240 LF · 12 cores"),
-              // so it gets a wider column instead of wrapping under its label.
-              gridTemplateColumns: '0.8fr 0.8fr 0.9fr 1.6fr 1fr 0.8fr',
+              gridTemplateColumns: '1fr 1fr 1fr 1fr',
               gap: 10,
               marginTop: 6,
               paddingTop: 5,
@@ -1139,21 +1197,6 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
               value={data.totals.subsistence_nights > 0 ? String(data.totals.subsistence_nights) : null}
             />
             <Field label="Night Stayed" value={data.totals.subsistence_nights > 0 ? 'Yes' : null} />
-            <Field label="Total Hours" value={data.totals.hours.toFixed(2)} bold />
-            {/* Total footage cut was the one answer the removed checklist knew.
-                It belongs on the sheet, so it moved here instead of vanishing. */}
-            <Field
-              label="Total Cut"
-              value={
-                [
-                  footage.linearFeet > 0 ? `${footage.linearFeet} LF` : null,
-                  footage.cores > 0 ? `${footage.cores} core${footage.cores === 1 ? '' : 's'}` : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ') || null
-              }
-              bold
-            />
             <Field
               label="Standby Time"
               value={data.totals.standby_hours > 0 ? `${data.totals.standby_hours} hrs` : null}
