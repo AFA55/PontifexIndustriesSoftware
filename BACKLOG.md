@@ -823,3 +823,74 @@ Recommendation: **separate Pontifex identity + a hub that MANAGES companies with
 - [ ] This week (~1.5–2 days, all reversible): `/platform` entrance with no company code · require `expected_tenant_id` server-side (`app/shop-login/page.tsx` never sends it, so that door has no company boundary) · make `logAuditEvent` write `tenant_id` and add an awaited variant.
 - [ ] Note: `docs/plans/IDENTITY_AND_TENANT_ROUTING_PLAN.md` (Jun 2026) designed the org-switcher model and was **never built** — mark superseded in part, keep its Phase 0 schema.
 - [ ] Note: `vercel.json` disables branch deploys twice over, so **there are no preview URLs** — CLAUDE.md is stale on this. Verification happens on localhost.
+
+---
+
+## Change a person's role after their account exists (Aug 18 2026)
+
+**Founder:** *"We need to incorporate a way to be able to switch team members to operators within Team Profiles. I accidentally made Jose a team member instead of an operator and now I can't switch, and we need to make it so I can request and make changes."*
+
+**Verified:** `Jose Mendoza` (`93a6772b-aad3-4bb5-a097-86e1b46a7a6f`) is `role = 'apprentice'` — which the UI labels "Team Member". He should be `operator`. There is no way to change it from Team Profiles.
+
+**Why it matters beyond Jose:** role decides everything downstream — whether he can be assigned as the lead on a job, what the schedule board offers him, which dashboard cards he sees, and whether his hours attribute as operator or helper. A wrong role at signup is permanent today, and the only fix is a developer editing the database.
+
+**Build:**
+- Change a person's role from Team Profiles, rank-guarded (an admin must not be able to promote someone above themselves, and only `super_admin` / `operations_manager` should reach the top roles).
+- Audit-logged: who changed it, from what, to what, when. This is a privilege change.
+- Consider whether a role change needs approval — the founder says *"request and make changes"*, so ask him whether an admin can do it outright or whether it needs a second person.
+
+**Check before building:** what a role change breaks for work already recorded. Jose has timecards and possibly helper logs filed as an apprentice; changing him to operator must not retroactively re-attribute historical hours or alter what a printed ticket said at the time. Decide explicitly whether history keeps the role it was filed under.
+
+**Related:** `user_card_permissions` per-user overrides now work (Aug 18) — a role change and a permission override are different tools and the UI should not confuse them.
+
+---
+
+# Aug 19 2026 — founder brief, broken into tasks
+
+Full context: `docs/plans/AUG19_FOUNDER_BRIEF.md`. Do not start one of these
+without reading that file — each carries verified production numbers.
+
+### P0 — corrupts payroll and invoices, live now
+- [ ] **Split a day's hours at the next job's In Route press.** Verified Aug 19:
+      Conrade clocked 07:03–17:38 (10.09 h, one card) across NC&E and Sterling;
+      the Sterling ticket shows **0.04 h**, which is the daily log's 1m45s open
+      duration, not work. Should be NC&E 07:03→14:05 (7.03 h) and Sterling
+      14:05→17:38 (3.55 h). Axel was on both jobs and needs the same split from
+      his own 9.06 h card. Never derive job hours from a log's open duration —
+      this is the second time that bug has shipped. Build with the clock-cycle
+      model in `BILLABLE_HOURS_AND_SHOP_TICKETS.md`, not separately.
+
+### P1
+- [ ] **Printed timesheets must name the jobs.** Amanda ran payroll off sheets
+      showing times but not jobs. One job → name it; two or three → all of them,
+      with contractor name, job name and job ID. Downstream of the P0 split.
+- [ ] **Personal calendar + reminders for every role.** Future-dated reminders
+      with notes, files and photos; reminds in-app; personal, not the job board.
+      Reuse `sendNotification`; tenant-scoped with SECURITY DEFINER RLS.
+- [ ] **Time off on the schedule board and the weekly timesheet.** Requested off /
+      vacation / called off, PTO or not, dates, notes (why, and when back), so the
+      office does not overbook. **A time-off system already exists** — check
+      `/dashboard/request-time-off` and `/api/admin/time-off` first; this may be
+      surfacing existing data rather than building new.
+- [ ] **Unassign a job without ending it.** Crew comes off, job stays active,
+      reassign later, no side effects on the person. Not everyone uses the app.
+      The Aug 18 live-job guard must ask, not refuse.
+
+### P2
+- [ ] **One completed-ticket design.** The schedule-board route shows more data
+      and the founder prefers it; the Completed Jobs route is missing **Print Work
+      Order** and did not show the sign-off PDFs. Consolidate onto the better one.
+      Same drift that produced two printed-ticket designs.
+- [ ] **Change a person's role** (see the entry above this section — Jose Mendoza,
+      apprentice → operator).
+
+### P3
+- [ ] **Consolidate the founder's two accounts** (`andres@patriotconcretecutting.com`
+      and `andres.altamirano1280@gmail.com` — same person, two phones). Until then
+      `salesman_name` carries both spellings and the PM filter splits his jobs.
+- [ ] **Remove "Super Admin (Demo)" from the PM filter** — it is `salesman_name` on
+      `QA-2026-122769` and `QA-2026-718910`. Two data rows, not a code change.
+
+### Watch, no action yet
+- `JOB-2026-424813`: 28 person-days over 15 dates, runs to 2026-10-02. Crosses 3
+  printed pages ~Sept 6, ~5 by October. Day/week modes handle it.
