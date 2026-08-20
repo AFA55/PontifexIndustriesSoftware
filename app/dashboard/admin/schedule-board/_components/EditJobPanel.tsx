@@ -12,6 +12,7 @@ import type { JobCardData } from './JobCard';
 import { EQUIPMENT_ABBREVIATIONS, getDisplayName } from '@/lib/equipment-map';
 import SkillMatchIndicator from './SkillMatchIndicator';
 import { fetchPrintPdf, openPrintBlob, printFailureAlertText } from '@/lib/print-failure';
+import { OFF_PLATFORM_LEAD_MAX_LENGTH, normalizeOffPlatformLeadName, describeOffPlatformLead } from '@/lib/off-platform-lead';
 
 interface Contact {
   id: string;
@@ -43,7 +44,7 @@ interface EditJobPanelProps {
   busyOperators: Record<string, string>;
   busyHelpers: Record<string, string>;
   operatorSkillMap?: Record<string, number | null>;
-  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; customer_name?: string; location?: string; address?: string; estimated_cost?: number | null; salesman_name?: string; jobsite_conditions?: string; project_manager_id?: string | null }) => void;
+  onSave: (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; newOffPlatformLeadName?: string | null; customer_contact?: string; site_contact_phone?: string; customer_name?: string; location?: string; address?: string; estimated_cost?: number | null; salesman_name?: string; jobsite_conditions?: string; project_manager_id?: string | null }) => void;
   onChangeRequestSuccess?: () => void;
   onClose: () => void;
   onViewNotes: () => void;
@@ -69,6 +70,10 @@ export default function EditJobPanel({
   const [newEquipment, setNewEquipment] = useState('');
   const [selectedOperator, setSelectedOperator] = useState<string>(currentOperatorName || '');
   const [selectedHelper, setSelectedHelper] = useState<string>(currentHelperName || '');
+  // Free-text name of whoever is running a crew that has no Pontifex operator
+  // (founder, Aug 20). Seeded from the board's per-day ledger so re-opening the
+  // panel does not silently blank a name the office already gave.
+  const [offPlatformLead, setOffPlatformLead] = useState<string>(job.off_platform_lead_name || '');
   const [description, setDescription] = useState(job.description || '');
   const [poNumber, setPoNumber] = useState(job.po_number || '');
   const [hasChanges, setHasChanges] = useState(false);
@@ -926,14 +931,51 @@ export default function EditJobPanel({
                           </div>
                         )}
                       </div>
+
+                      {/* WHO IS LEADING A CREW WITH NO PONTIFEX OPERATOR.
+                          This panel has always offered "Unassigned" in the
+                          operator slot, so an office that left it empty and
+                          picked a helper was already making a helper-only crew —
+                          it just had nowhere to say who was actually running it,
+                          and the board then drew the job as unassigned. Shown
+                          only in that state; conditionally RENDERED, never
+                          `hidden={…}` (Tailwind 3.4: `hidden` loses to `block`). */}
+                      {!selectedOperator && selectedHelper && (
+                        <div>
+                          <label className="block text-xs font-semibold text-gray-500 dark:text-white/50 mb-1">
+                            CREW LEAD <span className="text-gray-400 dark:text-white/30 font-normal">(not on Pontifex — optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={offPlatformLead}
+                            onChange={e => { setOffPlatformLead(e.target.value); markChanged(); }}
+                            maxLength={OFF_PLATFORM_LEAD_MAX_LENGTH}
+                            placeholder="Name of the sub or lead on site"
+                            autoComplete="off"
+                            className="w-full px-3 py-2 border border-gray-300 dark:border-white/10 rounded-lg text-base sm:text-sm text-gray-900 dark:text-white bg-white dark:bg-white/[0.05] focus:ring-2 focus:ring-brand/30 focus:border-brand"
+                          />
+                          <p className="text-xs text-gray-500 dark:text-white/40 mt-1">
+                            No operator on this crew — {selectedHelper} gets the ticket and their timecard lands on this job.
+                            {' '}Saving here sets the crew for this date and every remaining day of the job; use Assign on the
+                            board to state a single day.
+                          </p>
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Date:</span><span className="font-medium dark:text-white">{scheduledDate}</span></div>
                       {endDate && <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">End:</span><span className="font-medium dark:text-white">{endDate}</span></div>}
                       {arrivalTime && <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Arrival:</span><span className="font-medium dark:text-white">{arrivalTime}</span></div>}
-                      <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Operator:</span><span className="font-medium dark:text-white">{currentOperatorName || 'Unassigned'}</span></div>
-                      {currentHelperName && <div className="flex justify-between"><span className="text-gray-500 dark:text-white/50">Helper:</span><span className="font-medium dark:text-white">{currentHelperName}</span></div>}
+                      {/* A crew with a helper and no operator is NOT unassigned,
+                          and a reader who cannot edit is exactly the one who
+                          would act on "Unassigned" — chase the office, or hand
+                          the job to somebody else. Say what it actually is. */}
+                      <div className="flex justify-between gap-3"><span className="text-gray-500 dark:text-white/50 flex-shrink-0">Operator:</span><span className="font-medium dark:text-white text-right">{currentOperatorName || (currentHelperName ? 'None — crew led off Pontifex' : 'Unassigned')}</span></div>
+                      {!currentOperatorName && currentHelperName && (
+                        <div className="flex justify-between gap-3"><span className="text-gray-500 dark:text-white/50 flex-shrink-0">Crew lead:</span><span className="font-medium dark:text-white text-right break-words min-w-0">{describeOffPlatformLead(job.off_platform_lead_name)}</span></div>
+                      )}
+                      {currentHelperName && <div className="flex justify-between gap-3"><span className="text-gray-500 dark:text-white/50 flex-shrink-0">Helper:</span><span className="font-medium dark:text-white text-right">{currentHelperName}</span></div>}
                     </div>
                   )}
                 </section>
@@ -1050,6 +1092,10 @@ export default function EditJobPanel({
                   po_number: poNumber || null,
                   newOperatorName: selectedOperator || null,
                   newHelperName: selectedHelper || null,
+                  // Only meaningful on a crew with no operator; the API clears it
+                  // outright whenever an operator is set, so sending it here is
+                  // harmless in the other case.
+                  newOffPlatformLeadName: selectedOperator ? null : normalizeOffPlatformLeadName(offPlatformLead),
                   customer_contact: selectedContact || undefined,
                   site_contact_phone: selectedContactPhone || undefined,
                   customer_name: editedCustomerName || undefined,

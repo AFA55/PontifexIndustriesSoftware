@@ -48,6 +48,11 @@ import {
   summarizeCrewChange,
   type CrewChangeSummary,
 } from '@/lib/crew-assignment';
+import {
+  OFF_PLATFORM_LEAD_COLUMN,
+  isMissingColumnError,
+  resolveOffPlatformLead,
+} from '@/lib/off-platform-lead';
 
 export type ReassignScope = 'day' | 'remaining';
 export type ReassignPosition = 'first' | 'last';
@@ -176,7 +181,13 @@ export function planLedgerSequences(
     const others = othersByDate.get(d) || [];
 
     if (!operatorId) {
-      sequences[d] = own?.day_sequence ?? 1; // unassigned rows keep their slot
+      // Rows with no operator KEEP THE SLOT THEY ALREADY HAD — they do not all
+      // collapse to 1. This covers the helper-only crew as well as the skeleton
+      // row, so two helper-only rows on one day can hold distinct sequences, and
+      // anything that reasons "an operator-less row is always #1" is wrong. (The
+      // sequence landscape above is only gathered per OPERATOR, so there is no
+      // append/shift to do here either way.)
+      sequences[d] = own?.day_sequence ?? 1;
       continue;
     }
     if (!sameOperator && position === 'first' && others.length > 0) {
@@ -253,6 +264,22 @@ export interface ReassignParams {
    * `null` = clear the helper.
    */
   helperId?: string | null;
+  /**
+   * Who is actually LEADING this crew, when that person is not a Pontifex user.
+   *
+   * Founder, Aug 20: helpers are sometimes sent out under a sub, or under someone
+   * not yet onboarded, and until now the office could not place the helper at all
+   * — so that helper's day had no job, their timecard showed nothing, and the
+   * ticket showed nobody. Free text on the ledger row, not a user record; see
+   * lib/off-platform-lead.ts for why.
+   *
+   * Tri-state like the two seats above: `undefined` leaves whatever is stored
+   * alone, `null` clears it, a string sets it. Ignored (forced to null) whenever
+   * an `operatorId` is set — a crew with a Pontifex lead has no off-platform one,
+   * and a stale name left behind on a row that later gained a real operator would
+   * print two leads on one crew.
+   */
+  offPlatformLeadName?: string | null;
   /** YYYY-MM-DD the change anchors on (the board's viewed date). */
   assignmentDate: string;
   scope: ReassignScope;
@@ -292,6 +319,12 @@ export type ReassignResult =
        * incident invisible until the next refetch.
        */
       crew_change: CrewChangeSummary;
+      /**
+       * The off-platform lead stored on the anchor date after this write, or
+       * null. `undefined` when the caller said nothing and we therefore left
+       * whatever was there — the caller must not report that as "cleared".
+       */
+      off_platform_lead_name?: string | null;
     }
   | {
       ok: false;
@@ -318,6 +351,51 @@ async function tenantLocalToday(tenantId: string): Promise<string> {
     /* non-critical — fall back */
   }
   return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+}
+
+/**
+ * IS THIS PERSON ACTUALLY ONE OF OURS?
+ *
+ * `supabaseAdmin` bypasses RLS, and every id in this write path arrives in a
+ * request body. The job is fetched `.eq('tenant_id', tenantId)`, so a foreign JOB
+ * cannot be touched — but until now nothing checked the CREW ids, so a
+ * schedule-board editor could have put another tenant's user on their own job and
+ * that person would have found it on their phone.
+ *
+ * THREE ANSWERS, because "we could not ask" is not "the answer is no". The query
+ * error used to be discarded, so a dropped connection came back looking exactly
+ * like a foreign id and the office was told "That person is not on this
+ * company's crew" about their own operator — an accusation instead of a retry,
+ * and one that sends them looking for a data problem that does not exist.
+ *
+ *   • `{ ok: true, name }`      — the id belongs to this tenant.
+ *   • `{ ok: false, reason: 'foreign' }` — it does not, or does not exist.
+ *   • `{ ok: false, reason: 'unavailable' }` — we could not find out.
+ *
+ * `name` is `null` for "no id was given" and for a tenant member with no
+ * full_name; both are legitimately "nobody to name".
+ */
+type CrewNameLookup =
+  | { ok: true; name: string | null }
+  | { ok: false; reason: 'foreign' | 'unavailable' };
+
+async function tenantProfileName(
+  userId: string | null,
+  tenantId: string
+): Promise<CrewNameLookup> {
+  if (!userId) return { ok: true, name: null };
+  const { data, error } = await supabaseAdmin
+    .from('profiles')
+    .select('full_name')
+    .eq('id', userId)
+    .eq('tenant_id', tenantId)
+    .maybeSingle();
+  if (error) {
+    console.error('reassign: crew tenant check failed:', error);
+    return { ok: false, reason: 'unavailable' };
+  }
+  if (!data) return { ok: false, reason: 'foreign' };
+  return { ok: true, name: data.full_name ?? null };
 }
 
 async function profileName(userId: string | null): Promise<string | null> {
@@ -371,6 +449,11 @@ async function writeLedgerRows(params: {
   helperId: string | null;
   operatorName: string | null;
   helperName: string | null;
+  /**
+   * `undefined` = do not touch the stored value (so a drag that says nothing
+   * about the lead does not erase the name the office typed yesterday).
+   */
+  offPlatformLeadName: string | null | undefined;
   dates: string[];
   position: ReassignPosition;
   tenantId: string;
@@ -379,7 +462,7 @@ async function writeLedgerRows(params: {
   | { sequences: Record<string, number>; anchorOthers: number; previousDayOperatorId: string | null }
   | { error: 'race' | 'failed' }
 > {
-  const { jobOrderId, operatorId, helperId, operatorName, helperName, dates, position, tenantId, actorId } = params;
+  const { jobOrderId, operatorId, helperId, operatorName, helperName, offPlatformLeadName, dates, position, tenantId, actorId } = params;
 
   // The operator's OTHER rows across the scope dates (sequence landscape).
   // Not tenant-filtered on purpose: legacy JDA rows can carry tenant_id NULL
@@ -444,9 +527,55 @@ async function writeLedgerRows(params: {
     updated_at: nowIso,
   }));
 
-  const { error: jdaError } = await supabaseAdmin
+  // THE OFF-PLATFORM LEAD, WHEN THERE IS ONE. The rule itself lives in
+  // `resolveOffPlatformLead` because the response/audit below has to give the
+  // same answer; see that function for the three cases. In short: a name only
+  // survives on a row where a HELPER IS ALONE — an operator on the row clears it
+  // (a crew has one lead) and so does a row left with nobody (that is a skeleton
+  // holding a date open, and a lead left on one would be inherited by whoever is
+  // assigned to it next). Silence about a helper-only crew leaves the stored name
+  // untouched, so a drag or a sequence shuffle cannot erase what the office typed
+  // yesterday.
+  //
+  // NOTE ON SCOPE (and it is deliberate): this is written to EVERY date in
+  // `dates`, not just the anchor. The column is per-DAY, and the assign modal
+  // states one day at a time (scope 'day'), so Monday's lead and Thursday's can
+  // genuinely differ. But the lead is part of a crew statement, never a field of
+  // its own — an edit made at scope 'remaining' moves the operator and helper
+  // seats for every remaining date, and the lead travels with them. A lead
+  // written for one day while the crew moved for four would print a named lead on
+  // Monday and "Lead not on Pontifex" on the rest of the same crew's week.
+  const leadValue: string | null | undefined = resolveOffPlatformLead({
+    operatorId,
+    helperId,
+    requested: offPlatformLeadName,
+  });
+
+  const withLead =
+    leadValue === undefined
+      ? rows
+      : rows.map((r) => ({ ...r, [OFF_PLATFORM_LEAD_COLUMN]: leadValue }));
+
+  let { error: jdaError } = await supabaseAdmin
     .from('job_daily_assignments')
-    .upsert(rows, { onConflict: 'job_order_id,assignment_date' });
+    .upsert(withLead, { onConflict: 'job_order_id,assignment_date' });
+
+  // THE MIGRATION MAY NOT BE APPLIED YET. It is written but the founder applies
+  // schema changes by hand, so the code has to survive the window in between.
+  // Losing the lead's NAME in that window is a small, visible degradation; losing
+  // the ASSIGNMENT would mean the office pressed assign and nothing happened,
+  // which is the exact failure this whole change exists to end. Retry the write
+  // without the column, once.
+  if (jdaError && withLead !== rows && isMissingColumnError(jdaError)) {
+    console.warn(
+      `reassign: ${OFF_PLATFORM_LEAD_COLUMN} is not in the schema yet — ` +
+        'writing the assignment without the lead name. Apply ' +
+        'supabase/migrations/20260820_off_platform_lead_name.sql.'
+    );
+    ({ error: jdaError } = await supabaseAdmin
+      .from('job_daily_assignments')
+      .upsert(rows, { onConflict: 'job_order_id,assignment_date' }));
+  }
 
   if (jdaError) {
     console.error('reassign: JDA upsert failed:', jdaError);
@@ -509,14 +638,26 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
     ? (anchorRow.helper_id ?? null)
     : (job.helper_assigned_to ?? null);
 
-  // undefined helper = preserve the job's current helper (reorder drag path).
-  const helperId = params.helperId === undefined ? (job.helper_assigned_to ?? null) : params.helperId;
+  // undefined = preserve whoever is already on it, in BOTH seats. "Whoever" is
+  // the anchor date's ledger row when one exists — that is the crew the board is
+  // showing for this date — and the job's own seat otherwise.
+  //
+  // THE HELPER USED TO READ `job.helper_assigned_to` DIRECTLY, and the comment
+  // beside the operator warned why that is wrong without noticing the seat right
+  // next to it did it. 39 of 111 production ledger rows disagree with their job's
+  // helper seat. So any write that omitted the helper — a reorder drag, or an
+  // edit that only meant to change a PO number — rewrote the day's helper from a
+  // job-level column: it undid a day-override, and on a helper-only crew (where
+  // the helper IS the crew) it took the helper off the job entirely, which is the
+  // failure this whole feature exists to end.
+  //
+  // The ledger is already the authority for this everywhere else: `lib/dispatch.ts`
+  // promotes the day's `helper_id` — including a null one — into
+  // `job_orders.helper_assigned_to` every morning. This makes the reassign path
+  // agree instead of fighting it for the rest of the day.
+  const helperId: string | null =
+    params.helperId === undefined ? presentHelperId : params.helperId;
 
-  // undefined OPERATOR = preserve whoever is already on it. "Whoever" is the
-  // anchor date's ledger row when one exists — that is the person the board is
-  // showing for this date — and the job's lead otherwise. Reading the job's
-  // lead alone would quietly promote a day-override back to the lead on a
-  // helper-only edit.
   const operatorId: string | null =
     params.operatorId === undefined ? presentOperatorId : params.operatorId;
 
@@ -562,11 +703,36 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
 
   const dates = expandScopeDates(scope, assignmentDate, job.end_date, job.is_multi_day === true);
 
-  // 2. Names for the JDA ledger rows.
-  const [operatorName, helperName] = await Promise.all([
-    profileName(operatorId),
-    profileName(helperId),
+  // 2. Names for the JDA ledger rows — and the tenant check on the crew ids,
+  //    which is the same query, so it costs nothing extra. See
+  //    `tenantProfileName`: the job is already tenant-scoped, the PEOPLE were not.
+  const [operatorLookup, helperLookup] = await Promise.all([
+    tenantProfileName(operatorId, tenantId),
+    tenantProfileName(helperId, tenantId),
   ]);
+  if (!operatorLookup.ok || !helperLookup.ok) {
+    const unavailable =
+      (!operatorLookup.ok && operatorLookup.reason === 'unavailable') ||
+      (!helperLookup.ok && helperLookup.reason === 'unavailable');
+    // A lookup we could not perform is OUR failure, and must read as one.
+    if (unavailable) {
+      return {
+        ok: false,
+        status: 503,
+        error: 'Could not verify the crew right now.',
+        details: 'The crew list could not be read. Nothing was changed — try again in a moment.',
+      };
+    }
+    return {
+      ok: false,
+      status: 400,
+      error: 'That person is not on this company’s crew.',
+      details:
+        'The operator or helper could not be found in this tenant. Refresh the board and pick from the crew list.',
+    };
+  }
+  const operatorName = operatorLookup.name;
+  const helperName = helperLookup.name;
 
   // 3. Write the per-day ledger (sequence-aware). One retry on a sequence
   //    race — two admins assigning the same operator at the same instant can
@@ -580,6 +746,7 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
       helperId,
       operatorName,
       helperName,
+      offPlatformLeadName: params.offPlatformLeadName,
       dates,
       position,
       tenantId,
@@ -717,6 +884,14 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   const whenLabel = scopeLabel(scope, assignmentDate, dates);
   const anchorSequence = ledger.sequences[assignmentDate] ?? 1;
   const anchorDayJobCount = ledger.anchorOthers + 1;
+  // The SAME call writeLedgerRows made, so what we report is what we wrote.
+  // `undefined` means we left the stored name alone and the caller must not
+  // report it as removed.
+  const effectiveLead: string | null | undefined = resolveOffPlatformLead({
+    operatorId,
+    helperId,
+    requested: params.offPlatformLeadName,
+  });
 
   // Audit
   logAuditEvent({
@@ -736,6 +911,9 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
       dates,
       sequences: ledger.sequences,
       jobNumber: job.job_number,
+      // A crew placed with no Pontifex lead is exactly the thing a reader of
+      // this log would otherwise mistake for a half-finished assignment.
+      ...(effectiveLead !== undefined ? { offPlatformLeadName: effectiveLead } : {}),
     },
     request,
   });
@@ -772,6 +950,12 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
         }
         if (operatorId && anchorDayJobCount > 1) {
           lines.push(`Sequenced as ${operatorName || 'operator'}'s ${ordinal(anchorSequence)} job of the day.`);
+        }
+        // Say WHY there is no operator, in the job's own history. Without this
+        // the change log reads "Operator: Conrade Richardson → (unassigned)",
+        // which is indistinguishable from someone being taken off by mistake.
+        if (!operatorId && effectiveLead) {
+          lines.push(`Crew runs under ${effectiveLead}, who is not on Pontifex (${whenLabel}).`);
         }
         await supabaseAdmin.from('job_notes').insert({
           job_order_id: jobOrderId,
@@ -930,5 +1114,6 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
       { operatorId: prevOperatorId, helperId: prevHelperId },
       { operatorId, helperId }
     ),
+    ...(effectiveLead !== undefined ? { off_platform_lead_name: effectiveLead } : {}),
   };
 }

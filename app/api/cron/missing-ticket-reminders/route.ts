@@ -13,9 +13,21 @@ export const dynamic = 'force-dynamic';
  * count. Aiden lost Aug 4 on Parkk the same way. Nothing told either of them.
  *
  * The rule for "he missed one" is in lib/missing-ticket.ts and is unit-tested:
- * the office placed him as LEAD, he actually clocked in, and no daily log
- * exists for that person on that job on that date. All three — a placement on
- * its own is a plan, not attendance.
+ * the office placed him, he actually clocked in, and nothing was filed for that
+ * person on that job on that date. All three — a placement on its own is a plan,
+ * not attendance.
+ *
+ * WHO IS "HIM". Normally the LEAD OPERATOR: on a crew that has a lead, the lead
+ * completes the ticket and the helper is blocked from day-complete by design, so
+ * chasing the helper asks for something they cannot do.
+ *
+ * The exception is a crew placed with a HELPER AND NO OPERATOR (founder, Aug 20:
+ * crews sometimes run under a sub who is not on Pontifex). There the helper is
+ * the only Pontifex person on the job — they get the ticket, their day lands on
+ * it, and they file a `helper_work_logs` row. Nobody else is going to. This
+ * sweep used to filter those rows out at the query (`.not(operator_id, is,
+ * null)`), so the one crew shape with no lead to fall back on was the one shape
+ * never chased. It found seven unsubmitted tickets in its first live week.
  *
  * Authorization: Bearer ${CRON_SECRET}  (fail-closed if env var unset)
  */
@@ -32,6 +44,7 @@ import {
   MISSING_TICKET_TIME,
 } from '@/lib/missing-ticket';
 import { dayName } from '@/lib/dates';
+import { isHelperLogHandled } from '@/lib/unfinished-tickets';
 
 /**
  * Only OPEN jobs are chased.
@@ -90,19 +103,39 @@ export async function GET(request: NextRequest) {
       const startYMD = ymd(start);
       const endYMD = ymd(end);
 
-      // 1. Every named LEAD placement in the window, for this tenant.
+      // 1. Every placement in the window that put SOMEBODY on a job, for this
+      //    tenant. Both seats, because a helper-only crew has no lead to chase.
+      //    A row with neither is a skeleton holding a date open and owes nothing.
       const { data: placements } = await supabaseAdmin
         .from('job_daily_assignments')
-        .select('job_order_id, operator_id, assignment_date')
+        .select('job_order_id, operator_id, helper_id, assignment_date')
         .eq('tenant_id', tenant.id)
         .gte('assignment_date', startYMD)
         .lte('assignment_date', endYMD)
-        .not('operator_id', 'is', null);
+        .or('operator_id.not.is.null,helper_id.not.is.null');
 
-      const rows = (placements as Array<{
-        job_order_id: string; operator_id: string | null; assignment_date: string;
+      const placementRows = (placements as Array<{
+        job_order_id: string; operator_id: string | null; helper_id: string | null; assignment_date: string;
       }>) ?? [];
-      if (rows.length === 0) continue;
+      if (placementRows.length === 0) continue;
+
+      // WHO OWES EACH DAY. The lead when the row has one; the helper only when it
+      // does not. `findMissedTickets` asks about one person per row, so the owner
+      // is resolved here and handed to it in the `operator_id` position — the
+      // module's rule (placed + clocked in + nothing filed) is identical for both
+      // seats, and the paperwork each one owes is what differs.
+      const rows = placementRows.map((r) => ({
+        job_order_id: r.job_order_id,
+        operator_id: r.operator_id ?? r.helper_id ?? null,
+        assignment_date: r.assignment_date,
+      }));
+      // "jobId|userId|date" for the days owed by a HELPER, so the chase reads
+      // their helper log rather than an operator ticket they never had.
+      const helperOwed = new Set(
+        placementRows
+          .filter((r) => !r.operator_id && r.helper_id)
+          .map((r) => `${r.job_order_id}|${r.helper_id}|${r.assignment_date}`)
+      );
 
       const userIds = Array.from(new Set(rows.map((r) => r.operator_id).filter(Boolean) as string[]));
       const jobIds = Array.from(new Set(rows.map((r) => r.job_order_id).filter(Boolean)));
@@ -110,7 +143,7 @@ export async function GET(request: NextRequest) {
 
       // 2. Who was actually on the clock, 3. what has already been filed,
       // 4. which of these jobs are still worth chasing.
-      const [{ data: cards }, { data: logs }, { data: jobRows }] = await Promise.all([
+      const [{ data: cards }, { data: logs }, { data: helperLogs }, { data: jobRows }] = await Promise.all([
         supabaseAdmin
           .from('timecards')
           .select('user_id, date, clock_in_time')
@@ -119,6 +152,17 @@ export async function GET(request: NextRequest) {
         supabaseAdmin
           .from('daily_job_logs')
           .select('job_order_id, operator_id, log_date')
+          .in('job_order_id', jobIds)
+          .in('log_date', dates),
+        // The helper side of "already filed". Only consulted for helper-owed
+        // days, and a bare "start" row does NOT count — /api/helper-work-log
+        // inserts one with an EMPTY description the moment a helper presses
+        // start, so treating its existence as filed would silence the chase for
+        // every helper who opened the form and walked away. Same predicate the
+        // clock-out gate uses (`isHelperLogHandled`).
+        supabaseAdmin
+          .from('helper_work_logs')
+          .select('job_order_id, helper_id, log_date, completed_at, work_description')
           .in('job_order_id', jobIds)
           .in('log_date', dates),
         supabaseAdmin
@@ -136,6 +180,13 @@ export async function GET(request: NextRequest) {
         ((logs as Array<{ job_order_id: string; operator_id: string; log_date: string }>) ?? [])
           .map((l) => `${l.job_order_id}|${l.operator_id}|${l.log_date}`)
       );
+      for (const h of ((helperLogs as Array<{
+        job_order_id: string; helper_id: string; log_date: string;
+        completed_at: string | null; work_description: string | null;
+      }>) ?? [])) {
+        if (!isHelperLogHandled(h)) continue;
+        filed.add(`${h.job_order_id}|${h.helper_id}|${h.log_date}`);
+      }
 
       const jobs = new Map<string, { job_number: string | null; customer_name: string | null }>();
       const chaseable = new Set<string>();
@@ -160,7 +211,19 @@ export async function GET(request: NextRequest) {
       );
 
       for (const m of missed) {
-        const { title, message } = missedTicketMessage(m, dayName(m.date));
+        // A helper is asked for the thing a helper actually files. Sending them
+        // "your ticket is still open" points at a form they do not have — they
+        // see the helper view and file a work log.
+        const isHelperDay = helperOwed.has(`${m.jobOrderId}|${m.userId}|${m.date}`);
+        const day = dayName(m.date);
+        const { title, message } = isHelperDay
+          ? {
+              title: `${day}'s work log is still open`,
+              message:
+                `You worked ${m.customerName || m.jobNumber || 'a job'} on ${day} and your work log was ` +
+                `never submitted. Open it and finish it so the day is on record.`,
+            }
+          : missedTicketMessage(m, day);
         const res = await sendReminderOnce(`missing_ticket:${m.jobOrderId}:${m.date}`, {
           userId: m.userId,
           tenantId: tenant.id,
@@ -171,7 +234,11 @@ export async function GET(request: NextRequest) {
           jobOrderId: m.jobOrderId,
           // Deep link carries the DATE so the backfill opens on the right day
           // rather than on today — the whole point is that the day is not today.
-          actionUrl: `/dashboard/job-schedule/${m.jobOrderId}/work-performed?date=${m.date}`,
+          // A helper is sent to their own job page, where HelperWorkLog renders;
+          // the operator's work-performed form is not theirs to open.
+          actionUrl: isHelperDay
+            ? `/dashboard/my-jobs/${m.jobOrderId}`
+            : `/dashboard/job-schedule/${m.jobOrderId}/work-performed?date=${m.date}`,
           smsPhone: phoneMap.get(m.userId) ?? null,
         });
         if (res) {

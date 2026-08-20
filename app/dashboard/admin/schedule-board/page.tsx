@@ -30,7 +30,7 @@ import UnassignedSection from './_components/UnassignedSection';
 import BoardLoadingSkeleton from './_components/BoardLoadingSkeleton';
 import NextAvailableBanner from './_components/NextAvailableBanner';
 import { OPERATOR_COLORS, SALESMEN } from './_components/constants';
-import { parseLocalDate, toDateString, formatDisplayDate, daysAgo, apiFetch, toJobCard } from './_components/helpers';
+import { parseLocalDate, toDateString, formatDisplayDate, daysAgo, apiFetch, toJobCard, editCrewChanges } from './_components/helpers';
 import type { ConflictData, RowChangeConflict } from './_components/types';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { fetchPrintPdf, openPrintBlob } from '@/lib/print-failure';
@@ -118,10 +118,25 @@ export default function ScheduleBoardPage() {
   const [rowNotesMap, setRowNotesMap] = useState<Record<string, string>>({}); // operatorId → note text
 
   // ═══ ROW ASSIGNMENTS — who's in which crew row (driven by capacityMaxSlots) ═══
-  const [rowAssignments, setRowAssignments] = useState<{ operator: string | null; helper: string | null }[]>(
-    Array.from({ length: 8 }, () => ({ operator: null, helper: null }))
-  );
-  const NUM_ROWS = capacityMaxSlots;
+  //
+  // `offPlatformLead` is ADDITIVE and optional on purpose: ~30 call sites read
+  // `.operator` / `.helper` and every one of them keeps working untouched. It is
+  // set only on a row whose operator seat is empty because the crew's lead is not
+  // a Pontifex user (founder, Aug 20) — never on a row that simply has nobody in
+  // it yet, so an empty row and an off-platform crew stay two different things.
+  const [rowAssignments, setRowAssignments] = useState<
+    { operator: string | null; helper: string | null; offPlatformLead?: string | null }[]
+  >(Array.from({ length: 8 }, () => ({ operator: null, helper: null })));
+  // THE BOARD MUST DRAW EVERY CREW IT BUILT, capacity or not.
+  //
+  // Each helper-only crew now takes a whole row of its own (they used to collapse
+  // into the single "Unassigned" row), so the number of crews on a day can exceed
+  // the capacity setting — and the board rendered `capacityMaxSlots` rows and
+  // nothing else. The tail rows, and every job on them, simply were not drawn:
+  // not on the board, not in Unassigned, nowhere. Lower the capacity on a busy
+  // day and crews disappear. Capacity is a planning number ("how many crews can
+  // we field"), never a limit on what the day actually contains.
+  const NUM_ROWS = Math.max(capacityMaxSlots, rowAssignments.length);
 
   // ═══ UI STATE ═══
   const [showPendingQueue, setShowPendingQueue] = useState(false);
@@ -647,22 +662,63 @@ export default function ScheduleBoardPage() {
       }));
       const willCall = (json.data?.willCall || []).map((j: any) => toJobCard(j, date));
 
-      // Group assigned jobs by operator name into rows
-      const newRows: { operator: string | null; helper: string | null }[] = [];
+      // ── Group assigned jobs into crew rows ────────────────────────────────
+      //
+      // A row used to BE an operator: the key was `operator_name`, and anything
+      // without one collapsed into a single row literally labelled "Unassigned".
+      // That is the second half of why a helper could not be placed — even once
+      // the API stopped filing helper-only jobs under unassigned, they would all
+      // have merged into one nonsense row.
+      //
+      // A row is a CREW. When there is no Pontifex operator the crew is keyed on
+      // its helper, so that helper's two jobs that day share one row exactly as an
+      // operator's two do, and two different helpers never merge. The lead's name
+      // (free text, may be absent) rides on the row for display only — it is
+      // NEVER a key, and never goes near `resolveCrewId`. A name that cannot be
+      // resolved to an id being treated as crew state is the Aug 18 incident.
+      const newRows: { operator: string | null; helper: string | null; offPlatformLead?: string | null }[] = [];
       const newJobsByOp: Record<number, JobCardData[]> = {};
-      const operatorGrouped = new Map<string, { jobs: JobCardData[]; helperName: string | null }>();
+      const crewGrouped = new Map<
+        string,
+        { jobs: JobCardData[]; operatorName: string | null; helperName: string | null; lead: string | null }
+      >();
 
       for (const rawJob of json.data?.assigned || []) {
-        const opName = rawJob.operator_name || 'Unassigned';
-        if (!operatorGrouped.has(opName)) {
-          operatorGrouped.set(opName, { jobs: [], helperName: rawJob.helper_name || null });
+        // "Is there an operator" is the ID, not the name. A job WITH a lead whose
+        // name failed to resolve keeps its old label ("Unassigned") and its old
+        // behaviour — it must not be redrawn as an off-platform crew, which would
+        // state something about the job that is not true.
+        const hasOperator = !!rawJob.assigned_to;
+        const opName: string | null = hasOperator ? (rawJob.operator_name || 'Unassigned') : null;
+        const helperName: string | null = rawJob.helper_name || null;
+        // Keys are namespaced so an operator called "Marcus" and a helper called
+        // "Marcus" cannot land on the same row. The job id is the last resort for
+        // a crew we can name neither half of — one row each beats one merged row.
+        const key = opName ? `op:${opName}` : helperName ? `helper:${helperName}` : `job:${rawJob.id}`;
+        if (!crewGrouped.has(key)) {
+          crewGrouped.set(key, {
+            jobs: [],
+            operatorName: opName,
+            helperName,
+            lead: opName ? null : rawJob.off_platform_lead_name || null,
+          });
         }
-        operatorGrouped.get(opName)!.jobs.push(toJobCard(rawJob, date));
+        const group = crewGrouped.get(key)!;
+        // First named lead wins; a later job on the same crew that nobody named
+        // must not blank one the office did name.
+        if (!group.lead && !opName && rawJob.off_platform_lead_name) {
+          group.lead = rawJob.off_platform_lead_name;
+        }
+        group.jobs.push(toJobCard(rawJob, date));
       }
 
       let rowIdx = 0;
-      operatorGrouped.forEach((group, opName) => {
-        newRows.push({ operator: opName, helper: group.helperName });
+      crewGrouped.forEach((group) => {
+        newRows.push({
+          operator: group.operatorName,
+          helper: group.helperName,
+          offPlatformLead: group.operatorName ? null : group.lead,
+        });
         newJobsByOp[rowIdx] = group.jobs;
         rowIdx++;
       });
@@ -1282,8 +1338,12 @@ export default function ScheduleBoardPage() {
     return -1;
   };
 
-  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string, position?: 'first' | 'last') => {
-    const operatorName = explicitOperatorName ?? rowAssignments[rowIndex]?.operator;
+  const proceedWithAssignment = async (rowIndex: number, job: JobCardData, source: 'unassigned' | 'willcall', helperName: string | null, explicitOperatorName?: string | null, position?: 'first' | 'last', offPlatformLeadName?: string | null) => {
+    // `??` would have collapsed an explicit `null` ("this crew has no Pontifex
+    // operator") back into "read it off the row" — the same two-states-in-one
+    // mistake that took three crews off live jobs on Aug 18.
+    const operatorName =
+      explicitOperatorName !== undefined ? explicitOperatorName : rowAssignments[rowIndex]?.operator;
     const operatorId = operatorName ? resolveCrewId(crewNameIndex, operatorName) : null;
     const helperId = helperName ? resolveCrewId(crewNameIndex, helperName) : null;
 
@@ -1292,13 +1352,33 @@ export default function ScheduleBoardPage() {
       addToast('error', 'Assignment Failed', `Operator "${operatorName}" not found in crew roster. Please refresh the page.`);
       return;
     }
+    // Same rule for the helper seat, and it matters MORE on a helper-only crew:
+    // there, an unresolvable helper would send `operatorId: null, helperId: null`
+    // — a skeleton row that places nobody, dressed up as an assignment.
+    if (!helperId && helperName) {
+      addToast('error', 'Assignment Failed', `Helper "${helperName}" isn't in the crew roster. Please refresh the page.`);
+      return;
+    }
+    if (!operatorId && !helperId) {
+      addToast('error', 'Assignment Failed', 'Pick an operator or a helper — a job cannot be assigned to nobody.');
+      return;
+    }
 
     let daySequence: number | null = null;
     let dayJobCount = 1;
     try {
       const res = await apiFetch('/api/admin/schedule-board/assign', {
         method: 'POST',
-        body: JSON.stringify({ jobOrderId: job.id, operatorId, helperId, assignment_date: selectedDate, position: position || 'last' }),
+        body: JSON.stringify({
+          jobOrderId: job.id,
+          operatorId,
+          helperId,
+          // Only sent when the office actually answered the question. Omitting
+          // the key leaves whatever is stored alone (see the API's tri-state).
+          ...(offPlatformLeadName !== undefined ? { offPlatformLeadName } : {}),
+          assignment_date: selectedDate,
+          position: position || 'last',
+        }),
       });
       if (!res.ok) {
         const errJson = await res.json().catch(() => null);
@@ -1331,21 +1411,86 @@ export default function ScheduleBoardPage() {
       [rowIndex]: [...(prev[rowIndex] || []), assignedJob],
     }));
 
-    const opName = operatorName || 'Operator';
-    addToast(
-      'success',
-      `${job.customer_name} → ${opName}`,
-      dayJobCount > 1 && daySequence
-        ? `Assigned as ${opName}'s #${daySequence} job that day — starts after the earlier one is completed`
-        : 'Operator assigned successfully'
-    );
+    // A helper-only crew is announced as what it is. Saying "Operator assigned"
+    // — or worse, naming a lead who is not on the platform as though they were —
+    // is how the office would stop trusting the board.
+    if (!operatorId && helperName) {
+      addToast(
+        'success',
+        `${job.customer_name} → ${helperName}`,
+        offPlatformLeadName
+          ? `Assigned as helper — crew runs under ${offPlatformLeadName}, who is not on Pontifex`
+          : 'Assigned as helper — no Pontifex operator on this crew'
+      );
+    } else {
+      const opName = operatorName || 'Operator';
+      addToast(
+        'success',
+        `${job.customer_name} → ${opName}`,
+        dayJobCount > 1 && daySequence
+          ? `Assigned as ${opName}'s #${daySequence} job that day — starts after the earlier one is completed`
+          : 'Operator assigned successfully'
+      );
+    }
     // Refetch so sequence badges + per-day ledger state show correctly.
     fetchScheduleData(selectedDate);
   };
 
-  const handleAssignOperator = (operatorName: string, helperName: string | null) => {
+  const handleAssignOperator = (
+    operatorName: string | null,
+    helperName: string | null,
+    offPlatformLeadName?: string | null
+  ) => {
     if (!assignTarget) return;
     const { job, source } = assignTarget;
+
+    // ── NO PONTIFEX OPERATOR ON THIS CREW (founder, Aug 20) ─────────────────
+    // The helper IS the crew, so the row is theirs. Handled before the operator
+    // machinery below because every bit of it — `findRowForOperator`, the
+    // busy-operator conflict prompt, the row relabel — is keyed on an operator
+    // name that does not exist here. Nothing is written optimistically: the write
+    // happens, then `fetchScheduleData` inside `proceedWithAssignment` redraws the
+    // row from the ledger, which is the only place that knows the truth.
+    if (!operatorName) {
+      if (!helperName) {
+        addToast('error', 'Assignment Failed', 'Pick the helper who is going — this job would be assigned to nobody.');
+        setAssignTarget(null);
+        return;
+      }
+      // This helper's existing operator-less row (their 2nd job of the day lands
+      // beside their 1st, exactly as an operator's would), else the first row
+      // that is genuinely empty.
+      let targetRow = -1;
+      for (let i = 0; i < NUM_ROWS; i++) {
+        const r = rowAssignments[i];
+        if (r && !r.operator && r.helper === helperName && (operatorJobs[i] || []).length > 0) {
+          targetRow = i;
+          break;
+        }
+      }
+      if (targetRow === -1) {
+        for (let i = 0; i < NUM_ROWS; i++) {
+          const r = rowAssignments[i];
+          if (r && !r.operator && !r.helper && (operatorJobs[i] || []).length === 0) {
+            targetRow = i;
+            break;
+          }
+        }
+      }
+      if (targetRow === -1) {
+        addToast('error', 'No Available Rows', 'All crew rows are full — remove a job first');
+        setAssignTarget(null);
+        return;
+      }
+      setRowAssignments(prev => prev.map((r, i) =>
+        i === targetRow ? { operator: null, helper: helperName, offPlatformLead: offPlatformLeadName ?? null } : r
+      ));
+      // `null`, not `undefined` — undefined means "read the row's operator",
+      // and this crew explicitly has none.
+      proceedWithAssignment(targetRow, job, source, helperName, null, 'last', offPlatformLeadName ?? null);
+      setAssignTarget(null);
+      return;
+    }
 
     const targetRow = findRowForOperator(operatorName);
     if (targetRow === -1) {
@@ -1401,15 +1546,17 @@ export default function ScheduleBoardPage() {
   };
 
   // --- Edit Job: Save ---
-  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number | null; jobsite_conditions?: string; project_manager_id?: string | null }) => {
+  const handleEditSave = async (updates: Partial<JobCardData> & { newOperatorName?: string | null; newHelperName?: string | null; newOffPlatformLeadName?: string | null; customer_contact?: string; site_contact_phone?: string; estimated_cost?: number | null; jobsite_conditions?: string; project_manager_id?: string | null }) => {
     if (!editTarget) return;
     const { job, rowIndex: currentRowIdx } = editTarget;
     const newOpName = updates.newOperatorName;
     const newHelperName = updates.newHelperName;
+    const newLeadName = updates.newOffPlatformLeadName;
 
     const jobUpdates = { ...updates };
     delete (jobUpdates as any).newOperatorName;
     delete (jobUpdates as any).newHelperName;
+    delete (jobUpdates as any).newOffPlatformLeadName;
 
     const apiPayload: Record<string, unknown> = {};
     if (jobUpdates.arrival_time !== undefined) apiPayload.arrival_time = jobUpdates.arrival_time;
@@ -1427,10 +1574,21 @@ export default function ScheduleBoardPage() {
     if (updates.jobsite_conditions !== undefined) apiPayload.jobsite_conditions = updates.jobsite_conditions;
     if (updates.project_manager_id !== undefined) apiPayload.project_manager_id = updates.project_manager_id;
 
-    const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator : null;
-    const currentHelper = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.helper : null;
-    const operatorChanged = newOpName !== undefined && newOpName !== currentOp;
-    const helperChanged = newHelperName !== undefined && newHelperName !== currentHelper;
+    const currentOp = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.operator ?? null : null;
+    const currentHelper = currentRowIdx !== null ? rowAssignments[currentRowIdx]?.helper ?? null : null;
+    // COMPARE EACH SEAT WITH THE SOURCE THE PANEL SEEDED IT FROM. The lead's
+    // "before" is the JOB's per-day lead — the same value EditJobPanel puts in
+    // the field — never the ROW's, which is the first named lead among all that
+    // row's jobs and is `"Mike Sanchez"` for a second job nobody named. See
+    // `editCrewChanges` for the wipe that mismatch caused.
+    const { operatorChanged, helperChanged, leadChanged, crewWriteNeeded } = editCrewChanges({
+      currentOperatorName: currentOp,
+      currentHelperName: currentHelper,
+      currentLeadName: job.off_platform_lead_name ?? null,
+      newOperatorName: newOpName,
+      newHelperName,
+      newLeadName,
+    });
 
     try {
       const res = await apiFetch(`/api/admin/job-orders/${job.id}`, {
@@ -1454,7 +1612,7 @@ export default function ScheduleBoardPage() {
     // reassignment (/assign, scope 'remaining' = this date forward). The old
     // PATCH-assigned_to route was masked by the per-day ledger overlay on the
     // board GET, so the edit looked like it reverted.
-    if (operatorChanged || helperChanged) {
+    if (crewWriteNeeded) {
       const explicitUnassign = operatorChanged && !newOpName;
       const newOperatorId = newOpName ? resolveCrewId(crewNameIndex, newOpName) : null;
       const newHelperId = newHelperName ? resolveCrewId(crewNameIndex, newHelperName) : null;
@@ -1482,6 +1640,8 @@ export default function ScheduleBoardPage() {
       const crewFields: Record<string, string | null> = {};
       if (operatorChanged) crewFields.operatorId = explicitUnassign ? null : newOperatorId;
       if (helperChanged) crewFields.helperId = newHelperName ? newHelperId : null;
+      // Same rule, third field: omitted means "leave the stored name alone".
+      if (leadChanged) crewFields.offPlatformLeadName = newLeadName ?? null;
 
       // Anchor on the board's viewed date when the job spans it, otherwise the
       // job's (possibly just-edited) start date.
@@ -1543,6 +1703,19 @@ export default function ScheduleBoardPage() {
           }));
           addToast('success', 'Job Updated', `${job.customer_name} moved to ${newOpName}`);
         }
+      } else if (newHelperName) {
+        // OPERATOR CLEARED BUT A HELPER STAYS = a crew, not an empty job. The
+        // optimistic move below used to dump it in the unassigned pile and say
+        // so, which is the report the office read as "it didn't work". The
+        // refetch at the end redraws the real row; this only has to not lie in
+        // the meantime.
+        addToast(
+          'success',
+          'Job Updated',
+          newLeadName
+            ? `${job.customer_name} — ${newHelperName} on it, crew runs under ${newLeadName} (not on Pontifex)`
+            : `${job.customer_name} — ${newHelperName} on it, no Pontifex operator`
+        );
       } else {
         const updatedJob = { ...job, ...jobUpdates, helper_names: [] };
         setUnassignedJobs(prev => [...prev, updatedJob]);
@@ -2087,7 +2260,10 @@ export default function ScheduleBoardPage() {
       } else {
         addToast('success', `Row → ${newOperator}`, `${rowJobs.length} job${rowJobs.length > 1 ? 's' : ''} reassigned for ${formatDisplayDate(selectedDate)}`);
       }
-      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, operator: newOperator } : r));
+      // A real operator on the crew means there is no off-platform lead — the
+      // API clears the stored name for the same reason, and the row must not go
+      // on showing it until the refetch lands.
+      setRowAssignments(prev => prev.map((r, i) => i === rowIndex ? { ...r, operator: newOperator, offPlatformLead: null } : r));
       // Refetch so the board reflects the DB (and any partial failures revert).
       fetchScheduleData(selectedDate);
       return;
@@ -2396,6 +2572,7 @@ export default function ScheduleBoardPage() {
                 rowIndex={idx}
                 operatorName={rowAssignments[idx]?.operator ?? null}
                 helperName={rowAssignments[idx]?.helper ?? null}
+                offPlatformLeadName={rowAssignments[idx]?.offPlatformLead ?? null}
                 jobs={operatorJobs[idx] || []}
                 colorScheme={OPERATOR_COLORS[idx % OPERATOR_COLORS.length]}
                 canEdit={canEdit}

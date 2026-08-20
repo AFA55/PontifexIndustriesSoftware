@@ -12,6 +12,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { jobRunsOn } from '@/lib/job-workdays';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { OFF_PLATFORM_LEAD_COLUMN, isMissingColumnError, placesSomeone } from '@/lib/off-platform-lead';
 
 export async function GET(request: NextRequest) {
   try {
@@ -86,12 +87,32 @@ export async function GET(request: NextRequest) {
     // This ensures multi-day jobs show the operator assigned to THAT specific day,
     // not the job_orders.assigned_to which reflects the first-ever assignment.
     if (date && jobs && jobs.length > 0) {
-      let dailyQuery = supabaseAdmin
-        .from('job_daily_assignments')
-        .select('job_order_id, operator_id, helper_id, operator_name, helper_name, day_sequence')
-        .eq('assignment_date', date);
-      if (tenantId) { dailyQuery = dailyQuery.eq('tenant_id', tenantId); }
-      const { data: dailyAssignments } = await dailyQuery;
+      const OVERLAY_COLUMNS = 'job_order_id, operator_id, helper_id, operator_name, helper_name, day_sequence';
+      const dailyFor = (columns: string) => {
+        let q = supabaseAdmin
+          .from('job_daily_assignments')
+          .select(columns)
+          .eq('assignment_date', date);
+        if (tenantId) { q = q.eq('tenant_id', tenantId); }
+        return q;
+      };
+      // THE MIGRATION IS APPLIED BY HAND, SO THIS READ HAS TO SURVIVE ITS
+      // ABSENCE. PostgREST rejects the WHOLE select on one unknown column, and
+      // this select is the per-day ledger overlay — the thing that makes the
+      // board show TODAY's operator rather than the job's first-ever one. An
+      // unguarded new column here would not degrade the lead name, it would
+      // silently take the entire overlay down. Ask for the column, fall back to
+      // the exact previous select when it is not there yet.
+      let dailyRes: { data: any[] | null; error: any } = await dailyFor(
+        `${OVERLAY_COLUMNS}, ${OFF_PLATFORM_LEAD_COLUMN}`
+      ) as any;
+      if (dailyRes.error && isMissingColumnError(dailyRes.error)) {
+        dailyRes = await dailyFor(OVERLAY_COLUMNS) as any;
+      }
+      if (dailyRes.error) {
+        console.error('Error fetching per-day assignments:', dailyRes.error);
+      }
+      const dailyAssignments = dailyRes.data as any[] | null;
 
       if (dailyAssignments && dailyAssignments.length > 0) {
         const dailyMap = new Map(dailyAssignments.map(a => [a.job_order_id, a]));
@@ -111,6 +132,18 @@ export async function GET(request: NextRequest) {
             job.helper_id = da.helper_id !== undefined ? da.helper_id : job.helper_id;
             if (da.operator_name !== undefined) job.operator_name = da.operator_name;
             if (da.helper_name !== undefined) job.helper_name = da.helper_name;
+            // Who is running this crew when nobody on Pontifex is. Absent
+            // entirely until the migration lands (see the fallback above), which
+            // is why this is `?? null` rather than a bare read.
+            job.off_platform_lead_name = (da as any)[OFF_PLATFORM_LEAD_COLUMN] ?? null;
+            // THE LEDGER HAS SPOKEN FOR THIS DATE, so the job's own seats are no
+            // longer the fallback for it. 11 production rows place NOBODY on a
+            // date for a job whose `helper_assigned_to` is still set — a date held
+            // open on the board, for a job that has a helper on other days. Those
+            // must keep landing in the unassigned pile exactly as they do today;
+            // without this flag the helper-only classification below would read
+            // the job's stale seat and file them as crewed.
+            job.day_crew_stated = true;
             job.day_sequence = da.day_sequence ?? 1;
             job.operator_day_job_count = da.operator_id ? (operatorDayCounts.get(da.operator_id) || 1) : 1;
           }
@@ -214,10 +247,41 @@ export async function GET(request: NextRequest) {
     const assigned: typeof jobs = [];
     const unassigned: typeof jobs = [];
 
+    // A CREW OF ONE HELPER IS STILL A CREW (founder, Aug 20).
+    //
+    // This read `job.assigned_to` alone, which is where the office's request
+    // actually died. Every other layer already allowed a helper-only placement —
+    // `job_daily_assignments` has had both id columns nullable since April,
+    // `shouldPromoteToAssigned` counts a helper as somebody since Aug 13, and
+    // `lib/dispatch.ts` has texted helper-only jobs since Aug 15 — but the board
+    // then filed the job under UNASSIGNED, so the office pressed assign, watched
+    // the ticket drop back into the unassigned pile, and concluded it had not
+    // worked. Zero of 111 production rows are helper-only; this line is the
+    // reason.
+    //
+    // `helper_id` is the per-day ledger's helper, set by the overlay above and
+    // ONLY there — `schedule_board_view` has no such column. The ledger is the
+    // only thing that can put a helper on a crew for a DATE.
+    //
+    // ⚠️ `job_orders.helper_assigned_to` is deliberately NOT a fallback here.
+    // It is a job-level seat, not a statement about this date, and it has never
+    // once affected this classification — before today only `assigned_to` did. On
+    // a date the ledger did not speak for, reading it would take a job OUT of the
+    // Unassigned pile on a seat nobody stated: extend a job's `end_date` past its
+    // ledger rows and the new days would draw as crewed. A job nobody sees in the
+    // pile is a job nobody dispatches. Nothing is lost by declining it — a
+    // helper-only placement always writes the ledger rows for the dates it
+    // states, so the crew still lands on exactly the days the office named.
+    //
+    // `day_crew_stated` (set by the overlay) is what tells "the ledger said
+    // nobody" apart from "the ledger said nothing": 11 production rows place
+    // NOBODY for a job whose `helper_assigned_to` is still set — a date held open
+    // on the board — and those must keep landing in Unassigned exactly as today.
     for (const job of jobs || []) {
+      const helperOnDay = job.day_crew_stated ? (job.helper_id ?? null) : null;
       if (job.is_will_call) {
         continue; // will-call fetched separately
-      } else if (job.assigned_to) {
+      } else if (placesSomeone({ operator_id: job.assigned_to ?? null, helper_id: helperOnDay })) {
         assigned.push(job);
       } else {
         unassigned.push(job);

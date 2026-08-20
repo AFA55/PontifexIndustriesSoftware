@@ -3,16 +3,24 @@
 import { useState, useRef, useEffect } from 'react';
 import {
   Users, Plus, Briefcase, ChevronDown, ChevronUp, Check,
-  CalendarX, XCircle, UserX,
+  CalendarX, XCircle, UserX, UserMinus,
 } from 'lucide-react';
 import JobCard from './JobCard';
 import RowDuplicateButton from './RowDuplicateButton';
+import { describeOffPlatformLead } from '@/lib/off-platform-lead';
 import type { JobCardData } from './JobCard';
 
 interface OperatorRowProps {
   rowIndex: number;
   operatorName: string | null;
   helperName: string | null;
+  /**
+   * Set only when this crew has NO Pontifex operator because their lead is not on
+   * the platform (founder, Aug 20). Display only — never resolved to a user id,
+   * never sent as crew state. May be null even on such a row: the office is not
+   * required to know who the sub is.
+   */
+  offPlatformLeadName?: string | null;
   jobs: JobCardData[];
   colorScheme: {
     border: string;
@@ -181,6 +189,7 @@ export default function OperatorRow({
   rowIndex,
   operatorName,
   helperName,
+  offPlatformLeadName,
   jobs,
   colorScheme,
   canEdit,
@@ -210,6 +219,15 @@ export default function OperatorRow({
   onDuplicateJob,
 }: OperatorRowProps) {
   const hasJobs = jobs.length > 0;
+  /**
+   * A CREW WITH NO PONTIFEX OPERATOR, as distinct from an empty row.
+   *
+   * The two look identical in `rowAssignments` — operator null either way — and
+   * the difference is entirely whether anyone is actually going. Jobs on the row
+   * plus a helper is the crew; jobs on the row and nobody is a row still being
+   * filled in, and must keep reading as "Available".
+   */
+  const isOffPlatformCrew = !operatorName && hasJobs && !!helperName;
   const isBlocked = !!timeOff && BLOCKED_TYPES.has(timeOff.type);
   const [dragOver, setDragOver] = useState(false);
 
@@ -285,8 +303,12 @@ export default function OperatorRow({
       <div className="p-4">
         {/* Row header */}
         <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isBlocked ? 'bg-rose-100 dark:bg-rose-500/20' : colorScheme.bg} dark:opacity-80`}>
+          {/* `min-w-0` on BOTH flex levels: without it a flex item's default
+              `min-width:auto` refuses to shrink below its content, so the lead
+              chip below can push the row wider than the phone and nothing
+              truncates. */}
+          <div className="flex items-center gap-3 min-w-0">
+            <div className={`w-10 h-10 rounded-xl flex-shrink-0 flex items-center justify-center ${isBlocked ? 'bg-rose-100 dark:bg-rose-500/20' : colorScheme.bg} dark:opacity-80`}>
               {isBlocked
                 ? <UserX className="w-5 h-5 text-rose-600 dark:text-rose-300" />
                 : hasJobs
@@ -294,37 +316,70 @@ export default function OperatorRow({
                   : <Users className={`w-5 h-5 ${colorScheme.icon}`} />
               }
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
-              {canEdit ? (
-                <>
-                  <PersonDropdown
-                    value={operatorName}
-                    options={allOperators}
-                    busyMap={busyOperators}
-                    noteMap={operatorSlotNotes}
-                    placeholder="Select Operator"
-                    onSelect={(name) => onChangeOperator?.(name)}
-                    colorScheme={isBlocked ? { bg: 'bg-rose-100 dark:bg-rose-500/20', text: 'text-rose-700 dark:text-rose-300' } : colorScheme}
-                  />
-                  <span className="text-gray-300 dark:text-white/20 hidden sm:inline">+</span>
-                  <PersonDropdown
-                    value={helperName}
-                    options={allHelpers}
-                    busyMap={busyHelpers}
-                    placeholder="Select Helper"
-                    onSelect={(name) => onChangeHelper?.(name)}
-                    colorScheme={{ bg: 'bg-gray-100 dark:bg-white/10', text: 'text-gray-600 dark:text-white/70' }}
-                  />
-                </>
-              ) : (
-                <div>
-                  <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">
-                    {operatorName || 'Available'}
-                  </h3>
-                  {helperName && (
-                    <p className="text-xs text-gray-500 dark:text-white/50">+ {helperName}</p>
-                  )}
-                </div>
+            <div className="flex flex-col gap-1 min-w-0">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                {canEdit ? (
+                  <>
+                    <PersonDropdown
+                      value={operatorName}
+                      options={allOperators}
+                      busyMap={busyOperators}
+                      noteMap={operatorSlotNotes}
+                      // The empty operator seat says WHY it is empty. Left as
+                      // "Select Operator" this row is indistinguishable from a
+                      // half-finished assignment, which is the impression that
+                      // stopped the office placing helpers at all. The dropdown
+                      // stays live either way — putting a real operator on the
+                      // crew later is one click, and doing so clears the lead.
+                      placeholder={isOffPlatformCrew ? 'No Pontifex operator' : 'Select Operator'}
+                      onSelect={(name) => onChangeOperator?.(name)}
+                      colorScheme={isBlocked ? { bg: 'bg-rose-100 dark:bg-rose-500/20', text: 'text-rose-700 dark:text-rose-300' } : colorScheme}
+                    />
+                    <span className="text-gray-300 dark:text-white/20 hidden sm:inline">+</span>
+                    <PersonDropdown
+                      value={helperName}
+                      options={allHelpers}
+                      busyMap={busyHelpers}
+                      placeholder="Select Helper"
+                      onSelect={(name) => onChangeHelper?.(name)}
+                      colorScheme={{ bg: 'bg-gray-100 dark:bg-white/10', text: 'text-gray-600 dark:text-white/70' }}
+                    />
+                  </>
+                ) : (
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-white text-sm sm:text-base">
+                      {operatorName || (isOffPlatformCrew ? helperName : 'Available')}
+                    </h3>
+                    {isOffPlatformCrew ? (
+                      <p className="text-xs text-gray-500 dark:text-white/50">
+                        Helper — lead not on Pontifex
+                      </p>
+                    ) : helperName ? (
+                      <p className="text-xs text-gray-500 dark:text-white/50">+ {helperName}</p>
+                    ) : null}
+                  </div>
+                )}
+              </div>
+              {/* Who is actually running this crew. Conditionally RENDERED —
+                  Tailwind 3.4 `hidden` loses to `flex` at equal specificity, so a
+                  hidden chip would still be on screen. */}
+              {isOffPlatformCrew && (
+                <span
+                  className="inline-flex items-center gap-1.5 self-start min-w-0 max-w-full px-2 py-1 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-300 dark:border-sky-500/30"
+                  title={
+                    offPlatformLeadName
+                      ? `${offPlatformLeadName} is running this crew and is not a Pontifex user`
+                      : 'This crew has no Pontifex operator — the office did not record who is leading it'
+                  }
+                >
+                  <UserMinus className="w-3 h-3 flex-shrink-0" />
+                  {/* The name is free text up to 80 characters and can arrive
+                      with no spaces in it, so it truncates rather than pushing
+                      the row past the width of a phone. `truncate` must sit on
+                      the TEXT, not on this flex container — `text-overflow` does
+                      nothing to a flex item. The full name stays in the title. */}
+                  <span className="truncate">{describeOffPlatformLead(offPlatformLeadName)}</span>
+                </span>
               )}
             </div>
           </div>

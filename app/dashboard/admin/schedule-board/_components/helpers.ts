@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { authedFetchQuiet } from '@/lib/authed-fetch';
+import { offPlatformLeadChanged } from '@/lib/off-platform-lead';
 import type { JobCardData } from './JobCard';
 
 // ─── Date helpers ─────────────────────────────────────────────────────────
@@ -103,6 +104,9 @@ export function toJobCard(job: any, viewDate?: string): JobCardData {
     // the extra job_crew members the board GET now attaches.
     operator_name: job.operator_name || null,
     helper_name: job.helper_name || null,
+    // The crew's lead when they are not a Pontifex user. Only ever set on jobs
+    // with no operator; absent until the migration lands, hence `|| null`.
+    off_platform_lead_name: job.off_platform_lead_name || null,
     crew: Array.isArray(job.crew) ? job.crew : [],
     po_number: job.po_number || null,
     day_label: computeDayLabel(job, viewDate),
@@ -117,5 +121,57 @@ export function toJobCard(job: any, viewDate?: string): JobCardData {
     arrived_at_jobsite_at: job.arrived_at_jobsite_at ?? null,
     work_started_at: job.work_started_at ?? null,
     work_completed_at: job.work_completed_at ?? null,
+  };
+}
+
+// ─── Which crew seats did the Edit panel actually change? ─────────────────
+//
+// PURE AND EXPORTED SO IT CAN BE PINNED BY A TEST, because getting it wrong
+// silently replaces a day's crew. Saving the panel fires a full crew write
+// (`/assign`, scope 'remaining') whenever ANY of the three answers is true, and
+// that write restates every seat the caller did not omit. So a seat that reads
+// as "changed" when nothing about the crew changed is not a cosmetic bug — it is
+// a wipe with a save button on it.
+//
+// THE BUG THIS EXISTS TO PREVENT (guardian, Aug 20): the lead was compared
+// against the ROW's lead while the panel seeded its field from the JOB's. Those
+// two legitimately differ — the board sets a row's lead to the first NAMED lead
+// among that row's jobs, so a second job on the same helper's row, with no lead
+// of its own, reads `null` against a row reading "Mike Sanchez". Editing that
+// job's PO number then reported `leadChanged`, fired the crew write, and the
+// helper's day was rewritten from the job's stale seat. Compare like with like:
+// every seat here is read from the SAME source the panel seeded its control
+// from — the job, per-day, as the board GET overlaid it.
+export interface EditCrewChangeInput {
+  /** The panel's own starting values (what the office saw when it opened). */
+  currentOperatorName: string | null;
+  currentHelperName: string | null;
+  /** The job's per-day lead, from the board GET's ledger overlay. */
+  currentLeadName: string | null | undefined;
+  /** What the panel returned. `undefined` = the panel did not speak. */
+  newOperatorName?: string | null;
+  newHelperName?: string | null;
+  newLeadName?: string | null;
+}
+
+export function editCrewChanges(input: EditCrewChangeInput): {
+  operatorChanged: boolean;
+  helperChanged: boolean;
+  leadChanged: boolean;
+  /** True when a crew write must be sent at all. */
+  crewWriteNeeded: boolean;
+} {
+  const operatorChanged =
+    input.newOperatorName !== undefined &&
+    (input.newOperatorName || null) !== (input.currentOperatorName || null);
+  const helperChanged =
+    input.newHelperName !== undefined &&
+    (input.newHelperName || null) !== (input.currentHelperName || null);
+  const leadChanged = offPlatformLeadChanged(input.newLeadName, input.currentLeadName);
+  return {
+    operatorChanged,
+    helperChanged,
+    leadChanged,
+    crewWriteNeeded: operatorChanged || helperChanged || leadChanged,
   };
 }

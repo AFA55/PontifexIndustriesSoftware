@@ -7,6 +7,7 @@ import UserAvatar from '@/components/UserAvatar';
 import DraggableJobCard from './DraggableJobCard';
 import JobCard from './JobCard';
 import RowDuplicateButton from './RowDuplicateButton';
+import { describeOffPlatformLead } from '@/lib/off-platform-lead';
 import type { JobCardData } from './JobCard';
 
 interface OperatorInfo {
@@ -18,7 +19,7 @@ interface OperatorInfo {
 interface OperatorRowViewProps {
   operatorJobs: Record<number, JobCardData[]>;
   unassignedJobs: JobCardData[];
-  rowAssignments: { operator: string | null; helper: string | null }[];
+  rowAssignments: { operator: string | null; helper: string | null; offPlatformLead?: string | null }[];
   operatorIdMap: Record<string, string>;
   operatorAvatarMap?: Record<string, string | null>;
   operatorSkillMap: Record<string, number | null>;
@@ -92,8 +93,35 @@ export default function OperatorRowView({
     }
 
     // Build full list from allOperatorsList
-    const ops: (OperatorInfo & { rowIndex: number; jobs: JobCardData[]; helper: string | null; timeOff?: { type: string; notes: string | null } })[] = [];
+    const ops: (OperatorInfo & { rowIndex: number; jobs: JobCardData[]; helper: string | null; timeOff?: { type: string; notes: string | null }; offPlatformLead?: string | null; isOffPlatformCrew?: boolean })[] = [];
     const seenNames = new Set<string>();
+
+    // ── CREWS WITH NO PONTIFEX OPERATOR ─────────────────────────────────────
+    // This view is built from operator NAMES, so a row whose operator seat is
+    // deliberately empty (founder, Aug 20: the crew's lead is a sub) would have
+    // been skipped entirely by the loop above — its jobs invisible here AND
+    // absent from the Unassigned block, since the board GET no longer files them
+    // there. The helper is the crew, so the helper heads the row.
+    for (let i = 0; i < rowAssignments.length; i++) {
+      const a = rowAssignments[i];
+      const jobs = operatorJobs[i] || [];
+      if (a?.operator || !a?.helper || jobs.length === 0) continue;
+      ops.push({
+        id: `off-platform-row-${i}`,
+        name: a.helper,
+        skillLevel: null,
+        rowIndex: i,
+        jobs,
+        helper: null,
+        offPlatformLead: a.offPlatformLead ?? null,
+        isOffPlatformCrew: true,
+      });
+      // …AND HE IS NOT ALSO "AVAILABLE". `allOperatorsList` includes apprentices,
+      // so without this the same person was printed twice on the same board —
+      // once heading his own crew with two jobs, and once below it with a green
+      // "Available" badge. The office reads that badge as free capacity.
+      seenNames.add(a.helper);
+    }
 
     // First add operators with assignments (they have row indices)
     for (const [name, data] of assignedOps) {
@@ -216,6 +244,11 @@ export default function OperatorRowView({
                     </div>
                     {op.helper && (
                       <p className="text-[10px] text-gray-500 dark:text-white/60">+ {op.helper}</p>
+                    )}
+                    {op.isOffPlatformCrew && (
+                      <p className="text-[10px] text-sky-700 dark:text-sky-300 font-semibold truncate" title={describeOffPlatformLead(op.offPlatformLead)}>
+                        Helper — {describeOffPlatformLead(op.offPlatformLead)}
+                      </p>
                     )}
                   </div>
 

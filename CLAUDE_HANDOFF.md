@@ -1,6 +1,73 @@
 # CLAUDE_HANDOFF.md — Pontifex Industries Platform
 
-**Last updated:** Aug 15, 2026 (Opus 5) | **Branch:** `main` | **Prod:** ✅ LIVE through `3ee41f06`. Everything is pushed EXCEPT the work-performed rebuild (see below).
+**Last updated:** Aug 20, 2026 (Opus 5) | **Branch:** `main` | **Prod:** LIVE through `8166222e`. **5+ commits sit UNPUSHED** — see the Aug 20 block below.
+
+---
+
+## 📌 Aug 20 — payroll accuracy. ONE root cause behind four separate complaints.
+
+**READ THIS FIRST.** The founder reported, over one day: Keon's timecard wrong,
+Axel showing at "Lenfeng" all week, Nate's clock-in grabbing the wrong job,
+Micah's hours missing from Harper. **They are all the same defect.**
+
+> `timecards.job_order_id` is resolved ONCE at clock-in and never looked at
+> again. The crew clocks in 07:00–07:15. The office finishes the board
+> 07:15–08:10. **Every card is stamped before the answer exists.**
+
+Proven on Axel Valverde to the second: Aug 11 he clocked in `11:10:18Z` and the
+office created his real job #1 at `11:14:30Z` — **4 min 12 s later**. Aug 12 he
+clocked in `11:05:09Z` with no board row at all and was placed on Estes at
+`12:06:19Z` — **61 minutes later**. Both cards still name Leifeng, a job with
+NULL crew slots that has sat `scheduled` since Aug 10.
+
+**The rule that came out of it, now used everywhere:** board > filed log >
+clock-in tag. A tag the board contradicts *for that person on that date*, with
+no log that person filed naming it, is **stale** — treated as absent, not
+disputed. Verified 6/6 against all 81 tagged cards in production. Zack's Aug 14
+correctly keeps its tag, because he filed that job's log himself that afternoon.
+
+**Worst finding of the day:** Micah's 8.47 h on Aug 4 were not merely missing
+from Harper — they printed on **Parkk's** ticket, unmarked, as recorded fact.
+One day of labour absent from the job that earned it and billed to the job that
+did not. Five person-days move; each leaves exactly one ticket as it arrives on
+another.
+
+**The founder + Amanda settled the timecard/ticket model** (`docs/plans/AUG19_FOUNDER_BRIEF.md` §10):
+the timecard lists jobs and keeps hours WHOLE; dividing a day between jobs
+belongs on the ticket. Two documents, two questions — what do we pay this
+person, what do we bill this customer.
+
+### Shipped Aug 20 (committed, NOT pushed)
+
+| commit | |
+|---|---|
+| `e9f05a6c` | photos asked once — Nate was uploading twice, 35 s apart on one job. Keyed off the SHIFT, not the wall clock, capped at 18 h so the 88-hour card can't widen it. Also closed a cross-tenant leak on `GET /photos`. |
+| `4c039966` | every customer completion email showed broken images — public-path URLs against a private bucket, HTTP 400. Now inline attachments (no expiry, no bearer token leaving our control). |
+| `99a26d0c` | the timecard now says WHERE. Was carrying no job information at all. Caught in review: a CRITICAL that would have silently reverted `5ca940e9` on Zack's Aug 14 — the builder's test used three distinct job ids and passed. |
+| `9078184f` | Industrial Safety Coatings billed **0.06 h** for a morning two men worked → 7.97 h. Root cause fixed: `status/route.ts:314` stamps `route_started_at` **once per job, ever**, and the closeout copied it onto every day's row. 22 of 54 press stamps are prior-day copies. |
+| `71858b69` | the Aug 20 findings, with timestamps. |
+| *(uncommitted)* | stale-tag rule + soft-deleted jobs 404 on three print routes + helper-only assignment |
+
+### Live hazards found and closed
+
+- **Three print routes rendered soft-deleted jobs** — `work-ticket`, `completion-summary`, `progress-by-day` had no `deleted_at` guard. Only the P&L route did. A deleted job printed a ticket with hours on it.
+- **The sidebar's timecard badge read 0 since it was written** — it parsed a shape the route does not return. **19 flagged cards awaiting review, oldest May 18**, including Aiden's 88.61-hour card. Now counts `flagged`, not `pending` (a pending card is one still OPEN — that badge would read ~8 every weekday and 0 by evening).
+- **Your board has the whole crew placed on Sat Aug 8 and Sun Aug 9** with no timecards. Keyshawn Robinson placed with no card on Aug 11/13/14/17; Javier on Aug 6/7/12/14.
+
+### Open — needs the founder
+
+1. **Nate's Harper paper ticket says "7-12".** Read as 7 am–noon, Mon Aug 3. Aug 3 exists in NO record — no card, no board row, no log — so nothing can corroborate it. Needs a yes/no before anything is entered.
+2. **Refresco is two job records at one site** — `QA-2026-232706` (8/12, **cancelled**, Aiden 10.48 + Lucas 9.35) and `JOB-2026-929434` (8/13, completed). Addresses differ by a typo, 990 vs 1990 Hood Rd. Merge the 12th onto 929434?
+3. **Does the last job of a day end at clock-out or at its own completion?** Currently clock-out. Ending at completion strands 1.42 h of Keon's and 1.28 h of Axel's paid day on no job. If the intent is "don't bill the ride home", that is billable-vs-paid, not a boundary change.
+4. **34 day-2+ In Route presses sit unread in `job_status_history`** (`JOB-2026-424813` has ten, one per working day, while `job_orders.route_started_at` is NULL). Recovering them moves hours on already-invoiced jobs. Note that table has **no `tenant_id`** — query it only by an id list a tenant-scoped query produced.
+5. **Keon's Wed 8/19 log is filed against the OLD AM King job.** His own filed record — not to be rewritten unilaterally.
+
+### The money seam, unfixed
+
+The split sums to the **gross** clocked span; lunch is not apportioned. Keon 10.52 vs a 10.04 card, Axel 10.22 vs 9.73 — **+0.97 billable hours on Aug 11 that no clock supports.** Pre-existing (task #10, `net_hours ?? total_hours` in `lib/work-ticket.ts` ~line 505), now reaching two more person-days.
+
+---
+
 
 ---
 

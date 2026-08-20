@@ -34,6 +34,13 @@ export interface JobCardData {
   /** Lead + helper names as the board resolved them (view + per-day overlay). */
   operator_name?: string | null;
   helper_name?: string | null;
+  /**
+   * Who is running this crew when NO Pontifex operator is on it (founder, Aug 20:
+   * helpers sometimes go out under a sub). Free text from the per-day ledger —
+   * never a user id, never resolvable to a profile. Null both when there is a
+   * real operator and when the office did not say who the lead was.
+   */
+  off_platform_lead_name?: string | null;
   /** Extra crew (job_crew) beyond the lead + helper seat — already de-duped
    *  against those two by the board GET. Empty for jobs with no extra crew. */
   crew?: JobCrewMember[];

@@ -32,6 +32,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
 import { applyReassignment, shouldPromoteToAssigned, shouldDowngradeToScheduled, ordinal } from '@/lib/reassign';
 import { crewClearNeedsConfirmation, crewClearBlockedMessage } from '@/lib/crew-assignment';
+import { isHelperOnlyPlacement } from '@/lib/off-platform-lead';
 
 export async function POST(request: NextRequest) {
   try {
@@ -62,6 +63,13 @@ export async function POST(request: NextRequest) {
     // multi-day job. /reorder already reads it this way; /assign did not.
     const helperId: string | null | undefined =
       'helperId' in body ? (body.helperId ?? null) : undefined;
+
+    // WHO IS LEADING THIS CREW WHEN NOBODY ON PONTIFEX IS (founder, Aug 20).
+    // Same three states as the two seats: omitted leaves the stored name alone,
+    // null clears it, a string sets it. `applyReassignment` forces it to null
+    // whenever an operator is being set — a crew has one lead.
+    const offPlatformLeadName: string | null | undefined =
+      'offPlatformLeadName' in body ? (body.offPlatformLeadName ?? null) : undefined;
     const force = body.force === true;
 
     if (!jobOrderId) {
@@ -78,6 +86,7 @@ export async function POST(request: NextRequest) {
         operatorId,
         // undefined = keep whoever is on it (applyReassignment honours it).
         helperId,
+        offPlatformLeadName,
         assignmentDate: assignment_date,
         // DEFAULT 'day', not 'remaining' (founder, Aug 11: "I have someone on
         // one job one day — it doesn't mean they're going to be there the next
@@ -126,9 +135,24 @@ export async function POST(request: NextRequest) {
             result.crew_change.helper_cleared ? 'helper' : null,
           ].filter(Boolean).join(' and ')} removed — check this job still has who it needs.`
         : null;
+      // A HELPER-ONLY PLACEMENT IS AN ASSIGNMENT, AND MUST READ AS ONE. It is
+      // the shape the office could never create before (zero rows in production
+      // out of 111), so the one thing the answer must not do is look like a
+      // half-finished operator assignment.
+      const lead = result.off_platform_lead_name;
+      // The shared predicate, not a second copy of it spelled out inline. Read
+      // off what the CALLER asked for: an operator that was merely OMITTED says
+      // nothing about whether one is on the job, so only an explicit `null`
+      // (the modal's "no Pontifex operator" choice) can make this a helper-only
+      // placement — hence the `!== undefined` before it.
+      const helperOnly =
+        operatorId !== undefined &&
+        isHelperOnlyPlacement({ operator_id: operatorId, helper_id: helperId ?? null });
       return NextResponse.json({
         success: true,
-        message: `Job ${someoneIsOnIt ? 'assigned' : 'unassigned'} successfully${seqNote}`,
+        message: helperOnly
+          ? `Helper assigned${lead ? ` — crew runs under ${lead}, who is not on Pontifex` : ' — no Pontifex operator on this crew'}`
+          : `Job ${someoneIsOnIt ? 'assigned' : 'unassigned'} successfully${seqNote}`,
         ...(notice ? { notice } : {}),
         data: {
           ...result.job,
@@ -136,6 +160,7 @@ export async function POST(request: NextRequest) {
           operator_day_job_count: result.operator_day_job_count,
           sequences: result.sequences,
           crew_change: result.crew_change,
+          ...(lead !== undefined ? { off_platform_lead_name: lead } : {}),
         },
       });
     }
