@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
+// The read guard's own day test — imported, never re-implemented. See
+// `sameDayStamp` below for what a second copy of this rule would cost.
+import { dateInTz } from '@/lib/reminder-timing';
 import { boundedJobHours, clampDailyLogHours, MAX_DAILY_LOG_HOURS } from '@/lib/labor-cost';
 import { dayCompletePermission } from '@/lib/day-complete-auth';
 import {
@@ -323,21 +326,128 @@ export async function POST(
     // than clobbering the morning's note; skip the append if it's already there
     // (idempotent resubmit).
     let mergedNotes: string | null = notes || null;
+    let priorRouteStart: string | null = null;
+    let priorWorkStart: string | null = null;
+    /**
+     * SENT-BUT-NOT-LOADED IS A WIPE.
+     *
+     * The read below is the ONLY thing that knows what is already on this row.
+     * PostgREST does not throw on a failed read — it returns `{ data: null,
+     * error }` — so without inspecting `error`, a dead query is indistinguishable
+     * from "there is no prior row": `priorRouteStart` stays null, the job-level
+     * fallback is rejected by `sameDayStamp` on any day but its own, and the
+     * upsert then writes NULL over a genuine same-day press.
+     *
+     * Measured against production rather than assumed: 33 `daily_job_logs` rows
+     * carry a start stamp on their own `log_date`, and on SIXTEEN of them the
+     * job-level fallback is null or belongs to another day — so a failed read
+     * would have written NULL over a genuine same-day press. (All 16 lose
+     * `route_started_at`; 13 of those lose `work_started_at` too.) They are
+     * precisely the rows this change exists to protect.
+     *
+     * So on ANY failure the two start columns are OMITTED from the payload
+     * entirely (see `startStampPatch`). PostgREST leaves unlisted columns untouched
+     * on the UPDATE arm of an upsert, so the row keeps whatever it had; on the
+     * INSERT arm there is nothing to lose. The closeout still succeeds — a
+     * failed read must not block an operator finishing his day — it simply
+     * declines to assert anything about stamps it could not see.
+     */
+    let priorStartsKnown = true;
     try {
-      const { data: priorLog } = await supabaseAdmin
+      const { data: priorLog, error: priorErr } = await supabaseAdmin
         .from('daily_job_logs')
-        .select('notes')
+        // `route_started_at` / `work_started_at` come back too — this upsert
+        // rewrites the whole row, so anything already on it that we do not
+        // carry forward is DESTROYED. See `sameDayStamp` below.
+        .select('notes, route_started_at, work_started_at')
         .eq('job_order_id', jobId)
         .eq('operator_id', user.id)
         .eq('log_date', effectiveDate)
         .maybeSingle();
-      const prior = (priorLog as { notes: string | null } | null)?.notes || null;
+      if (priorErr) {
+        // A missing table is not a failed read of an existing row: there is no
+        // prior row anywhere, nothing can be wiped, and the upsert below has its
+        // own `isTableNotFoundError` path. Everything else is a read we cannot
+        // trust, so we decline to write the columns it was meant to protect.
+        if (!isTableNotFoundError(priorErr)) {
+          priorStartsKnown = false;
+          console.error('daily-log: prior-row read failed; leaving start stamps untouched', priorErr);
+        }
+        throw priorErr;
+      }
+      const priorRow = priorLog as {
+        notes: string | null;
+        route_started_at: string | null;
+        work_started_at: string | null;
+      } | null;
+      priorRouteStart = priorRow?.route_started_at ?? null;
+      priorWorkStart = priorRow?.work_started_at ?? null;
+      const prior = priorRow?.notes || null;
       if (prior && mergedNotes && prior !== mergedNotes && !prior.includes(mergedNotes)) {
         mergedNotes = `${prior} | ${mergedNotes}`;
       } else if (prior && !mergedNotes) {
         mergedNotes = prior;
       }
-    } catch { /* best-effort merge — fall back to the incoming note */ }
+    } catch (err) {
+      // A THROW IS THE SAME UNKNOWN AS AN ERROR OBJECT. Network failure,
+      // abort, a client bug — none of them tell us what is on the row, and the
+      // whole point of this guard is that not knowing means not writing.
+      if (!isTableNotFoundError(err)) priorStartsKnown = false;
+      /* best-effort merge — fall back to the incoming note */
+    }
+
+    /**
+     * A DAY'S LOG MUST NOT CARRY ANOTHER DAY'S PRESS.
+     *
+     * This upsert used to write `route_started_at: job.route_started_at` flat.
+     * A job's press is stamped ONCE, ever — `status/route.ts` sets it only
+     * `if (!existingJob.route_started_at)` — so on day 2 and after, that copies
+     * day 1's timestamp onto today's row. TWENTY-TWO of the fifty-four
+     * production log rows that carry a press are such copies (re-counted Aug 20
+     * 2026; it was 13 of 53 when the read guard shipped, so this is still
+     * happening), and every one is a ten-hour phantom waiting: JOB-2026-277097's 8/12
+     * closeout row carries 8/10 07:43, filed from a different job's truck.
+     *
+     * `jobStartOnDate` (lib/job-day-boundary.ts, guard (a)) already REJECTS them
+     * at read time, so nothing is mis-billed today. This stops manufacturing
+     * them, which matters for the same reason the guard does: a stamp that looks
+     * like a press is one refactor away from being believed as one. It is the
+     * write half of the fix whose read half is the close fallback.
+     *
+     * DELIBERATELY NOT TOUCHED: the job-level `job_orders.route_started_at`.
+     * `app/api/admin/jobs/[id]/timestamps/route.ts` documents it as the editable
+     * canonical press, and the completed-jobs list, job P&L and JobDetailView
+     * all read it as "when this job started". Redefining it as "the latest
+     * press" would move boundaries on jobs the office has already invoiced —
+     * a larger and separate decision. Here the job stamp is still the source; it
+     * is simply not written to a day it did not happen on.
+     */
+    // ONE COPY OF THE DAY TEST, NOT TWO. This used to re-implement `dateInTz`
+    // inline (`toLocaleDateString('en-CA', { timeZone })`). It was the same rule
+    // as guard (a) in lib/job-day-boundary.ts written out a second time, and the
+    // failure mode of two copies of one rule is that they drift APART silently:
+    // the write guard would start admitting a stamp the read guard rejects, or
+    // the reverse, and nothing would fail — the hours would simply be wrong.
+    // The read guard's own helper is imported instead.
+    const sameDayStamp = (iso: string | null | undefined): string | null =>
+      iso && dateInTz(iso, tenantTz) === effectiveDate ? iso : null;
+    // A per-day stamp already on the row outranks the job-level one and must
+    // survive the upsert; the job stamp is the fallback, and only on its own day.
+    //
+    // When the prior-row read failed we know NEITHER, so both columns are left
+    // OUT OF THE PAYLOAD entirely rather than written as null — see the note on
+    // `priorStartsKnown`. Spread rather than `undefined` values: a key that is
+    // never in the object cannot be resurrected by a serializer that decides to
+    // keep undefined, and the intent reads off the page.
+    const startStampPatch: {
+      route_started_at?: string | null;
+      work_started_at?: string | null;
+    } = priorStartsKnown
+      ? {
+          route_started_at: sameDayStamp(priorRouteStart) ?? sameDayStamp(job.route_started_at),
+          work_started_at: sameDayStamp(priorWorkStart) ?? sameDayStamp(job.work_started_at),
+        }
+      : {};
 
     // Create daily log entry — gracefully handle missing table
     let dailyLog = null;
@@ -352,8 +462,10 @@ export async function POST(
         // Stamp tenant_id: no trigger sets it; unstamped rows vanish from
         // tenant-filtered admin reads (undercounted hours on completed tickets).
         tenant_id: job.tenant_id ?? null,
-        route_started_at: job.route_started_at,
-        work_started_at: job.work_started_at,
+        // NOT `job.route_started_at` — see `sameDayStamp` above. Absent
+        // entirely when the prior-row read failed, so a dead query leaves the
+        // row's own press alone instead of erasing it.
+        ...startStampPatch,
         day_completed_at: now,
         work_performed: workPerformed || [],
         notes: mergedNotes,

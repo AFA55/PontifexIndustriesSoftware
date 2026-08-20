@@ -494,7 +494,18 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   // In/Out on these rows are the job's bounds rather than the person's clock,
   // the Total is that stretch rather than the card's paid hours, and Lunch is
   // deliberately blank. See `hours_boundary` in lib/work-ticket.ts.
-  const hasBoundary = hourRows.some(({ p }) => p.hours_boundary);
+  const hasBoundary = hourRows.some(({ p }) => p.hours_boundary && !p.hours_boundary_board);
+  // THE DAY WAS SHARED AND THE OFFICE'S BOARD — NOT THE CREW'S PRESSES —
+  // ORDERED IT. `‖` is the next mark in the classic footnote sequence
+  // (* † ‡ § ¶ ‖) and it is separate from `¶` on purpose: the ¶ footnote states
+  // that In/Out come from clock-in or the In Route press, and on a board-ordered
+  // day at least one job on it recorded no press at all. See
+  // `hours_boundary_board` in lib/work-ticket.ts for why it is worth a fifth mark.
+  const hasBoundaryBoard = hourRows.some(({ p }) => p.hours_boundary_board);
+  // A STRICT SUBSET OF THE ABOVE, and NOT a sixth mark. It only adds the
+  // sentence in the ‖ footnote that names a sign-off as the line, because that
+  // sentence names the stamp an admin would have to correct.
+  const hasBoundaryClose = hourRows.some(({ p }) => p.hours_boundary_close);
 
   /**
    * ROW DENSITY, MEASURED — NOT GUESSED.
@@ -1098,7 +1109,16 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                             divided row is inferred BY DEFINITION, and two marks
                             on one figure sends the office to two footnotes to
                             learn one thing. */}
-                        {p.hours_boundary && <span style={{ fontWeight: 400 }}>&nbsp;¶</span>}
+                        {/* ‖ where the day's ORDER came from the schedule board
+                            because at least one job on it never recorded a
+                            press — a weaker inference, and the ¶ footnote's
+                            wording would not be supported on this row. One mark
+                            or the other, never both: they answer the same
+                            question. */}
+                        {p.hours_boundary_board && <span style={{ fontWeight: 400 }}>&nbsp;‖</span>}
+                        {p.hours_boundary && !p.hours_boundary_board && (
+                          <span style={{ fontWeight: 400 }}>&nbsp;¶</span>
+                        )}
                         {p.hours_attributed && !p.hours_boundary && (
                           <span style={{ fontWeight: 400 }}>&nbsp;†</span>
                         )}
@@ -1146,6 +1166,9 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                           founder actually writes down — a total that looks
                           unqualified while its parts are qualified is where the
                           caveat gets lost. */}
+                      {hasBoundaryBoard && (
+                        <span style={{ fontWeight: 400, fontSize: 10 }}>&nbsp;‖</span>
+                      )}
                       {hasBoundary && <span style={{ fontWeight: 400, fontSize: 10 }}>&nbsp;¶</span>}
                       {hasAttributed && <span style={{ fontWeight: 400, fontSize: 10 }}>&nbsp;†</span>}
                     </td>
@@ -1191,6 +1214,30 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                   clocked stretch with lunch INCLUDED (billable); rows without ¶ show the payroll
                   figure with lunch already deducted. The day&apos;s one lunch is taken on the
                   timecard, not divided between the jobs.
+                </p>
+              )}
+              {/* THE SAME KIND OF ROW, DRAWN FROM A WEAKER FACT — and the office
+                  is told which it is looking at. At least one job on the day
+                  recorded no In Route press (typically day 2+ of a job, which is
+                  pressed once, ever), so the ORDER of the day comes from the
+                  schedule board rather than from the crew's stamps.
+
+                  The second sentence appears only when a boundary actually came
+                  from a sign-off, because it names the stamp an admin would have
+                  to correct. It is deliberately not a sixth mark: both shapes
+                  are the same question — "is this division the crew's or the
+                  office's?" — and two marks would send the office to two
+                  footnotes to learn one thing. */}
+              {hasBoundaryBoard && (
+                <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
+                  ‖ Shared day the crew&apos;s In Route presses could not divide — at least one
+                  job that day recorded no press. In/Out are this job&apos;s hours, and the ORDER
+                  of the jobs comes from the schedule board; check it before invoicing.
+                  {hasBoundaryClose
+                    ? ' Where a press was missing the line falls at the moment the earlier job was CLOSED OUT.'
+                    : ''}{' '}
+                  Same basis as ¶: the full clocked stretch, lunch INCLUDED (billable), and the
+                  day&apos;s one lunch stays on the timecard.
                 </p>
               )}
             </div>

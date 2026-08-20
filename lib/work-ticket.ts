@@ -470,6 +470,36 @@ export interface TicketPersonDay {
    * the founder writes invoices from it.
    */
   hours_boundary?: boolean;
+  /**
+   * TRUE when this row's day was ordered by the SCHEDULE BOARD rather than by
+   * the crew's own In Route presses — `divided_by_board`, rule 7's second
+   * branch in lib/job-day-boundary.ts. Always accompanied by `hours_boundary`;
+   * the sheet prints `‖` instead of `¶` on these rows.
+   *
+   * WHY IT EARNS ITS OWN MARK, WHICH IS A REAL COST ON AN ALREADY-CROWDED SHEET.
+   * The `¶` footnote makes a specific factual claim — In/Out come "from clock-in
+   * or the In Route press" — and on a board-ordered day that sentence is not
+   * supported: at least one job on the day recorded no press at all. The two
+   * ways to keep the sheet honest were to blur `¶`'s wording until it covered
+   * both, or to add the next mark in the classic footnote sequence
+   * (* † ‡ § ¶ ‖) and leave `¶` saying exactly what it has always said.
+   * Blurring loses the thing Amanda most needs before she bills: whether the
+   * division came from what the crew stamped or from what the office scheduled.
+   *
+   * IT IS THE WIDE FLAG ON PURPOSE — see `divided_by_board`. It was briefly the
+   * narrow one (close-divided days only), which left the other board-ordered
+   * shape printing `¶` and claiming a press that was never recorded.
+   */
+  hours_boundary_board?: boolean;
+  /**
+   * TRUE when a boundary on this row's day was drawn at a job's CLOSE rather
+   * than at an In Route press — rule 6. A strict subset of
+   * `hours_boundary_board`, and NOT separately marked: it selects the extra
+   * sentence in the `‖` footnote that names a sign-off as the line, because
+   * that names the stamp an admin has to correct. Keon's and Axel's Aug 11 are
+   * the only close-divided person-days in production.
+   */
+  hours_boundary_close?: boolean;
 }
 
 export interface TicketDay {
@@ -603,7 +633,16 @@ export interface BuildTicketDaysInput {
    * another job's and the log was all that was left. Sterling's real share is
    * the 14:05 press to the 17:38 clock-out.
    */
-  boundarySegments?: Map<string, { start: string; end: string; hours: number }>;
+  boundarySegments?: Map<
+    string,
+    {
+      start: string;
+      end: string;
+      hours: number;
+      divided_by_board?: boolean;
+      divided_by_close?: boolean;
+    }
+  >;
   /**
    * Today, local, bare 'YYYY-MM-DD'. Only used to keep a FUTURE scheduled day
    * off the sheet: the board holds next week's placements, and a printed ticket
@@ -747,6 +786,12 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
 
     if (segment) {
       p.hours_boundary = true;
+      // Rule 7: the day's order came from the board, not from the crew's own
+      // presses. The row says so, because the two are not the same quality of
+      // fact — and `divided_by_close` narrows it to "and a sign-off drew the
+      // line", which is the stamp an admin would have to correct.
+      if (segment.divided_by_board) p.hours_boundary_board = true;
+      if (segment.divided_by_close) p.hours_boundary_close = true;
       if (!p.clock_in || segment.start < p.clock_in) p.clock_in = segment.start;
       if (!p.clock_out || segment.end > p.clock_out) p.clock_out = segment.end;
       // Lunch is deliberately NOT carried onto a divided row — see

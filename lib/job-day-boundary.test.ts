@@ -1,4 +1,4 @@
-import { jobStartOnDate, splitClockDayAtJobStarts } from './job-day-boundary';
+import { jobCloseOnDate, jobStartOnDate, splitClockDayAtJobStarts } from './job-day-boundary';
 import { floor2 } from './labor-cost';
 
 // ── The Aug 19 2026 production day, verbatim ────────────────────────────────
@@ -326,6 +326,438 @@ describe('jobStartOnDate — a boundary must fall on the day it divides', () => 
         JOB
       )
     ).toBeNull();
+  });
+});
+
+// ── KEON MCKNIGHT, TUE AUG 11 2026 — THE CLOSE FALLBACK, VERBATIM ───────────
+// Keon ran Industrial Safety Coatings in the morning and Leifeng in the
+// afternoon, with Axel helping on both. Leifeng was day 2, so its only press is
+// an Aug 10 copy that guard (a) rejects; before rule 6 the whole day abstained
+// and Leifeng took all of it (9.12 h off its log) while ISC printed 0.06 h — the
+// length of its own log session, the same phantom class as Dante's 0.09.
+const ISC = '7dc77ea1-c63e-41a7-be58-5f8697ed0811';
+const LEIFENG = 'd38d68f9-d938-4d98-89f1-9582e39be325';
+const AUG11 = '2026-08-11';
+
+const ISC_PRESS = '2026-08-11T11:31:50.078Z'; // 07:31 EDT
+const ISC_CLOSE = '2026-08-11T15:04:36.460Z'; // 11:04 EDT
+const LEIFENG_STALE_PRESS = '2026-08-10T14:07:03.384Z'; // the PREVIOUS day
+const LEIFENG_CLOSE = '2026-08-11T20:07:12.812Z'; // 16:07 EDT
+
+/** Keon's card and Axel's, exactly as production holds them. */
+const KEON_CARD = {
+  clock_in_time: '2026-08-11T11:00:00.000Z', // 07:00 EDT
+  clock_out_time: '2026-08-11T21:32:09.645Z', // 17:32 EDT
+};
+const AXEL_AUG11_CARD = {
+  clock_in_time: '2026-08-11T11:10:18.923Z', // 07:10 EDT
+  clock_out_time: '2026-08-11T21:24:00.000Z', // 17:24 EDT
+};
+
+/** The board: ISC is Keon's #1 that day, Leifeng his #3. */
+const aug11 = [
+  { job_order_id: ISC, started_at: ISC_PRESS, completed_at: ISC_CLOSE, day_sequence: 1 },
+  { job_order_id: LEIFENG, started_at: null, completed_at: LEIFENG_CLOSE, day_sequence: 3 },
+];
+
+describe("Keon's Aug 11 2026 — a day divided at a CLOSE, not a press", () => {
+  it("Leifeng's press really is unusable — the day cannot divide on presses", () => {
+    // The log row carries Aug 10's stamp and so does the job. Guard (a) rejects
+    // both, which is what made this day abstain in the first place. The row's
+    // same-day CLOSE is sitting right there and the start rule does not see it:
+    // `jobStartOnDate` reads start columns only.
+    expect(
+      jobStartOnDate(
+        AUG11,
+        [{ job_order_id: LEIFENG, log_date: AUG11, route_started_at: LEIFENG_STALE_PRESS }],
+        { in_route_at: LEIFENG_STALE_PRESS, route_started_at: null },
+        LEIFENG
+      )
+    ).toBeNull();
+    expect(
+      jobCloseOnDate(
+        AUG11,
+        [{ job_order_id: LEIFENG, log_date: AUG11, day_completed_at: LEIFENG_CLOSE }],
+        null,
+        LEIFENG
+      )
+    ).toBe(LEIFENG_CLOSE);
+  });
+
+  it("ISC's close IS on the day, and is what draws the line", () => {
+    expect(
+      jobCloseOnDate(
+        AUG11,
+        [{ job_order_id: ISC, log_date: AUG11, day_completed_at: ISC_CLOSE }],
+        { work_completed_at: ISC_CLOSE },
+        ISC
+      )
+    ).toBe(ISC_CLOSE);
+  });
+
+  it("Keon's day divides 4.07 / 6.45 at ISC's close", () => {
+    const segments = splitClockDayAtJobStarts(KEON_CARD, aug11);
+    expect(segments).not.toBeNull();
+    expect(hoursFor(segments, ISC)).toBe(4.07);
+    expect(hoursFor(segments, LEIFENG)).toBe(6.45);
+  });
+
+  it('Axel divides IDENTICALLY, from his own card — a two-man day splits both men', () => {
+    // The regression that would matter most on an invoice: one man divided and
+    // the other billed whole would put 9.73 helper-hours on Leifeng alone.
+    const segments = splitClockDayAtJobStarts(AXEL_AUG11_CARD, aug11);
+    expect(segments).not.toBeNull();
+    expect(hoursFor(segments, ISC)).toBe(3.9);
+    expect(hoursFor(segments, LEIFENG)).toBe(6.32);
+  });
+
+  it('the 0.06 and 9.12 log figures are nowhere in the answer', () => {
+    for (const card of [KEON_CARD, AXEL_AUG11_CARD]) {
+      const segments = splitClockDayAtJobStarts(card, aug11)!;
+      for (const s of segments) expect(s.hours).toBeGreaterThan(1);
+      expect(segments.map((s) => s.hours)).not.toContain(0.06);
+      expect(segments.map((s) => s.hours)).not.toContain(9.12);
+    }
+  });
+
+  it('ISC runs from CLOCK-IN to its close; Leifeng from that close to CLOCK-OUT', () => {
+    const segments = splitClockDayAtJobStarts(KEON_CARD, aug11)!;
+    const isc = segments.find((s) => s.job_order_id === ISC)!;
+    const lei = segments.find((s) => s.job_order_id === LEIFENG)!;
+    expect(isc.start).toBe(new Date(KEON_CARD.clock_in_time).toISOString());
+    expect(isc.end).toBe(new Date(ISC_CLOSE).toISOString());
+    expect(lei.start).toBe(new Date(ISC_CLOSE).toISOString());
+    // Rule 4 is untouched: the LAST job runs to clock-out, NOT to its own close.
+    expect(lei.end).toBe(new Date(KEON_CARD.clock_out_time).toISOString());
+    expect(lei.end).not.toBe(new Date(LEIFENG_CLOSE).toISOString());
+  });
+
+  it('the drive to job 2 bills to job 2 — the same reading as under a press', () => {
+    // Under rule 3 the segment opens at the press, BEFORE the crew has driven
+    // anywhere. Under rule 6 it opens at the previous job's close, which is
+    // earlier still: they close out, pack up, THEN drive. Either way every
+    // minute of the drive falls inside the second job's stretch.
+    const segments = splitClockDayAtJobStarts(KEON_CARD, aug11)!;
+    const lei = segments.find((s) => s.job_order_id === LEIFENG)!;
+    const drivePress = new Date('2026-08-11T15:20:00Z').getTime(); // any later departure
+    expect(new Date(lei.start).getTime()).toBeLessThanOrEqual(drivePress);
+    expect(new Date(lei.end).getTime()).toBeGreaterThan(drivePress);
+  });
+
+  it('every segment of the day is marked board-ordered AND close-divided', () => {
+    const segments = splitClockDayAtJobStarts(KEON_CARD, aug11)!;
+    expect(segments.every((s) => s.divided_by_board)).toBe(true);
+    expect(segments.every((s) => s.divided_by_close)).toBe(true);
+    // …and a fully-pressed day is NEITHER, so the sheet can tell them apart.
+    const pressed = splitClockDayAtJobStarts(CONRADE_CARD, day)!;
+    expect(pressed.some((s) => s.divided_by_board)).toBe(false);
+    expect(pressed.some((s) => s.divided_by_close)).toBe(false);
+  });
+
+  it('the shares still never sum past the clocked span', () => {
+    for (const card of [KEON_CARD, AXEL_AUG11_CARD]) {
+      const segments = splitClockDayAtJobStarts(card, aug11)!;
+      const sum = segments.reduce((s, x) => s + x.hours, 0);
+      const gross =
+        (new Date(card.clock_out_time).getTime() - new Date(card.clock_in_time).getTime()) / 3600000;
+      expect(sum).toBeLessThanOrEqual(gross);
+    }
+  });
+});
+
+describe('rule 7 — a close is evidence of a boundary, NEVER of an ordering', () => {
+  const A = 'aaaaaaaa-0000-0000-0000-000000000000';
+  const B = 'bbbbbbbb-0000-0000-0000-000000000000';
+  const C = 'cccccccc-0000-0000-0000-000000000000';
+  const card = { clock_in_time: '2026-08-05T11:00:00Z', clock_out_time: '2026-08-05T21:00:00Z' };
+
+  it('a job on no board row and no press cannot be ordered — abstain', () => {
+    // THE SHAPE, from Conrade's Aug 5 stamps — but NOT that day's outcome, and
+    // the header used to claim otherwise. In production Conrade's Aug 5
+    // RESOLVES (QA Harper 3.22 / Bwc 7.77) because Harper General never enters
+    // the day's job set at all: the board named the other two and only a log
+    // named Harper General, so the ladder in lib/timecard-job-rules.ts drops it
+    // as a conflict before this function is ever called.
+    //
+    // The stamps are kept because they are the clearest illustration of why
+    // ORDER MAY NEVER COME FROM A CLOSE. QA Harper pressed 11:44 and closed
+    // 14:26; Harper General carried no same-day press and closed 14:27, seventy
+    // seconds later; Bwc pressed 14:28. Sorting "press, else close" would slot
+    // Harper General between the two and hand it 70 seconds, giving QA Harper a
+    // morning the two plainly shared. With no board row it cannot be ordered,
+    // and the day abstains.
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: '2026-08-05T11:44:57Z', completed_at: '2026-08-05T14:26:49Z', day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: '2026-08-05T14:27:59Z', day_sequence: null },
+        { job_order_id: C, started_at: '2026-08-05T14:28:30Z', completed_at: null, day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it('the board orders the day when a press is missing', () => {
+    const segments = splitClockDayAtJobStarts(card, [
+      // Handed in "wrong" order, and B's close is LATER than A's press — the
+      // ordering must come from the sequences, not from comparing the two.
+      { job_order_id: B, started_at: null, completed_at: '2026-08-05T20:00:00Z', day_sequence: 3 },
+      { job_order_id: A, started_at: '2026-08-05T12:00:00Z', completed_at: '2026-08-05T15:00:00Z', day_sequence: 1 },
+    ])!;
+    expect(segments.map((s) => s.job_order_id)).toEqual([A, B]);
+    expect(hoursFor(segments, A)).toBe(4); // clock-in 11:00 → A's close 15:00
+    expect(hoursFor(segments, B)).toBe(6); // 15:00 → clock-out 21:00
+  });
+
+  it('a fully-pressed day ignores the board, even when the board disagrees', () => {
+    // Rule 5 is untouched: nothing about rule 6 or 7 may move a day that
+    // already resolves. The sequences here say B first; the presses say A.
+    const segments = splitClockDayAtJobStarts(card, [
+      { job_order_id: A, started_at: '2026-08-05T12:00:00Z', completed_at: '2026-08-05T13:00:00Z', day_sequence: 9 },
+      { job_order_id: B, started_at: '2026-08-05T18:00:00Z', completed_at: null, day_sequence: 1 },
+    ])!;
+    expect(segments.map((s) => s.job_order_id)).toEqual([A, B]);
+    // A runs PAST its own 13:00 close to B's press — rule 5, unchanged.
+    expect(hoursFor(segments, A)).toBe(7);
+    expect(segments.some((s) => s.divided_by_close)).toBe(false);
+  });
+
+  it('two jobs the board calls #1 are not an order — abstain', () => {
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: '2026-08-05T12:00:00Z', completed_at: '2026-08-05T15:00:00Z', day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: '2026-08-05T20:00:00Z', day_sequence: 1 },
+      ])
+    ).toBeNull();
+  });
+
+  it('EVERY segment of a board-ordered day is marked, even the press-drawn one', () => {
+    // The shape that used to print `¶`. A has no press at all; B pressed at
+    // 14:00. The LINE is B's real press, so no close is involved and
+    // `divided_by_close` is correctly absent — but A's three hours rest on the
+    // board saying A came first, and the `¶` footnote claims In/Out come from
+    // clock-in or the In Route press. On A that sentence is not supported.
+    const segments = splitClockDayAtJobStarts(card, [
+      { job_order_id: A, started_at: null, completed_at: '2026-08-05T13:30:00Z', day_sequence: 1 },
+      { job_order_id: B, started_at: '2026-08-05T14:00:00Z', completed_at: null, day_sequence: 2 },
+    ])!;
+    expect(segments.map((s) => s.job_order_id)).toEqual([A, B]);
+    expect(hoursFor(segments, A)).toBe(3); // clock-in 11:00 → B's press 14:00
+    expect(hoursFor(segments, B)).toBe(7);
+    expect(segments.every((s) => s.divided_by_board)).toBe(true);
+    expect(segments.some((s) => s.divided_by_close)).toBe(false);
+  });
+});
+
+describe('guard (c) — the board is an ORDER, not a FACT', () => {
+  const A = 'aaaaaaaa-0000-0000-0000-000000000000';
+  const B = 'bbbbbbbb-0000-0000-0000-000000000000';
+
+  // AXEL VALVERDE, WED AUG 12 2026, with the office's skeleton board row filled
+  // in. Estes pressed 12:35:13 and closed 14:35; Leifeng carries nothing on that
+  // date but an Aug 10 press copy. Before guard (c) this printed 3.65 h against
+  // a job the founder says the man never went to — six-and-a-half on the longer
+  // card shape — on the strength of one line of a schedule.
+  const AXEL_AUG12 = {
+    clock_in_time: '2026-08-12T11:05:09.858Z',
+    clock_out_time: '2026-08-12T18:14:25.737Z',
+  };
+
+  it("Axel's Aug 12 abstains BY LAW, not by a half-filled board row", () => {
+    expect(
+      splitClockDayAtJobStarts(AXEL_AUG12, [
+        {
+          job_order_id: A,
+          started_at: '2026-08-12T12:35:13.002Z',
+          completed_at: '2026-08-12T14:35:00.000Z',
+          day_sequence: 1,
+        },
+        // No press, no close. A board row and nothing else.
+        { job_order_id: B, started_at: null, completed_at: null, day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it('the FIRST job needs a fact too — it is never asked for a boundary', () => {
+    // The mirror image, and the one a guard written inside rule 6 would miss:
+    // an unpressed job in slot 1 is handed clock-in → the next job's press
+    // without any boundary of its own ever being computed.
+    expect(
+      splitClockDayAtJobStarts(AXEL_AUG12, [
+        { job_order_id: A, started_at: null, completed_at: null, day_sequence: 1 },
+        { job_order_id: B, started_at: '2026-08-12T14:00:00.000Z', completed_at: null, day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it('a same-day CLOSE is a fact — this is what saves Leifeng on Aug 11', () => {
+    // Keon's and Axel's Aug 11 resolve precisely because Leifeng's own log
+    // carries `day_completed_at` on that date. Take it away and the same day
+    // abstains; nothing else about it differs.
+    const withClose = splitClockDayAtJobStarts(KEON_CARD, aug11);
+    expect(withClose).not.toBeNull();
+    expect(
+      splitClockDayAtJobStarts(KEON_CARD, [
+        { job_order_id: ISC, started_at: ISC_PRESS, completed_at: ISC_CLOSE, day_sequence: 1 },
+        { job_order_id: LEIFENG, started_at: null, completed_at: null, day_sequence: 3 },
+      ])
+    ).toBeNull();
+  });
+
+  it('a fully-pressed day cannot be touched by it — the press IS the fact', () => {
+    // The guard must be inert wherever the day already resolves. Conrade's and
+    // Axel's Aug 19 carry no closes at all in this fixture and still divide.
+    expect(splitClockDayAtJobStarts(CONRADE_CARD, day)).not.toBeNull();
+    expect(splitClockDayAtJobStarts(AXEL_CARD, day)).not.toBeNull();
+    expect(day.every((j) => (j as { completed_at?: string }).completed_at == null)).toBe(true);
+  });
+});
+
+describe('rule 6 — when the close fallback must still refuse to answer', () => {
+  const A = 'aaaaaaaa-0000-0000-0000-000000000000';
+  const B = 'bbbbbbbb-0000-0000-0000-000000000000';
+  const card = { clock_in_time: '2026-08-06T11:00:00Z', clock_out_time: '2026-08-06T21:00:00Z' };
+
+  it("Keon's Aug 6 abstains — no press and no close on either job", () => {
+    // Two jobs, both day 2, neither pressed and neither closed that day. There
+    // is genuinely nothing to divide on, and an abstention the office can see
+    // beats a fabricated division it cannot.
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: null, completed_at: null, day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: null, day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it("Axel and Conrade's Aug 7 abstains — a close with no same-day start behind it", () => {
+    // J. Davis carries a close at 11:25:47 and NO same-day press: seventeen
+    // minutes after Axel clocked in, somebody filed that job's paperwork. That
+    // is the closeout-from-another-truck pattern, not a morning's work, and
+    // believing it would hand J. Davis 0.28 h and Bwc the other 8.79.
+    const jdavis = 'aaaaaaaa-0000-0000-0000-00000008070a';
+    const bwc = 'bbbbbbbb-0000-0000-0000-00000008070b';
+    const axel = {
+      clock_in_time: '2026-08-07T11:08:51.349Z',
+      clock_out_time: '2026-08-07T20:13:27.291Z',
+    };
+    expect(
+      splitClockDayAtJobStarts(axel, [
+        { job_order_id: jdavis, started_at: null, completed_at: '2026-08-07T11:25:47.945Z', day_sequence: 1 },
+        { job_order_id: bwc, started_at: null, completed_at: null, day_sequence: 2 },
+      ])
+    ).toBeNull();
+
+    // …and giving J. Davis a same-day press is STILL not enough, because Bwc
+    // has no same-day fact of its own: guard (c) refuses to bill a job whose
+    // only claim on the day is a line on the board.
+    expect(
+      splitClockDayAtJobStarts(axel, [
+        {
+          job_order_id: jdavis,
+          started_at: '2026-08-07T11:15:00.000Z',
+          completed_at: '2026-08-07T11:25:47.945Z',
+          day_sequence: 1,
+        },
+        { job_order_id: bwc, started_at: null, completed_at: null, day_sequence: 2 },
+      ])
+    ).toBeNull();
+
+    // It divides only when BOTH conditions hold, which is the whole difference
+    // between this day and Keon's Aug 11: the first job demonstrably ran (its
+    // own press) AND the second carries a same-day fact of its own (its close).
+    const complete = splitClockDayAtJobStarts(axel, [
+      {
+        job_order_id: jdavis,
+        started_at: '2026-08-07T11:15:00.000Z',
+        completed_at: '2026-08-07T11:25:47.945Z',
+        day_sequence: 1,
+      },
+      { job_order_id: bwc, started_at: null, completed_at: '2026-08-07T19:30:00.000Z', day_sequence: 2 },
+    ]);
+    expect(complete).not.toBeNull();
+    expect(complete!.every((s) => s.divided_by_close)).toBe(true);
+    expect(complete!.every((s) => s.divided_by_board)).toBe(true);
+  });
+
+  it('the job BEFORE never closed, so nothing marks where the day moved on', () => {
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: '2026-08-06T12:00:00Z', completed_at: null, day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: '2026-08-06T19:00:00Z', day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it('a job may not BEGIN after its own close', () => {
+    // B closed at 10:00 — before A did. B therefore ran inside A's window and
+    // handing it A's 16:00 close would print an impossibility.
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: '2026-08-06T12:00:00Z', completed_at: '2026-08-06T16:00:00Z', day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: '2026-08-06T13:00:00Z', day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it('a close-derived boundary may not fall before the preceding press', () => {
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: '2026-08-06T14:00:00Z', completed_at: '2026-08-06T13:00:00Z', day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: '2026-08-06T20:00:00Z', day_sequence: 2 },
+      ])
+    ).toBeNull();
+  });
+
+  it('boundaries may not run backwards across three jobs', () => {
+    const C = 'cccccccc-0000-0000-0000-000000000000';
+    expect(
+      splitClockDayAtJobStarts(card, [
+        { job_order_id: A, started_at: '2026-08-06T12:00:00Z', completed_at: '2026-08-06T18:00:00Z', day_sequence: 1 },
+        { job_order_id: B, started_at: null, completed_at: '2026-08-06T20:00:00Z', day_sequence: 2 },
+        // C's own press is EARLIER than the close that opened B.
+        { job_order_id: C, started_at: '2026-08-06T13:00:00Z', completed_at: null, day_sequence: 3 },
+      ])
+    ).toBeNull();
+  });
+});
+
+describe('jobCloseOnDate — the mirror of jobStartOnDate, and its asymmetry', () => {
+  const JOB = 'job-1';
+
+  it('REJECTS a close that belongs to another day', () => {
+    // The whole-job `work_completed_at` of a multi-day job is a different day's
+    // fact on every day but the last, and is discarded exactly as a stale press.
+    expect(jobCloseOnDate(AUG11, [], { work_completed_at: '2026-08-12T18:00:00Z' }, JOB)).toBeNull();
+  });
+
+  it('takes the LATEST surviving close, where a start takes the earliest', () => {
+    // A job's window runs to the OUTERMOST evidence it carries. Taking the
+    // earlier close would hand the next job minutes this one can prove it worked.
+    const early = '2026-08-11T15:04:36.460Z';
+    const late = '2026-08-11T16:30:00.000Z';
+    expect(
+      jobCloseOnDate(
+        AUG11,
+        [{ job_order_id: JOB, log_date: AUG11, day_completed_at: early }],
+        { work_completed_at: late },
+        JOB
+      )
+    ).toBe(late);
+  });
+
+  it("never reads another job's log row", () => {
+    expect(
+      jobCloseOnDate(
+        AUG11,
+        [{ job_order_id: 'someone-else', log_date: AUG11, day_completed_at: ISC_CLOSE }],
+        null,
+        JOB
+      )
+    ).toBeNull();
+  });
+
+  it('is null when nothing closed that day', () => {
+    expect(jobCloseOnDate(AUG11, [], {}, JOB)).toBeNull();
+    expect(jobCloseOnDate(AUG11, null, null, JOB)).toBeNull();
   });
 });
 

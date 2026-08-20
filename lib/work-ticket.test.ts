@@ -1714,4 +1714,85 @@ describe('buildTicketDays — Aug 19, a day divided at the in-route press', () =
     expect(conrade.lunch_minutes).toBe(30);
     expect(conrade.hours_boundary).toBeUndefined();
   });
+
+  it('a PRESS-ORDERED row is ¶ only — it does not claim the weaker inference', () => {
+    const days = build(sterlingSegments, [sterlingLog]);
+    for (const p of days[0].people) {
+      expect(p.hours_boundary).toBe(true);
+      expect(p.hours_boundary_board).toBeUndefined();
+      expect(p.hours_boundary_close).toBeUndefined();
+    }
+  });
+
+  it('a CLOSE-divided row carries board AND close, so the sheet prints ‖ not ¶', () => {
+    // Keon's Aug 11 shape: no In Route press for the later job, so the day's
+    // order came from the board and the line was drawn at the earlier job's
+    // close. The ¶ footnote states In/Out come "from clock-in or the In Route
+    // press" — not supported on this row, hence the other mark.
+    const closeDivided = new Map([
+      [
+        CONRADE_CARD,
+        {
+          start: STERLING_PRESS,
+          end: '2026-08-19T21:38:48.668Z',
+          hours: 3.55,
+          divided_by_board: true,
+          divided_by_close: true,
+        },
+      ],
+      [
+        AXEL_CARD,
+        {
+          start: STERLING_PRESS,
+          end: '2026-08-19T20:42:46.533Z',
+          hours: 2.62,
+          divided_by_board: true,
+          divided_by_close: true,
+        },
+      ],
+    ]);
+    const days = build(closeDivided, [sterlingLog]);
+    for (const p of days[0].people) {
+      expect(p.hours_boundary).toBe(true);
+      expect(p.hours_boundary_board).toBe(true);
+      expect(p.hours_boundary_close).toBe(true);
+    }
+    // The hours themselves are unchanged — only the statement about them is.
+    expect(days[0].total_hours).toBe(6.17);
+  });
+
+  it('a BOARD-ORDERED row with a real press boundary still prints ‖, not ¶', () => {
+    // THE ROW THAT USED TO LIE. The line here IS an In Route press — so
+    // `divided_by_close` is correctly absent — but the day's ORDER came from the
+    // board because the other job on it never pressed. Marking only the
+    // close-divided case left this row printing ¶, whose footnote claims every
+    // In/Out on it comes from clock-in or a press.
+    const boardOrdered = new Map([
+      [
+        CONRADE_CARD,
+        {
+          start: STERLING_PRESS,
+          end: '2026-08-19T21:38:48.668Z',
+          hours: 3.55,
+          divided_by_board: true,
+        },
+      ],
+      [
+        AXEL_CARD,
+        {
+          start: STERLING_PRESS,
+          end: '2026-08-19T20:42:46.533Z',
+          hours: 2.62,
+          divided_by_board: true,
+        },
+      ],
+    ]);
+    const days = build(boardOrdered, [sterlingLog]);
+    for (const p of days[0].people) {
+      expect(p.hours_boundary).toBe(true);
+      expect(p.hours_boundary_board).toBe(true);
+      expect(p.hours_boundary_close).toBeUndefined();
+    }
+    expect(days[0].total_hours).toBe(6.17);
+  });
 });

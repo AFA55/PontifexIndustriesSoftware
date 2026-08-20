@@ -55,16 +55,28 @@ export function canEditJobTimestamps(role: string | null | undefined): boolean {
  * In Route nulls BOTH press columns, after which `work_started_at` is the only
  * candidate left and every later edit to it moves the boundary.
  *
+ * `work_completed_at` JOINED THE SET WHEN THE CLOSE FALLBACK SHIPPED (Aug 20).
+ * It is not a start stamp and never will be — rule 5 still says a completion
+ * does not end its own job's segment. But rule 6 in `lib/job-day-boundary.ts`
+ * hands the NEXT job the close of the one before it whenever that next job has
+ * no usable same-day press, so editing a completion time now moves a boundary
+ * one job downstream. On Keon's Aug 11 it is the ONLY thing holding the line
+ * between ISC and Leifeng: move ISC's close and every hour on both invoices
+ * moves with it. A field that can do that has to carry the same warning as a
+ * press, whatever kind of stamp it is.
+ *
  * Kept in one place because the client modal (which must warn BEFORE the click)
  * and the PATCH route (which returns the note AFTER it) have to agree; when they
  * disagree the office either gets a warning about nothing or no warning about
- * something. `arrived_at_jobsite_at` and `work_completed_at` are deliberately
- * absent — neither is a start-stamp candidate.
+ * something. `arrived_at_jobsite_at` is deliberately absent — it is read by
+ * neither the start rule nor the close rule.
  */
 export const BOUNDARY_TIMESTAMP_FIELDS: readonly string[] = [
   'in_route_at',
   'route_started_at',
   'work_started_at',
+  // Not a start. A boundary all the same — see the note above.
+  'work_completed_at',
 ];
 
 /** True when editing this timestamp column can move a job-day boundary. */

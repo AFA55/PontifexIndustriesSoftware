@@ -5,7 +5,12 @@ import {
   TIMESTAMP_EDIT_ROLES,
 } from './timestamp-edit-access';
 import { ADMIN_ROLES } from './api-auth';
-import { jobStartOnDate, type JobStartStamps } from './job-day-boundary';
+import {
+  jobCloseOnDate,
+  jobStartOnDate,
+  type JobCloseStamps,
+  type JobStartStamps,
+} from './job-day-boundary';
 
 describe('canEditJobTimestamps — the gate on the job timestamp editor', () => {
   it('admits exactly the roles requireAdmin admits', () => {
@@ -69,9 +74,19 @@ describe('movesJobDayBoundary — which timestamp edits move another job’s hou
     }
   );
 
-  it.each(['arrived_at_jobsite_at', 'work_completed_at', 'day_completed_at'])(
-    'leaves %s alone — it is not a start stamp',
+  it('treats work_completed_at as a boundary field — the close fallback', () => {
+    // NOT a start stamp, and rule 5 still says a completion does not end its own
+    // segment. But rule 6 hands the NEXT job the close of the one before it when
+    // that next job has no usable press, so editing a completion moves a
+    // boundary one job downstream. This assertion used to read `false`.
+    expect(movesJobDayBoundary('work_completed_at')).toBe(true);
+  });
+
+  it.each(['arrived_at_jobsite_at', 'day_completed_at'])(
+    'leaves %s alone — neither the start rule nor the close rule reads it',
     (field) => {
+      // `day_completed_at` lives on `daily_job_logs` and IS read by
+      // `jobCloseOnDate`, but this route edits `job_orders` and cannot touch it.
       expect(movesJobDayBoundary(field)).toBe(false);
     }
   );
@@ -109,24 +124,41 @@ describe('movesJobDayBoundary — which timestamp edits move another job’s hou
     expect(jobStartOnDate(DATE, null, cleared)).toBe('2026-08-19T12:10:00.000Z');
   });
 
-  it('covers every stamp jobStartOnDate actually reads', () => {
-    // Move each field on its own, from a baseline where it is not the minimum,
-    // to a time that IS the minimum. If the boundary changes, that field can
-    // move another job's hours and must be in the set.
-    const BASE: Required<JobStartStamps> = {
+  it('covers every stamp the boundary rules actually read', () => {
+    // Move each field on its own and ask the REAL rules whether the day would be
+    // divided differently — through `jobStartOnDate` (which opens a job's
+    // stretch) and `jobCloseOnDate` (which, under rule 6, opens the NEXT job's).
+    // If either answer changes, that field can move somebody's invoiced hours
+    // and must be in the set. Derived, never restated: add a candidate to
+    // lib/job-day-boundary.ts and forget this list, and this fails.
+    // The union of what BOTH rules read. `work_completed_at` lives in
+    // `JobCloseStamps`, not `JobStartStamps` — a completion is not a start, and
+    // the shapes say so — but the edit gate has to cover every column that can
+    // move a boundary, whichever rule reads it.
+    const BASE: Required<JobStartStamps & JobCloseStamps> = {
       route_started_at: '2026-08-19T13:00:00.000Z',
       in_route_at: '2026-08-19T13:00:00.000Z',
       work_started_at: '2026-08-19T13:00:00.000Z',
+      work_completed_at: '2026-08-19T13:00:00.000Z',
     };
     const EARLIER = '2026-08-19T11:00:00.000Z';
 
-    const baseline = jobStartOnDate(DATE, null, BASE);
-    expect(baseline).toBe('2026-08-19T13:00:00.000Z');
+    const baseStart = jobStartOnDate(DATE, null, BASE);
+    const baseClose = jobCloseOnDate(DATE, null, BASE);
+    expect(baseStart).toBe('2026-08-19T13:00:00.000Z');
+    expect(baseClose).toBe('2026-08-19T13:00:00.000Z');
 
     const moversFound: string[] = [];
-    for (const field of Object.keys(BASE) as (keyof JobStartStamps)[]) {
-      const moved = jobStartOnDate(DATE, null, { ...BASE, [field]: EARLIER });
-      if (moved !== baseline) moversFound.push(field);
+    // The key type is the UNION of both shapes, because `BASE` is. Casting to
+    // `keyof JobStartStamps` alone was a lie the compiler could not catch:
+    // `work_completed_at` is not in that type, so the one field the close rule
+    // reads was being iterated under a name that claims it is a start stamp —
+    // in the very test whose job is to keep starts and closes distinct.
+    for (const field of Object.keys(BASE) as (keyof (JobStartStamps & JobCloseStamps))[]) {
+      const edited = { ...BASE, [field]: EARLIER };
+      const movedStart = jobStartOnDate(DATE, null, edited) !== baseStart;
+      const movedClose = jobCloseOnDate(DATE, null, edited) !== baseClose;
+      if (movedStart || movedClose) moversFound.push(field);
     }
 
     expect(moversFound.sort()).toEqual([...BOUNDARY_TIMESTAMP_FIELDS].sort());

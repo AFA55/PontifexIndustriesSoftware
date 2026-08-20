@@ -12,7 +12,7 @@ export type EditTimestampField =
   | 'work_completed_at';
 
 /**
- * MOVING A START STAMP MOVES ANOTHER JOB'S HOURS.
+ * MOVING A BOUNDARY STAMP MOVES ANOTHER JOB'S HOURS.
  *
  * Since the clock-cycle billing model shipped, the moment a job takes over a
  * crew's clocked day is the EARLIEST of its start stamps — `route_started_at`,
@@ -21,6 +21,14 @@ export type EditTimestampField =
  * to the next boundary or to clock-out. So correcting job B's start earlier
  * shortens job A's stretch on the same day and lengthens B's — and job A may
  * already be invoiced.
+ *
+ * `work_completed_at` IS IN THE SET AND OBEYS THE OPPOSITE RULE. It is not a
+ * start; `jobCloseOnDate` reduces closes with `max`, and rule 6 hands the close
+ * to the job AFTER this one when that job never recorded a press. So the LATEST
+ * sign-off wins and the hours that move are one job downstream. The warning
+ * below branches on the field for exactly this reason — the two sentences are
+ * not interchangeable, and the wrong one would send an admin to move two
+ * invoices believing they had moved none.
  *
  * Which fields those are lives in `lib/timestamp-edit-access.ts` so this modal
  * and the PATCH route cannot drift apart; see the note there for why
@@ -284,17 +292,38 @@ export default function EditTimestampModal({
         {/* Body */}
         <div className="px-5 pb-5 space-y-4">
           {/* WHAT THIS EDIT ACTUALLY MOVES — said before the click, not after.
-              A start stamp is where a crew's clocked day divides between jobs,
-              so correcting it rewrites the OTHER job's hours too. The copy names
-              the field being edited rather than In Route, because Work Started
-              can be the boundary too — it is whichever start stamp is earliest. */}
+              The stamp is where a crew's clocked day divides between jobs, so
+              correcting it rewrites the OTHER job's hours too.
+
+              THE SENTENCE IS FIELD-AWARE, AND HAS TO BE. "The earliest one wins"
+              is true of the START stamps — `jobStartOnDate` reduces them with
+              `min`, so whichever of In Route / Work Started is earliest is the
+              boundary. It is FALSE of `work_completed_at`: that is not a start
+              at all, `jobCloseOnDate` reduces closes with `max`, and under rule 6
+              it opens the NEXT job's hours rather than this one's. Telling an
+              admin correcting a completion time that the earliest wins, when the
+              latest does and the effect lands one job downstream, is worse than
+              no warning — they would move two invoices believing they moved
+              none. See `BOUNDARY_TIMESTAMP_FIELDS` in lib/timestamp-edit-access.ts. */}
           {movesBoundary && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/30">
               <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-amber-800 dark:text-amber-200">
-                {label} is one of the stamps that decides where a crew&rsquo;s clocked day divides
-                between jobs — the earliest one wins. Moving it can also change the hours on the
-                other job(s) they worked that day, including jobs that may already be invoiced.
+                {field === 'work_completed_at' ? (
+                  <>
+                    {label} decides where a crew&rsquo;s clocked day divides between jobs when the
+                    NEXT job never recorded an In Route press — that job&rsquo;s hours start at this
+                    sign-off. The LATEST sign-off on the day wins. Moving it changes the hours on
+                    both jobs, including jobs that may already be invoiced.
+                  </>
+                ) : (
+                  <>
+                    {label} is one of the START stamps that decides where a crew&rsquo;s clocked day
+                    divides between jobs — the earliest one wins. Moving it can also change the
+                    hours on the other job(s) they worked that day, including jobs that may already
+                    be invoiced.
+                  </>
+                )}
               </p>
             </div>
           )}
