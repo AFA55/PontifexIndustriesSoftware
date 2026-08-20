@@ -22,6 +22,7 @@ import {
   jobHoursForCard,
   laborLine,
   paidCardHours,
+  paidSegmentHours,
   round2,
   DEFAULT_LABOR_BURDEN_PCT,
   type BoundableCard,
@@ -39,12 +40,21 @@ export interface LaborBreakdownLine {
   span_end: string | null;
   /** The card/log's own paid hours (lunch-adjusted for timecards). */
   raw_hours: number;
-  /** Hours actually attributable to THIS job (bounded; shop-flagged → 0). */
+  /**
+   * Hours actually attributable to THIS job (bounded; shop-flagged → 0), on the
+   * PAYROLL basis — this is a COST line, and payroll does not pay the lunch.
+   *
+   * On a day divided at the in-route presses that makes it deliberately SMALLER
+   * than the same segment on the printed work ticket, which carries the gross
+   * span because the customer IS billed for the lunch inside it (founder,
+   * Aug 17 2026). Conrade's Aug 19 Sterling stretch is 3.55 billable / 3.38
+   * paid. See `paidSegmentHours` in lib/labor-cost.ts.
+   */
   bounded_hours: number;
   /** raw_hours − bounded_hours (≥ 0). */
   excluded_hours: number;
   /** Why hours were excluded, when they were. */
-  excluded_reason: 'shop' | 'outside_job_window' | null;
+  excluded_reason: 'shop' | 'outside_job_window' | 'other_job' | null;
   /**
    * TRUE = these hours are ATTRIBUTED, not recorded: the card carries no
    * `job_order_id`, and it counts here because the office placed this person on
@@ -158,6 +168,15 @@ export function buildLaborBreakdown(args: {
    * treated as linked, which is the pre-attribution behaviour.
    */
   attributedTimecardIds?: Set<string>;
+  /**
+   * `attributableTimecards.boundarySegments` — card id → the stretch of that
+   * card belonging to THIS job on a day the crew ran more than one. When a card
+   * is in here the segment IS its bound, and the on-site window below is not
+   * consulted at all: the founder's boundary is the START OF THE NEXT JOB, not
+   * this one's completion. Omit and every card keeps the window clip it has
+   * today.
+   */
+  boundarySegments?: Map<string, { start: string; end: string }>;
 }): LaborBreakdown {
   const { job, burdenPct } = args;
   const now = args.now ?? new Date();
@@ -188,7 +207,22 @@ export function buildLaborBreakdown(args: {
     // the Completed Job Ticket's hours panel, which is read beside this cost
     // while an invoice is being written and must not quote a different figure.
     const paid = paidHours(t);
-    const bounded = jobHoursForCard(t, job, attributed, now);
+    const segment = args.boundarySegments?.get(t.id) ?? null;
+    // BILLABLE first (the segment's gross clocked span, lunch included — the
+    // figure the customer's ticket carries), then the PAYROLL basis for the
+    // COST, because payroll does not pay the lunch.
+    //
+    // "lunch is deducted for employees and still considered billable hours"
+    // (founder, Aug 17 2026). A divided day is split on the gross clock, so its
+    // segments sum to the card's gross span: Conrade's Aug 19 is 7.03 + 3.55 =
+    // 10.58 against 10.09 actually paid. Feeding 10.58 into `laborLine` books
+    // half an hour of wage AND burden that no payroll run will ever produce —
+    // +2.43 h across the five divided person-days in production today. Every
+    // other line in this function is already capped at the card's paid hours;
+    // the segment path was the one that was not. See `paidSegmentHours` for the
+    // proportional rule and why a lunch-window rule is not available.
+    const billable = jobHoursForCard(t, job, attributed, now, undefined, segment);
+    const bounded = segment ? paidSegmentHours(t, billable, now) : billable;
     const isShop =
       t.is_shop_hours === true ||
       t.is_shop_time === true ||
@@ -208,12 +242,16 @@ export function buildLaborBreakdown(args: {
       worker_name: t.full_name || 'Unknown',
       role: t.role ?? null,
       date: t.date ?? null,
-      span_start: t.clock_in_time ?? null,
-      span_end: t.clock_out_time ?? null,
+      // On a divided day the span shown must be the span BILLED, or the screen
+      // states a ten-hour clock beside three and a half hours and reads as an
+      // error. The card's own clock is still on the timecard.
+      span_start: segment?.start ?? t.clock_in_time ?? null,
+      span_end: segment?.end ?? t.clock_out_time ?? null,
       raw_hours: raw,
       bounded_hours: bounded,
       excluded_hours: excluded,
-      excluded_reason: excluded > 0 ? (isShop ? 'shop' : 'outside_job_window') : null,
+      excluded_reason:
+        excluded > 0 ? (isShop ? 'shop' : segment ? 'other_job' : 'outside_job_window') : null,
       attributed,
       hourly_rate: rate,
       rate_missing: rate == null && bounded > 0,

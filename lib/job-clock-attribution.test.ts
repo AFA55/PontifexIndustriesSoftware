@@ -116,3 +116,120 @@ describe('attributableTimecards — a failed read throws instead of reporting ze
     expect(cards).toEqual([]);
   });
 });
+
+/**
+ * AUG 19 2026 — THE DAY THE BOARD SENT ONE CREW TO TWO JOBS.
+ *
+ * Conrade and Axel each clocked ONE card, both tagged NC&E, and the board placed
+ * both men on NC&E and then Sterling. Every job that day recorded an in-route
+ * press, so the day divides at them: NC&E from clock-in to Sterling's press,
+ * Sterling from that press to clock-out.
+ */
+describe('attributableTimecards — the in-route press divides the day', () => {
+  const NCE = 'job-nce';
+  const STERLING = 'job-sterling';
+  const CONRADE = 'op-conrade';
+  const AXEL = 'op-axel';
+  const DAY = '2026-08-19';
+  const NCE_PRESS = '2026-08-19T11:52:42.498Z';
+  const STERLING_PRESS = '2026-08-19T18:05:27.030Z';
+
+  const conradeCard = {
+    id: 'tc-conrade',
+    user_id: CONRADE,
+    date: DAY,
+    clock_in_time: '2026-08-19T11:03:19.547Z',
+    clock_out_time: '2026-08-19T21:38:48.668Z',
+    net_hours: 10.09,
+    total_hours: 10.09,
+    job_order_id: NCE,
+  };
+  const axelCard = {
+    id: 'tc-axel',
+    user_id: AXEL,
+    date: DAY,
+    clock_in_time: '2026-08-19T11:09:17.983Z',
+    clock_out_time: '2026-08-19T20:42:46.533Z',
+    net_hours: 9.06,
+    total_hours: 9.06,
+    job_order_id: NCE,
+  };
+
+  const seedTheDay = (opts: { sterlingPress?: string | null } = {}) => {
+    const sterlingPress = opts.sterlingPress === undefined ? STERLING_PRESS : opts.sterlingPress;
+    mockResults.timecards = { data: [conradeCard, axelCard], error: null };
+    mockResults.job_daily_assignments = {
+      data: [
+        { assignment_date: DAY, operator_id: CONRADE, helper_id: AXEL, job_order_id: NCE },
+        { assignment_date: DAY, operator_id: CONRADE, helper_id: AXEL, job_order_id: STERLING },
+      ],
+      error: null,
+    };
+    mockResults.daily_job_logs = {
+      data: [
+        {
+          operator_id: CONRADE,
+          log_date: DAY,
+          job_order_id: NCE,
+          route_started_at: NCE_PRESS,
+          work_started_at: '2026-08-19T14:12:55.025Z',
+        },
+        {
+          operator_id: CONRADE,
+          log_date: DAY,
+          job_order_id: STERLING,
+          route_started_at: sterlingPress,
+          work_started_at: sterlingPress,
+        },
+      ],
+      error: null,
+    };
+    mockResults.helper_work_logs = { data: [], error: null };
+    mockResults.job_orders = {
+      data: [
+        { id: NCE, route_started_at: NCE_PRESS, in_route_at: NCE_PRESS },
+        { id: STERLING, route_started_at: sterlingPress, in_route_at: sterlingPress },
+      ],
+      error: null,
+    };
+  };
+
+  it('hands NC&E 7.03 and 6.93 — the morning, not the whole card', async () => {
+    seedTheDay();
+    const out = await attributableTimecards(NCE, [CONRADE, AXEL], [DAY]);
+    expect(out.boundarySegments.get('tc-conrade')?.hours).toBe(7.03);
+    expect(out.boundarySegments.get('tc-axel')?.hours).toBe(6.93);
+    expect(out.boundaryIds.has('tc-conrade')).toBe(true);
+    // The segment ends where Sterling starts, not where NC&E was signed off.
+    expect(out.boundarySegments.get('tc-conrade')?.end).toBe(
+      new Date(STERLING_PRESS).toISOString()
+    );
+  });
+
+  it('does not divide the day when the second job was never pressed', async () => {
+    // Guard (b): a job with no in-route press cannot claim a boundary, and
+    // cannot be ordered against the one that has it either.
+    seedTheDay({ sterlingPress: null });
+    const out = await attributableTimecards(NCE, [CONRADE, AXEL], [DAY]);
+    expect(out.boundarySegments.size).toBe(0);
+    // …and the card still reaches the job the ordinary way, unchanged.
+    expect(out.cards.map((c) => c.id).sort()).toEqual(['tc-axel', 'tc-conrade']);
+  });
+
+  it('rejects a stale press copied from an earlier day', async () => {
+    seedTheDay({ sterlingPress: '2026-08-10T18:05:27.030Z' });
+    const out = await attributableTimecards(NCE, [CONRADE, AXEL], [DAY]);
+    expect(out.boundarySegments.size).toBe(0);
+  });
+
+  it('a dead start-stamp read throws — it must not read as "the day did not divide"', async () => {
+    seedTheDay();
+    mockResults.job_orders = {
+      data: null,
+      error: { code: '42703', message: 'column job_orders.in_route_at does not exist' },
+    };
+    await expect(attributableTimecards(NCE, [CONRADE, AXEL], [DAY])).rejects.toBeInstanceOf(
+      TimecardAttributionQueryError
+    );
+  });
+});

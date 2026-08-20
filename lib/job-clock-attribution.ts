@@ -47,6 +47,12 @@
  */
 
 import { supabaseAdmin } from '@/lib/supabase-admin';
+import { DEFAULT_TENANT_TZ } from '@/lib/reminder-timing';
+import {
+  jobStartOnDate,
+  splitClockDayAtJobStarts,
+  type JobDaySegment,
+} from '@/lib/job-day-boundary';
 
 /**
  * A QUERY THAT DIED MUST NEVER LOOK LIKE A JOB NOBODY WORKED.
@@ -138,6 +144,36 @@ export interface AttributedClockCards {
    * cannot drift from the card rule it mirrors.
    */
   offJobPersonDays: Set<string>;
+  /**
+   * THE DAY DIVIDED AT THE IN-ROUTE PRESSES — card id → the stretch of that
+   * card that belongs to THIS job.
+   *
+   * Populated only for a person-day the crew was provably on TWO OR MORE jobs
+   * and EVERY one of them recorded a start on that date
+   * (lib/job-day-boundary.ts). Three consequences for the caller, and all three
+   * matter on a sheet the office invoices from:
+   *
+   *   • the card's own `net_hours`/`total_hours` describe the WHOLE day and are
+   *     no longer this job's figure — use `hours` off the segment;
+   *   • the card's clock-in/clock-out are not this job's start and end — use the
+   *     segment's, which are the person's clock-in (first job) or the press, and
+   *     the next press or their clock-out;
+   *   • the figure is INFERRED from the presses rather than read off a tagged
+   *     card, and has to print as such.
+   *
+   * A card carrying ANOTHER job's `job_order_id` appears in `cards` when, and
+   * only when, it is in here: that is the Aug 19 case. Conrade's and Axel's
+   * single cards are both tagged NC&E, and Sterling's share of the day exists
+   * nowhere else — which is why Sterling printed 0.04 h, the length of a daily
+   * log's open session, against three and a half hours of work.
+   */
+  boundarySegments: Map<string, JobDaySegment>;
+  /**
+   * Ids of the cards in `boundarySegments` — the same judgement as a set, for
+   * callers that only need "is this one of them" (e.g. the helper
+   * double-count guard, which takes a set of inferred card ids).
+   */
+  boundaryIds: Set<string>;
 }
 
 /**
@@ -171,12 +207,20 @@ export async function attributableTimecards(
   dates: string[],
   select: string = TIMECARD_ATTRIBUTION_SELECT,
   from: 'timecards' | 'timecards_with_users' = 'timecards',
-  tenantId?: string | null
+  tenantId?: string | null,
+  /**
+   * The zone a boundary timestamp's calendar date is read in — see guard (a) in
+   * lib/job-day-boundary.ts. Defaults to the platform default, matching
+   * `jobHoursForCard`; a multi-zone tenant should pass its own.
+   */
+  timeZone: string = DEFAULT_TENANT_TZ
 ): Promise<AttributedClockCards> {
   const splitDates = new Set<string>();
   const splitPersonDays = new Set<string>();
   const attributedIds = new Set<string>();
   const offJobPersonDays = new Set<string>();
+  const boundarySegments = new Map<string, JobDaySegment>();
+  const boundaryIds = new Set<string>();
 
   // Each query is hoisted and the tenant filter applied with a plain `if`.
   // A generic `scoped(q)` helper reads better but its type parameter is
@@ -220,7 +264,15 @@ export async function attributableTimecards(
   dates = Array.from(dateSet);
 
   if (userIds.length === 0 || dates.length === 0) {
-    return { cards, splitDates, splitPersonDays, attributedIds, offJobPersonDays };
+    return {
+      cards,
+      splitDates,
+      splitPersonDays,
+      attributedIds,
+      offJobPersonDays,
+      boundarySegments,
+      boundaryIds,
+    };
   }
 
   let byCrewQuery = supabaseAdmin.from(from).select(select).in('user_id', userIds).in('date', dates);
@@ -294,12 +346,48 @@ export async function attributableTimecards(
     if (jobs.size > 0 && !jobs.has(jobId)) offJobPersonDays.add(key);
   }
 
+  // ── THE IN-ROUTE PRESS IS THE JOB BOUNDARY ────────────────────────────────
+  //
+  // Everything above answers "does this whole card belong to this job". On a
+  // day the crew ran two jobs the honest answer is "part of it does", and until
+  // now there was no way to say that: the card went entirely to whichever job
+  // it was tagged with, and the second job fell back to its DAILY LOG's
+  // `hours_worked` — the length of the closeout session. That is how Sterling
+  // printed 0.04 h against three and a half hours of work on Aug 19, and it is
+  // the same defect as the 0.09 h phantom, one surface over.
+  //
+  // The day's jobs come from the SAME authority ladder the card rule uses, so
+  // the two can never disagree about where someone was:
+  //   1. the office's placement ledger, when it placed them anywhere that day;
+  //   2. otherwise the jobs they filed paperwork on;
+  //   3. plus, always, the job their own card is TAGGED with — a recorded fact
+  //      that no ledger outranks (real: Zack's Aug 14 card names
+  //      JOB-2026-424813 while the board placed him on JOB-2026-675188).
+  //
+  // Rung 1 is what keeps the closeout phantoms dead. On 8/12 Dante FILED
+  // JOB-2026-277097's paperwork from another job's truck; the board placed him
+  // only on JOB-2026-914932, so 277097 is not one of that day's jobs and cannot
+  // be handed a boundary — never mind the 10.37-hour card it would have taken.
+  await resolveBoundarySegments({
+    jobId,
+    timeZone,
+    tenantId,
+    cardPool: [...cards, ...byCrew],
+    placed,
+    touched,
+    boundarySegments,
+    boundaryIds,
+  });
+
   const seen = new Set(cards.map((c) => c.id));
   for (const t of byCrew) {
     if (seen.has(t.id)) continue;
-    // Already another job's hours.
-    if (t.job_order_id && t.job_order_id !== jobId) continue;
-    if (!t.job_order_id) {
+    // A card whose day divides at the presses carries a stretch that is ours,
+    // whatever job its tag names. The segment — not the card — is the figure.
+    const hasBoundary = boundarySegments.has(t.id);
+    // Already another job's hours, unless part of the day is provably here.
+    if (t.job_order_id && t.job_order_id !== jobId && !hasBoundary) continue;
+    if (!t.job_order_id && !hasBoundary) {
       const key = `${t.user_id}|${t.date}`;
       const placedThatDay = placed.get(key);
       if (placedThatDay && placedThatDay.size > 0) {
@@ -333,7 +421,149 @@ export async function attributableTimecards(
 
   await backfillShopFlags(from, cards, tenantId);
 
-  return { cards, splitDates, splitPersonDays, attributedIds, offJobPersonDays };
+  return {
+    cards,
+    splitDates,
+    splitPersonDays,
+    attributedIds,
+    offJobPersonDays,
+    boundarySegments,
+    boundaryIds,
+  };
+}
+
+/**
+ * Fill `boundarySegments` for every card whose person-day divides at the
+ * in-route presses and whose division gives a stretch to THIS job.
+ *
+ * Two reads, both tenant-scoped like everything else here, both narrowed to the
+ * job/date pairs that a multi-job person-day actually needs — a single-job day
+ * can never produce a boundary, so the common case costs nothing:
+ *   • `job_orders` start stamps (the whole-job press; right for a one-day job
+ *     and for day 1 of a multi-day one);
+ *   • `daily_job_logs` per-DAY start stamps (the only source that can be right
+ *     on day 5 — and the one whose stale copies guard (a) exists to reject).
+ *
+ * A failed read THROWS, like every other read in this module: a dead query must
+ * never present as "this day did not divide", which is indistinguishable on
+ * screen from the bug being fixed.
+ */
+async function resolveBoundarySegments(args: {
+  jobId: string;
+  timeZone: string;
+  tenantId?: string | null;
+  cardPool: any[];
+  placed: Map<string, Set<string>>;
+  touched: Map<string, Set<string>>;
+  boundarySegments: Map<string, JobDaySegment>;
+  boundaryIds: Set<string>;
+}): Promise<void> {
+  const { jobId, timeZone, tenantId, cardPool, placed, touched } = args;
+
+  // person|date → every card that person clocked that day. One card per day on
+  // 297 of 298 production person-days; the exception is a night shift, and each
+  // of its cards divides on its own terms.
+  const cardsByPersonDay = new Map<string, any[]>();
+  const seenCards = new Set<string>();
+  for (const c of cardPool) {
+    if (!c?.id || !c.user_id || !c.date || seenCards.has(c.id)) continue;
+    seenCards.add(c.id);
+    const key = `${c.user_id}|${c.date}`;
+    const list = cardsByPersonDay.get(key) ?? [];
+    list.push(c);
+    cardsByPersonDay.set(key, list);
+  }
+  if (cardsByPersonDay.size === 0) return;
+
+  // person|date → the jobs that day, by the authority ladder documented above.
+  const dayJobs = new Map<string, Set<string>>();
+  const addJob = (key: string, jid?: string | null) => {
+    if (!jid) return;
+    const s = dayJobs.get(key) ?? new Set<string>();
+    s.add(jid);
+    dayJobs.set(key, s);
+  };
+  for (const [key, jobs] of placed) for (const j of jobs) addJob(key, j);
+  for (const [key, jobs] of touched) {
+    // Rung 2 only when rung 1 said nothing. A filed log never adds a job to a
+    // day the office already accounted for — that is the Aug 18 closeout rule,
+    // and re-litigating it here would resurrect the phantoms it killed.
+    if ((placed.get(key)?.size ?? 0) > 0) continue;
+    for (const j of jobs) addJob(key, j);
+  }
+  for (const [key, list] of cardsByPersonDay) {
+    for (const c of list) addJob(key, c.job_order_id);
+  }
+
+  // Only days that (a) have two or more jobs and (b) include THIS one.
+  const candidates: Array<{ key: string; date: string; jobIds: string[] }> = [];
+  const neededJobIds = new Set<string>();
+  const neededDates = new Set<string>();
+  for (const [key, jobs] of dayJobs) {
+    if (jobs.size < 2 || !jobs.has(jobId)) continue;
+    if (!cardsByPersonDay.has(key)) continue;
+    const sep = key.lastIndexOf('|');
+    const date = key.slice(sep + 1);
+    if (!date) continue;
+    candidates.push({ key, date, jobIds: Array.from(jobs) });
+    for (const j of jobs) neededJobIds.add(j);
+    neededDates.add(date);
+  }
+  if (candidates.length === 0) return;
+
+  const jobIdList = Array.from(neededJobIds);
+  const dateList = Array.from(neededDates);
+
+  let jobStampQuery = supabaseAdmin
+    .from('job_orders')
+    .select('id, route_started_at, in_route_at, work_started_at')
+    .in('id', jobIdList);
+  if (tenantId) jobStampQuery = jobStampQuery.eq('tenant_id', tenantId);
+
+  // Any operator's log for the job+date: the press belongs to the JOB that day,
+  // not to whoever happened to file the paperwork. A helper never files one.
+  let logStampQuery = supabaseAdmin
+    .from('daily_job_logs')
+    .select('job_order_id, log_date, route_started_at, work_started_at')
+    .in('job_order_id', jobIdList)
+    .in('log_date', dateList);
+  if (tenantId) logStampQuery = logStampQuery.eq('tenant_id', tenantId);
+
+  const [jobStampRes, logStampRes] = await Promise.all([jobStampQuery, logStampQuery]);
+  const jobStampRows = rowsOrThrow(jobStampRes, 'job start stamps');
+  const logStampRows = rowsOrThrow(logStampRes, 'daily-log start stamps');
+
+  const stampsByJob = new Map<string, any>();
+  for (const r of jobStampRows) stampsByJob.set(r.id, r);
+  const logsByJobDate = new Map<string, any[]>();
+  for (const r of logStampRows) {
+    if (!r.job_order_id || !r.log_date) continue;
+    const k = `${r.job_order_id}|${r.log_date}`;
+    const list = logsByJobDate.get(k) ?? [];
+    list.push(r);
+    logsByJobDate.set(k, list);
+  }
+
+  for (const { key, date, jobIds } of candidates) {
+    const starts = jobIds.map((j) => ({
+      job_order_id: j,
+      started_at: jobStartOnDate(
+        date,
+        logsByJobDate.get(`${j}|${date}`) ?? [],
+        stampsByJob.get(j) ?? null,
+        j,
+        timeZone
+      ),
+    }));
+    for (const card of cardsByPersonDay.get(key) ?? []) {
+      const segments = splitClockDayAtJobStarts(card, starts);
+      if (!segments) continue; // guard (b): a job with no press, or no day to divide
+      const mine = segments.find((s) => s.job_order_id === jobId);
+      if (!mine) continue;
+      args.boundarySegments.set(card.id, mine);
+      args.boundaryIds.add(card.id);
+    }
+  }
 }
 
 /**

@@ -25,7 +25,7 @@ export interface LaborBreakdownLineDTO {
   raw_hours: number;
   bounded_hours: number;
   excluded_hours: number;
-  excluded_reason: 'shop' | 'outside_job_window' | null;
+  excluded_reason: 'shop' | 'outside_job_window' | 'other_job' | null;
   /** true = inferred from the office's placement, not tagged by the operator. */
   attributed?: boolean;
   hourly_rate: number | null;
@@ -236,7 +236,11 @@ export default function LaborCostBreakdown({
                     <span className="inline-flex items-center gap-1 text-slate-400 dark:text-white/40">
                       {l.excluded_reason === 'shop' && <Factory className="w-3 h-3" />}
                       excluded {l.excluded_hours.toFixed(2)}h{' '}
-                      {l.excluded_reason === 'shop' ? '(shop)' : '(outside job window)'}
+                      {l.excluded_reason === 'shop'
+                        ? '(shop)'
+                        : l.excluded_reason === 'other_job'
+                          ? '(another job that day + lunch)'
+                          : '(outside job window)'}
                     </span>
                   )}
                 </div>

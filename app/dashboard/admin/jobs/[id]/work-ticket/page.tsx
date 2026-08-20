@@ -477,12 +477,24 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
     (d.people || []).filter((p) => !p.filed_off_job).map((p) => ({ date: d.date, p }))
   );
   // Footnote markers, printed only when the sheet actually contains one.
-  const hasAttributed = hourRows.some(({ p }) => p.hours_attributed);
+  // `&& !p.hours_boundary` MIRRORS THE ROW MARK. On a row the ¶ suppresses the †
+  // (a divided row is inferred by definition), so a sheet whose ONLY inferred
+  // rows are divided ones would print "¶ †" on the grand total with no † row
+  // above it and an orphaned † footnote underneath. Unreachable on today's data
+  // — every divided card here also carries another job's tag — but the total's
+  // test has to be the same test the rows use, or the two drift the first time
+  // an untagged card divides.
+  const hasAttributed = hourRows.some(({ p }) => p.hours_attributed && !p.hours_boundary);
   const hasScheduledOnly = hourRows.some(({ p }) => p.scheduled_only);
   // A card EXISTS on these days and could not be divided between two jobs. A
   // different fact from `scheduled_only`, and it needs its own mark — see
   // `hours_split` in lib/work-ticket.ts.
   const hasSplit = hourRows.some(({ p }) => p.hours_split);
+  // THE DAY WAS SHARED AND THE IN-ROUTE PRESS DIVIDED IT. Its own mark, because
+  // In/Out on these rows are the job's bounds rather than the person's clock,
+  // the Total is that stretch rather than the card's paid hours, and Lunch is
+  // deliberately blank. See `hours_boundary` in lib/work-ticket.ts.
+  const hasBoundary = hourRows.some(({ p }) => p.hours_boundary);
 
   /**
    * ROW DENSITY, MEASURED — NOT GUESSED.
@@ -1082,7 +1094,14 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                             board placed this person on this job that day. The
                             founder writes invoices off this sheet, so the two
                             kinds must not look identical. */}
-                        {p.hours_attributed && <span style={{ fontWeight: 400 }}>&nbsp;†</span>}
+                        {/* ¶ is the more specific statement and swallows †: a
+                            divided row is inferred BY DEFINITION, and two marks
+                            on one figure sends the office to two footnotes to
+                            learn one thing. */}
+                        {p.hours_boundary && <span style={{ fontWeight: 400 }}>&nbsp;¶</span>}
+                        {p.hours_attributed && !p.hours_boundary && (
+                          <span style={{ fontWeight: 400 }}>&nbsp;†</span>
+                        )}
                         {/* Sent here by the board, nothing clocked. The row
                             prints so the day is not silently missing. */}
                         {p.scheduled_only && <span style={{ fontWeight: 400 }}>‡</span>}
@@ -1127,6 +1146,7 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                           founder actually writes down — a total that looks
                           unqualified while its parts are qualified is where the
                           caveat gets lost. */}
+                      {hasBoundary && <span style={{ fontWeight: 400, fontSize: 10 }}>&nbsp;¶</span>}
                       {hasAttributed && <span style={{ fontWeight: 400, fontSize: 10 }}>&nbsp;†</span>}
                     </td>
                     <td style={hourCell} />
@@ -1156,6 +1176,21 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                 <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
                   § Hours split across jobs that day — the clock card carried no job tag and the
                   schedule had this person on more than one job.
+                </p>
+              )}
+              {/* The founder's own rule, printed where the number is read:
+                  "from the moment they clicked en route to when they clock out
+                  is when they were at the other job." IN and OUT on these rows
+                  are this job's bounds, not the person's clock; the lunch
+                  deduction belongs to the whole day and is not divided, so the
+                  cell is blank rather than claiming a deduction was applied. */}
+              {hasBoundary && (
+                <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
+                  ¶ Shared day — In/Out are this job&apos;s hours, from clock-in or the In Route
+                  press to the next job&apos;s In Route press or clock-out. That Total is the full
+                  clocked stretch with lunch INCLUDED (billable); rows without ¶ show the payroll
+                  figure with lunch already deducted. The day&apos;s one lunch is taken on the
+                  timecard, not divided between the jobs.
                 </p>
               )}
             </div>

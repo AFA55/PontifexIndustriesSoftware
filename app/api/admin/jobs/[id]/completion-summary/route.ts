@@ -27,8 +27,7 @@ import { attributableTimecards } from '@/lib/job-clock-attribution';
 import { bookedEndDateOf, dropHelperDoubleCountedCards } from '@/lib/labor-cost';
 import {
   buildCompletedJobDays,
-  paidOrLiveCardHours,
-  isShopCard,
+  laborRowHours,
   type DayTimecardLike,
 } from '@/lib/completed-job-days';
 
@@ -186,6 +185,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       cards: attributedCards,
       attributedIds,
       splitDates,
+      // Each card's share of a day the crew ran more than one job, divided at
+      // the in-route presses. See `boundarySegments` in job-clock-attribution.
+      boundarySegments,
+      boundaryIds,
     } = await attributableTimecards(
       jobId,
       crewUserIds,
@@ -204,7 +207,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // here so `labor_rows` and `work_days` below are built from the same cards.
     const timecards = dropHelperDoubleCountedCards(
       attributedCards as Array<{ id: string; user_id?: string | null; date?: string | null }>,
-      attributedIds,
+      // A boundary-divided card is inferred for this job the same way an
+      // untagged one is, so the double-count guard must see it too.
+      new Set([...attributedIds, ...boundaryIds]),
       helperLogs as Array<{ helper_id: string | null; log_date: string | null; hours_worked: number | null }>
     );
 
@@ -235,6 +240,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
       names,
       attributedIds,
       splitDates,
+      // A shared day divides at the in-route presses, and the segment then
+      // supersedes the on-site window below — the boundary is the START OF THE
+      // NEXT JOB, not this one's completion.
+      boundarySegments,
       // The on-site window, so each line can carry the hours THIS JOB is
       // charged next to the person's paid day. Without it the panel showed a
       // paid day (18.27h on JOB-2026-343888) beside a Labor Cost tile built on
@@ -264,19 +273,36 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // rather than cast away. A cast here would hide the next column rename the
     // way `work_date` and `clock_in` already hid theirs on this screen.
     const laborRows = ((timecards || []) as DayTimecardLike[]).map((t) => {
-      // `paidOrLiveCardHours`, not `net_hours ?? total_hours` — neither column is
-      // reliably the lunch-adjusted one and the smaller is the one that got its
-      // deduction. See the note on paidOrLiveCardHours.
+      // `laborRowHours` carries three rules this line used to restate:
+      // `paidOrLiveCardHours` rather than `net_hours ?? total_hours` (neither
+      // column is reliably the lunch-adjusted one and the smaller is the one
+      // that got its deduction); SHOP-ZEROED like the day cards above (these
+      // rows were not, so this table could show shop hours as job labor); and:
       //
-      // SHOP-ZEROED, like the day cards built above. These rows were not, so
-      // the page's header total (summed from here) and the per-day totals it
-      // sat over could disagree by exactly one shop card, and the flat table
-      // would have shown shop hours as job labor.
-      const shop = isShopCard(t);
-      const total = shop ? 0 : paidOrLiveCardHours(t);
-      const ot = Number(t.overtime_hours) || 0;
-      const ns = Number(t.night_shift_premium_hours) || 0;
-      const reg = t.regular_hours != null ? Number(t.regular_hours) || 0 : Math.max(0, total - ot);
+      // THE SEGMENT, WHEN THE DAY DIVIDED. `boundarySegments` was wired into
+      // `buildCompletedJobDays` twenty lines above and NOT into this table, so
+      // the same cards were billed twice over on one screen: Sterling's day rows
+      // read 3.55 / 2.62 (6.17) while this table — the degraded path's only
+      // source of hours, and its own footer total — read 19.15, the two crew's
+      // WHOLE paid days. A card here can be tagged to another job entirely; only
+      // its segment belongs to this one. The rule is `laborRowHours`, shared so
+      // no consumer of these cards can restate it wrong a third time.
+      const { total, divided, shop } = laborRowHours(t, boundarySegments.get(t.id));
+      // REGULAR / OT / NIGHT ARE FACTS ABOUT THE DAY AND DO NOT DIVIDE. The
+      // premium split is computed against the whole clocked day (Conrade's Aug 19
+      // card: 8.00 regular + 2.09 OT) and nothing records which job the overtime
+      // fell in — the same argument that leaves the lunch on the day. Printing
+      // the day's 8.00 regular beside a 3.55 total makes a row that does not add
+      // up, and apportioning the OT would invent the fact that is missing. So a
+      // divided row states its segment as straight time and claims no premium;
+      // the day's own split stays on the timecard, where it is true.
+      const ot = divided ? 0 : Number(t.overtime_hours) || 0;
+      const ns = divided ? 0 : Number(t.night_shift_premium_hours) || 0;
+      const reg = divided
+        ? total
+        : t.regular_hours != null
+          ? Number(t.regular_hours) || 0
+          : Math.max(0, total - ot);
       return {
         // `user_id` and `date` are nullable on the row. The old
         // `Record<string, any>` cast typed that away, so `names.get(undefined)`

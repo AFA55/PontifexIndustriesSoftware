@@ -1584,3 +1584,134 @@ function blank(userId: string) {
     helper_note: null,
   };
 }
+
+/**
+ * AUG 19 2026 — THE IN-ROUTE PRESS IS THE JOB BOUNDARY.
+ *
+ * Conrade clocked 07:03→17:38 and Axel 07:09→16:42, each on ONE card TAGGED
+ * NC&E, and they ran NC&E in the morning and Sterling in the afternoon. The
+ * Sterling sheet printed **0.04 h** — not labour at all, but the 1 min 45 s its
+ * daily log sat open (16:11:15 → 16:13:00). Same defect class as Dante's 0.09 h
+ * phantom, one surface over: a log's duration standing in for a day's work.
+ *
+ * The founder's rule, applied: NC&E runs clock-in → Sterling's press, Sterling
+ * runs its press → clock-out. NC&E's own completion at 10:17 does not end it.
+ */
+describe('buildTicketDays — Aug 19, a day divided at the in-route press', () => {
+  const DAY = '2026-08-19';
+  const CONRADE_CARD = 'tc-conrade-0819';
+  const AXEL_CARD = 'tc-axel-0819';
+  const STERLING_PRESS = '2026-08-19T18:05:27.030Z'; // 14:05 EDT
+
+  // ZACK stands in for Conrade (lead), LUCAS for Axel (helper).
+  const cards: TicketTimecardRow[] = [
+    {
+      id: CONRADE_CARD,
+      user_id: ZACK,
+      date: DAY,
+      clock_in_time: '2026-08-19T11:03:19.547Z',
+      clock_out_time: '2026-08-19T21:38:48.668Z',
+      lunch_duration_minutes: 30,
+      net_hours: 10.09,
+      total_hours: 10.09,
+    },
+    {
+      id: AXEL_CARD,
+      user_id: LUCAS,
+      date: DAY,
+      clock_in_time: '2026-08-19T11:09:17.983Z',
+      clock_out_time: '2026-08-19T20:42:46.533Z',
+      lunch_duration_minutes: 30,
+      net_hours: 9.06,
+      total_hours: 9.06,
+    },
+  ];
+
+  // The Sterling daily log: 0.04 h, created 16:11:15, closed 16:13:00.
+  const sterlingLog: TicketDailyLog = {
+    id: 'log-sterling',
+    operator_id: ZACK,
+    log_date: DAY,
+    hours_worked: 0.04,
+  };
+
+  const sterlingSegments = new Map([
+    [CONRADE_CARD, { start: STERLING_PRESS, end: '2026-08-19T21:38:48.668Z', hours: 3.55 }],
+    [AXEL_CARD, { start: STERLING_PRESS, end: '2026-08-19T20:42:46.533Z', hours: 2.62 }],
+  ]);
+  const nceSegments = new Map([
+    [CONRADE_CARD, { start: '2026-08-19T11:03:19.547Z', end: STERLING_PRESS, hours: 7.03 }],
+    [AXEL_CARD, { start: '2026-08-19T11:09:17.983Z', end: STERLING_PRESS, hours: 6.93 }],
+  ]);
+
+  const build = (segments: Map<string, { start: string; end: string; hours: number }>, logs: TicketDailyLog[]) =>
+    buildTicketDays({
+      range: { from: DAY, to: DAY },
+      timecards: cards,
+      logs,
+      workItems: [],
+      roles,
+      names,
+      scheduledPersonDays: new Set([`${ZACK}|${DAY}`, `${LUCAS}|${DAY}`]),
+      boundarySegments: segments,
+      todayYMD: DAY,
+    });
+
+  it('Sterling prints 3.55 and 2.62 — and 0.04 appears nowhere', () => {
+    const days = build(sterlingSegments, [sterlingLog]);
+    const conrade = days[0].people.find((p) => p.user_id === ZACK)!;
+    const axel = days[0].people.find((p) => p.user_id === LUCAS)!;
+    expect(conrade.hours).toBe(3.55);
+    expect(axel.hours).toBe(2.62);
+    expect(days[0].total_hours).toBe(6.17);
+    for (const p of days[0].people) expect(p.hours).not.toBe(0.04);
+    expect(grandTotalHours(days)).not.toBe(0.04);
+  });
+
+  it('NC&E prints 7.03 and 6.93 — not the whole card it happens to be tagged with', () => {
+    const days = build(nceSegments, []);
+    const conrade = days[0].people.find((p) => p.user_id === ZACK)!;
+    const axel = days[0].people.find((p) => p.user_id === LUCAS)!;
+    expect(conrade.hours).toBe(7.03);
+    expect(axel.hours).toBe(6.93);
+    // NOT the card's own 10.09 / 9.06 — those describe a day spent on two jobs.
+    expect(conrade.hours).not.toBe(10.09);
+    expect(axel.hours).not.toBe(9.06);
+  });
+
+  it('the helper splits from HIS OWN card, not the operator\'s', () => {
+    const days = build(sterlingSegments, [sterlingLog]);
+    const axel = days[0].people.find((p) => p.user_id === LUCAS)!;
+    // Axel clocked out at 16:42, Conrade at 17:38 — different cards, different
+    // ends. A helper inheriting the operator's figure would read 3.55 here.
+    expect(axel.hours).toBe(2.62);
+    expect(axel.clock_out).toBe('2026-08-19T20:42:46.533Z');
+  });
+
+  it('In / Out are the JOB\'s bounds and Lunch is blank, marked as divided', () => {
+    const days = build(sterlingSegments, [sterlingLog]);
+    const conrade = days[0].people.find((p) => p.user_id === ZACK)!;
+    expect(conrade.clock_in).toBe(STERLING_PRESS);
+    expect(conrade.clock_out).toBe('2026-08-19T21:38:48.668Z');
+    // One lunch deduction, two jobs, no record of which it fell in — so it is
+    // stated on neither rather than deducted twice or guessed at.
+    expect(conrade.lunch_minutes).toBeNull();
+    expect(conrade.hours_boundary).toBe(true);
+  });
+
+  it('the board seeding does not turn a divided day into "nothing was clocked"', () => {
+    const days = build(sterlingSegments, [sterlingLog]);
+    for (const p of days[0].people) {
+      expect(p.scheduled_only).toBeUndefined();
+      expect(p.hours_split).toBeUndefined();
+    }
+  });
+
+  it('a day with NO segment is untouched — the card keeps its paid hours', () => {
+    const days = build(new Map(), []);
+    const conrade = days[0].people.find((p) => p.user_id === ZACK)!;
+    expect(conrade.hours).toBe(10.09);
+    expect(conrade.lunch_minutes).toBe(30);
+    expect(conrade.hours_boundary).toBeUndefined();
+  });
+});

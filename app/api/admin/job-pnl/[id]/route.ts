@@ -119,6 +119,10 @@ export async function GET(
       cards: attributedCards,
       attributedIds,
       splitDates,
+      // Each card's share of a day the crew ran more than one job, divided at
+      // the in-route presses. See `boundarySegments` in job-clock-attribution.
+      boundarySegments,
+      boundaryIds,
     } = await attributableTimecards(
       jobId,
       laborUserIds,
@@ -134,7 +138,10 @@ export async function GET(
     // completion-summary route and the day-by-day builder apply it too.
     const timecards = dropHelperDoubleCountedCards(
       attributedCards as Array<{ id: string; user_id?: string | null; date?: string | null }>,
-      attributedIds,
+      // A boundary-divided card is INFERRED for this job just as an untagged
+      // one is, so the helper double-count guard has to see it too — otherwise a
+      // helper with both a filed log and a divided card is billed twice.
+      new Set([...attributedIds, ...boundaryIds]),
       helperLogs as Array<{ helper_id: string | null; log_date: string | null; hours_worked: number | null }>
     ) as any[];
 
@@ -191,6 +198,7 @@ export async function GET(
       helperLogs: helperLogs || [],
       burdenPct,
       attributedTimecardIds: attributedIds,
+      boundarySegments,
     });
     const lineById = new Map(labor.lines.map((l) => [`${l.source}:${l.id}`, l]));
 

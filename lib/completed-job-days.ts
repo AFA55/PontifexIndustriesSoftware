@@ -27,6 +27,7 @@ import {
   dropHelperDoubleCountedCards,
   jobHoursForCard,
   paidCardHours as paidHoursRule,
+  segmentJobHours,
   type JobWindow,
 } from './labor-cost';
 
@@ -162,6 +163,44 @@ export function paidOrLiveCardHours(t: DayTimecardLike, now: Date = new Date()):
   return paid != null ? round2(paid) : cardSpanHours(t, now);
 }
 
+/** The hours one card puts on one job in the flat Labor Hours table. */
+export interface LaborRowHours {
+  /** Hours charged to THIS job for this card, on the BILLABLE basis. Shop → 0. */
+  total: number;
+  /** TRUE when the figure is a boundary segment, not the card's own paid day. */
+  divided: boolean;
+  /** TRUE when the card is shop time, which is never job labor. */
+  shop: boolean;
+}
+
+/**
+ * THE FLAT LABOR HOURS TABLE'S FIGURE FOR ONE CARD — the third consumer of the
+ * in-route boundary, and the second one that shipped without it.
+ *
+ * It lives here, exported and pure, rather than inline in the
+ * completion-summary route, for the reason the boundary exists at all: since
+ * `boundarySegments` landed, `attributableTimecards` hands back cards TAGGED TO
+ * ANOTHER JOB whenever the day divides. A consumer that reads the card's own
+ * hours then charges a whole ten-hour day to a job owning three and a half of
+ * it. Three surfaces read those cards; two of the three restated the rule and
+ * both restated it wrong. One function, three callers, no fourth chance to.
+ *
+ * A ZERO-length segment counts as zero and does NOT fall through to the card's
+ * paid day — see `segmentJobHours`.
+ */
+export function laborRowHours(
+  t: DayTimecardLike,
+  segment?: { hours?: number | null } | null,
+  now: Date = new Date()
+): LaborRowHours {
+  const shop = isShopCard(t);
+  if (shop) return { total: 0, divided: false, shop: true };
+  const seg = segmentJobHours(segment);
+  return seg != null
+    ? { total: seg, divided: true, shop: false }
+    : { total: paidOrLiveCardHours(t, now), divided: false, shop: false };
+}
+
 /** Shop time is never job labor. All THREE flags, not just the one the
  *  `timecards_with_users` view happens to expose. */
 export function isShopCard(t: DayTimecardLike): boolean {
@@ -221,6 +260,14 @@ export interface BuildCompletedJobDaysInput {
   attributedIds?: Set<string>;
   /** Dates nobody's card could be attributed on. */
   splitDates?: Set<string>;
+  /**
+   * `attributableTimecards.boundarySegments` — card id → the stretch of that
+   * card that belongs to THIS job on a day the crew ran more than one, divided
+   * at the in-route presses (lib/job-day-boundary.ts). Sets the row's job hours
+   * and the clock times printed beside them; the card's own paid hours still
+   * show as the day's `hours`, which is what they are.
+   */
+  boundarySegments?: Map<string, { start: string; end: string }>;
   /** Injectable clock — only reached by OPEN cards, whose hours are still running. */
   now?: Date;
   /**
@@ -243,11 +290,31 @@ export function buildCompletedJobDays(input: BuildCompletedJobDaysInput): Comple
   const splitDates = input.splitDates ?? new Set<string>();
   const now = input.now ?? new Date();
   const jobWindow: JobWindow | null = input.job ?? null;
+  // A job with no recorded window at all. Only reached when a BOUNDARY segment
+  // exists (which supersedes the window entirely), so it never clips anything —
+  // it just satisfies the signature without inventing stamps.
+  const EMPTY_JOB_WINDOW: JobWindow = {
+    work_started_at: null,
+    route_started_at: null,
+    work_completed_at: null,
+  };
   // The same person-day must not arrive twice — once as a helper's own log row
   // and once as their inferred day card. Shared guard, see lib/labor-cost.ts.
+  //
+  // A BOUNDARY-DIVIDED CARD IS INFERRED TOO, so it belongs in the guard's set.
+  // Both callers happen to pre-filter with the union today, which makes this a
+  // no-op on every production path — but this function is EXPORTED and its
+  // contract is "give me the cards and I apply the rules". Taking only
+  // `attributedIds` under-guards that contract, and the next caller that passes
+  // raw cards would double-bill a helper's divided day. Unioning here costs
+  // nothing (the guard is idempotent) and cannot drift from the boundary map.
+  const inferredIds = new Set([
+    ...attributedIds,
+    ...(input.boundarySegments?.keys() ?? []),
+  ]);
   const timecards = dropHelperDoubleCountedCards(
     input.timecards,
-    attributedIds,
+    inferredIds,
     input.helperLogs
   );
   const nameOf = (id?: string | null): string =>
@@ -309,12 +376,21 @@ export function buildCompletedJobDays(input: BuildCompletedJobDaysInput): Comple
     const hours = shop ? 0 : paidOrLiveCardHours(t, now);
     // Billable to THIS job. Without a window there is nothing to clip against,
     // so job hours are the paid day — the behaviour before the split.
-    const jobHours = jobWindow ? Math.min(hours, jobHoursForCard(t, jobWindow, attributed, now)) : hours;
+    const segment = input.boundarySegments?.get(t.id) ?? null;
+    const jobHours =
+      jobWindow || segment
+        ? Math.min(
+            hours,
+            jobHoursForCard(t, jobWindow ?? EMPTY_JOB_WINDOW, attributed, now, undefined, segment)
+          )
+        : hours;
     day.hours.push({
       key: `tc-${t.id}`,
       worker_name: nameOf(t.user_id) || 'Unknown',
-      clock_in: t.clock_in_time ?? null,
-      clock_out: t.clock_out_time ?? null,
+      // On a divided day these are the job's bounds, not the person's clock —
+      // the same statement the printed ticket makes. See `boundarySegments`.
+      clock_in: segment?.start ?? t.clock_in_time ?? null,
+      clock_out: segment?.end ?? t.clock_out_time ?? null,
       hours,
       job_hours: jobHours,
       regular_hours: t.regular_hours != null ? round2(num(t.regular_hours)) : null,

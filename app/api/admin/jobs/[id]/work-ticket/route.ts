@@ -207,6 +207,11 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // how a man who clocked 8.58 hours printed as "no clock card was
       // recorded" — see `hours_split` in lib/work-ticket.ts.
       splitPersonDays,
+      // THE IN-ROUTE PRESS IS THE JOB BOUNDARY (founder, Aug 19). On a day the
+      // crew ran two jobs off one clock cycle, this carries each card's share
+      // of it. Without it the second job fell back to its daily log's open
+      // duration — Sterling printed 0.04 h against three and a half hours.
+      boundarySegments,
     } = await attributableTimecards(
       jobId,
       ticketUserIds,
@@ -366,6 +371,9 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // The founder writes invoices from this sheet; the two must not print
       // identically. See `hours_attributed` in lib/work-ticket.ts.
       attributedCardIds: attributedIds,
+      // Each card's share of a day the crew split between jobs, bounded by the
+      // in-route presses. See `boundarySegments` in lib/work-ticket.ts.
+      boundarySegments,
       todayYMD: today,
     });
 

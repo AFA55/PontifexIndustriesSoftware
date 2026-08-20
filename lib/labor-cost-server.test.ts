@@ -18,7 +18,7 @@
 jest.mock('./supabase-admin', () => ({ supabaseAdmin: {} }));
 
 import { buildLaborBreakdown } from './labor-cost-server';
-import { dropHelperDoubleCountedCards } from './labor-cost';
+import { dropHelperDoubleCountedCards, round2 } from './labor-cost';
 
 // Aug 5 07:00–15:30Z card; the job's on-site window is Aug 6 only.
 const card = (over: Record<string, unknown> = {}) => ({
@@ -332,5 +332,110 @@ describe('dropHelperDoubleCountedCards', () => {
     const once = dropHelperDoubleCountedCards(cards, new Set(['attr']), logs);
     const twice = dropHelperDoubleCountedCards(once, new Set(['attr']), logs);
     expect(twice).toEqual(once);
+  });
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * A DIVIDED DAY IS COSTED ON THE PAYROLL BASIS, NOT THE BILLABLE ONE.
+ *
+ * Founder, Aug 17 2026: "lunch is deducted for employees and still considered
+ * billable hours." So the segment the customer is billed for INCLUDES the lunch,
+ * and the wage we pay does not. Conrade's Aug 19 divides 7.03 + 3.55 = 10.58 on
+ * the gross clock against 10.09 actually paid; costing the gross books half an
+ * hour of wage AND burden that no payroll run will ever produce.
+ */
+describe('buildLaborBreakdown — a boundary segment is costed net of lunch', () => {
+  const conrade = {
+    id: 'tc-conrade',
+    full_name: 'Conrade Richardson',
+    role: 'operator',
+    hourly_rate: 30,
+    date: '2026-08-19',
+    clock_in_time: '2026-08-19T11:03:19.547Z', // 07:03 EDT
+    clock_out_time: '2026-08-19T21:38:48.668Z', // 17:38 EDT — 10.59h gross
+    net_hours: 10.09,
+    total_hours: 10.09, // 30 min lunch already off
+  };
+  // Sterling's stretch: its 14:05 press → clock-out.
+  const sterlingSegment = {
+    start: '2026-08-19T18:05:27.030Z',
+    end: '2026-08-19T21:38:48.668Z',
+  };
+  const sterling = {
+    work_started_at: '2026-08-19T20:10:53.879Z',
+    route_started_at: '2026-08-19T18:05:27.030Z',
+    work_completed_at: '2026-08-19T20:13:00.955Z', // signed off 2 min later
+    status: 'completed',
+  };
+
+  const run = (segments?: Map<string, { start: string; end: string }>) =>
+    buildLaborBreakdown({
+      job: sterling,
+      timecards: [conrade],
+      helperLogs: [],
+      burdenPct: 25,
+      boundarySegments: segments,
+    });
+
+  it('costs 3.38h, not the 3.55h billable segment — the lunch is not paid', () => {
+    const line = run(new Map([['tc-conrade', sterlingSegment]])).lines[0];
+    expect(line.bounded_hours).toBe(3.38);
+    expect(line.base_cost).toBe(round2(3.38 * 30));
+    expect(line.total_cost).toBe(round2(3.38 * 30 * 1.25));
+  });
+
+  it('the two segments of one card cost no more than the day was paid for', () => {
+    const nceSegment = { start: conrade.clock_in_time, end: sterlingSegment.start };
+    const nce = buildLaborBreakdown({
+      job: { work_started_at: null, route_started_at: null, work_completed_at: null },
+      timecards: [conrade],
+      helperLogs: [],
+      burdenPct: 25,
+      boundarySegments: new Map([['tc-conrade', nceSegment]]),
+    }).lines[0];
+    const sterlingLine = run(new Map([['tc-conrade', sterlingSegment]])).lines[0];
+    expect(round2(nce.bounded_hours + sterlingLine.bounded_hours)).toBeLessThanOrEqual(10.09);
+    // …whereas the BILLABLE shares provably exceed it. That gap is the lunch.
+    expect(round2(7.03 + 3.55)).toBeGreaterThan(10.09);
+  });
+
+  it('the excluded hours explain the gap as OTHER JOB, off the full paid day', () => {
+    const line = run(new Map([['tc-conrade', sterlingSegment]])).lines[0];
+    expect(line.raw_hours).toBe(10.09);
+    expect(line.excluded_hours).toBe(round2(10.09 - 3.38));
+    expect(line.excluded_reason).toBe('other_job');
+    // The span shown is the segment's, not the card's ten-hour clock.
+    expect(line.span_start).toBe(sterlingSegment.start);
+    expect(line.span_end).toBe(sterlingSegment.end);
+  });
+
+  it('THE DEFECT, PINNED: with no segment the on-site window collapses the day', () => {
+    // Sterling was signed off 2 minutes after work started, so the window alone
+    // is worth 0.04h against three and a half hours of work. This is why the
+    // boundary supersedes the window rather than intersecting with it.
+    expect(run().lines[0].bounded_hours).toBe(0.04);
+  });
+
+  it('an undivided card is unchanged — no boundary, no lunch arithmetic', () => {
+    const whole = buildLaborBreakdown({
+      job: { work_started_at: null, route_started_at: null, work_completed_at: null },
+      timecards: [conrade],
+      helperLogs: [],
+      burdenPct: 25,
+    }).lines[0];
+    expect(whole.bounded_hours).toBe(10.09);
+  });
+
+  it('shop time is never job labour, segment or no segment', () => {
+    const shopLine = buildLaborBreakdown({
+      job: sterling,
+      timecards: [{ ...conrade, work_location: 'shop' }],
+      helperLogs: [],
+      burdenPct: 25,
+      boundarySegments: new Map([['tc-conrade', sterlingSegment]]),
+    }).lines[0];
+    expect(shopLine.bounded_hours).toBe(0);
+    expect(shopLine.total_cost).toBe(0);
   });
 });

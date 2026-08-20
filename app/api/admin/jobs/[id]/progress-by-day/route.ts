@@ -42,6 +42,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
 import { loadJobProgress, explodeProgressEntries } from '@/lib/job-progress-server';
 import { attributableTimecards, TIMECARD_ATTRIBUTION_SELECT } from '@/lib/job-clock-attribution';
+import { clockedJobHours } from '@/lib/labor-cost';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -189,15 +190,26 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // `job_daily_assignments` is filtered on DATES alone. A second tenant's
     // placement on the same day can make one of these people look "placed on 2
     // jobs", and their card is then dropped — a cross-tenant UNDER-count.
-    const { cards: timecards, splitDates: unattributableDates } =
-      await attributableTimecards(
-        jobId,
-        jobOperatorIds,
-        jobLogDates,
-        TIMECARD_ATTRIBUTION_SELECT,
-        'timecards',
-        tenantId
-      );
+    //
+    // `boundarySegments` is NOT optional here. Since the in-route boundary
+    // shipped, `attributableTimecards` returns cards TAGGED TO ANOTHER JOB
+    // whenever the day divides — Sterling's Aug 19 share exists only on cards
+    // tagged NC&E. Summing those cards' own hours charges this job a whole
+    // ten-hour day for the three and a half it owns: this panel would have moved
+    // JOB-2026-654657 from 0.04 h to 19.15 h while the printed ticket said 6.17.
+    // The segment is the figure — see `clockedJobHours` in lib/labor-cost.ts.
+    const {
+      cards: timecards,
+      splitDates: unattributableDates,
+      boundarySegments,
+    } = await attributableTimecards(
+      jobId,
+      jobOperatorIds,
+      jobLogDates,
+      TIMECARD_ATTRIBUTION_SELECT,
+      'timecards',
+      tenantId
+    );
 
     // ── scope_progress summary (cumulative totals) ───────────────────────────
     const scopeProgress = loaded.scope_progress;
@@ -302,28 +314,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         .sort()
         .reverse()[0] || null;
 
-      // The day's hours come from the CLOCK CARD (see the timecard fetch above).
-      // `net_hours` is the payroll figure (gross minus lunch); `total_hours` is
-      // the older column; otherwise measure clock-out minus clock-in. A card
-      // still open (no clock-out) contributes nothing rather than counting to
-      // now — an un-clocked-out card is what produced "213 hours" elsewhere.
-      const clockHours = tcs.reduce((s: number, t: any) => {
-        // A stated ZERO is not an answer. Two production cards carry
-        // `net_hours = 0` against a real 9–10 hour span (a gross-hours
-        // miscalculation upstream); `??` would have let that zero win over a
-        // perfectly good `total_hours` and printed the very 0.00 the founder
-        // complained about. Take the first POSITIVE figure, then measure.
-        const stated = [t.net_hours, t.total_hours]
-          .map(Number)
-          .find((v) => Number.isFinite(v) && v > 0);
-        if (stated !== undefined) return s + stated;
-        if (t.clock_in_time && t.clock_out_time) {
-          const mins =
-            (new Date(t.clock_out_time).getTime() - new Date(t.clock_in_time).getTime()) / 60000;
-          if (mins > 0) return s + mins / 60;
-        }
-        return s;
-      }, 0);
+      // The day's hours come from the CLOCK CARD (see the timecard fetch above),
+      // and from the card's BOUNDARY SEGMENT when the crew ran more than one job
+      // on that clock cycle. THE RULE LIVES IN `clockedJobHours`
+      // (lib/labor-cost.ts) so this panel, the Completed Job Ticket and the
+      // printed work ticket cannot quote three different figures for one day.
+      const clockHours = clockedJobHours(tcs, boundarySegments);
       const loggedHours = logs.reduce((s, l) => s + Number(l.hours_worked || 0), 0);
       // Fall back to the operator-entered hours only when nobody clocked in
       // that day, so a day is never silently blank.

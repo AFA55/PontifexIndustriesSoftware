@@ -43,6 +43,26 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * ROUND DOWN TO 2dp — for a figure that DIVIDES something already measured.
+ *
+ * `round2` is right for a standalone hour figure and wrong for a share of one.
+ * When one clocked day is split between two jobs at the in-route press
+ * (lib/job-day-boundary.ts), rounding each share up can make the shares sum to
+ * MORE than the day: Conrade's Aug 19 splits into 7.0354 + 3.5560 h, which
+ * `round2` turns into 7.04 + 3.56 = 10.60 against a 10.59-hour clocked span.
+ * Half a minute of labour that exists on no clock, on two different invoices.
+ *
+ * So a share gives up its final fraction instead. Flooring can only ever
+ * under-claim, which is the direction this codebase has settled on every time
+ * the choice has come up. The epsilon absorbs binary-float noise (7.03 arriving
+ * as 7.029999999) — without it a value that IS exactly 7.03 can floor to 7.02.
+ */
+export function floor2(n: number): number {
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor((n + 1e-9) * 100) / 100;
+}
+
 export interface BoundableCard {
   clock_in_time: string | null;
   clock_out_time: string | null;
@@ -202,6 +222,146 @@ export function paidCardHours(card: PaidHoursCard): number | null {
     .filter((n) => Number.isFinite(n) && n >= 0)
     .filter((n) => !(isOpen && n === 0));
   return candidates.length > 0 ? round2(Math.min(...candidates)) : null;
+}
+
+/**
+ * THE BOUNDARY SEGMENT'S HOURS, or `null` when this card's day did not divide.
+ *
+ * ONE LINE, IN ONE PLACE, BECAUSE THREE CONSUMERS GOT IT WRONG. `boundarySegments`
+ * (lib/job-clock-attribution.ts) makes `attributableTimecards` return cards
+ * TAGGED TO ANOTHER JOB whenever the day divides — the whole point, since
+ * Sterling's Aug 19 share lives only on cards tagged NC&E. Every consumer that
+ * kept summing the card's own `net_hours`/`total_hours` therefore started
+ * charging a WHOLE ten-hour day to a job that owns three and a half hours of it.
+ * That is exactly what shipped: the Daily Progress panel would have moved
+ * Sterling from 0.04 to 19.15 against a printed ticket saying 6.17, and the
+ * Completed Job Ticket's flat Labor Hours table the same 19.15 beside day rows
+ * totalling 6.17. Three numbers, one day, one invoice.
+ *
+ * So the rule is here, once, and it returns `null` — never 0 — for "no
+ * boundary", so a caller can tell "this day did not divide" from "this job's
+ * share of it was nothing". A ZERO-length segment is a real answer (the crew
+ * left for the next job the moment this one started) and must NOT fall through
+ * to the card's whole day.
+ *
+ * These hours are the segment's GROSS clocked span — see `paidSegmentHours` for
+ * the payroll-basis figure and why the two differ by the lunch.
+ */
+export function segmentJobHours(
+  segment: { hours?: number | null } | null | undefined
+): number | null {
+  if (!segment) return null;
+  const n = Number(segment.hours);
+  return Number.isFinite(n) && n >= 0 ? floor2(n) : null;
+}
+
+/**
+ * THE PAYROLL-BASIS SHARE OF A DIVIDED DAY — the segment with its part of the
+ * card's lunch taken off. This is what a COST may be computed on; it is not what
+ * the customer is billed.
+ *
+ * TWO BASES, ON PURPOSE (founder, Aug 17 2026, in
+ * docs/plans/BILLABLE_HOURS_AND_SHOP_TICKETS.md):
+ *
+ *   > "lunch is deducted for employees and still considered billable hours"
+ *
+ *   BILLABLE (customer) = clock-in → clock-out, lunch INCLUDED → the segment's
+ *                         gross span, which is what the printed ticket carries.
+ *   PAID     (employee) = lunch DEDUCTED → `min(net_hours, total_hours)`.
+ *
+ * A segmented day is divided on the GROSS clock, so the segments sum to the
+ * card's gross span and NOT to what the person was paid. Conrade's Aug 19 is
+ * 7.03 + 3.55 = 10.58 against 10.09 paid: half an hour of lunch, on the job
+ * hours where it belongs and in the labour COST where it does not. Costing the
+ * gross segment books 10.58 h of wage + burden against 10.09 h of payroll, on
+ * every divided person-day — +2.43 h across the five in production today.
+ *
+ * PROPORTIONAL ACROSS THE SEGMENTS, NOT CHARGED TO THE ONE HOLDING THE LUNCH
+ * WINDOW. The window-based split is the more accurate rule and the data cannot
+ * support it: `timecards.lunch_start_time` and `lunch_end_time` are NULL on ALL
+ * 318 production cards (verified Aug 19 2026), and 269 of the 318 carry
+ * `auto_lunch_applied = true` — a flat 30 minutes attached to the day by rule,
+ * never observed at a clock. There is no lunch window to place. Choosing
+ * proportional is therefore not a preference between two available rules; it is
+ * the only one the recorded facts admit. If lunch timing is ever captured, this
+ * function is the single place a window rule would replace it.
+ *
+ * The share is `segment × (paid ÷ gross)`, floored — so N shares can only ever
+ * sum to at most the paid day, never past it (Conrade: 6.69 + 3.38 = 10.07
+ * against 10.09 paid). An OPEN card has no paid figure yet, so nothing is
+ * deducted from it: payroll has not written the lunch, and inventing a
+ * deduction on a live day understates a job still running.
+ */
+export function paidSegmentHours(
+  card: PaidHoursCard,
+  segmentHours: number,
+  now: Date = new Date()
+): number {
+  const seg = floor2(segmentHours);
+  if (seg <= 0) return 0;
+  const paid = paidCardHours(card);
+  // Nothing recorded to deduct: an open card's payroll columns are not written.
+  if (paid == null) return seg;
+  const gross = cardSpanHours(card, now);
+  // No usable gross, or no deduction was applied at all — cap and stop.
+  if (!(gross > 0) || paid >= gross) return Math.min(seg, paid);
+  return Math.min(floor2(seg * (paid / gross)), paid);
+}
+
+/** One clock card, as much of it as a day-hours rollup reads. */
+export interface ClockCardHoursLike {
+  id: string;
+  net_hours?: number | null;
+  total_hours?: number | null;
+  clock_in_time?: string | null;
+  clock_out_time?: string | null;
+}
+
+/**
+ * THE CLOCKED HOURS A SET OF CARDS PUTS ON ONE JOB FOR ONE DAY, on the BILLABLE
+ * basis (see `paidSegmentHours` for why there are two).
+ *
+ * Extracted from the Daily Progress panel's own reducer so the boundary rule is
+ * applied by the SAME code every caller runs, rather than restated per route —
+ * restating it is precisely how two of the three consumers shipped without it.
+ *
+ * Per card, in order:
+ *   1. its boundary segment, when the day divided (`segmentJobHours`);
+ *   2. the first POSITIVE of `net_hours` / `total_hours`. A stated ZERO is not
+ *      an answer — two production cards carry `net_hours = 0` against a real
+ *      9–10 hour span, and `??` would let that zero beat a good `total_hours`
+ *      and print the 0.00 the founder complained about;
+ *   3. failing both, the measured clock-out minus clock-in. A card still open
+ *      (no clock-out) contributes NOTHING rather than counting to now — an
+ *      un-clocked-out card is what produced "213 hours" elsewhere.
+ *
+ * Returns the raw sum; the caller rounds, so a two-step round can't drift.
+ */
+export function clockedJobHours(
+  cards: ClockCardHoursLike[] | null | undefined,
+  boundarySegments?: Map<string, { hours?: number | null }> | null
+): number {
+  let sum = 0;
+  for (const t of cards || []) {
+    const seg = segmentJobHours(boundarySegments?.get(t.id));
+    if (seg != null) {
+      sum += seg;
+      continue;
+    }
+    const stated = [t.net_hours, t.total_hours]
+      .map(Number)
+      .find((v) => Number.isFinite(v) && v > 0);
+    if (stated !== undefined) {
+      sum += stated;
+      continue;
+    }
+    if (t.clock_in_time && t.clock_out_time) {
+      const mins =
+        (new Date(t.clock_out_time).getTime() - new Date(t.clock_in_time).getTime()) / 60000;
+      if (mins > 0) sum += mins / 60;
+    }
+  }
+  return sum;
 }
 
 /**
@@ -375,7 +535,23 @@ export function jobHoursForCard(
   now: Date = new Date(),
   /** Zone the card's day is read in when it has no `date` column, and the zone
    *  the window's own days are derived in. Defaults to the platform default. */
-  timeZone: string = DEFAULT_TENANT_TZ
+  timeZone: string = DEFAULT_TENANT_TZ,
+  /**
+   * THE IN-ROUTE BOUNDARY, WHEN THIS PERSON-DAY HAD ONE.
+   *
+   * `[start, end]` for the stretch of this card that belongs to THIS job, from
+   * `splitClockDayAtJobStarts` (lib/job-day-boundary.ts): the person was on two
+   * or more jobs that day and every one of them recorded a start, so the day
+   * divides at the presses. When present it REPLACES the on-site window clip
+   * entirely — deliberately, because the founder's boundary is the start of the
+   * next job, not this one's completion (plan doc R4). Clipping at
+   * `work_completed_at` is exactly what printed NC&E at 0.08 h for a morning's
+   * work: the job was signed off at 10:17 and the crew stayed until 14:05.
+   *
+   * Omitted (the default) → nothing changes: every day that is not provably
+   * split keeps the bound it has today.
+   */
+  segment?: { start: string; end: string } | null
 ): number {
   // THE JOB WAS OVER. A card dated after the last day a COMPLETED job was
   // booked for contributes nothing to it, linked or attributed alike — see
@@ -385,6 +561,25 @@ export function jobHoursForCard(
   if (bookedEnd) {
     const cardDay = cardPayrollDay(card, timeZone);
     if (cardDay && cardDay > bookedEnd) return 0;
+  }
+
+  // A PROVEN BOUNDARY OUTRANKS EVERY INFERRED WINDOW. The day divides at the
+  // presses; the job's own on-site stamps say nothing more about it.
+  if (segment) {
+    if (card.is_shop_hours === true || card.is_shop_time === true) return 0;
+    if (typeof card.work_location === 'string' && card.work_location.toLowerCase() === 'shop') {
+      return 0;
+    }
+    const segStart = new Date(segment.start).getTime();
+    const segEnd = new Date(segment.end).getTime();
+    if (!Number.isFinite(segStart) || !Number.isFinite(segEnd)) return 0;
+    let hours = floor2(Math.max(0, segEnd - segStart) / 3600000);
+    // One share can never exceed the whole card's paid hours. Non-binding on
+    // every production split today; a guard against a corrupt boundary, not a
+    // lunch model — see `splitClockDayAtJobStarts` on why lunch is not divided.
+    const paid = paidCardHours(card);
+    if (paid != null) hours = Math.min(hours, paid);
+    return hours;
   }
 
   const clipToWindow = !attributed || cardDayIsInsideJobWindow(card, job, timeZone);

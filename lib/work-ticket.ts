@@ -436,6 +436,40 @@ export interface TicketPersonDay {
    * empty Total, and only this one is true when it is set.
    */
   hours_split?: boolean;
+  /**
+   * THIS DAY WAS SHARED, AND THE IN-ROUTE PRESS IS WHERE IT DIVIDED.
+   *
+   * The crew ran two or more jobs on one clock cycle and every one of them
+   * recorded a start, so the day divides at those presses
+   * (lib/job-day-boundary.ts). On such a row:
+   *
+   *   • In / Out are the SEGMENT's bounds, not the card's — the person's
+   *     clock-in for the day's first job, this job's own press after that, and
+   *     the next job's press or their clock-out at the far end. That is exactly
+   *     what the founder asked the sheet to say: "NC&E, clock-in 07:03 →
+   *     Sterling's in-route 14:05".
+   *   • Total is that stretch, not the card's paid hours.
+   *   • Lunch is BLANK. A card carries one lunch deduction and nothing records
+   *     which of two jobs it fell in, so it is neither divided nor printed twice;
+   *     it stays a fact about the day. The footnote says so.
+   *
+   * TWO BASES ON ONE SHEET, STATED RATHER THAN NORMALISED. A ¶ row's Total is
+   * the GROSS clocked stretch, lunch included — which is the BILLABLE figure
+   * (founder, Aug 17: "lunch is deducted for employees and still considered
+   * billable hours"). An ordinary row's Total is `net_hours ?? total_hours`, the
+   * PAID figure with lunch already off. On the seven jobs divided today every
+   * printed row happens to be a ¶ row, so no sheet mixes them yet; the first job
+   * with one shared day and one ordinary day will. The ¶ footnote therefore
+   * names both bases outright. Normalising instead — re-deriving every ordinary
+   * row as a gross span — would change the printed hours on every job the office
+   * has already invoiced from, which is a far larger and separate decision than
+   * this fix. Task #10 in BILLABLE_HOURS_AND_SHOP_TICKETS.md is where it belongs.
+   *
+   * Marked on the printed sheet for the same reason `hours_attributed` is: the
+   * figure is derived from the presses rather than read off a tagged card, and
+   * the founder writes invoices from it.
+   */
+  hours_boundary?: boolean;
 }
 
 export interface TicketDay {
@@ -557,6 +591,19 @@ export interface BuildTicketDaysInput {
    * single-job day) says so. Drives `hours_attributed`. See that field.
    */
   attributedCardIds?: Set<string>;
+  /**
+   * `attributableTimecards.boundarySegments` — card id → the stretch of that
+   * card belonging to THIS job, for the person-days that divide at the in-route
+   * presses. When a card is in here its segment REPLACES the card's own
+   * clock-in, clock-out and hours on the sheet; see `hours_boundary`.
+   *
+   * This is the fix for the Aug 19 defect. Conrade and Axel each clocked ONE
+   * card tagged NC&E and worked NC&E then Sterling; Sterling's printed figure
+   * was 0.04 h — the 1 min 45 s its daily log sat open — because the card was
+   * another job's and the log was all that was left. Sterling's real share is
+   * the 14:05 press to the 17:38 clock-out.
+   */
+  boundarySegments?: Map<string, { start: string; end: string; hours: number }>;
   /**
    * Today, local, bare 'YYYY-MM-DD'. Only used to keep a FUTURE scheduled day
    * off the sheet: the board holds next week's placements, and a printed ticket
@@ -686,12 +733,30 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     // never let it vouch for a person being on this job that day either.
     if (isShopCard(tc)) continue;
     const p = bucket(tc.date as string, tc.user_id);
+    // THE DAY DIVIDED AT THE PRESSES. When it did, the segment is this job's
+    // whole truth about this card — its bounds and its hours both — and the
+    // card's own figures describe a day that was spent on more than this job.
+    const segment = input.boundarySegments?.get(tc.id);
     // An INFERRED hour must never print as a recorded one. See
     // `hours_attributed` — this is the only place the distinction is knowable.
     if (input.attributedCardIds?.has(tc.id)) p.hours_attributed = true;
-    // A card got this far only by being linked to this job or attributed to it,
-    // both of which outrank the placement ledger for this person-day.
+    // A card got this far only by being linked to this job, attributed to it,
+    // or divided into it at the presses — all of which outrank the placement
+    // ledger for this person-day.
     cardBacked.add(dayKey(tc.user_id, tc.date as string));
+
+    if (segment) {
+      p.hours_boundary = true;
+      if (!p.clock_in || segment.start < p.clock_in) p.clock_in = segment.start;
+      if (!p.clock_out || segment.end > p.clock_out) p.clock_out = segment.end;
+      // Lunch is deliberately NOT carried onto a divided row — see
+      // `hours_boundary`. It belongs to the day and to neither job.
+      if (Number.isFinite(Number(segment.hours))) {
+        p.hours = round2((p.hours ?? 0) + Number(segment.hours));
+      }
+      continue;
+    }
+
     if (tc.clock_in_time && (!p.clock_in || tc.clock_in_time < p.clock_in)) p.clock_in = tc.clock_in_time;
     if (tc.clock_out_time && (!p.clock_out || tc.clock_out_time > p.clock_out)) p.clock_out = tc.clock_out_time;
     const lunch = tc.lunch_duration_minutes ?? tc.break_minutes;

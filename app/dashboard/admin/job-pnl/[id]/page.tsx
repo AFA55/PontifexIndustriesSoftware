@@ -58,7 +58,7 @@ interface TimecardEntry {
   /** The card's own paid day, and what this job did not get. */
   raw_hours?: number;
   excluded_hours?: number;
-  excluded_reason?: 'shop' | 'outside_job_window' | null;
+  excluded_reason?: 'shop' | 'outside_job_window' | 'other_job' | null;
   labor_cost: number;
   hour_type: string;
   is_shop_hours: boolean;
@@ -547,7 +547,11 @@ export default function JobPnlDetailPage() {
                               {(entry.excluded_hours ?? 0) > 0 && (
                                 <span className="block text-[10px] text-slate-400 tabular-nums">
                                   of {(entry.raw_hours ?? 0).toFixed(2)} paid
-                                  {entry.excluded_reason === 'shop' ? ' (shop)' : ' (off job)'}
+                                  {entry.excluded_reason === 'shop'
+                                    ? ' (shop)'
+                                    : entry.excluded_reason === 'other_job'
+                                      ? ' (another job)'
+                                      : ' (off job)'}
                                 </span>
                               )}
                             </td>

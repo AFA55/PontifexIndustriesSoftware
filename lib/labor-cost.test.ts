@@ -7,10 +7,13 @@ import {
   boundedJobHours,
   cardDayIsInsideJobWindow,
   cardPayrollDay,
+  clockedJobHours,
   jobHoursForCard,
   laborLine,
   clampDailyLogHours,
+  paidSegmentHours,
   round2,
+  segmentJobHours,
   MAX_DAILY_LOG_HOURS,
   DEFAULT_LABOR_BURDEN_PCT,
 } from './labor-cost';
@@ -346,5 +349,215 @@ describe('bookedSpanEndDay — the open-ended window guard', () => {
     expect(
       cardDayIsInsideJobWindow({ ...wednesdayCard, date: '2026-08-11' }, southernBasements)
     ).toBe(true);
+  });
+});
+
+/**
+ * THE IN-ROUTE BOUNDARY OUTRANKS THE ON-SITE WINDOW (founder, Aug 19).
+ *
+ * NC&E was signed off at 10:17 and the crew stayed on it until 14:05. Clipping
+ * to `work_completed_at` is exactly what made the Daily Progress panel report
+ * 0.08 h for a seven-hour morning: the window is the on-site visit, and the
+ * founder's boundary is the START OF THE NEXT JOB.
+ */
+describe('jobHoursForCard — a divided day is bounded by the presses', () => {
+  const card = {
+    id: 'tc-conrade-0819',
+    date: '2026-08-19',
+    clock_in_time: '2026-08-19T11:03:19.547Z', // 07:03 EDT
+    clock_out_time: '2026-08-19T21:38:48.668Z', // 17:38 EDT
+    net_hours: 10.09,
+    total_hours: 10.09,
+  };
+  const nce = {
+    work_started_at: '2026-08-19T14:12:55.025Z', // 10:12 EDT
+    route_started_at: '2026-08-19T11:52:42.498Z',
+    work_completed_at: '2026-08-19T14:17:35.447Z', // 10:17 EDT — 0.08h of window
+    status: 'completed',
+  };
+  const nceSegment = { start: '2026-08-19T11:03:19.547Z', end: '2026-08-19T18:05:27.030Z' };
+  const sterlingSegment = { start: '2026-08-19T18:05:27.030Z', end: '2026-08-19T21:38:48.668Z' };
+
+  it('without a segment it still clips to the on-site window — the defect, pinned', () => {
+    expect(jobHoursForCard(card, nce, false)).toBe(0.08);
+  });
+
+  it('with the segment NC&E is 7.03 — completion does not end the job', () => {
+    expect(jobHoursForCard(card, nce, false, new Date(), undefined, nceSegment)).toBe(7.03);
+  });
+
+  it('the same card gives Sterling 3.55 off its own segment', () => {
+    const sterling = {
+      work_started_at: '2026-08-19T20:10:53.879Z',
+      route_started_at: '2026-08-19T18:05:27.030Z',
+      work_completed_at: '2026-08-19T20:13:00.955Z',
+      status: 'completed',
+    };
+    expect(jobHoursForCard(card, sterling, false, new Date(), undefined, sterlingSegment)).toBe(3.55);
+  });
+
+  it('shop time is never job labour, segment or no segment', () => {
+    expect(
+      jobHoursForCard({ ...card, is_shop_hours: true }, nce, false, new Date(), undefined, nceSegment)
+    ).toBe(0);
+    expect(
+      jobHoursForCard({ ...card, work_location: 'shop' }, nce, false, new Date(), undefined, nceSegment)
+    ).toBe(0);
+  });
+
+  it('one share can never exceed the whole card\'s paid hours', () => {
+    const short = { ...card, net_hours: 2, total_hours: 2 };
+    expect(jobHoursForCard(short, nce, false, new Date(), undefined, nceSegment)).toBe(2);
+  });
+
+  it('an unparseable segment yields nothing rather than a wild number', () => {
+    expect(
+      jobHoursForCard(card, nce, false, new Date(), undefined, { start: 'x', end: 'y' })
+    ).toBe(0);
+  });
+});
+
+/**
+ * ────────────────────────────────────────────────────────────────────────────
+ * THE AUG 19 2026 DAY, AS EVERY CONSUMER MUST READ IT.
+ *
+ * Conrade 07:03→17:38 (paid 10.09) and Axel 07:09→16:42 (paid 9.06) ran NC&E in
+ * the morning and Sterling from 14:05. BOTH cards are tagged NC&E, so Sterling's
+ * share exists ONLY as a boundary segment — which is why `attributableTimecards`
+ * now hands another job's cards back, and why every consumer that kept reading
+ * the card's own hours started charging Sterling nineteen hours for six.
+ */
+const AUG19 = {
+  conrade: {
+    id: 'tc-conrade',
+    date: '2026-08-19',
+    clock_in_time: '2026-08-19T11:03:19.547Z',
+    clock_out_time: '2026-08-19T21:38:48.668Z',
+    net_hours: 10.09,
+    total_hours: 10.09,
+  },
+  axel: {
+    id: 'tc-axel',
+    date: '2026-08-19',
+    clock_in_time: '2026-08-19T11:09:17.983Z',
+    clock_out_time: '2026-08-19T20:42:46.533Z',
+    net_hours: 9.06,
+    total_hours: 9.06,
+  },
+};
+/** Sterling's stretch of each card: its 14:05 press → that person's clock-out. */
+const STERLING_SEGMENTS = new Map<string, { start: string; end: string; hours: number }>([
+  ['tc-conrade', { start: '2026-08-19T18:05:27.030Z', end: '2026-08-19T21:38:48.668Z', hours: 3.55 }],
+  ['tc-axel', { start: '2026-08-19T18:05:27.030Z', end: '2026-08-19T20:42:46.533Z', hours: 2.62 }],
+]);
+
+describe('segmentJobHours — "no boundary" and "a boundary worth nothing" are different answers', () => {
+  it('null for no segment, so the caller falls back to the card', () => {
+    expect(segmentJobHours(null)).toBeNull();
+    expect(segmentJobHours(undefined)).toBeNull();
+  });
+
+  it('ZERO for a zero-length segment — it must NOT fall through to the whole day', () => {
+    // The crew left for the next job the moment this one started. That is a
+    // real answer; treating it as "no boundary" would bill the entire card.
+    expect(segmentJobHours({ hours: 0 })).toBe(0);
+  });
+
+  it('floors, so N shares can never sum past the day they divide', () => {
+    expect(segmentJobHours({ hours: 7.0354119 })).toBe(7.03);
+    expect(segmentJobHours({ hours: 3.5560106 })).toBe(3.55);
+  });
+
+  it('null for a nonsense figure rather than a wild number', () => {
+    expect(segmentJobHours({ hours: Number.NaN })).toBeNull();
+    expect(segmentJobHours({ hours: -1 })).toBeNull();
+    expect(segmentJobHours({})).toBeNull();
+  });
+});
+
+describe('clockedJobHours — the Daily Progress panel reads the segment, not the card', () => {
+  it('THE DEFECT: without segments Sterling is charged both WHOLE days (19.15)', () => {
+    expect(round2(clockedJobHours([AUG19.conrade, AUG19.axel]))).toBe(19.15);
+  });
+
+  it('with segments Sterling is 6.17 — the figure the printed ticket carries', () => {
+    expect(round2(clockedJobHours([AUG19.conrade, AUG19.axel], STERLING_SEGMENTS))).toBe(6.17);
+  });
+
+  it('an undivided day is untouched — the first POSITIVE of net/total', () => {
+    // A stated ZERO net is not an answer; total_hours wins. Pinned because `??`
+    // here printed the very 0.00 the founder complained about.
+    expect(round2(clockedJobHours([{ id: 'a', net_hours: 0, total_hours: 9.5 }]))).toBe(9.5);
+    expect(round2(clockedJobHours([{ id: 'b', net_hours: 7.47, total_hours: 8.01 }]))).toBe(7.47);
+  });
+
+  it('measures the clock when neither column carries a figure', () => {
+    expect(
+      round2(
+        clockedJobHours([
+          { id: 'c', clock_in_time: '2026-08-19T11:00:00Z', clock_out_time: '2026-08-19T19:00:00Z' },
+        ])
+      )
+    ).toBe(8);
+  });
+
+  it('an OPEN card contributes nothing rather than counting to now', () => {
+    expect(clockedJobHours([{ id: 'd', clock_in_time: '2026-08-19T11:00:00Z' }])).toBe(0);
+  });
+});
+
+/**
+ * LUNCH: BILLABLE ≠ PAID (founder, Aug 17 2026 — "lunch is deducted for
+ * employees and still considered billable hours").
+ *
+ * A divided day is cut on the GROSS clock, so its segments sum to the card's
+ * gross span and NOT to what payroll paid. Costing the gross books wage +
+ * burden that no payroll run produces.
+ */
+describe('paidSegmentHours — a COST may not be built on the gross segment', () => {
+  it("deducts Conrade's lunch in proportion: 7.03 / 3.55 gross → 6.69 / 3.38 paid", () => {
+    // gross span 10.59, paid 10.09 → every share scaled by 10.09/10.59.
+    expect(paidSegmentHours(AUG19.conrade, 7.03)).toBe(6.69);
+    expect(paidSegmentHours(AUG19.conrade, 3.55)).toBe(3.38);
+  });
+
+  it('the paid shares never sum past the paid day (10.07 ≤ 10.09)', () => {
+    const sum = paidSegmentHours(AUG19.conrade, 7.03) + paidSegmentHours(AUG19.conrade, 3.55);
+    expect(round2(sum)).toBeLessThanOrEqual(10.09);
+    // …while the GROSS shares provably do exceed it. That gap is the lunch.
+    expect(round2(7.03 + 3.55)).toBeGreaterThan(10.09);
+  });
+
+  it("Axel's day the same way: 6.93 / 2.62 gross → 6.56 / 2.48 paid", () => {
+    expect(paidSegmentHours(AUG19.axel, 6.93)).toBe(6.56);
+    expect(paidSegmentHours(AUG19.axel, 2.62)).toBe(2.48);
+  });
+
+  it('deducts NOTHING when no lunch was taken off the card', () => {
+    const noLunch = { ...AUG19.conrade, net_hours: 10.59, total_hours: 10.59 };
+    expect(paidSegmentHours(noLunch, 7.03)).toBe(7.03);
+  });
+
+  it('deducts nothing from an OPEN card — payroll has not written the lunch', () => {
+    const open = { clock_in_time: '2026-08-19T11:03:19.547Z', net_hours: 0, total_hours: null };
+    expect(paidSegmentHours(open, 3.55, NOW)).toBe(3.55);
+  });
+
+  it('a heavily-deducted day scales every share by the same ratio', () => {
+    // Only 2 of a 10.59h clock were paid, so a 7.03h stretch is worth
+    // 7.03 × 2/10.59 = 1.32. The proportional rule bites first; the paid-day cap
+    // below is the guard behind it, not the mechanism.
+    const short = { ...AUG19.conrade, net_hours: 2, total_hours: 2 };
+    expect(paidSegmentHours(short, 7.03)).toBe(1.32);
+    expect(paidSegmentHours(short, 7.03)).toBeLessThanOrEqual(2);
+  });
+
+  it('a corrupt segment longer than the whole day is still capped at the paid day', () => {
+    expect(paidSegmentHours(AUG19.conrade, 30)).toBe(10.09);
+  });
+
+  it('nothing is nothing', () => {
+    expect(paidSegmentHours(AUG19.conrade, 0)).toBe(0);
+    expect(paidSegmentHours(AUG19.conrade, -3)).toBe(0);
   });
 });
