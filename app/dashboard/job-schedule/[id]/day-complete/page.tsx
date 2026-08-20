@@ -30,12 +30,13 @@ import {
   Sparkles,
   Navigation,
 } from 'lucide-react';
-import PhotoUploader from '@/components/PhotoUploader';
+import PhotoUploader, { PhotoViewer } from '@/components/PhotoUploader';
 import EsignConsentCheckbox from '@/components/EsignConsentCheckbox';
 import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey';
 import JobProgressLogger from '@/components/JobProgressLogger';
 import DayCloseoutChoice from '@/components/DayCloseoutChoice';
 import { toLocalYMD } from '@/lib/dates';
+import { photosFiledThisShift, currentShiftStartMs } from '@/lib/job-photo-day';
 import {
   planDayCloseout,
   CONTINUE_CONFIRMATION_REQUIRED,
@@ -82,6 +83,76 @@ export default function DayCompletePage() {
   // office on the schedule form) — operators can no longer self-exempt via a
   // local checkbox. Flag true → photo gate auto-satisfied + notice shown.
   const [photosProhibited, setPhotosProhibited] = useState(false);
+
+  // ─── Photos ALREADY on this job this shift ───────────────────────────────
+  //
+  // ASKED ONCE PER JOB PER SHIFT (founder, Aug 20 2026 — Nate wanted to go back
+  // to paper over exactly this). The work-performed screen uploads into the
+  // same bucket and the same `job_orders.photo_urls` column this screen writes
+  // to, but the gate below only ever looked at `completionPhotos` — local
+  // state that starts empty on every mount. So the crew shot the work, walked
+  // to this screen, and were told to shoot it again; production shows the two
+  // clusters minutes (once thirty-five seconds) apart.
+  //
+  // These are held SEPARATELY from `completionPhotos` on purpose, and are NOT
+  // loaded into the uploader. They are already saved on the job: folding them
+  // into the editable list would re-POST them on submit (duplicating the array)
+  // and would put an X button on them that removes nothing server-side — a lie
+  // to the operator. Read-only here, editable list stays new-photos-only, so
+  // the POST paths below need no change.
+  //
+  // (Name kept for continuity; "today" here means the SHIFT's day — see
+  // fetchPhotosAlreadyToday and lib/job-photo-day.ts. A crew that shot the cut
+  // at 23:50 and closes out at 00:05 is on one shift, not two days.)
+  const [photosAlreadyToday, setPhotosAlreadyToday] = useState<string[]>([]);
+
+  /** Stops two reads of the photo list overlapping (mount + a focus refetch). */
+  const photosRefetching = useRef(false);
+  /** `submitting`, readable from the window listeners below without re-binding. */
+  const submittingRef = useRef(false);
+  useEffect(() => { submittingRef.current = submitting; }, [submitting]);
+
+  /**
+   * WHAT THE CUSTOMER'S THANK-YOU EMAIL SHOWS, AND IN WHAT ORDER.
+   *
+   * `emails/CompletionThankYouEmail.tsx` keeps only the FIRST SIX. This list
+   * used to be built chronologically — everything already on the job today,
+   * then the completion shots — so a crew that filed seven in-progress photos
+   * on the work log and two finished-cut photos here sent the customer six
+   * mid-job photos and NONE of the finished work. The one thing the email
+   * exists to show was the one thing truncated away.
+   *
+   * Completion photos therefore lead. Two consequences, both deliberate:
+   *
+   *  - The finished work can never be the part that gets cut. Whatever else
+   *    happens, photo #1 is the completed cut.
+   *  - The set reads "after, then before". That is the right order for this
+   *    audience: the customer opens the email to see the work is done, and the
+   *    in-progress shots read as supporting context behind it. (The office asked
+   *    for the process photos to reach the customer — Aug 3 — so they are kept
+   *    rather than dropped; they simply follow.)
+   *
+   * De-duplicated because a focus refetch can pull a photo this page already
+   * uploaded into `photosAlreadyToday`; the customer should not see it twice.
+   */
+  const customerPhotoUrls = Array.from(
+    new Set([...completionPhotos, ...photosAlreadyToday])
+  );
+
+  /**
+   * The photo requirement, in one place, used by all three terminal actions.
+   *
+   * NOT weakened to nothing: photos are still required to finish a job, and
+   * still required for THIS SHIFT (a day-1 photo cannot close out day 5 of a
+   * multi-day job — the office bills and defends the work with these). What
+   * changed is that evidence already filed on this shift COUNTS, wherever on
+   * the ticket it was filed from — including the half of an overnight shift
+   * that fell on yesterday's date.
+   */
+  const photoRequirementMet =
+    photosProhibited || completionPhotos.length > 0 || photosAlreadyToday.length > 0;
+  const PHOTO_REQUIRED_MESSAGE =
+    'Add at least one job photo before finishing — none have been added on this job this shift.';
   const [esignConsented, setEsignConsented] = useState(false);
   const [pdfSaved, setPdfSaved] = useState(false);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
@@ -191,6 +262,7 @@ export default function DayCompletePage() {
   useEffect(() => {
     fetchJob();
     fetchScheduleInfo();
+    fetchPhotosAlreadyToday();
     // DB-first: fetch saved work items; fall back to localStorage if DB is empty
     (async () => {
       try {
@@ -239,6 +311,36 @@ export default function DayCompletePage() {
     })();
   }, [jobId]);
 
+  // ─── A PHOTO THAT LANDS LATE MUST STILL BE SEEN ──────────────────────────
+  //
+  // The gate reads the job's photos once, at mount. That single read is a race
+  // with the work-performed screen's write: the work log now waits for its
+  // photo POST before it navigates, but a phone that was backgrounded mid-write
+  // — a jobsite, weak LTE, the operator locks the screen and comes back — can
+  // still land the write after this page has already made up its mind and put
+  // an empty required uploader in front of him.
+  //
+  // So: re-read whenever the screen comes back to the front. Cheap (one small
+  // GET), and it can only ever ADD photos to the list, never take the
+  // requirement away.
+  useEffect(() => {
+    const refetch = () => {
+      // Not while submitting. This page POSTs the photos it is holding; a read
+      // landing between those writes would fold them into the read-only
+      // "already added" list and send the customer the same photo twice.
+      if (submittingRef.current) return;
+      if (document.visibilityState === 'hidden') return;
+      fetchPhotosAlreadyToday();
+    };
+    window.addEventListener('focus', refetch);
+    document.addEventListener('visibilitychange', refetch);
+    return () => {
+      window.removeEventListener('focus', refetch);
+      document.removeEventListener('visibilitychange', refetch);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobId]);
+
   const fetchJob = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -272,6 +374,68 @@ export default function DayCompletePage() {
       console.error('Error fetching job:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * What this job already has on file for THIS SHIFT.
+   *
+   * Two reads, in parallel: the job's photos, and the operator's own recent
+   * clock cycles — because "today" here means the shift's day, not the phone's
+   * date. `docs/plans/NIGHT_SHIFT_AND_LATE_CLOSEOUT.md`: "A shift belongs to the
+   * day it STARTED." A crew that photographed the cut at 23:50 and closes out at
+   * 00:05 filed those photos on THIS shift, and must not be asked again.
+   *
+   * DELIBERATELY NOT `/api/timecard/current`. That endpoint auto-closes any open
+   * card dated before today — calling it at 00:05 would clock the operator out
+   * of the overnight shift he is standing in, stamping a clock-out on a live
+   * payroll row. `/api/timecard/history` is a plain read.
+   *
+   * FAILS OPEN — a network hiccup, a missing timecard, an operator who never
+   * clocked in: every one of those leaves this at the wall-clock behaviour that
+   * shipped before, which is that the operator is asked. Never the other way
+   * round; a failed read must not waive the evidence requirement.
+   */
+  const fetchPhotosAlreadyToday = async () => {
+    if (photosRefetching.current) return;
+    photosRefetching.current = true;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const authHeaders = { Authorization: `Bearer ${session.access_token}` };
+
+      // Yesterday and today: an overnight shift's clock-in is dated yesterday.
+      // Local components, never toISOString — the recurring off-by-a-day bug.
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const shiftUrl =
+        `/api/timecard/history?startDate=${toLocalYMD(yesterday)}` +
+        `&endDate=${toLocalYMD()}&limit=5`;
+
+      const [photoRes, shiftRes] = await Promise.all([
+        fetch(`/api/job-orders/${jobId}/photos`, { headers: authHeaders }),
+        // Its own catch: the shift read is an ENHANCEMENT. If it fails, the
+        // photo gate still works on the wall clock — it must not take the
+        // photo read down with it.
+        fetch(shiftUrl, { headers: authHeaders }).catch(() => null),
+      ]);
+
+      if (!photoRes.ok) return;
+      const json = await photoRes.json();
+
+      let shiftStartMs: number | null = null;
+      if (shiftRes?.ok) {
+        const shiftJson = await shiftRes.json().catch(() => null);
+        shiftStartMs = currentShiftStartMs(shiftJson?.data?.timecards);
+      }
+
+      setPhotosAlreadyToday(
+        photosFiledThisShift(json?.data?.photo_urls, { shiftStartMs })
+      );
+    } catch {
+      /* fail open — the gate simply asks, as it did before */
+    } finally {
+      photosRefetching.current = false;
     }
   };
 
@@ -311,8 +475,8 @@ export default function DayCompletePage() {
       setNotification({ message: 'Add what work was performed before submitting.', type: 'error' });
       return;
     }
-    if (completionPhotos.length === 0 && !photosProhibited) {
-      setNotification({ message: 'Add at least one job photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+    if (!photoRequirementMet) {
+      setNotification({ message: PHOTO_REQUIRED_MESSAGE, type: 'error' });
       return;
     }
     setSubmitting(true);
@@ -488,8 +652,8 @@ export default function DayCompletePage() {
       setNotification({ message: 'Add what work was performed before completing the job.', type: 'error' });
       return;
     }
-    if (completionPhotos.length === 0 && !photosProhibited) {
-      setNotification({ message: 'Add at least one job photo — or mark “Photos prohibited on this site” to skip.', type: 'error' });
+    if (!photoRequirementMet) {
+      setNotification({ message: PHOTO_REQUIRED_MESSAGE, type: 'error' });
       return;
     }
     setSubmitting(true);
@@ -530,7 +694,14 @@ export default function DayCompletePage() {
             signatureDataUrl: signatureData || null,
             workPerformed,
             customer_email: customerEmail.trim() || undefined,
-            reference_photo_urls: completionPhotos,
+            // This shift's evidence, wherever on the ticket it was filed from.
+            // It used to be `completionPhotos` alone, so a crew that
+            // photographed the work on the work-performed screen and added
+            // nothing here sent the customer a thank-you email with no photos
+            // in it. Completion shots lead — the email keeps only the first six
+            // and the finished work must never be what gets cut. See the
+            // `customerPhotoUrls` note above.
+            reference_photo_urls: customerPhotoUrls,
           }),
         });
         if (pdfRes.ok) {
@@ -737,8 +908,8 @@ export default function DayCompletePage() {
       refuse('Add what work was performed before finishing the job.');
       return;
     }
-    if (completionPhotos.length === 0 && !photosProhibited) {
-      refuse('Add at least one job photo — or mark “Photos prohibited on this site” to skip.');
+    if (!photoRequirementMet) {
+      refuse(PHOTO_REQUIRED_MESSAGE);
       return;
     }
     if (!remotePhone.trim()) {
@@ -1326,18 +1497,46 @@ export default function DayCompletePage() {
                   nothing is being signed. `isLastScheduledDay !== true` is the
                   same condition that shows the Done-for-today button below. */}
               <h3 className="text-sm font-bold text-gray-700 dark:text-gray-200">
-                Completion Photos{' '}
-                {!photosProhibited && isLastScheduledDay === true && <span className="text-red-500">*</span>}
+                Job Photos{' '}
+                {!photosProhibited &&
+                  isLastScheduledDay === true &&
+                  photosAlreadyToday.length === 0 && <span className="text-red-500">*</span>}
               </h3>
               <p className="text-xs text-gray-500 dark:text-gray-400">
                 {photosProhibited
                   ? 'Not allowed at this jobsite'
-                  : isLastScheduledDay === true
-                    ? 'Required to complete the job — before/after photos, site conditions'
-                    : 'Optional today — required only when you complete the job'}
+                  : photosAlreadyToday.length > 0
+                    ? 'Already covered for this shift'
+                    : isLastScheduledDay === true
+                      ? 'Required to complete the job — before/after photos, site conditions'
+                      : 'Optional today — required only when you complete the job'}
               </p>
             </div>
           </div>
+
+          {/* ONE ASK PER JOB PER SHIFT. If the crew already filed photos on this
+              shift — from the work log or from here — say so plainly and show
+              them, instead of putting an empty required uploader in front of a
+              man who photographed the same work four minutes ago. That second
+              ask is the reason an operator asked to go back to paper.
+              "This shift", not "today", because a crew that shot the cut at
+              23:50 and closes out at 00:05 is on the same shift and would
+              otherwise be told those photos belonged to yesterday. */}
+          {!photosProhibited && photosAlreadyToday.length > 0 && (
+            <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/20 dark:bg-emerald-500/10">
+              <p className="flex items-center gap-1.5 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                <CheckCircle2 className="h-4 w-4 flex-shrink-0" />
+                {photosAlreadyToday.length} photo{photosAlreadyToday.length === 1 ? '' : 's'} already added on this shift
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-700 dark:text-emerald-400">
+                These are on the ticket already — you don&apos;t need to take them again.
+              </p>
+              <div className="mt-2">
+                <PhotoViewer photos={photosAlreadyToday} label="Added this shift" />
+              </div>
+            </div>
+          )}
+
           {photosProhibited ? (
             // Office flagged this jobsite photo-prohibited (secure facility) —
             // the photo requirement is auto-waived; operators cannot self-exempt.
@@ -1356,7 +1555,7 @@ export default function DayCompletePage() {
               photos={completionPhotos}
               onPhotosChange={setCompletionPhotos}
               maxPhotos={10}
-              label="Add Completion Photos"
+              label={photosAlreadyToday.length > 0 ? 'Add More Photos (optional)' : 'Add Completion Photos'}
               lightMode={true}
               captureLocation
               jobId={jobId}

@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAuth } from '@/lib/api-auth';
 import { parseStorageRef } from '@/lib/job-ticket-photos';
+import { appendUniquePhotoUrls, countAlreadyPresent } from '@/lib/job-photo-append';
 
 const ADMIN_ROLES = ['admin', 'super_admin', 'operations_manager', 'supervisor'];
 
@@ -93,9 +94,24 @@ export async function POST(
       );
     }
 
-    // Atomic append using SQL to avoid race condition
+    // Append what is genuinely new.
+    //
+    // The work-performed screen retries this POST when the response is lost
+    // (weak LTE, or its 20 s abort firing after the write already landed), so
+    // "append everything I was handed" turns one submission into two identical
+    // photos: day-complete then reports four photos for two, and the ticket
+    // prints four photo pages. See lib/job-photo-append.ts for why exact-string
+    // matching is sufficient here rather than merely convenient.
     const existing = job.photo_urls || [];
-    const merged = [...existing, ...photo_urls];
+    const merged = appendUniquePhotoUrls(existing, photo_urls);
+    const alreadyPresent = countAlreadyPresent(existing, photo_urls);
+    if (alreadyPresent > 0) {
+      // Visible, not silent: a retry that adds nothing should look like a retry
+      // in the logs, not like a successful upload of new work.
+      console.log(
+        `photos: ${alreadyPresent} of ${photo_urls.length} already on job ${jobId} — treated as a retry`
+      );
+    }
 
     const { error: updateError } = await supabaseAdmin
       .from('job_orders')
@@ -126,7 +142,7 @@ export async function GET(
     // Check authorization: must be assigned to job or admin
     const { data: job } = await supabaseAdmin
       .from('job_orders')
-      .select('assigned_to, helper_assigned_to, photo_urls')
+      .select('assigned_to, helper_assigned_to, photo_urls, tenant_id')
       .eq('id', jobId)
       .single();
 
@@ -139,7 +155,12 @@ export async function GET(
       .single();
 
     let isAssigned = job.assigned_to === auth.userId || job.helper_assigned_to === auth.userId;
-    const isAdmin = ADMIN_ROLES.includes(profile?.role || '');
+    // Same-tenant, exactly as the POST branch above (security audit M1 IDOR).
+    // The POST was fixed and this read was left behind, so an admin in tenant A
+    // could still enumerate tenant B's job photos by id. day-complete now reads
+    // this endpoint on every load, so it is no longer a rarely-touched path.
+    const isAdmin = ADMIN_ROLES.includes(profile?.role || '')
+      && (!auth.tenantId || job.tenant_id === auth.tenantId);
     if (!isAssigned && !isAdmin) {
       isAssigned = await isCrewMember(jobId, auth.userId);
     }

@@ -126,7 +126,24 @@ export default function WorkPerformed() {
   // flag still drives the acknowledgement UI for secure sites.
   const [photosProhibited, setPhotosProhibited] = useState(false);
   const [photosSkipAcknowledged, setPhotosSkipAcknowledged] = useState(false);
+  /**
+   * SET WHEN THE PHOTO WRITE FAILED — and it is the only thing that sets it.
+   *
+   * This used to be rendered and never populated: three `setPhotoError(null)`
+   * calls and no message, so the line below the uploader could not appear. Dead
+   * wiring is this codebase's recurring defect, so it is connected rather than
+   * deleted: it is now exactly the surface a failed photo save needs, which is
+   * the failure the copy in this section makes a promise about.
+   */
   const [photoError, setPhotoError] = useState<string | null>(null);
+  /**
+   * Photo URLs the server has already accepted for this job.
+   *
+   * `/api/job-orders/[id]/photos` APPENDS. Retrying a submit after a photo
+   * failure must not re-send what already landed, or the job's `photo_urls`
+   * carries every photo twice — and the office bills off that array.
+   */
+  const savedPhotoUrls = useRef<Set<string>>(new Set());
 
   // ─── Day lock state (read-only if the day's log is already submitted) ─────
   const [dayAlreadySubmitted, setDayAlreadySubmitted] = useState(false);
@@ -634,6 +651,9 @@ export default function WorkPerformed() {
     if (isSubmitting) return;
     setIsSubmitting(true);
 
+    /** How many photos failed to reach the job, 0 when all of them landed. */
+    let photoSaveFailed = 0;
+
     try {
       const { data: { session } } = await supabase.auth.getSession();
 
@@ -692,16 +712,61 @@ export default function WorkPerformed() {
         // usage is captured on the Equipment Usage form below. Removed rather
         // than carried forward one more time.
 
-        // Save photos if any were taken
-        if (jobPhotos.length > 0) {
-          fetch(`/api/job-orders/${params.id}/photos`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.access_token}`
-            },
-            body: JSON.stringify({ photo_urls: jobPhotos })
-          }).catch(err => console.error('Photo save error:', err));
+        // ── SAVE THE PHOTOS, AND WAIT FOR IT ────────────────────────────────
+        //
+        // This used to be fire-and-forget with a `.catch(console.error)`, and
+        // the page navigated 800ms later. The screen the operator lands on
+        // reads the job's photos ONCE, at mount — so on weak site LTE the read
+        // beat the write, found nothing, and demanded photos he had just taken.
+        // On an outright failure the photos never reached `photo_urls` at all,
+        // while the copy above promises him they are the whole day's
+        // requirement. A promise carried by a request nobody waits for is not a
+        // promise.
+        //
+        // Only URLs not already accepted by the server are sent: this endpoint
+        // APPENDS, so a retry that re-sent the whole list would store every
+        // photo twice on the job. That is also why the failure is not queued to
+        // the outbox — a background replay racing a manual retry double-writes
+        // the array, and there is no server-side de-duplication to catch it.
+        // An immediate, honest error with a one-tap retry is the safer trade.
+        const unsavedPhotos = jobPhotos.filter((u) => !savedPhotoUrls.current.has(u));
+        if (unsavedPhotos.length > 0) {
+          // Bounded: the operator is standing on a jobsite, not watching a
+          // spinner. The files are ALREADY in storage by this point — this is a
+          // small JSON write — so 20s is generous, not tight.
+          const photoTimeout = new AbortController();
+          const timer = setTimeout(() => photoTimeout.abort(), 20_000);
+          let photoOk = false;
+          try {
+            const photoRes = await fetch(`/api/job-orders/${params.id}/photos`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${session.access_token}`
+              },
+              body: JSON.stringify({ photo_urls: unsavedPhotos }),
+              signal: photoTimeout.signal,
+            });
+            photoOk = photoRes.ok;
+            if (!photoOk) {
+              console.error('Photo save failed', photoRes.status);
+            }
+          } catch (err) {
+            console.error('Photo save error:', err);
+          } finally {
+            clearTimeout(timer);
+          }
+
+          if (photoOk) {
+            // Accepted by the server — never send these again from this screen.
+            unsavedPhotos.forEach((u) => savedPhotoUrls.current.add(u));
+            setPhotoError(null);
+          } else {
+            // Flagged, not returned: the day's numbers, the localStorage backup
+            // and the workflow step below all still deserve to run. Only the
+            // NAVIGATION is withheld — see the branch further down.
+            photoSaveFailed = unsavedPhotos.length;
+          }
         }
 
         // Update workflow tracking (fire and forget)
@@ -733,6 +798,24 @@ export default function WorkPerformed() {
       // work", and pressing Back from the day-complete page must still show
       // what they entered. It no longer leaks into tomorrow — the draft carries
       // the date it was written for and is discarded on load if that isn't today.
+
+      // THE PHOTOS DID NOT LAND. The day's work DID — the early return above
+      // guarantees it, so nothing needs re-typing. Stop here rather than
+      // navigating: the next screen would show a bare required uploader with no
+      // explanation, which is exactly the second ask this change exists to
+      // remove, and the copy in the photo section has just promised him the
+      // opposite. He can tap Submit again (only the unsaved photos are re-sent),
+      // or take the explicit way out rendered under the message.
+      if (photoSaveFailed > 0) {
+        setPhotoError(
+          `Your work is saved, but ${photoSaveFailed === 1 ? 'the photo' : `${photoSaveFailed} photos`} did not upload — check your signal and tap Submit again. If you keep going, you'll be asked for photos again at day's end.`
+        );
+        document.getElementById('job-photos-section')?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center',
+        });
+        return; // `finally` clears isSubmitting — the button re-arms itself.
+      }
 
       showNotification('Work performed saved!', 'success');
 
@@ -1181,9 +1264,14 @@ export default function WorkPerformed() {
                 </div>
               ) : (
                 <>
+                  {/* SAY THE ONCE-ONLY RULE OUT LOUD (founder, Aug 20 2026).
+                      Day-complete now counts anything filed on this job today,
+                      so photos added here are the whole day's requirement — but
+                      the crew only stops resenting the second screen if they
+                      know that BEFORE they get to it. */}
                   <p className="text-xs text-gray-500 dark:text-white/50 mb-3">
-                    Optional here — add them if you have them. Photos are required
-                    when you finish the job, right before the customer signs.
+                    Add them here and you won&apos;t be asked again when you close out —
+                    photos are needed once a shift, not on every screen.
                   </p>
                   <PhotoUploader
                     bucket="job-photos"
@@ -1208,8 +1296,32 @@ export default function WorkPerformed() {
                 </>
               )}
 
+              {/* THE PHOTO WRITE FAILED. The day's work is already saved — say
+                  so first, because "error" on this screen used to mean a lost
+                  day. Then a way forward that is never a dead end: tap Submit
+                  again, or go on and take the second ask at day's end. The
+                  second option exists so a phone with no signal cannot trap an
+                  operator on a jobsite. */}
               {photoError && (
-                <p className="mt-3 text-xs font-semibold text-red-600 dark:text-red-400">{photoError}</p>
+                <div className="mt-3 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-500/20 dark:bg-red-500/10">
+                  <p className="text-xs font-semibold text-red-700 dark:text-red-300">{photoError}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoError(null);
+                      localStorage.removeItem(`job_last_page_${params.id}`);
+                      if (isCoOperator) {
+                        setCoOpSubmitted(true);
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                        return;
+                      }
+                      router.push(`/dashboard/job-schedule/${params.id}/day-complete`);
+                    }}
+                    className="mt-3 w-full min-h-[44px] px-4 py-2.5 rounded-xl border border-red-300 dark:border-red-500/30 text-sm font-semibold text-red-700 dark:text-red-300 hover:bg-red-100 dark:hover:bg-red-500/20 transition-colors"
+                  >
+                    Keep going without the photos
+                  </button>
+                </div>
               )}
             </div>
 
