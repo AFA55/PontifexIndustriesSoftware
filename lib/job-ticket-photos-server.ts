@@ -61,25 +61,61 @@ function sniffImageMime(buf: Buffer): string | null {
   return null;
 }
 
-function toDataUri(buf: Buffer, declaredMime: string | null): string | null {
-  if (buf.length === 0 || buf.length > MAX_PHOTO_BYTES) return null;
+/** Raw image bytes plus the mime we are willing to stand behind. */
+export interface PhotoBytes {
+  buffer: Buffer;
+  /** 'image/jpeg' | 'image/png' — sniffed from the bytes where they disagree with the label. */
+  mime: string;
+}
+
+function toPhotoBytes(buf: Buffer, declaredMime: string | null, maxBytes: number): PhotoBytes | null {
+  if (buf.length === 0 || buf.length > maxBytes) return null;
   const mime = normalizeImageMime(declaredMime) ?? sniffImageMime(buf);
   if (!mime) return null;
   // Trust the bytes over the label when they disagree.
   const sniffed = sniffImageMime(buf);
-  return `data:${sniffed ?? mime};base64,${buf.toString('base64')}`;
+  return { buffer: buf, mime: sniffed ?? mime };
 }
 
 /** Pull an object straight out of Storage with the service-role client. */
-async function downloadFromStorage(bucket: string, path: string): Promise<string | null> {
+async function downloadFromStorage(
+  bucket: string,
+  path: string,
+  maxBytes: number
+): Promise<PhotoBytes | null> {
   try {
     const { data, error } = await supabaseAdmin.storage.from(bucket).download(path);
     if (error || !data) return null;
     const buf = Buffer.from(await data.arrayBuffer());
-    return toDataUri(buf, (data as Blob).type);
+    return toPhotoBytes(buf, (data as Blob).type, maxBytes);
   } catch {
     return null;
   }
+}
+
+/**
+ * One stored photo URL → its verified image bytes, or null.
+ *
+ * The shared primitive behind BOTH consumers of a private-bucket photo:
+ *  • the printed job ticket, which base64s them into the PDF (below), and
+ *  • the customer's completion email, which mails them as inline parts
+ *    (lib/completion-email-photos.ts).
+ *
+ * It is deliberately the same function for both, because the interesting part
+ * is not the download — it is the three gates in `parseStorageRef` (same
+ * origin, allow-listed bucket, no traversal) standing between an
+ * operator-supplied string and a SERVICE-ROLE read that ignores storage RLS.
+ * A second copy of that reasoning is a second chance to get it wrong.
+ *
+ * Never throws. Anything unresolvable is null and the caller carries on.
+ */
+export async function fetchPhotoBytes(
+  url: string,
+  maxBytes: number = MAX_PHOTO_BYTES
+): Promise<PhotoBytes | null> {
+  const ref = parseStorageRef(url);
+  if (!ref) return null;
+  return downloadFromStorage(ref.bucket, ref.path, maxBytes);
 }
 
 /** A genuinely external https image (not one of our buckets). */
@@ -94,9 +130,9 @@ export async function fetchPhotoDataUri(url: string): Promise<string | null> {
   // A URL that is not one of THIS project's allow-listed photo buckets is not
   // fetched at all. See parseStorageRef for why that matters: these bytes are
   // read with the service-role client, which bypasses storage RLS entirely.
-  const ref = parseStorageRef(url);
-  if (!ref) return null;
-  return downloadFromStorage(ref.bucket, ref.path);
+  const photo = await fetchPhotoBytes(url, MAX_PHOTO_BYTES);
+  if (!photo) return null;
+  return `data:${photo.mime};base64,${photo.buffer.toString('base64')}`;
 }
 
 /**

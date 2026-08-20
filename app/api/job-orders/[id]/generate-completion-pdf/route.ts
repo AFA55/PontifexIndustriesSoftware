@@ -22,6 +22,7 @@ import React from 'react';
 import CompletionSignOffPDF, { type CompletionPDFData } from '@/components/pdf/CompletionSignOffPDF';
 import { toCompletionPdfWorkItems } from '@/lib/work-items-format';
 import { sendEmail, getTenantEmailBranding, generateCompletionThankYouEmail } from '@/lib/email';
+import { resolveCompletionEmailPhotos } from '@/lib/completion-email-photos';
 
 export async function POST(
   request: NextRequest,
@@ -297,11 +298,42 @@ export async function POST(
       );
     }
 
-    // ── Optional: email PDF receipt to customer (fire-and-forget) ──────────
+    // ── Optional: email the sign-off to the customer ────────────────────────
+    //
+    // AWAITED, not fired and forgotten. This runs on Vercel: the instance is
+    // frozen the moment the response is returned, so an un-awaited send is a
+    // coin flip. It is wrapped in try/catch instead — a failed email must not
+    // fail a job the customer has already signed for, but it must be logged.
     const customerEmailTrimmed = (customer_email || '').trim();
     if (customerEmailTrimmed) {
       try {
-        const referencePhotos = Array.isArray(reference_photo_urls) ? reference_photo_urls : [];
+        // THE PHOTOS TRAVEL WITH THE MESSAGE.
+        //
+        // This used to hand the template the raw stored URLs, which are in the
+        // `/storage/v1/object/public/job-photos/…` shape while that bucket is
+        // PRIVATE — they answer 400 "Bucket not found", so every completion
+        // email ever sent showed grey boxes where the finished cut should be.
+        // Signed URLs would render, but each one is a bearer token for our
+        // storage origin travelling in a forwardable email with an expiry that
+        // is either too short to survive being filed or too long to be safe.
+        // Inline parts carry the bytes: no expiry, no credential, works offline.
+        // See lib/completion-email-photos.ts.
+        //
+        // Order is preserved (completed-cut photo first) and the six-photo cap
+        // is the template's, matched here so we do not download a tail we drop.
+        const photos = await resolveCompletionEmailPhotos(reference_photo_urls);
+        if (photos.failedCount > 0) {
+          // Never fatal — the email goes with whatever did resolve. Logged so a
+          // storage regression shows up here instead of in a customer's inbox.
+          console.error(
+            `Completion email: ${photos.failedCount} of ${
+              Array.isArray(reference_photo_urls) ? reference_photo_urls.length : 0
+            } job photos could not be attached for job ${job.job_number}; sending with ${
+              photos.sources.length
+            }.`
+          );
+        }
+
         const branding = await getTenantEmailBranding(tenantId);
         const html = await generateCompletionThankYouEmail({
           variant: 'completion',
@@ -312,7 +344,8 @@ export async function POST(
           location: job.address || job.location,
           scopeOfWork: job.scope_of_work || job.description,
           operatorName,
-          referencePhotos,
+          // `cid:` references into the inline parts below, not URLs.
+          referencePhotos: photos.sources,
         });
         // base64-encode the PDF buffer for Resend's attachment payload
         const pdfBase64 = Buffer.from(buffer).toString('base64');
@@ -326,6 +359,7 @@ export async function POST(
               content: pdfBase64,
               contentType: 'application/pdf',
             },
+            ...photos.attachments,
           ],
         });
       } catch (emailErr) {

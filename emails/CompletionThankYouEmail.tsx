@@ -31,7 +31,19 @@ export interface CompletionThankYouEmailProps {
   /** liability variant only. */
   supportEmail?: string | null;
   signedDate?: string | null;
-  /** completion variant only — up to 6 site photo URLs. */
+  /**
+   * completion variant only — up to 6 site photo `<img src>` values.
+   *
+   * These are `cid:` references into inline attachments on the same message,
+   * NOT storage URLs. Do not go back to passing the stored URLs: `job-photos`
+   * and `scope-photos` are PRIVATE buckets while every row holds a
+   * `/storage/v1/object/public/…` URL, so an `<Img src={storedUrl}>` renders a
+   * grey box in the customer's inbox and nothing anywhere errors — that was the
+   * bug (verified against production: 400 "Bucket not found"). A signed URL
+   * would render, but it is a bearer token for our storage with an expiry, sent
+   * to someone who forwards it. The route resolves the bytes and attaches them:
+   * app/api/job-orders/[id]/generate-completion-pdf + lib/completion-email-photos.ts.
+   */
   referencePhotos?: string[];
 }
 
@@ -84,6 +96,11 @@ function CompletionBody({
   referencePhotos = [],
 }: CompletionThankYouEmailProps) {
   const { brandColor, companyName } = branding;
+  // Six is deliberate, and so is the ORDER: the caller sorts the completed-cut
+  // photo first precisely so that the thing this email exists to show can never
+  // be what the cap truncates. Mirrored by MAX_EMAIL_PHOTOS in
+  // lib/completion-email-photos.ts so the route resolves exactly what renders.
+  // Kept here as well — the template must not depend on the caller behaving.
   const photos = (referencePhotos || []).slice(0, 6);
   const photoRows: string[][] = [];
   for (let i = 0; i < photos.length; i += 3) photoRows.push(photos.slice(i, i + 3));

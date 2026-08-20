@@ -183,6 +183,18 @@ export interface EmailAttachment {
   /** base64-encoded string OR Buffer; passed through to Resend's `content` field. */
   content: string | Buffer;
   contentType?: string;
+  /**
+   * Optional Content-ID. When set, Resend sends the part INLINE and the HTML can
+   * reference it as `<img src="cid:THIS_VALUE">` instead of a URL.
+   *
+   * This is how the completion thank-you shows job photos. The photo buckets are
+   * private, so an `<img src>` pointing at storage cannot resolve for the
+   * customer at all — and a signed URL that could is a bearer token with an
+   * expiry, mailed to someone who forwards it. Inline parts carry the bytes
+   * themselves: nothing to expire, nothing to leak back to our origin.
+   * (Resend `Attachment.contentId`, verified against resend@6.16.0's types.)
+   */
+  contentId?: string;
 }
 
 interface EmailOptions {
@@ -229,6 +241,10 @@ export async function sendEmail({ to, subject, html, attachments }: EmailOptions
         filename: a.filename,
         content: a.content,
         ...(a.contentType ? { contentType: a.contentType } : {}),
+        // Present only for inline parts (see EmailAttachment.contentId). Resend
+        // switches the part's disposition to `inline` when this is set, which is
+        // what makes `cid:` references in the HTML resolve.
+        ...(a.contentId ? { contentId: a.contentId } : {}),
       }));
     }
     const { data, error } = await resend.emails.send(payload);
