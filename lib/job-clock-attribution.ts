@@ -17,7 +17,8 @@
  * So the rule lives here, once, and both callers use it. A card counts against
  * a job in exactly three cases, all provable:
  *
- *   1. the card is explicitly linked to that job (`job_order_id` matches), or
+ *   1. the card is explicitly linked to that job (`job_order_id` matches) and
+ *      that link is not yesterday's (`isStaleCardTag`), or
  *   2. the card has NO link and the office placed that person on this job — and
  *      only this job — that day (`job_daily_assignments`), or
  *   3. the card has NO link, the office placed nobody, AND that person touched
@@ -54,7 +55,7 @@ import {
   splitClockDayAtJobStarts,
   type JobDaySegment,
 } from '@/lib/job-day-boundary';
-import { resolveDayJobs, type JobDayEvidence } from '@/lib/timecard-job-rules';
+import { isStaleCardTag, resolveDayJobs, type JobDayEvidence } from '@/lib/timecard-job-rules';
 
 /**
  * A QUERY THAT DIED MUST NEVER LOOK LIKE A JOB NOBODY WORKED.
@@ -163,8 +164,10 @@ export interface AttributedClockCards {
    *   • the figure is INFERRED from the presses rather than read off a tagged
    *     card, and has to print as such.
    *
-   * A card carrying ANOTHER job's `job_order_id` appears in `cards` when, and
-   * only when, it is in here: that is the Aug 19 case. Conrade's and Axel's
+   * A card carrying ANOTHER job's `job_order_id` appears in `cards` when it is
+   * in here — the Aug 19 case — or when that tag was condemned as STALE and the
+   * office's own placement then put the whole card here (`isStaleCardTag`;
+   * Micah's Aug 4). Conrade's and Axel's
    * single cards are both tagged NC&E, and Sterling's share of the day exists
    * nowhere else — which is why Sterling printed 0.04 h, the length of a daily
    * log's open session, against three and a half hours of work.
@@ -231,8 +234,10 @@ export async function attributableTimecards(
   // repo-wide. This is the shape the rest of the codebase uses; keep it.
   let linkedQuery = supabaseAdmin.from(from).select(select).eq('job_order_id', jobId);
   if (tenantId) linkedQuery = linkedQuery.eq('tenant_id', tenantId);
-  // Cards explicitly tagged with this job are the job's, full stop.
-  const cards: any[] = rowsOrThrow(
+  // Cards explicitly tagged with this job are the job's — unless the tag is
+  // yesterday's, which `isStaleCardTag` decides below once the ledger has been
+  // read. See the stale-tag block after `placed`/`touched` are built.
+  let cards: any[] = rowsOrThrow(
     await linkedQuery.order('clock_in_time', { ascending: true }),
     'linked timecards'
   );
@@ -254,6 +259,17 @@ export async function attributableTimecards(
   // operator would never be searched for the helper's UNTAGGED card sitting
   // beside it — the day would print half its crew. The linked query above has
   // no date filter, so these dates cost nothing to collect.
+  //
+  // A TAG LATER CONDEMNED AS STALE STILL WIDENS THE DATE. That is not an
+  // oversight and it is not circular: the verdict needs the ledger and the logs,
+  // which cannot be read until the dates exist, so the widening has to happen
+  // first. It is safe because a date only ever adds ROWS TO CONSIDER — nothing
+  // downstream treats "this date was in the universe" as evidence of anything.
+  // The card that supplied the date is judged on its own merits a few blocks
+  // down, and if condemned it is dropped; other people's cards on that date face
+  // the ordinary ledger/log rules, which say nothing about why the date is here.
+  // Verified against production: widening from condemned tags alone produces no
+  // pipeline diff on any of the 62 jobs.
   for (const c of cards) if (c?.date) dateSet.add(c.date);
   for (const a of ownAssignments) {
     // Empty skeleton rows hold a date open on the board — nobody was placed.
@@ -265,7 +281,33 @@ export async function attributableTimecards(
   userIds = Array.from(userSet);
   dates = Array.from(dateSet);
 
-  if (userIds.length === 0 || dates.length === 0) {
+  // AN EMPTY CREW IS NOT AN EXCUSE TO SKIP THE JUDGEMENT.
+  //
+  // This guard used to read `userIds.length === 0 || dates.length === 0`, and
+  // that `||` was a FOURTH, unjudged reading of a card tag — the one path where
+  // a linked card reached a caller without `isStaleCardTag` ever seeing it.
+  //
+  // QA-2026-942182 is the live proof. It has no `assigned_to`, no
+  // `helper_assigned_to`, no `job_crew`, no logs, and only a skeleton board row —
+  // so `userSet` is empty — but TWO cards are tagged with it, which fills
+  // `dateSet` from the tags themselves at the widening above. The old guard
+  // returned right there, so Aiden's 9.89 h on 2026-08-04 stayed on this job on
+  // a frozen stamp AND landed whole on JOB-2026-402357, where the board actually
+  // put him: 19.78 hours billed for a 9.89-hour day.
+  //
+  // Only the DATE universe can end the work early. With no dates there is
+  // nothing to read the ledger or the logs for, and no card can be judged (a
+  // card with a date puts that date in `dateSet` two blocks up, so `cards` is
+  // necessarily empty here). With no USERS there is still everything to do:
+  // `.in('user_id', [])` is a legal PostgREST filter that returns nothing, so
+  // `byCrew` is empty, while the ledger, the logs and the stale-tag verdict below
+  // all still run on the cards already in hand.
+  //
+  // Deliberately NOT fixed by seeding `userSet` from the linked cards: `userIds`
+  // governs which cards this job MAY TAKE, and widening it would let a job
+  // collect a stranger's untagged card. The note above `logUserIds` is the same
+  // distinction from the other side.
+  if (dates.length === 0) {
     return {
       cards,
       splitDates,
@@ -280,17 +322,30 @@ export async function attributableTimecards(
   let byCrewQuery = supabaseAdmin.from(from).select(select).in('user_id', userIds).in('date', dates);
   if (tenantId) byCrewQuery = byCrewQuery.eq('tenant_id', tenantId);
 
+  // WHOSE PAPERWORK WE LOOK FOR IS WIDER THAN WHOSE CARDS WE CONSIDER.
+  //
+  // `touched` is the corroboration half of `isStaleCardTag`: a tag the board
+  // contradicts survives only if that person FILED something naming it that day.
+  // A person absent from this list has no log coverage at all, and the test
+  // would then read "we did not look" as "he filed nothing" and condemn a good
+  // tag. Everyone holding a card LINKED to this job is therefore included —
+  // deliberately NOT added to `userIds` itself, which governs which CARDS the
+  // job may take; this widens only what we know about the cards already in hand.
+  const logUserIds = Array.from(
+    new Set([...userIds, ...cards.map((c) => c?.user_id).filter(Boolean)])
+  ) as string[];
+
   let opLogsQuery = supabaseAdmin
     .from('daily_job_logs')
     .select('operator_id, log_date, job_order_id')
-    .in('operator_id', userIds)
+    .in('operator_id', logUserIds)
     .in('log_date', dates);
   if (tenantId) opLogsQuery = opLogsQuery.eq('tenant_id', tenantId);
 
   let helpLogsQuery = supabaseAdmin
     .from('helper_work_logs')
     .select('helper_id, log_date, job_order_id')
-    .in('helper_id', userIds)
+    .in('helper_id', logUserIds)
     .in('log_date', dates);
   if (tenantId) helpLogsQuery = helpLogsQuery.eq('tenant_id', tenantId);
 
@@ -374,6 +429,46 @@ export async function attributableTimecards(
     if (jobs.size > 0 && !jobs.has(jobId)) offJobPersonDays.add(key);
   }
 
+  // ── THE CLOCK-IN TAG THAT IS YESTERDAY'S ANSWER ───────────────────────────
+  //
+  // Founder, Aug 20 2026, on JOB-2026-631148: "On 8/3 and 8/4 Nate went to
+  // Harper and was there the 3rd and 4th, but it doesn't show Micah's time."
+  //
+  // Micah Rentz clocked 8.47 hours that Tuesday. The board placed him on Harper
+  // as Conrade's helper. His card still carried MONDAY's job, JOB-2026-424813,
+  // frozen at the 07:04 clock-in — so the rule below skipped it as "already
+  // another job's hours", Harper printed him `‡ scheduled; no hours`, and
+  // JOB-2026-424813's own sheet printed his 8.47 h as recorded fact on a day the
+  // board had someone else in that seat. One day's labour, absent from the job
+  // that earned it and present on the job that did not.
+  //
+  // `isStaleCardTag` (lib/timecard-job-rules.ts) is the whole rule and the
+  // evidence for it. Condemned here, ONCE, so that every use of a tag below —
+  // the linked seed, the day's job set for the boundary split, and the card loop
+  // — reads the same verdict and the two sheets can never disagree.
+  const staleTagCardIds = new Set<string>();
+  for (const c of [...cards, ...byCrew]) {
+    if (!c?.id || !c.job_order_id || !c.user_id || !c.date) continue;
+    const key = `${c.user_id}|${c.date}`;
+    if (
+      isStaleCardTag({
+        tagJobId: c.job_order_id,
+        ledgerJobIds: placed.get(key),
+        loggedJobIds: touched.get(key),
+      })
+    ) {
+      staleTagCardIds.add(c.id);
+    }
+  }
+  // A LINKED CARD LOSES ITS SEAT WHEN THE LINK IS STALE. This is the only place
+  // in the module where a card tagged with THIS job is refused, and it is
+  // deliberate: the alternative is billing the same hours twice, once here on a
+  // frozen stamp and once on the job the office actually sent the man to. It
+  // cannot cascade — the loop below re-reads every one of these from `byCrew`,
+  // and a stale tag by definition means the board placed this person somewhere
+  // that is not this job, so the untagged rules refuse it too.
+  if (staleTagCardIds.size > 0) cards = cards.filter((c) => !staleTagCardIds.has(c.id));
+
   // ── THE IN-ROUTE PRESS IS THE JOB BOUNDARY ────────────────────────────────
   //
   // Everything above answers "does this whole card belong to this job". On a
@@ -390,7 +485,10 @@ export async function attributableTimecards(
   //   2. otherwise the jobs they filed paperwork on;
   //   3. plus, always, the job their own card is TAGGED with — a recorded fact
   //      that no ledger outranks (real: Zack's Aug 14 card names
-  //      JOB-2026-424813 while the board placed him on JOB-2026-675188).
+  //      JOB-2026-424813 while the board placed him on JOB-2026-675188), EXCEPT
+  //      a tag condemned as yesterday's by `isStaleCardTag`. Zack's survives
+  //      because he also FILED 424813's log that Thursday; Micah's Aug 4 does
+  //      not, because nothing but the 07:04 stamp ever put him there.
   //
   // Rung 1 is what keeps the closeout phantoms dead. On 8/12 Dante FILED
   // JOB-2026-277097's paperwork from another job's truck; the board placed him
@@ -404,6 +502,7 @@ export async function attributableTimecards(
     placed,
     touched,
     daySequence,
+    staleTagCardIds,
     boundarySegments,
     boundaryIds,
   });
@@ -414,9 +513,14 @@ export async function attributableTimecards(
     // A card whose day divides at the presses carries a stretch that is ours,
     // whatever job its tag names. The segment — not the card — is the figure.
     const hasBoundary = boundarySegments.has(t.id);
+    // A STALE TAG IS AN ABSENT TAG, not a weaker one. Read once here so the two
+    // branches below and the `attributedIds` mark can never drift apart: a card
+    // that reaches this job on the office's placement is INFERRED, and must
+    // print as inferred, whatever its frozen stamp happens to say.
+    const tag = staleTagCardIds.has(t.id) ? null : t.job_order_id;
     // Already another job's hours, unless part of the day is provably here.
-    if (t.job_order_id && t.job_order_id !== jobId && !hasBoundary) continue;
-    if (!t.job_order_id && !hasBoundary) {
+    if (tag && tag !== jobId && !hasBoundary) continue;
+    if (!tag && !hasBoundary) {
       const key = `${t.user_id}|${t.date}`;
       const placedThatDay = placed.get(key);
       if (placedThatDay && placedThatDay.size > 0) {
@@ -444,7 +548,7 @@ export async function attributableTimecards(
       }
     }
     seen.add(t.id);
-    if (!t.job_order_id) attributedIds.add(t.id);
+    if (!tag) attributedIds.add(t.id);
     cards.push(t);
   }
 
@@ -494,10 +598,13 @@ async function resolveBoundarySegments(args: {
   touched: Map<string, Set<string>>;
   /** `job|date` → the board's day_sequence. Orders a day a press cannot. */
   daySequence: Map<string, number>;
+  /** Cards whose job tag is yesterday's — see `isStaleCardTag`. */
+  staleTagCardIds: Set<string>;
   boundarySegments: Map<string, JobDaySegment>;
   boundaryIds: Set<string>;
 }): Promise<void> {
-  const { jobId, timeZone, tenantId, cardPool, placed, touched, daySequence } = args;
+  const { jobId, timeZone, tenantId, cardPool, placed, touched, daySequence, staleTagCardIds } =
+    args;
 
   // person|date → every card that person clocked that day. One card per day on
   // 297 of 298 production person-days; the exception is a night shift, and each
@@ -538,6 +645,14 @@ async function resolveBoundarySegments(args: {
     // the distinction is immaterial to the split and is not reconstructed here.
     for (const j of touched.get(key) ?? []) evidence.push({ jobId: j, source: 'operator_log' });
     for (const c of cardsByPersonDay.get(key) ?? []) {
+      // A STALE TAG NEVER ADMITS A JOB TO THE DAY. `always_counts` below makes a
+      // card tag unconditional, and that is right for the tag it was written
+      // for — but only once the tag is known to be TODAY's. Micah's Aug 4 would
+      // otherwise put JOB-2026-424813 in a day he spent at Harper, making it a
+      // two-job day the split then has to abstain on (both board rows are
+      // `day_sequence` 1, so nothing can order it) — and abstention is how his
+      // 8.47 hours went missing in the first place.
+      if (staleTagCardIds.has(c.id)) continue;
       if (c.job_order_id) evidence.push({ jobId: c.job_order_id, source: 'timecard' });
     }
     const { jobIds } = resolveDayJobs(evidence, { cardTagPolicy: 'always_counts' });

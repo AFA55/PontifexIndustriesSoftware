@@ -58,6 +58,8 @@ import {
   TimecardTenantScopeError,
 } from './timecard-job-context';
 import { buildWeekDayEntries, getWeekDates, type TimecardEntry } from './timecard-utils';
+// Pure, database-free: imported from the rules module directly.
+import { isStaleCardTag } from './timecard-job-rules';
 
 const TENANT = 'ee3d8081-cec2-47f3-ac23-bdc0bb2d142d';
 const KEON = 'bb5f3f96-1960-477b-8ca4-24f3a38a2670';
@@ -546,5 +548,53 @@ describe('tenant isolation', () => {
     await expect(
       loadTimecardDayJobs(CARDS, undefined as unknown as string)
     ).rejects.toBeInstanceOf(TimecardTenantScopeError);
+  });
+});
+
+// ── The stale clock-in tag (pure) ───────────────────────────────────────────
+
+describe('isStaleCardTag — is this card naming yesterday’s job?', () => {
+  const HARPER = 'JOB-2026-631148';
+  const PARKK = 'JOB-2026-424813';
+  const NC_675188 = 'JOB-2026-675188';
+
+  it('MICAH, AUG 4: the board says Harper, the card says Monday, nothing else speaks', () => {
+    // The founder's report. His card was stamped JOB-2026-424813 at the 07:04
+    // clock-in — Monday's job — while the board had him at Harper as Conrade's
+    // helper. He filed nothing for Parkk that Tuesday, and neither did anyone
+    // else on his behalf. The stamp is the only thing that says he was there.
+    expect(
+      isStaleCardTag({ tagJobId: PARKK, ledgerJobIds: [HARPER], loggedJobIds: [] })
+    ).toBe(true);
+  });
+
+  it('ZACK, AUG 14: contradicted too, but he FILED the tagged job’s log that day', () => {
+    // The one person-day of this shape in production with corroboration, and the
+    // day commit 5ca940e9 exists for. Two records name 424813 — the tag and his
+    // own operator log — against one line of a board. The tag stands.
+    expect(
+      isStaleCardTag({ tagJobId: PARKK, ledgerJobIds: [NC_675188], loggedJobIds: [PARKK] })
+    ).toBe(false);
+  });
+
+  it('a SILENT board decides nothing — the tag is then the only record there is', () => {
+    expect(isStaleCardTag({ tagJobId: PARKK, ledgerJobIds: [], loggedJobIds: [] })).toBe(false);
+    expect(isStaleCardTag({ tagJobId: PARKK, ledgerJobIds: null, loggedJobIds: null })).toBe(false);
+  });
+
+  it('a board that AGREES is not a contradiction', () => {
+    expect(
+      isStaleCardTag({ tagJobId: PARKK, ledgerJobIds: [PARKK, HARPER], loggedJobIds: [] })
+    ).toBe(false);
+  });
+
+  it('an untagged card has nothing to condemn', () => {
+    expect(isStaleCardTag({ tagJobId: null, ledgerJobIds: [HARPER], loggedJobIds: [] })).toBe(false);
+  });
+
+  it('a log naming some OTHER job is not corroboration of this tag', () => {
+    expect(
+      isStaleCardTag({ tagJobId: PARKK, ledgerJobIds: [HARPER], loggedJobIds: [HARPER] })
+    ).toBe(true);
   });
 });

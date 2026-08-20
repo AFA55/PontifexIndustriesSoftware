@@ -60,8 +60,128 @@ export interface JobDayEvidence {
  *   JOB-2026-424813 while the board placed him on JOB-2026-675188, and the
  *   ticket has to divide his day between both). Preserved verbatim — the split
  *   that shipped in 5ca940e9 is not in scope here and must not shift.
+ *
+ *   A tag that `isStaleCardTag` below has already condemned never reaches this
+ *   function as `timecard` evidence at all. The policy therefore still means
+ *   exactly what it says: every tag it SEES counts. What changed is which tags
+ *   are believed to be tags.
  */
 export type CardTagPolicy = 'lowest' | 'always_counts';
+
+/**
+ * IS THIS CARD'S JOB TAG YESTERDAY'S ANSWER?
+ *
+ * Every clock card is stamped with a job at CLOCK-IN — around 07:00, from the
+ * operator's phone, off whatever the app last knew — and the office finishes the
+ * board afterwards. Axel Valverde's Aug 12 card was stamped at 07:00 and the
+ * board was finished at 08:06. So a tag is two different things depending on the
+ * day, and until now the billing path treated them alike:
+ *
+ *   • THE ONLY EVIDENCE OF A SECOND JOB. Zack, Thu Aug 14 2026: the board placed
+ *     him on JOB-2026-675188 and his card named JOB-2026-424813 — and he FILED
+ *     424813's operator log that same day, pressing In Route at 11:27 and booking
+ *     5.07 hours. Two independent records put him there. The tag must survive, or
+ *     commit 5ca940e9 silently reverts.
+ *
+ *   • YESTERDAY'S JOB, FROZEN. Micah Rentz, Tue Aug 4 2026: the board placed him
+ *     on JOB-2026-631148 (Harper General, Chesnee WWTP) as Conrade Richardson's
+ *     helper, and his card still named JOB-2026-424813 — MONDAY's job, where the
+ *     board had had him the day before. He filed nothing for 424813 that Tuesday;
+ *     nobody did on his behalf. Nothing but the stamp says he was there.
+ *
+ * THE DIFFERENCE IS CORROBORATION, NOT CONTRADICTION. "The board disagrees"
+ * alone cannot decide it — the board disagrees in BOTH cases above. What
+ * separates them is whether anything ELSE that person did that date names the
+ * tagged job. Measured across all of production (Aug 20 2026): six person-days
+ * carry a tag the board contradicts, and exactly ONE of the six — Zack's Aug 14 —
+ * has a filed log of that person's own on the tagged job that date.
+ *
+ * So a tag is STALE when all four hold:
+ *   1. the board placed this person SOMEWHERE that date (a silent board decides
+ *      nothing, and the tag stays the best evidence there is);
+ *   2. it placed them in exactly ONE place (see below);
+ *   3. that place is not the tagged job; and
+ *   4. no log this person filed that date names the tagged job either.
+ *
+ * CLAUSE 2 EXISTS BECAUSE A DAY MUST NOT VANISH. Condemning a tag does not
+ * delete the hours — it hands them to the board, and the untagged rules in
+ * lib/job-clock-attribution.ts only ACCEPT a card when the board named exactly
+ * one job. A person the board put in TWO places is a person the board did not
+ * place: both destinations refuse the card as `split`, the tagged job has already
+ * dropped it, and one man's whole day lands on no ticket at all while printing
+ * "split" on two others. That is worse than either symptom the rule replaces.
+ * So an ambiguous board is treated like a silent one — it decides nothing, and
+ * the recorded stamp stands. Zero production instances today (all six
+ * contradicted person-days have exactly one board job, verified Aug 20 2026);
+ * this is the invariant, not a workaround: a tag is condemned only when there is
+ * a single, unambiguous place for the hours to go.
+ *
+ * A stale tag is not downgraded, disputed or footnoted — it is treated as ABSENT,
+ * so the card falls to the ordinary untagged rules and lands where the office
+ * says the person was, marked INFERRED (`attributedIds`) because that is what it
+ * is. Deliberately conservative in both directions: it cannot invent a job (only
+ * the board's own placement can receive the hours), and it cannot delete one (any
+ * corroboration at all, or a board that never spoke, keeps the tag).
+ *
+ * Pure and evidence-shaped rather than card-shaped so it can be exercised without
+ * a database, and so the caller decides what counts as "logged" (operator logs
+ * and helper logs share a rung — see SOURCE_RANK).
+ *
+ * A HELPER LOG COUNTS AS CORROBORATION, AND THAT IS DELIBERATE. It is the
+ * weakest record in the building: all 16 production `helper_work_logs` rows have
+ * `hours_worked` NULL and 14 of the 16 have `started_at == completed_at` — a
+ * filing instant, not a work window. It is fair to ask whether an instant should
+ * be allowed to keep a whole day billed where it already was.
+ *
+ * It should, for three reasons that hold together:
+ *   • clause 4 asks whether this person NAMED the tagged job that date, not how
+ *     long they were there. A zero-length filing is a complete answer to that
+ *     question; the missing duration would matter only if the log were being
+ *     asked to supply hours, which it never is here.
+ *   • the verdict is one-directional. Corroboration can only PRESERVE the tag —
+ *     the exact behaviour that shipped before this rule existed — and can never
+ *     move an hour onto a job. The failure mode of trusting it too much is "no
+ *     improvement"; the failure mode of trusting it too little is a new wrong
+ *     answer on a billing sheet. On a live invoice path, take the first.
+ *   • `SOURCE_RANK` already decided this: an operator ticket and a helper log are
+ *     one rung, "filed by the same crew on the same phones". Making them differ
+ *     here would put this function at odds with the ladder it sits beside, for a
+ *     case that has never occurred (the one corroborated person-day in
+ *     production, Zack's Aug 14, is an OPERATOR log).
+ *
+ * The revisit trigger, should it be needed: a helper log becomes the SOLE
+ * corroborator on a person-day whose board says otherwise. Zero such days today.
+ */
+export function isStaleCardTag(args: {
+  /** `timecards.job_order_id` — the clock-in stamp under judgement. */
+  tagJobId: string | null | undefined;
+  /** Jobs `job_daily_assignments` placed this person on, THIS DATE. */
+  ledgerJobIds: Iterable<string> | null | undefined;
+  /** Jobs this person filed a log on (operator or helper), THIS DATE. */
+  loggedJobIds: Iterable<string> | null | undefined;
+}): boolean {
+  const { tagJobId } = args;
+  if (!tagJobId) return false;
+  const ledger = new Set(args.ledgerJobIds ?? []);
+  // (1) The board said nothing about this person today. The tag is then the only
+  // record of where they were, and dropping it would lose the day outright.
+  if (ledger.size === 0) return false;
+  // (2) The board said TWO things, which is the same as saying nothing about
+  // where the day went — and nothing downstream can receive an ambiguous day, so
+  // condemning the tag here would lose it rather than move it. See the note
+  // above; this is the clause that keeps the guarantee "one ticket in, one
+  // ticket out" true rather than merely usually true.
+  if (ledger.size > 1) return false;
+  // (3) The board agrees with the tag. Nothing to decide.
+  if (ledger.has(tagJobId)) return false;
+  // (4) The person's own paperwork names the tagged job. Two records beat one
+  // schedule — this is Zack, Aug 14, and it is why `always_counts` exists.
+  // Operator and helper logs both count; see the note above for why the helper
+  // log's missing duration does not weaken the answer it is being asked for.
+  const logged = new Set(args.loggedJobIds ?? []);
+  if (logged.has(tagJobId)) return false;
+  return true;
+}
 
 export interface DayJobResolution {
   /** The jobs this person was on that day, most-authoritative source first. */

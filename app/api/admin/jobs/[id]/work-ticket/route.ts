@@ -89,6 +89,32 @@ export async function GET(request: NextRequest, context: RouteContext) {
          utility_waiver_signer_name, liability_release_signed_at`
       )
       .eq('id', jobId)
+      // A DELETED JOB IS NOT A TICKET THE OFFICE MAY PRINT.
+      //
+      // This is the sheet an invoice is written from, and until now a job the
+      // office had DELETED still produced one, complete with crew names and
+      // hours presented as recorded fact. QA-2026-942182 is the live case:
+      // soft-deleted 2026-08-10, no crew, no logs, no board placement — and two
+      // clock cards still tagged to it, one of them Aiden's whole 9.89-hour
+      // Aug 4, a day the board spent on JOB-2026-402357.
+      //
+      // 404 rather than a "this job was deleted" banner, and rather than letting
+      // it print with a watermark, because deletion is the office's own
+      // statement that the job is not to be acted on, and every route that reads
+      // it back for MONEY should agree with that statement. The row stays in the
+      // database — soft delete exists so `job_daily_assignments` can still
+      // answer "was operator X assigned on Thursday?" for a payroll dispute (see
+      // the DELETE handler in ../route.ts) — so nothing an auditor needs is lost;
+      // what is refused is the billing artefact, which is the only thing this
+      // route produces. Matches app/api/admin/job-pnl/[id]/route.ts, which has
+      // filtered `deleted_at` all along. Nothing links here for a deleted job:
+      // every list that offers "Print ticket" already filters `deleted_at IS
+      // NULL`, so the only way to arrive is a stale bookmark or a walked id.
+      //
+      // Deliberately part of the SAME query as the tenant read, so a deleted job
+      // and a foreign job give the identical answer and neither can be
+      // distinguished by probing.
+      .is('deleted_at', null)
       .maybeSingle();
 
     // Missing and cross-company get the SAME answer, deliberately — a 404 that

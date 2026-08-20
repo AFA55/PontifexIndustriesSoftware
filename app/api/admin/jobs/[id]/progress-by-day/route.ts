@@ -68,7 +68,17 @@ export async function GET(request: NextRequest, context: RouteContext) {
     // this route was widened from 3 roles to 5, but widening the audience is
     // exactly the moment to close it.
     {
-      let gate = supabaseAdmin.from('job_orders').select('id').eq('id', jobId);
+      // …and a job the office DELETED is not one to report progress or hours on
+      // either. Same 404 as a foreign job, for the same reason the sibling
+      // work-ticket route gives: deletion is the office's own statement that the
+      // job is not to be acted on, and this panel is read to bill from. The row
+      // survives in the database for payroll disputes; only the answer here is
+      // refused. Matches app/api/admin/job-pnl/[id]/route.ts.
+      let gate = supabaseAdmin
+        .from('job_orders')
+        .select('id')
+        .eq('id', jobId)
+        .is('deleted_at', null);
       if (tenantId) gate = gate.eq('tenant_id', tenantId);
       const { data: allowed } = await gate.maybeSingle();
       if (!allowed) return NextResponse.json({ error: 'Job not found' }, { status: 404 });

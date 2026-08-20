@@ -111,7 +111,12 @@ export async function GET(request: NextRequest, context: RouteContext) {
         customer_communication_rating, customer_feedback_comments, feedback_submitted_at,
         photo_urls
       `)
-      .eq('id', jobId);
+      .eq('id', jobId)
+      // A DELETED JOB HAS NO COMPLETION SUMMARY. See the note on the P&L route,
+      // which has filtered this all along; the three sibling routes did not, and
+      // QA-2026-942182 — soft-deleted 2026-08-10, still holding two tagged
+      // clock cards — is the live proof of what that costs.
+      .is('deleted_at', null);
 
     if (tenantId) jobQuery = jobQuery.eq('tenant_id', tenantId);
 
