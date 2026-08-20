@@ -57,6 +57,81 @@ const TERMINAL_STATES: ReadonlySet<JobStatus> = new Set<JobStatus>([
 ]);
 
 /**
+ * THE JOB IS OVER — nothing may be attributed to it as live work.
+ *
+ * The same three states as `TERMINAL_STATES`, exported as a plain array because
+ * callers need it two ways: as a set for an in-memory test, and as a PostgREST
+ * `not.in` literal for a query. Kept as ONE list so a status added here reaches
+ * both without anyone remembering to update a second string.
+ */
+export const CLOSED_JOB_STATUSES = ['completed', 'cancelled', 'archived'] as const;
+
+/**
+ * States that disqualify a job the clock-in only INFERRED someone was on —
+ * from a job-level crew slot or the `job_crew` list, neither of which is dated.
+ *
+ * Closed states, plus three that are live rows but not evidence of live work:
+ *   • `on_hold`          — the office paused it. NOT closed (see the warning
+ *                          below); excluded here only because an undated
+ *                          inference is weak evidence to begin with, which is
+ *                          how these fallbacks already behaved.
+ *   • `pending_approval` — not yet a job. Never dispatched, cannot be worked.
+ *   • `rejected`         — same, from the other direction. Not in `JobStatus`
+ *                          (it predates the union) but present in the schedule
+ *                          board's own exclusions, so it is honoured here.
+ *
+ * ⚠️ DO NOT APPLY THIS TO THE DAY LEDGER. `job_daily_assignments` is the
+ * office SAYING, for a named date, that this person is on this job — evidence
+ * that outranks a status flag nobody cleared. On Aug 20 2026 Conrade's real
+ * job, JOB-2026-974669 (ClemTenn), had sat `on_hold` since Aug 14 with
+ * `on_hold_released_at` null, and the office placed him on it anyway. Refusing
+ * `on_hold` on the ledger path would have replaced the wrong job with no job.
+ * The ledger path refuses `CLOSED_JOB_STATUSES` and nothing else.
+ *
+ * `pending_completion` is DELIBERATELY ABSENT from both lists. It means the
+ * crew filed the ticket and the office has not closed it out — exactly the
+ * state a job is in when it is sent back and worked a second day.
+ */
+export const UNCLOCKABLE_INFERRED_JOB_STATUSES = [
+  ...CLOSED_JOB_STATUSES,
+  'on_hold',
+  'pending_approval',
+  'rejected',
+] as const;
+
+/** `("completed","cancelled",…)` — the literal PostgREST's `not.in` wants. */
+export function postgrestNotInList(statuses: readonly string[]): string {
+  return `(${statuses.map((s) => `"${s}"`).join(',')})`;
+}
+
+/** True when the job is finished, cancelled or filed away. */
+export function isClosedJobStatus(status: unknown): boolean {
+  return typeof status === 'string' && (CLOSED_JOB_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * True when a clock-in may be attributed to a job in this state.
+ *
+ * `refuse` defaults to CLOSED-ONLY — the strongest evidence (a dated ledger
+ * placement) gets the narrowest refusal. Callers working from an undated
+ * inference pass `UNCLOCKABLE_INFERRED_JOB_STATUSES`.
+ *
+ * A NULL/unknown status is treated as ELIGIBLE. Every caller already narrows
+ * the candidate set by assignment, tenant and date before asking; refusing an
+ * unrecognised-but-live status would silently drop real work the day someone
+ * adds a status to the DB and not to this file. The states we must never pick
+ * are enumerated and known — everything else defaults to live.
+ */
+export function isClockInEligibleStatus(
+  status: unknown,
+  refuse: readonly string[] = CLOSED_JOB_STATUSES
+): boolean {
+  if (status === null || status === undefined) return true;
+  if (typeof status !== 'string') return true;
+  return !refuse.includes(status);
+}
+
+/**
  * The set of timestamp columns on job_orders that map to a given status. Used
  * by callers to know which "first transition" timestamp to stamp server-side.
  */

@@ -178,3 +178,74 @@ Also demo residue: **"Super Admin (Demo)"** appears in that filter, as
 `JOB-2026-424813` is 28 person-days over 15 dates and runs to **2026-10-02**. At
 its observed rate it crosses 3 printed pages around **Sept 6** and reaches roughly
 5 by October. Day and week modes exist for slicing it; no action needed yet.
+
+---
+
+## 1b. The DSM workflow — confirm the start time, don't infer it (founder, Aug 19)
+
+> *"How DSM had it — we can edit job start time and completion time, or reset the
+> ticket. DSM allowed you to edit your start time before completing the ticket,
+> or if you already completed the ticket you had to reset the ticket and input
+> the correct time, then complete it… Before completing a job it will just tell
+> them to confirm the start time of the 2nd job. If more than 2 jobs, then after
+> completing and starting the 3rd, confirm the start time. Start time of the 1st
+> job obviously is clock-in, but for 2nd jobs it can ask for confirmation on
+> start time, and end time is when they clock out."*
+
+**This is better than the pure In Route rule shipped in `5ca940e9`, and it fixes
+that rule's known gap.** The press-based split abstains on 17 of 22 multi-job
+person-days because a job with no press cannot be ordered. Asking the crew to
+confirm turns an abstention into an answer, at the one moment they still
+remember.
+
+**The synthesis to build — not a replacement, a confirmation step:**
+
+1. **Job 1 starts at clock-in.** Not at its own press; the yard and the loading
+   belong to it. Already implemented, unchanged.
+2. **Job 2+ proposes the In Route press as its start time** and asks the operator
+   to confirm or correct it when they complete that ticket. The press becomes a
+   default, not an assertion.
+3. **The last job ends at clock-out.** Unchanged.
+4. **Editable before completing.** Start and end time correctable on the ticket
+   itself, before submission.
+5. **Reset after completing** — see the open question below.
+
+**Why this is the right shape:** the platform currently infers a boundary and
+marks it `¶` as inferred. A confirmed boundary is *recorded*, which is strictly
+better — it removes the caveat from the invoice rather than explaining it.
+
+### What already exists — do not rebuild
+
+`POST /api/job-orders/[id]/reset-day` ships and is reachable from the operator's
+Work Performed page. It clears one day's submitted work so it can be retyped.
+Three deliberate refusals are written into it:
+
+- **It never touches a COMPLETED job.** Once the customer has signed, the record
+  is closed and corrections go through the office so they are attributable.
+- It only clears the **caller's own** work — one operator cannot wipe another's.
+- It does not touch photos, timecards or job status — only that day's work.
+
+### THE OPEN QUESTION — needs the founder
+
+DSM let an operator reset a **completed** ticket and re-enter the time. This
+platform deliberately refuses that, because a completed ticket carries a customer
+signature and a reset would let the record change after the customer accepted it.
+
+Three options, and this is a decision about liability, not code:
+
+- **(a) Keep the refusal.** An operator can fix anything before completing; after
+  the signature it goes through the office, where it is attributable. Safest, and
+  it is what the current code was built to protect.
+- **(b) Allow the reset but preserve the signature trail** — record what the times
+  were when the customer signed, and what they were changed to, by whom. The
+  customer's acceptance stays intact as evidence.
+- **(c) Allow it outright**, as DSM did.
+
+**Recommendation: (b).** It gives the crew the DSM workflow without erasing what a
+customer agreed to. (c) means a signed record can change with no trace, which is
+the thing a signature exists to prevent.
+
+### Also still true
+Only the operator can press In Route — the helper cannot. So the press is a fact
+about the JOB and every crew member's card divides at the same moment. A
+confirmation step must therefore be asked of the operator and applied to the crew.

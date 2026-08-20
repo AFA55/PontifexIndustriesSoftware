@@ -58,16 +58,44 @@ export async function GET(request: NextRequest, context: RouteContext) {
 
     // Fetch extra timestamp columns separately to avoid GenericStringError
     // from unknown column names in the Supabase TS schema
+    //
+    // `route_started_at` and `work_completed_at` are in this select because the
+    // panel that consumes it carries the office's timestamp-correction controls
+    // and could not reach either one:
+    //
+    //  - `work_completed_at` was never returned, so the page's
+    //    `liveStatus.work_completed_at !== undefined` guard was always false and
+    //    the Work Completed row NEVER rendered. 13 production jobs carry a value
+    //    there (verified Aug 19 2026) and none of them could be corrected.
+    //  - The In Route press lives in TWO columns. 8 production jobs carry only
+    //    `in_route_at`, 30 carry both. A job carrying only `route_started_at`
+    //    would show "In Route —" while a press existed; today that count is 0,
+    //    but the panel should read the same pair the boundary rule reads
+    //    (`jobStartOnDate` in lib/job-day-boundary.ts takes the MIN of them)
+    //    rather than half of it.
+    //
+    // Column names verified against information_schema.columns for `job_orders`.
     const { data: tsRaw } = await supabaseAdmin
       .from('job_orders')
-      .select('in_route_at, arrived_at_jobsite_at, work_started_at')
+      .select(
+        'in_route_at, route_started_at, arrived_at_jobsite_at, work_started_at, work_completed_at'
+      )
       .eq('id', jobId)
       .maybeSingle();
 
     const ts = (tsRaw ?? {}) as Record<string, string | null>;
-    const inRouteAt: string | null = ts['in_route_at'] ?? null;
+    const routeStartedAt: string | null = ts['route_started_at'] ?? null;
+    // Display the press the boundary rule would use: the earlier of the pair.
+    const rawInRouteAt: string | null = ts['in_route_at'] ?? null;
+    const inRouteAt: string | null =
+      rawInRouteAt && routeStartedAt
+        ? new Date(rawInRouteAt) <= new Date(routeStartedAt)
+          ? rawInRouteAt
+          : routeStartedAt
+        : rawInRouteAt ?? routeStartedAt;
     const arrivedAt: string | null = ts['arrived_at_jobsite_at'] ?? null;
     const workStartedAt: string | null = ts['work_started_at'] ?? null;
+    const workCompletedAt: string | null = ts['work_completed_at'] ?? null;
 
     // ── 1b. Fetch GPS coordinates for route start / work start ───────────────
     let routeStartCoords: { lat: number; lng: number } | null = null;
@@ -398,8 +426,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
         operator_name: operatorName,
         helper_name: helperName,
         in_route_at: inRouteAt,
+        // The raw pair, so the office panel can show what it is actually
+        // editing when the two columns disagree.
+        route_started_at: routeStartedAt,
         arrived_at: arrivedAt,
         work_started_at: workStartedAt,
+        // Always present (null when unset) so the consuming panel's
+        // `!== undefined` guard renders the row and the value is correctable.
+        work_completed_at: workCompletedAt,
         standby_active: standbyActive,
         standby_started_at: standbyStartedAt,
         standby_duration_minutes: standbyDurationMinutes,

@@ -23,6 +23,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin } from '@/lib/api-auth';
+import { movesJobDayBoundary } from '@/lib/timestamp-edit-access';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -207,12 +208,19 @@ export async function PATCH(request: NextRequest, context: RouteContext) {
         edit_reason: editReason,
         // The caller asked to move In Route; both columns moved. See ALLOWED_KEYS.
         route_start_mirrored: mirrorRouteStart,
-        // An In Route press is a boundary between two jobs on one clocked day,
-        // so moving it re-divides that day. Surfaced, not hidden.
-        boundary_note:
-          'in_route_at' in updates || 'route_started_at' in updates
-            ? 'This press divides the crew’s clocked day between jobs — moving it also changes the hours attributed to the other job(s) worked that day.'
-            : null,
+        // A start stamp is a boundary between two jobs on one clocked day, so
+        // moving it re-divides that day. Surfaced, not hidden.
+        //
+        // This used to test only `in_route_at`/`route_started_at`, which missed
+        // the case that actually reaches an invoice: `jobStartOnDate` takes the
+        // MINIMUM of the three start stamps, so editing `work_started_at` moves
+        // the boundary whenever it is (or becomes) the earliest — and clearing
+        // In Route nulls both press columns, which makes it the only candidate
+        // left. The field list lives in `lib/timestamp-edit-access.ts` so the
+        // modal's up-front warning and this after-the-fact note stay in step.
+        boundary_note: Object.keys(updates).some(movesJobDayBoundary)
+          ? 'This stamp divides the crew’s clocked day between jobs — moving it also changes the hours attributed to the other job(s) worked that day.'
+          : null,
       },
     });
   } catch (error: unknown) {

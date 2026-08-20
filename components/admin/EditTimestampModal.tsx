@@ -1,14 +1,35 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, Loader2, AlertCircle, Clock, Edit2 } from 'lucide-react';
+import { X, Loader2, AlertCircle, AlertTriangle, Clock, Edit2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { movesJobDayBoundary } from '@/lib/timestamp-edit-access';
 
 export type EditTimestampField =
   | 'in_route_at'
   | 'arrived_at_jobsite_at'
   | 'work_started_at'
   | 'work_completed_at';
+
+/**
+ * MOVING A START STAMP MOVES ANOTHER JOB'S HOURS.
+ *
+ * Since the clock-cycle billing model shipped, the moment a job takes over a
+ * crew's clocked day is the EARLIEST of its start stamps — `route_started_at`,
+ * `in_route_at`, `work_started_at` (`lib/job-day-boundary.ts`). Whichever is the
+ * minimum is the boundary: the previous job runs up to it, this job runs from it
+ * to the next boundary or to clock-out. So correcting job B's start earlier
+ * shortens job A's stretch on the same day and lengthens B's — and job A may
+ * already be invoiced.
+ *
+ * Which fields those are lives in `lib/timestamp-edit-access.ts` so this modal
+ * and the PATCH route cannot drift apart; see the note there for why
+ * `work_started_at` belongs in the set and not just `in_route_at`.
+ *
+ * The API says as much in its `boundary_note`. This modal must not let someone
+ * move that number without being told first; the founder's own instruction was
+ * that the office needs to fix these, not that they should fix them blind.
+ */
 
 interface Props {
   jobId: string;
@@ -57,14 +78,31 @@ function isoToLocalInput(iso: string | null): string {
 }
 
 /**
- * Convert a `<input type="datetime-local">` string (interpreted as local time)
- * to a UTC ISO string for the API.
+ * Convert a `<input type="datetime-local">` string to a UTC ISO string.
+ *
+ * The components are pulled out and handed to the `Date(y, m, d, h, min)`
+ * constructor, which builds the date in the BROWSER'S LOCAL ZONE. It is not
+ * left to `new Date('2026-08-19T14:05')` — that form is local per spec, but
+ * this codebase has shipped a timezone bug three times off exactly that kind of
+ * "the spec says it's fine" string parse, and a timestamp editor is where such
+ * a bug does real damage: the tenant is America/New_York and the office reads
+ * these as local wall-clock times on an invoice.
  */
 function localInputToIso(local: string): string | null {
-  if (!local) return null;
-  const d = new Date(local);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(local ?? '');
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const date = new Date(
+    Number(y),
+    Number(mo) - 1,
+    Number(d),
+    Number(h),
+    Number(mi),
+    s ? Number(s) : 0,
+    0
+  );
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -81,6 +119,12 @@ export default function EditTimestampModal({
   const [reason, setReason] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Set while a boundary-moving edit is waiting for an explicit confirmation. */
+  const [pendingConfirm, setPendingConfirm] = useState<{ clear: boolean } | null>(null);
+  /** The server's boundary_note, held on screen after a successful save. */
+  const [savedNote, setSavedNote] = useState<string | null>(null);
+
+  const movesBoundary = movesJobDayBoundary(field);
 
   // Lock body scroll while modal open
   useEffect(() => {
@@ -100,6 +144,19 @@ export default function EditTimestampModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose, saving]);
 
+  /**
+   * Step one for a boundary-moving field: state the consequence and stop.
+   * Nobody moves another job's invoiced hours on a single click.
+   */
+  const request = (clear: boolean) => {
+    setError(null);
+    if (movesBoundary && !pendingConfirm) {
+      setPendingConfirm({ clear });
+      return;
+    }
+    void submit(clear);
+  };
+
   const submit = async (clear: boolean) => {
     setSaving(true);
     setError(null);
@@ -108,6 +165,7 @@ export default function EditTimestampModal({
       if (!clear && !iso) {
         setError('Enter a valid date and time, or use Clear to unset.');
         setSaving(false);
+        setPendingConfirm(null);
         return;
       }
 
@@ -129,19 +187,33 @@ export default function EditTimestampModal({
         }
         setError(msg);
         setSaving(false);
+        setPendingConfirm(null);
         return;
       }
 
+      // The route tells us, in its own words, when the saved press re-divided a
+      // clocked day. Hold it on screen rather than closing over it — the whole
+      // point is that the person who made the change knows what else moved.
+      const json = await res.json().catch(() => null);
+      const note: string | null = json?.data?.boundary_note ?? null;
+
       onSaved();
+      setSaving(false);
+      setPendingConfirm(null);
+      if (note) {
+        setSavedNote(note);
+        return;
+      }
       onClose();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Network error — please try again.');
       setSaving(false);
+      setPendingConfirm(null);
     }
   };
 
-  const handleSave = () => submit(false);
-  const handleClear = () => submit(true);
+  const handleSave = () => request(false);
+  const handleClear = () => request(true);
 
   return (
     <div
@@ -174,17 +246,61 @@ export default function EditTimestampModal({
           <button
             onClick={onClose}
             disabled={saving}
-            className="ml-auto p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50"
+            className="ml-auto inline-flex items-center justify-center w-11 h-11 -mr-2 rounded-lg hover:bg-slate-100 dark:hover:bg-white/10 disabled:opacity-50"
             aria-label="Close"
           >
             <X className="w-4 h-4 text-slate-500 dark:text-white/60" />
           </button>
         </div>
 
+        {/* ── Saved, with the server's boundary note held on screen ────────── */}
+        {savedNote ? (
+          <div className="px-5 pb-5 space-y-4">
+            <div className="flex items-start gap-2 px-3 py-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/30">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                  Saved — and this changed more than one job.
+                </p>
+                <p className="text-sm text-amber-800 dark:text-amber-200">{savedNote}</p>
+                <p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+                  Check the other job worked that day before its ticket is printed or invoiced.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="
+                w-full inline-flex items-center justify-center min-h-[44px] px-4 text-sm font-medium rounded-lg
+                text-white bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
+                hover:from-violet-700 hover:via-fuchsia-600 hover:to-pink-600 transition-all
+              "
+            >
+              Got it
+            </button>
+          </div>
+        ) : (
+        <>
         {/* Body */}
         <div className="px-5 pb-5 space-y-4">
+          {/* WHAT THIS EDIT ACTUALLY MOVES — said before the click, not after.
+              A start stamp is where a crew's clocked day divides between jobs,
+              so correcting it rewrites the OTHER job's hours too. The copy names
+              the field being edited rather than In Route, because Work Started
+              can be the boundary too — it is whichever start stamp is earliest. */}
+          {movesBoundary && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-500/10 dark:border-amber-400/30">
+              <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-300 flex-shrink-0 mt-0.5" />
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                {label} is one of the stamps that decides where a crew&rsquo;s clocked day divides
+                between jobs — the earliest one wins. Moving it can also change the hours on the
+                other job(s) they worked that day, including jobs that may already be invoiced.
+              </p>
+            </div>
+          )}
+
           {/* Current value summary */}
-          <div className="text-xs text-slate-500 dark:text-white/55 flex items-center gap-1.5">
+          <div className="text-sm text-slate-500 dark:text-white/55 flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5" />
             <span>
               {currentValue ? (
@@ -253,55 +369,95 @@ export default function EditTimestampModal({
           {error && (
             <div className="flex items-start gap-2 px-3 py-2 rounded-lg bg-rose-50 border border-rose-200 dark:bg-rose-500/10 dark:border-rose-400/30">
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-300 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-rose-700 dark:text-rose-200">{error}</p>
+              <p className="text-sm text-rose-700 dark:text-rose-200">{error}</p>
             </div>
           )}
         </div>
 
         {/* Footer actions */}
-        <div className="px-5 pb-5 sm:pb-5 pt-1 flex flex-col-reverse sm:flex-row sm:items-center gap-2">
-          <button
-            onClick={onClose}
-            disabled={saving}
-            className="
-              w-full sm:w-auto px-4 py-2 text-sm rounded-lg transition-colors
-              text-slate-600 hover:bg-slate-100
-              dark:text-white/70 dark:hover:bg-white/10
-              disabled:opacity-50
-            "
-          >
-            Cancel
-          </button>
-
-          {currentValue && (
+        {pendingConfirm ? (
+          // STEP TWO. The consequence is already stated above; this is the
+          // deliberate second press that moves the other job's hours.
+          <div className="px-5 pb-5 pt-1 space-y-2">
+            <p className="text-sm font-medium text-slate-700 dark:text-white/80">
+              {pendingConfirm.clear
+                ? `Clear ${label} and re-divide that day's hours?`
+                : `Change ${label} and re-divide that day's hours?`}
+            </p>
+            <div className="flex flex-col-reverse sm:flex-row sm:items-center gap-2">
+              <button
+                onClick={() => setPendingConfirm(null)}
+                disabled={saving}
+                className="
+                  w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] px-4 text-sm rounded-lg transition-colors
+                  text-slate-600 hover:bg-slate-100
+                  dark:text-white/70 dark:hover:bg-white/10
+                  disabled:opacity-50
+                "
+              >
+                Go back
+              </button>
+              <button
+                onClick={() => submit(pendingConfirm.clear)}
+                disabled={saving}
+                className="
+                  w-full sm:flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm font-medium rounded-lg
+                  text-white bg-amber-600 hover:bg-amber-700
+                  disabled:opacity-50 transition-colors shadow-sm
+                "
+              >
+                {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+                Yes, change the hours
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="px-5 pb-5 sm:pb-5 pt-1 flex flex-col-reverse sm:flex-row sm:items-center gap-2">
             <button
-              onClick={handleClear}
+              onClick={onClose}
               disabled={saving}
               className="
-                w-full sm:w-auto px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                text-rose-600 bg-white border border-rose-200 hover:bg-rose-50
-                dark:text-rose-200 dark:bg-white/5 dark:border-rose-400/30 dark:hover:bg-rose-500/10
+                w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] px-4 text-sm rounded-lg transition-colors
+                text-slate-600 hover:bg-slate-100
+                dark:text-white/70 dark:hover:bg-white/10
                 disabled:opacity-50
               "
             >
-              Clear
+              Cancel
             </button>
-          )}
 
-          <button
-            onClick={handleSave}
-            disabled={saving || !value}
-            className="
-              w-full sm:flex-1 inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium rounded-lg
-              text-white bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
-              hover:from-violet-700 hover:via-fuchsia-600 hover:to-pink-600
-              disabled:opacity-50 transition-all shadow-sm shadow-violet-500/20
-            "
-          >
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save
-          </button>
-        </div>
+            {currentValue && (
+              <button
+                onClick={handleClear}
+                disabled={saving}
+                className="
+                  w-full sm:w-auto inline-flex items-center justify-center min-h-[44px] px-4 text-sm font-medium rounded-lg transition-colors
+                  text-rose-600 bg-white border border-rose-200 hover:bg-rose-50
+                  dark:text-rose-200 dark:bg-white/5 dark:border-rose-400/30 dark:hover:bg-rose-500/10
+                  disabled:opacity-50
+                "
+              >
+                Clear
+              </button>
+            )}
+
+            <button
+              onClick={handleSave}
+              disabled={saving || !value}
+              className="
+                w-full sm:flex-1 inline-flex items-center justify-center gap-2 min-h-[44px] px-4 text-sm font-medium rounded-lg
+                text-white bg-gradient-to-r from-violet-600 via-fuchsia-500 to-pink-500
+                hover:from-violet-700 hover:via-fuchsia-600 hover:to-pink-600
+                disabled:opacity-50 transition-all shadow-sm shadow-violet-500/20
+              "
+            >
+              {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+              Save
+            </button>
+          </div>
+        )}
+        </>
+        )}
       </div>
     </div>
   );

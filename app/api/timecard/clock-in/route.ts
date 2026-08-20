@@ -26,6 +26,9 @@ import { isWithinShopRadius, SHOP_LOCATION, ALLOWED_RADIUS_METERS, ShopOverride 
 import { resolveEffectiveStart, computeLate } from '@/lib/timecard-start';
 import { endOfDayUTC } from '@/lib/dates';
 import { canBeCrewMember } from '@/lib/rbac';
+import { pickClockInJob, type ClockInJobCandidate } from '@/lib/clock-in-job';
+import { UNCLOCKABLE_INFERRED_JOB_STATUSES, postgrestNotInList } from '@/lib/job-status';
+import { jobStartOnDate } from '@/lib/job-day-boundary';
 
 const NIGHT_SHIFT_START_HOUR = 15;
 
@@ -401,40 +404,157 @@ export async function POST(request: NextRequest) {
     //     who is on a job on a given day (the clock-out gate already defers to
     //     it, and the office swaps crew day to day)
     // The ledger is checked FIRST for exactly that reason.
+    //
+    // THE SECOND GAP (Aug 20, in production): widening the question was right,
+    // but the answer was taken on trust. The ledger read had NO STATUS FILTER
+    // and `.limit(1)` with NO `ORDER BY`, so Conrade was clocked in to a job he
+    // had completed the previous afternoon and the office could not dispatch
+    // him. Which candidate wins is now decided by ONE documented, unit-tested
+    // rule in lib/clock-in-job.ts — earliest-sequenced OPEN job — and every
+    // lookup below feeds it instead of each picking for itself.
+    //
+    // A holder rather than a bare `let`: the assignment happens inside `settle`
+    // below, and TypeScript's flow analysis cannot see through a closure — a
+    // plain `let` narrows to `null` at the read site and the job name becomes
+    // unreachable code. The box makes the mutation explicit instead of casting
+    // the narrowing away at the point of use.
+    const jobLink: {
+      value: { id: string; job_number: string | null; customer_name: string | null } | null;
+    } = { value: null };
     if (tenantId) {
       try {
-        let resolvedJobId: string | null = null;
+        /**
+         * Turn a set of job ids into scored candidates. ONE indexed read on the
+         * primary key, tenant-scoped explicitly because `supabaseAdmin` bypasses
+         * RLS. It carries everything three different needs want: the status the
+         * rule filters on, the fields it orders by, and the job number the
+         * operator is shown — so no surface below costs an extra query.
+         */
+        const loadCandidates = async (
+          ids: string[],
+          sequenceByJob?: Map<string, number | null>
+        ): Promise<{ candidates: ClockInJobCandidate[]; rows: Map<string, any> }> => {
+          const rows = new Map<string, any>();
+          const unique = Array.from(new Set(ids.filter(Boolean)));
+          if (unique.length === 0) return { candidates: [], rows };
+          const { data, error } = await supabaseAdmin
+            .from('job_orders')
+            .select('id, job_number, customer_name, status, scheduled_date, route_started_at, in_route_at, work_started_at')
+            .eq('tenant_id', tenantId)
+            .in('id', unique);
+          // A dead read must not present as "no job today" — say so and let the
+          // clock-in proceed with a null, which is the honest answer.
+          if (error) {
+            console.error('[clock-in] job candidate read failed', { userId: user.id, tenantId, error });
+            return { candidates: [], rows };
+          }
+          const candidates: ClockInJobCandidate[] = [];
+          for (const j of data ?? []) {
+            rows.set(j.id, j);
+            candidates.push({
+              job_order_id: j.id,
+              status: j.status ?? null,
+              day_sequence: sequenceByJob?.get(j.id) ?? null,
+              // Guard (a) from lib/job-day-boundary.ts applies here too: a press
+              // recorded on ANOTHER day says nothing about this morning.
+              started_at: jobStartOnDate(todayDate, [], j, j.id, tenantTz),
+              scheduled_date: j.scheduled_date ?? null,
+            });
+          }
+          return { candidates, rows };
+        };
 
-        // 1. Today's ledger entry — the most specific answer there is.
-        const { data: ledgerRow } = await supabaseAdmin
+        /** Log the decision once, wherever it came from. Never silent again. */
+        const settle = (
+          resolution: ReturnType<typeof pickClockInJob>,
+          rows: Map<string, any>,
+          source: string
+        ) => {
+          // A ledger row pointing at a finished job is the Aug 20 signature and
+          // the ONLY canary for a ledger nothing prunes. It must be loud.
+          for (const c of resolution.closed) {
+            console.warn(
+              `[clock-in] STALE ASSIGNMENT ignored — ${source} placed ${user.id} on job ${c.job_order_id} ` +
+                `(${rows.get(c.job_order_id)?.job_number ?? 'unknown'}) for ${todayDate}, but that job is ` +
+                `"${c.status}". Not clocking in to a closed job.`,
+              { userId: user.id, tenantId, jobOrderId: c.job_order_id, status: c.status, date: todayDate }
+            );
+          }
+          if (resolution.jobOrderId) {
+            const row = rows.get(resolution.jobOrderId);
+            jobLink.value = {
+              id: resolution.jobOrderId,
+              job_number: row?.job_number ?? null,
+              customer_name: row?.customer_name ?? null,
+            };
+            console.log(
+              `[clock-in] job resolved via ${source}: ${row?.job_number ?? resolution.jobOrderId}` +
+                (resolution.contested ? ' (several open jobs today — earliest in the day\'s sequence won)' : ''),
+              { userId: user.id, jobOrderId: resolution.jobOrderId, source, contested: resolution.contested }
+            );
+          }
+          return resolution.jobOrderId != null;
+        };
+
+        // 1. Today's ledger entry — the most specific answer there is. EVERY row
+        //    is read, not an arbitrary one, so a day with two placements is
+        //    decided by the board's own sequence rather than by Postgres.
+        const { data: ledgerRows, error: ledgerError } = await supabaseAdmin
           .from('job_daily_assignments')
-          .select('job_order_id')
+          .select('job_order_id, day_sequence')
           .eq('tenant_id', tenantId)
           .eq('assignment_date', todayDate)
           .or(`operator_id.eq.${user.id},helper_id.eq.${user.id}`)
-          .limit(1)
-          .maybeSingle();
-        if (ledgerRow?.job_order_id) resolvedJobId = ledgerRow.job_order_id;
+          .limit(20);
+        if (ledgerError) {
+          console.error('[clock-in] daily-assignment read failed', { userId: user.id, tenantId, error: ledgerError });
+        }
+        const sequenceByJob = new Map<string, number | null>();
+        for (const r of ledgerRows ?? []) {
+          if (!r?.job_order_id) continue;
+          const prev = sequenceByJob.get(r.job_order_id);
+          const next = r.day_sequence ?? null;
+          if (prev == null || (next != null && next < prev)) sequenceByJob.set(r.job_order_id, next);
+        }
 
-        // 2. A job-level slot on a job running today.
-        if (!resolvedJobId) {
-          const { data: todaysJob } = await supabaseAdmin
+        let done = false;
+        if (sequenceByJob.size > 0) {
+          const { candidates, rows } = await loadCandidates(Array.from(sequenceByJob.keys()), sequenceByJob);
+          // CLOSED-ONLY refusal here: the ledger is the office naming a person,
+          // a job and a DATE. It outranks a status flag nobody cleared — on Aug
+          // 20 Conrade's real job had been `on_hold` since the 14th and the
+          // office placed him on it regardless. See job-status.ts.
+          done = settle(pickClockInJob(candidates), rows, 'the day ledger');
+        }
+
+        // 2. A job-level slot on a job running today. The status exclusion is
+        //    kept in SQL (it is indexed and cheap) AND re-applied in the rule,
+        //    so neither one alone is load-bearing.
+        if (!done) {
+          const { data: slotJobs } = await supabaseAdmin
             .from('job_orders')
             .select('id')
             .eq('tenant_id', tenantId)
             .or(`assigned_to.eq.${user.id},helper_assigned_to.eq.${user.id}`)
             .lte('scheduled_date', todayDate)
             .or(`scheduled_date.eq.${todayDate},end_date.gte.${todayDate}`)
-            .not('status', 'in', '("completed","cancelled","archived","on_hold")')
+            .not('status', 'in', postgrestNotInList(UNCLOCKABLE_INFERRED_JOB_STATUSES))
             .not('dispatched_at', 'is', null)
             .order('scheduled_date', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          if (todaysJob?.id) resolvedJobId = todaysJob.id;
+            .limit(10);
+          const slotIds = (slotJobs ?? []).map((j: { id: string }) => j.id).filter(Boolean);
+          if (slotIds.length > 0) {
+            const { candidates, rows } = await loadCandidates(slotIds);
+            done = settle(
+              pickClockInJob(candidates, { refuse: UNCLOCKABLE_INFERRED_JOB_STATUSES }),
+              rows,
+              'the job crew slots'
+            );
+          }
         }
 
         // 3. Crewed on a job running today (neither slot, but on the crew).
-        if (!resolvedJobId) {
+        if (!done) {
           const { data: crewRows } = await supabaseAdmin
             .from('job_crew')
             .select('job_order_id')
@@ -443,23 +563,46 @@ export async function POST(request: NextRequest) {
             .map((c: { job_order_id: string }) => c.job_order_id)
             .filter(Boolean);
           if (crewJobIds.length > 0) {
-            const { data: crewJob } = await supabaseAdmin
+            const { data: crewJobs } = await supabaseAdmin
               .from('job_orders')
               .select('id')
               .eq('tenant_id', tenantId)
               .in('id', crewJobIds)
               .lte('scheduled_date', todayDate)
               .or(`scheduled_date.eq.${todayDate},end_date.gte.${todayDate}`)
-              .not('status', 'in', '("completed","cancelled","archived","on_hold")')
+              .not('status', 'in', postgrestNotInList(UNCLOCKABLE_INFERRED_JOB_STATUSES))
               .order('scheduled_date', { ascending: false })
-              .limit(1)
-              .maybeSingle();
-            if (crewJob?.id) resolvedJobId = crewJob.id;
+              .limit(10);
+            const ids = (crewJobs ?? []).map((j: { id: string }) => j.id).filter(Boolean);
+            if (ids.length > 0) {
+              const { candidates, rows } = await loadCandidates(ids);
+              done = settle(
+                pickClockInJob(candidates, { refuse: UNCLOCKABLE_INFERRED_JOB_STATUSES }),
+                rows,
+                'the job crew list'
+              );
+            }
           }
         }
 
-        if (resolvedJobId) insertData.job_order_id = resolvedJobId;
-      } catch { /* job link is best-effort */ }
+        // NOTHING RESOLVED = NULL, NOT THE CLOSEST THING WE FOUND. The read-time
+        // deriver (lib/timecard-job-context.ts) renders this as "not recorded",
+        // which the office can see and fix. A guess written into a payroll row
+        // is indistinguishable from something the operator actually did.
+        if (!done) {
+          console.log('[clock-in] no open job resolved — leaving job_order_id null', {
+            userId: user.id,
+            tenantId,
+            date: todayDate,
+          });
+        }
+
+        if (jobLink.value) insertData.job_order_id = jobLink.value.id;
+      } catch (jobLinkError) {
+        // Job link is best-effort and must NEVER fail a clock-in — but it is no
+        // longer allowed to fail invisibly either.
+        console.error('[clock-in] job resolution threw; clocking in with no job', jobLinkError);
+      }
     }
 
     const { data: timecard, error: insertError } = await supabaseAdmin
@@ -691,12 +834,22 @@ export async function POST(request: NextRequest) {
 
     console.log(`Clock in: ${profile?.full_name || user.email} at ${now.toLocaleTimeString()} [${flags.join(', ')}]`);
 
+    // TELL THE OPERATOR WHICH JOB THEY WERE PUT ON. Conrade was clocked in to a
+    // job he had finished the day before and had no way to see it — the office
+    // found out when it could not dispatch him. The job the server chose now
+    // rides on the confirmation message every client already displays, so a
+    // wrong answer is visible to the one person standing there who knows better.
+    const linkedJob = jobLink.value;
+    const jobSuffix = linkedJob
+      ? ` — ${[linkedJob.job_number, linkedJob.customer_name].filter(Boolean).join(' · ') || 'job linked'}`
+      : '';
+
     return NextResponse.json(
       {
         success: true,
         message: clock_in_method === 'remote' || clock_in_method === 'gps_remote'
-          ? 'Remote clock-in recorded. Pending admin approval.'
-          : `Clocked in successfully at ${now.toLocaleTimeString()}`,
+          ? `Remote clock-in recorded. Pending admin approval.${jobSuffix}`
+          : `Clocked in successfully at ${now.toLocaleTimeString()}${jobSuffix}`,
         data: {
           id: timecard.id,
           clockInTime: timecard.clock_in_time,
@@ -712,6 +865,9 @@ export async function POST(request: NextRequest) {
             accuracy: timecard.clock_in_accuracy,
           },
           distanceFromShop: locationCheck.distanceFormatted,
+          // null = no open job could be tied to this clock-in. That is a real
+          // answer, not a missing one — never render it as a blank job name.
+          job: linkedJob,
           overdueTickets,
         },
       },

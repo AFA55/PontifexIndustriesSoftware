@@ -52,6 +52,7 @@ import OfficeCloseJob from '@/components/OfficeCloseJob';
 import { officeCloseAffordance } from '@/lib/office-completion';
 import WorkItemsSummary, { type WorkItemRow } from '@/components/WorkItemsSummary';
 import { getCurrentUser } from '@/lib/auth';
+import { canEditJobTimestamps } from '@/lib/timestamp-edit-access';
 import { supabase } from '@/lib/supabase';
 import { useVisiblePoll } from '@/lib/hooks/useVisiblePoll';
 import type { ScopeItem } from '@/components/JobScopePanel';
@@ -636,7 +637,11 @@ export default function AdminJobDetailPage({
     if (!['admin', 'super_admin', 'operations_manager', 'salesman', 'supervisor'].includes(user.role)) {
       router.push('/dashboard');
     }
-    setUserRole(user.role || 'admin');
+    // NOT `|| 'admin'`. A missing role would silently become the highest-trust
+    // value on this page, render the timestamp edit pencils, and then 403 on
+    // save — the UI-says-yes-API-says-no defect this page just fixed. An empty
+    // string fails every role check instead, which is the safe direction.
+    setUserRole(user.role || '');
   }, [router]);
 
   const fetchJob = useCallback(async () => {
@@ -909,6 +914,20 @@ export default function AdminJobDetailPage({
   // ── Render the live status panel — used both in normal page and in the no-job error fallback shell
   const renderLiveStatusPanel = () => {
     if (!liveStatus) return null;
+    // WHO MAY CORRECT A TIMESTAMP. The PATCH route is `requireAdmin`, but this
+    // page admits salesman and supervisor too (the project-manager roles). The
+    // pencils used to render for all of them: they filled in a time, pressed
+    // Save, and got "Forbidden. Admin access required." Conditional render, not
+    // `hidden={...}` — Tailwind's flex utilities beat [hidden]{display:none}.
+    const mayEditTimestamps = canEditJobTimestamps(userRole);
+    // The 44px floor on these rows exists FOR THE PENCIL — it is the tap target.
+    // When no pencil renders (salesman, supervisor) it is 44px of nothing, six
+    // times over, which pushed everything below Live Status down ~140px on a
+    // phone for the two roles that read this panel most. Rows stay uniform in
+    // both modes; the block is simply compact when there is nothing to tap.
+    const timestampRowClass = `flex items-center gap-2 text-sm${
+      mayEditTimestamps ? ' min-h-[44px]' : ''
+    }`;
     const standbySegments = liveStatus.standby_segments_today ?? [];
     const workPerformedCount = liveStatus.work_performed_count_today ?? (liveStatus.work_performed_today || []).length;
     const standbyElapsedMs = liveStatus.standby_active && liveStatus.standby_started_at
@@ -1119,92 +1138,100 @@ export default function AdminJobDetailPage({
           {/* Timestamps — always render rows so admin can fill in missed clicks */}
           <div className="space-y-2 mb-4">
             {liveStatus.clock_in_time && (
-              <div className="flex items-center gap-2 text-xs">
+              <div className={timestampRowClass}>
                 <Clock className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 flex-shrink-0" />
                 <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Clocked In</span>
                 <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_in_time)}</span>
               </div>
             )}
             {/* In Route — editable */}
-            <div className="flex items-center gap-2 text-xs">
+            <div className={timestampRowClass}>
               <Navigation className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" />
               <span className="text-slate-500 dark:text-white/55 min-w-[88px]">In Route</span>
               <span className="font-medium text-slate-800 dark:text-white">
                 {liveStatus.in_route_at ? formatTimeFromISO(liveStatus.in_route_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
               </span>
-              <button
-                onClick={() => setEditTimestampField({
-                  field: 'in_route_at',
-                  label: 'In Route Time',
-                  currentValue: liveStatus.in_route_at,
-                })}
-                title="Edit in-route timestamp"
-                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
+              {mayEditTimestamps && (
+                <button
+                  onClick={() => setEditTimestampField({
+                    field: 'in_route_at',
+                    label: 'In Route Time',
+                    currentValue: liveStatus.in_route_at,
+                  })}
+                  title="Edit in-route timestamp"
+                  className="ml-auto inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
             {/* Arrived — editable, always shown */}
-            <div className="flex items-center gap-2 text-xs">
+            <div className={timestampRowClass}>
               <MapPin className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
               <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Arrived</span>
               <span className="font-medium text-slate-800 dark:text-white">
                 {liveStatus.arrived_at ? formatTimeFromISO(liveStatus.arrived_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
               </span>
-              <button
-                onClick={() => setEditTimestampField({
-                  field: 'arrived_at_jobsite_at',
-                  label: 'Arrived On Site Time',
-                  currentValue: liveStatus.arrived_at,
-                })}
-                title="Edit arrival timestamp"
-                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
+              {mayEditTimestamps && (
+                <button
+                  onClick={() => setEditTimestampField({
+                    field: 'arrived_at_jobsite_at',
+                    label: 'Arrived On Site Time',
+                    currentValue: liveStatus.arrived_at,
+                  })}
+                  title="Edit arrival timestamp"
+                  className="ml-auto inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
             {/* Work Started — editable */}
-            <div className="flex items-center gap-2 text-xs">
+            <div className={timestampRowClass}>
               <Wrench className="w-3.5 h-3.5 text-brand flex-shrink-0" />
               <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Work Started</span>
               <span className="font-medium text-slate-800 dark:text-white">
                 {liveStatus.work_started_at ? formatTimeFromISO(liveStatus.work_started_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
               </span>
-              <button
-                onClick={() => setEditTimestampField({
-                  field: 'work_started_at',
-                  label: 'Work Started Time',
-                  currentValue: liveStatus.work_started_at,
-                })}
-                title="Edit work-started timestamp"
-                className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
+              {mayEditTimestamps && (
+                <button
+                  onClick={() => setEditTimestampField({
+                    field: 'work_started_at',
+                    label: 'Work Started Time',
+                    currentValue: liveStatus.work_started_at,
+                  })}
+                  title="Edit work-started timestamp"
+                  className="ml-auto inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
             {/* Work Completed — editable, only show if backend provides field */}
             {liveStatus.work_completed_at !== undefined && (
-              <div className="flex items-center gap-2 text-xs">
+              <div className={timestampRowClass}>
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                 <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Work Completed</span>
                 <span className="font-medium text-slate-800 dark:text-white">
                   {liveStatus.work_completed_at ? formatTimeFromISO(liveStatus.work_completed_at) : <span className="text-slate-300 dark:text-white/30">—</span>}
                 </span>
-                <button
-                  onClick={() => setEditTimestampField({
-                    field: 'work_completed_at',
-                    label: 'Work Completed Time',
-                    currentValue: liveStatus.work_completed_at ?? null,
-                  })}
-                  title="Edit work-completed timestamp"
-                  className="ml-auto p-1 rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                </button>
+                {mayEditTimestamps && (
+                  <button
+                    onClick={() => setEditTimestampField({
+                      field: 'work_completed_at',
+                      label: 'Work Completed Time',
+                      currentValue: liveStatus.work_completed_at ?? null,
+                    })}
+                    title="Edit work-completed timestamp"
+                    className="ml-auto inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded hover:bg-slate-100 dark:hover:bg-white/10 transition-colors text-slate-400 hover:text-brand dark:text-white/35 dark:hover:text-brand"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             )}
             {liveStatus.clock_out_time && (
-              <div className="flex items-center gap-2 text-xs">
+              <div className={timestampRowClass}>
                 <Clock className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
                 <span className="text-slate-500 dark:text-white/55 min-w-[88px]">Clocked Out</span>
                 <span className="font-medium text-slate-800 dark:text-white">{formatTimeFromISO(liveStatus.clock_out_time)}</span>

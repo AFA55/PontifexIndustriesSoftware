@@ -3,8 +3,9 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, Plus, ClipboardCheck } from 'lucide-react';
+import { Plus, ClipboardCheck } from 'lucide-react';
 import DashboardSidebar from '@/components/DashboardSidebar';
+import GlobalJobSearch from '@/components/admin/GlobalJobSearch';
 import NotificationBell from '@/components/NotificationBell';
 import { DarkModeIconToggle } from '@/components/ui/DarkModeToggle';
 import UserAvatar from '@/components/UserAvatar';
@@ -68,6 +69,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     setUser(getCurrentUser());
   }, []);
 
+  // WHICH ACTION BUTTONS THE HEADER CARRIES — derived once, so the mobile
+  // layout decision below cannot drift from what actually renders.
+  const showNewVisit = user?.role === 'supervisor';
+  const showNewJob = !['shop_manager', 'shop_help', 'admin'].includes(user?.role ?? '');
+  const headerActionCount = (showNewVisit ? 1 : 0) + (showNewJob ? 1 : 0);
+
   return (
     <div className="flex h-screen overflow-hidden bg-gray-50 dark:bg-[#0b0618]">
       {/*
@@ -104,30 +111,31 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             */}
             <div className="w-8 lg:hidden flex-shrink-0" aria-hidden="true" />
 
-            {/* Search input — hidden on mobile to keep header clean */}
-            <div className="
-              hidden sm:flex items-center gap-2 rounded-lg px-3 py-2 w-64 xl:w-80
-              bg-gray-100
-              dark:bg-white/5 dark:border dark:border-white/10
-            ">
-              <Search className="w-4 h-4 text-gray-400 dark:text-white/45 flex-shrink-0" />
-              <input
-                type="text"
-                placeholder="Search jobs, customers..."
-                className="
-                  bg-transparent text-sm outline-none flex-1 min-w-0
-                  text-gray-700 placeholder-gray-400
-                  dark:text-white dark:placeholder-white/40
-                "
-              />
-            </div>
+            {/*
+              Global job search. This used to be an <input> with a placeholder
+              and no onChange — it looked like a search bar and did nothing,
+              while the founder read job numbers out of chat messages with no
+              way to look them up. GlobalJobSearch renders an inline field from
+              sm: up and a 44px icon button + sheet below that, and renders
+              NOTHING for roles the search API refuses.
+
+              showMobileTrigger: below sm: the header is a fixed budget — a 32px
+              spacer clearing the sidebar's fixed hamburger, then the search
+              trigger, then every action button. A role with ONE action button
+              fits. `supervisor` has TWO (New Visit and New Job) and at 360px
+              (Galaxy S-class) the row overflows, which the ancestor's
+              overflow-hidden CLIPS the avatar rather than scrolling. So that one
+              role keeps the inline field from sm: up and skips the phone
+              trigger — which is exactly where the old dead input stood anyway.
+            */}
+            <GlobalJobSearch role={user?.role} showMobileTrigger={headerActionCount < 2} />
           </div>
 
           {/* Right: actions */}
           <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
             {/* Supervisor-only: New Visit Report. Sits next to + New Job.
                 min-h-[44px] for tap-target compliance on mobile. */}
-            {user?.role === 'supervisor' && (
+            {showNewVisit && (
               <Link
                 href="/dashboard/admin/site-visits/new"
                 prefetch
@@ -143,7 +151,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 so the click feels instant instead of waiting for the JS to load.
                 Hidden for shop_manager + shop_help (read-only schedule access) and
                 for admin (back-office role — not a salesperson, doesn't create jobs). */}
-            {!['shop_manager', 'shop_help', 'admin'].includes(user?.role ?? '') && (
+            {showNewJob && (
               <Link
                 href="/dashboard/admin/schedule-form"
                 prefetch
