@@ -32,6 +32,16 @@ interface DayInfo {
   isNoShow?: boolean;
   firstTimecardId?: string | null;
   firstClockIn?: string | null;
+  /**
+   * Where this person was that day — job number, contractor, project, one label
+   * per job. The cell fits a number and nothing else, so these ride in its
+   * tooltip; `hours` above is still the whole clocked day, undivided.
+   */
+  jobLabels?: string[];
+  /** A record disagreed with the one the day was resolved to. Marked, not hidden. */
+  jobConflict?: string | null;
+  /** The lookup failed — a different claim from "no job", and it must read that way. */
+  jobLookupFailed?: boolean;
 }
 
 interface TeamMember {
@@ -128,6 +138,24 @@ function getRoleBadge(role: string) {
 }
 
 // ── Day cell color ───────────────────────────────────────────
+/**
+ * The tooltip for one day cell: which jobs that person was on.
+ *
+ * Three states stay distinct, because the office runs payroll off this screen
+ * and "we could not look it up" must never read as "there was no job", which in
+ * turn must never read as an empty cell meaning "no hours".
+ */
+function describeDayJobs(info: DayInfo | undefined): string | null {
+  if (!info || (info.hours <= 0 && info.entryCount === 0)) return null;
+  if (info.jobLookupFailed) return 'Job lookup failed — not a record of "no job".';
+  const labels = info.jobLabels ?? [];
+  if (labels.length === 0) return 'Job not recorded for this day.';
+  const head = labels.length === 1 ? 'Job:' : `Jobs (${labels.length}) — hours below are the whole day, not split:`;
+  return [head, ...labels.map((l) => `• ${l}`), info.jobConflict ?? '']
+    .filter(Boolean)
+    .join('\n');
+}
+
 function getDayCellClasses(info: DayInfo): string {
   if (info.status === 'none') return 'text-gray-400';
   if (info.status === 'active') return 'bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-300';
@@ -176,6 +204,13 @@ export default function AdminTimecardsPage() {
   const [editClockInTarget, setEditClockInTarget] = useState<{ timecardId: string; currentClockIn: string; memberName: string } | null>(null);
   const [editClockInTime, setEditClockInTime] = useState('');
   const [editClockInNotes, setEditClockInNotes] = useState('');
+
+  // A day whose records DISAGREE about where somebody was — on a week Amanda is
+  // about to pay. The detail is the whole value of the flag, and it used to live
+  // in a `title=` attribute: hover-only on desktop and completely unreachable on
+  // a phone, where she could see that something disagreed and had no way to find
+  // out what. Both marks are buttons now and open this.
+  const [jobDetail, setJobDetail] = useState<{ memberName: string; day: string; info: DayInfo } | null>(null);
   const [savingClockIn, setSavingClockIn] = useState(false);
 
   // Toast notifications (replaces alert() for clock-in-adjacent error paths)
@@ -1253,10 +1288,19 @@ export default function AdminTimecardsPage() {
                         {/* Day columns */}
                         {DAY_NAMES.map((day) => {
                           const info = member.dailyHours[day];
+                          // WHERE THEY WERE. The grid is 7 cells wide and a job
+                          // name does not fit in one, so the answer rides in the
+                          // cell's tooltip and only the DISAGREEMENT gets a mark
+                          // on the page — that is the thing worth interrupting a
+                          // reader for. Hours in the cell are the whole day.
+                          const jobTip = describeDayJobs(info);
                           return (
                             <td key={day} className="px-2 py-3 text-center">
                               <div className="flex flex-col items-center gap-0.5">
-                                <div className={`inline-flex items-center justify-center w-12 h-8 rounded-md text-xs font-bold tabular-nums ${getDayCellClasses(info)}`}>
+                                <div
+                                  title={jobTip ?? undefined}
+                                  className={`inline-flex items-center justify-center w-12 h-8 rounded-md text-xs font-bold tabular-nums ${getDayCellClasses(info)}`}
+                                >
                                   {info.hours > 0 ? info.hours.toFixed(1) : info.status === 'active' ? (
                                     <span className="flex items-center gap-0.5">
                                       <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
@@ -1265,6 +1309,17 @@ export default function AdminTimecardsPage() {
                                     <span className="text-gray-300">-</span>
                                   )}
                                 </div>
+                                {info.jobConflict && (
+                                  <button
+                                    type="button"
+                                    onClick={() => setJobDetail({ memberName: member.fullName, day, info })}
+                                    title={info.jobConflict}
+                                    aria-label={`Job conflict on ${day} for ${member.fullName} — open details`}
+                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-100 dark:bg-amber-500/20 text-amber-800 dark:text-amber-300 rounded text-[9px] font-bold border border-amber-200 dark:border-amber-500/30 hover:bg-amber-200 dark:hover:bg-amber-500/30 cursor-pointer transition-colors"
+                                  >
+                                    Job conflict
+                                  </button>
+                                )}
                                 {info.isLate && (
                                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-100 dark:bg-red-500/20 text-red-700 dark:text-red-300 rounded text-[9px] font-bold border border-red-200 dark:border-red-500/30">
                                     ⏰ {info.lateMinutes}m late
@@ -1493,7 +1548,16 @@ export default function AdminTimecardsPage() {
                         const info = member.dailyHours[day];
                         return (
                           <div key={day} className="flex flex-col items-center min-w-0">
-                            <span className="text-[9px] font-bold text-gray-400 dark:text-white/30 uppercase">{day.charAt(0)}</span>
+                            <span className="text-[9px] font-bold text-gray-400 dark:text-white/30 uppercase">
+                              {day.charAt(0)}
+                              {/* Locator only — it marks WHICH day, and the
+                                  readable answer is on the button below the
+                                  grid. A 4px dot is not a tap target and its
+                                  meaning must not depend on reaching it. */}
+                              {info?.jobConflict && (
+                                <span className="ml-0.5 text-amber-500" aria-hidden="true">•</span>
+                              )}
+                            </span>
                             <div className={`mt-1 w-full h-9 rounded-md flex items-center justify-center text-[11px] font-bold tabular-nums ${getDayCellClasses(info)}`}>
                               {info.hours > 0 ? info.hours.toFixed(1) : info.status === 'active' ? (
                                 <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
@@ -1505,6 +1569,31 @@ export default function AdminTimecardsPage() {
                         );
                       })}
                     </div>
+
+                    {/* WHERE THE RECORDS DISAGREE — one button per day, opened by
+                        thumb. This is the phone's only route to the detail: the
+                        grid above is 7 cells across ~40px each, which cannot be
+                        a 44px tap target, so the answer gets its own row.
+                        stopPropagation because the whole card navigates. */}
+                    {DAY_NAMES.some((d) => member.dailyHours[d]?.jobConflict) && (
+                      <div className="flex flex-wrap gap-2 mt-2">
+                        {DAY_NAMES.filter((d) => member.dailyHours[d]?.jobConflict).map((d) => (
+                          <button
+                            key={d}
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setJobDetail({ memberName: member.fullName, day: d, info: member.dailyHours[d] });
+                            }}
+                            className="inline-flex items-center gap-1.5 min-h-[44px] px-3 rounded-xl bg-amber-50 dark:bg-amber-500/15 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-400/30 text-[11px] font-bold active:bg-amber-100 dark:active:bg-amber-500/25 transition-colors"
+                          >
+                            <AlertTriangle size={13} className="flex-shrink-0" />
+                            <span>{d} · Job conflict</span>
+                            <ChevronRight size={13} className="flex-shrink-0 opacity-60" />
+                          </button>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Summary chips */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
@@ -1749,6 +1838,93 @@ export default function AdminTimecardsPage() {
                 ))
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Job-conflict detail ──────────────────────────────
+          Two records disagree about where this person was on a day about to be
+          paid. WHAT they disagree about is the entire value of the flag, so it
+          is reachable by touch, not parked in a `title=` only a mouse can find.
+          Bottom sheet on a phone, centered card on a desktop. */}
+      {jobDetail && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setJobDetail(null)}
+        >
+          <div
+            className="bg-white dark:bg-[#1a0f35] rounded-t-2xl sm:rounded-2xl shadow-2xl border border-gray-200 dark:border-white/10 p-5 w-full sm:max-w-md max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="font-bold text-gray-900 dark:text-white text-sm">Job conflict</h3>
+                  <p className="text-[11px] text-gray-500 dark:text-white/40 truncate">
+                    {jobDetail.memberName} · {jobDetail.day}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setJobDetail(null)}
+                aria-label="Close"
+                className="-m-1 min-w-[44px] min-h-[44px] flex items-center justify-center hover:bg-gray-100 dark:hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
+              >
+                <X size={16} className="text-gray-400 dark:text-white/40" />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              {jobDetail.info.jobLookupFailed ? (
+                <p className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                  Job lookup failed — this is not a record of &ldquo;no job&rdquo;.
+                </p>
+              ) : (
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400 dark:text-white/30 mb-1.5">
+                    {(jobDetail.info.jobLabels ?? []).length === 1 ? 'Job on record' : 'Jobs on record'}
+                  </p>
+                  {(jobDetail.info.jobLabels ?? []).length === 0 ? (
+                    <p className="text-xs text-gray-500 dark:text-white/50 italic">Job not recorded for this day.</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {(jobDetail.info.jobLabels ?? []).map((l, i) => (
+                        <li key={i} className="text-xs text-gray-700 dark:text-white/70 leading-snug break-words">
+                          • {l}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              {jobDetail.info.jobConflict && (
+                <div className="px-3 py-2.5 bg-amber-50 dark:bg-amber-500/10 rounded-lg border border-amber-100 dark:border-amber-400/20">
+                  <p className="text-xs text-amber-800 dark:text-amber-200 leading-snug break-words">
+                    {jobDetail.info.jobConflict}
+                  </p>
+                </div>
+              )}
+
+              {/* Says out loud what the number beside it means, because this
+                  sheet is opened while looking at an hours figure. */}
+              <p className="text-[11px] text-gray-500 dark:text-white/40 leading-snug">
+                {jobDetail.info.hours.toFixed(1)} h is the whole clocked day and is not divided between
+                these jobs. Splitting a day between jobs belongs to the work ticket.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setJobDetail(null)}
+              className="mt-5 w-full min-h-[44px] rounded-xl bg-gray-100 dark:bg-white/10 text-gray-700 dark:text-white/80 text-sm font-bold active:bg-gray-200 dark:active:bg-white/20 transition-colors"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

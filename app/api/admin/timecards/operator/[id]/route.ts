@@ -23,7 +23,13 @@ import { requireCardLevel } from '@/lib/card-permissions-server';
 import { resolveAvatarUrl } from '@/lib/avatar';
 import { toLocalYMD, mondayOf } from '@/lib/dates';
 import { PROFILE_PHONE_SELECT, readProfilePhone } from '@/lib/profile-phone';
-import { resolveTimecardJobContext, formatJobContextLabel } from '@/lib/timecard-job-context';
+import {
+  loadTimecardDayJobs,
+  formatJobContextLabel,
+  formatJobConflictNote,
+  jobSourceNote,
+  personDayKey,
+} from '@/lib/timecard-job-context';
 
 export async function GET(
   request: NextRequest,
@@ -307,26 +313,47 @@ export async function GET(
     // signTimecardPhoto mints a short-lived (1 hr) signed URL for each real
     // path; legacy sentinel/null/full-URL values are left alone (the UI
     // hardens them to a "No photo" placeholder).
-    // WHERE WAS HE, EACH DAY (M9a). The founder wants the CONTRACTOR and PROJECT
-    // on the timecard, "to see where operators were within a timecard".
-    // timecards.job_order_id alone answers that for only ~60% of recent field
-    // entries, so this also derives it from the day's ledger and work logs.
+    // WHERE WAS HE, EACH DAY. The founder and Amanda want the CONTRACTOR, JOB
+    // NUMBER and PROJECT on the timecard for payroll — listed, not costed.
+    // `timecards.job_order_id` is the LAST source consulted, not the first: it
+    // is stamped at clock-in (07:00–07:15) and the office finishes the board
+    // afterwards, so it is a guess that is never revisited. The schedule board
+    // decides, the filed logs speak when it is silent, and any disagreement is
+    // reported rather than resolved away. See lib/timecard-job-context.ts.
     // Read-time only — nothing is written back into the payroll record.
-    const jobContext = await resolveTimecardJobContext(
+    const { byPersonDay: dayJobs, error: jobsError } = await loadTimecardDayJobs(
       enrichedEntries.map((e: any) => ({
         id: e.id,
         user_id: e.user_id ?? operatorId,
         date: e.date,
         job_order_id: e.job_order_id ?? null,
       })),
-      tenantId ?? null
+      // Non-null: the guard at the top of this handler 400s without a tenant.
+      tenantId
     );
+    if (jobsError) console.error('[operator timecards] job lookup failed —', jobsError);
 
     const finalEntries = await Promise.all(enrichedEntries.map(async (entry: any) => {
       const jobKey = `${entry.job_order_id}_${entry.date}`;
-      const ctx = jobContext.get(entry.id);
+      const day = dayJobs.get(personDayKey(entry.user_id ?? operatorId, entry.date));
+      // Labels are formatted HERE, not on the page: lib/timecard-job-context
+      // imports the service-role client and must never reach a client bundle.
+      const ctx = day?.jobs[0];
       return {
         ...entry,
+        // Every job the day resolved to, not just the first — one job, name it;
+        // two or three, name them all. Hours are NOT divided between them.
+        job_contexts: day?.jobs ?? [],
+        job_context_labels: (day?.jobs ?? []).map((j) => ({
+          label: formatJobContextLabel(j),
+          qualifier: jobSourceNote(j.source),
+        })),
+        // The evidence the ladder outranked — shown, so the office can catch a
+        // card whose 7 a.m. tag disagrees with where the board actually put them.
+        job_conflict_note: formatJobConflictNote(day),
+        job_unresolved: !jobsError && (day?.jobs.length ?? 0) === 0,
+        job_lookup_failed: !!jobsError,
+        // Kept for the primary-job rollups; `job_contexts` is the full answer.
         job_context: ctx ?? null,
         job_context_label: formatJobContextLabel(ctx),
         gps_logs: gpsLogsByTimecard[entry.id] || [],

@@ -49,10 +49,12 @@
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { DEFAULT_TENANT_TZ } from '@/lib/reminder-timing';
 import {
+  jobCloseOnDate,
   jobStartOnDate,
   splitClockDayAtJobStarts,
   type JobDaySegment,
 } from '@/lib/job-day-boundary';
+import { resolveDayJobs, type JobDayEvidence } from '@/lib/timecard-job-rules';
 
 /**
  * A QUERY THAT DIED MUST NEVER LOOK LIKE A JOB NOBODY WORKED.
@@ -297,7 +299,14 @@ export async function attributableTimecards(
   // one read the whole table, every tenant, with no filter at all.
   let allAssignmentsQuery = supabaseAdmin
     .from('job_daily_assignments')
-    .select('assignment_date, operator_id, helper_id, job_order_id')
+    // `day_sequence` is the office's own order for the day. It is read ONLY by
+    // the boundary split, and there only when a press is missing somewhere on
+    // the day (rule 7 in lib/job-day-boundary.ts) — a fully-pressed day never
+    // consults it, so a board that disagrees with the stamps cannot move a day
+    // that already resolves. Verified against information_schema: PostgREST
+    // rejects the WHOLE select on one bad column name and the page then reads
+    // as empty rather than broken.
+    .select('assignment_date, operator_id, helper_id, job_order_id, day_sequence')
     .in('assignment_date', dates);
   if (tenantId) allAssignmentsQuery = allAssignmentsQuery.eq('tenant_id', tenantId);
 
@@ -333,10 +342,29 @@ export async function attributableTimecards(
     s.add(jid);
     placed.set(k, s);
   };
+  // job|date → the board's `day_sequence` for that job that day. Person-agnostic
+  // because the sequence describes the JOB's place in the day, and a job appears
+  // on one board row per date. `min` on the off-chance two rows disagree: the
+  // lower number is the earlier slot, and the split only ever compares them.
+  //
+  // A SKELETON ROW SUPPLIES NOTHING. Rows with no operator and no helper hold a
+  // date open on the board — the same rows the date-widening above skips, for
+  // the same reason: they are not the office saying anybody was anywhere. Axel's
+  // Aug 12 is why it matters. Leifeng is in his day only through his frozen
+  // clock-in tag (`always_counts`), the board row for Leifeng that day places
+  // NOBODY, and borrowing its `day_sequence: 2` would have ordered his day off
+  // an empty row and moved 3.65 h onto a job the founder says he never went to.
+  const daySequence = new Map<string, number>();
   for (const a of allAssignments) {
     if (!a.assignment_date || !a.job_order_id) continue;
     place(a.operator_id, a.assignment_date, a.job_order_id);
     place(a.helper_id, a.assignment_date, a.job_order_id);
+    if (!a.operator_id && !a.helper_id) continue;
+    if (typeof a.day_sequence === 'number' && Number.isFinite(a.day_sequence)) {
+      const sk = `${a.job_order_id}|${a.assignment_date}`;
+      const prior = daySequence.get(sk);
+      if (prior == null || a.day_sequence < prior) daySequence.set(sk, a.day_sequence);
+    }
   }
 
   // The office placed these people somewhere, and it was not here. Recorded
@@ -375,6 +403,7 @@ export async function attributableTimecards(
     cardPool: [...cards, ...byCrew],
     placed,
     touched,
+    daySequence,
     boundarySegments,
     boundaryIds,
   });
@@ -440,9 +469,17 @@ export async function attributableTimecards(
  * job/date pairs that a multi-job person-day actually needs — a single-job day
  * can never produce a boundary, so the common case costs nothing:
  *   • `job_orders` start stamps (the whole-job press; right for a one-day job
- *     and for day 1 of a multi-day one);
+ *     and for day 1 of a multi-day one) AND its `work_completed_at`;
  *   • `daily_job_logs` per-DAY start stamps (the only source that can be right
- *     on day 5 — and the one whose stale copies guard (a) exists to reject).
+ *     on day 5 — and the one whose stale copies guard (a) exists to reject)
+ *     AND its per-day `day_completed_at`.
+ *
+ * THE CLOSES ARE READ BECAUSE A PRESS IS NOT ALWAYS THERE. Rule 6 in
+ * lib/job-day-boundary.ts uses the PRECEDING job's same-day close as the
+ * boundary when the job after it has no usable press — Keon's Aug 11, where
+ * Leifeng was day 2 and carried only an Aug 10 copy. Both close columns feed
+ * `jobCloseOnDate`, which applies the same day-guard as the presses; neither is
+ * ever used to end its own job's segment, which rule 5 forbids.
  *
  * A failed read THROWS, like every other read in this module: a dead query must
  * never present as "this day did not divide", which is indistinguishable on
@@ -455,10 +492,12 @@ async function resolveBoundarySegments(args: {
   cardPool: any[];
   placed: Map<string, Set<string>>;
   touched: Map<string, Set<string>>;
+  /** `job|date` → the board's day_sequence. Orders a day a press cannot. */
+  daySequence: Map<string, number>;
   boundarySegments: Map<string, JobDaySegment>;
   boundaryIds: Set<string>;
 }): Promise<void> {
-  const { jobId, timeZone, tenantId, cardPool, placed, touched } = args;
+  const { jobId, timeZone, tenantId, cardPool, placed, touched, daySequence } = args;
 
   // person|date → every card that person clocked that day. One card per day on
   // 297 of 298 production person-days; the exception is a night shift, and each
@@ -476,23 +515,33 @@ async function resolveBoundarySegments(args: {
   if (cardsByPersonDay.size === 0) return;
 
   // person|date → the jobs that day, by the authority ladder documented above.
+  //
+  // The ladder itself lives in lib/timecard-job-rules.ts and is shared with the
+  // TIMECARD, which lists a day's jobs rather than dividing them. One rule, two
+  // callers, so the two documents can never disagree about where somebody was.
+  //
+  // `always_counts` preserves THIS path's rule exactly: a card carrying a job tag
+  // is always one of that day's jobs, because the hours being divided are on that
+  // very card (Zack, Aug 14). The timecard uses the default `'lowest'` instead —
+  // the clock-in stamp is frozen before the office finishes the board, so for
+  // PAYROLL it is the last rung, not the first. See that module's note.
   const dayJobs = new Map<string, Set<string>>();
-  const addJob = (key: string, jid?: string | null) => {
-    if (!jid) return;
-    const s = dayJobs.get(key) ?? new Set<string>();
-    s.add(jid);
-    dayJobs.set(key, s);
-  };
-  for (const [key, jobs] of placed) for (const j of jobs) addJob(key, j);
-  for (const [key, jobs] of touched) {
-    // Rung 2 only when rung 1 said nothing. A filed log never adds a job to a
-    // day the office already accounted for — that is the Aug 18 closeout rule,
-    // and re-litigating it here would resurrect the phantoms it killed.
-    if ((placed.get(key)?.size ?? 0) > 0) continue;
-    for (const j of jobs) addJob(key, j);
-  }
-  for (const [key, list] of cardsByPersonDay) {
-    for (const c of list) addJob(key, c.job_order_id);
+  const personDayKeys = new Set<string>([
+    ...placed.keys(),
+    ...touched.keys(),
+    ...cardsByPersonDay.keys(),
+  ]);
+  for (const key of personDayKeys) {
+    const evidence: JobDayEvidence[] = [];
+    for (const j of placed.get(key) ?? []) evidence.push({ jobId: j, source: 'day_ledger' });
+    // `touched` already merges operator and helper logs; they share one rung, so
+    // the distinction is immaterial to the split and is not reconstructed here.
+    for (const j of touched.get(key) ?? []) evidence.push({ jobId: j, source: 'operator_log' });
+    for (const c of cardsByPersonDay.get(key) ?? []) {
+      if (c.job_order_id) evidence.push({ jobId: c.job_order_id, source: 'timecard' });
+    }
+    const { jobIds } = resolveDayJobs(evidence, { cardTagPolicy: 'always_counts' });
+    if (jobIds.length > 0) dayJobs.set(key, new Set(jobIds));
   }
 
   // Only days that (a) have two or more jobs and (b) include THIS one.
@@ -516,7 +565,11 @@ async function resolveBoundarySegments(args: {
 
   let jobStampQuery = supabaseAdmin
     .from('job_orders')
-    .select('id, route_started_at, in_route_at, work_started_at')
+    // `work_completed_at` feeds `jobCloseOnDate` (rule 6) and NOTHING else here.
+    // Column names verified against information_schema — one bad name and
+    // PostgREST rejects the whole select, `rowsOrThrow` throws, and the route
+    // answers 500 rather than quietly printing a day that did not divide.
+    .select('id, route_started_at, in_route_at, work_started_at, work_completed_at')
     .in('id', jobIdList);
   if (tenantId) jobStampQuery = jobStampQuery.eq('tenant_id', tenantId);
 
@@ -524,14 +577,16 @@ async function resolveBoundarySegments(args: {
   // not to whoever happened to file the paperwork. A helper never files one.
   let logStampQuery = supabaseAdmin
     .from('daily_job_logs')
-    .select('job_order_id, log_date, route_started_at, work_started_at')
+    // `day_completed_at` is the per-DAY close — the one that draws Keon's Aug 11
+    // boundary, since ISC's log closed at 15:04:36 and Leifeng never pressed.
+    .select('job_order_id, log_date, route_started_at, work_started_at, day_completed_at')
     .in('job_order_id', jobIdList)
     .in('log_date', dateList);
   if (tenantId) logStampQuery = logStampQuery.eq('tenant_id', tenantId);
 
   const [jobStampRes, logStampRes] = await Promise.all([jobStampQuery, logStampQuery]);
-  const jobStampRows = rowsOrThrow(jobStampRes, 'job start stamps');
-  const logStampRows = rowsOrThrow(logStampRes, 'daily-log start stamps');
+  const jobStampRows = rowsOrThrow(jobStampRes, 'job start and close stamps');
+  const logStampRows = rowsOrThrow(logStampRes, 'daily-log start and close stamps');
 
   const stampsByJob = new Map<string, any>();
   for (const r of jobStampRows) stampsByJob.set(r.id, r);
@@ -545,16 +600,18 @@ async function resolveBoundarySegments(args: {
   }
 
   for (const { key, date, jobIds } of candidates) {
-    const starts = jobIds.map((j) => ({
-      job_order_id: j,
-      started_at: jobStartOnDate(
-        date,
-        logsByJobDate.get(`${j}|${date}`) ?? [],
-        stampsByJob.get(j) ?? null,
-        j,
-        timeZone
-      ),
-    }));
+    const starts = jobIds.map((j) => {
+      const logs = logsByJobDate.get(`${j}|${date}`) ?? [];
+      const stamps = stampsByJob.get(j) ?? null;
+      return {
+        job_order_id: j,
+        started_at: jobStartOnDate(date, logs, stamps, j, timeZone),
+        // Rule 6's fallback and rule 7's ordering. Both are inert on a day where
+        // every job pressed — which is every day that resolves today.
+        completed_at: jobCloseOnDate(date, logs, stamps, j, timeZone),
+        day_sequence: daySequence.get(`${j}|${date}`) ?? null,
+      };
+    });
     for (const card of cardsByPersonDay.get(key) ?? []) {
       const segments = splitClockDayAtJobStarts(card, starts);
       if (!segments) continue; // guard (b): a job with no press, or no day to divide

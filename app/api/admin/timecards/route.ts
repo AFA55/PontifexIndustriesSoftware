@@ -16,7 +16,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireTimecardViewer, isTableNotFoundError } from '@/lib/api-auth';
-import { resolveTimecardJobContext, formatJobContextLabel } from '@/lib/timecard-job-context';
+import {
+  loadTimecardDayJobs,
+  formatJobContextLabel,
+  formatJobConflictNote,
+  jobSourceNote,
+  personDayKey,
+} from '@/lib/timecard-job-context';
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,6 +67,24 @@ export async function GET(request: NextRequest) {
       query = query.eq('approval_status', 'pending');
     }
 
+    // THE REVIEW QUEUE IS `flagged`, NOT `pending`.
+    //
+    // `approval_status = 'pending'` is a card that is still OPEN — the crew is
+    // clocked in right now. In production every pending row has a null
+    // `total_hours`. A badge counting those reads ~8 every weekday morning and
+    // drops to 0 at knock-off, signalling nothing an admin can act on.
+    //
+    // What actually wants a human is `flagged`: the auto-approver refused it.
+    // Production holds 19, the oldest from May 18, including Aiden's 88.61-hour
+    // card — none of them ever surfaced, because the sidebar badge read a
+    // response shape this route does not return and sat at 0.
+    //
+    // Filtered server-side so `summary.pendingApproval` is counted over the
+    // whole queue rather than over a 100-row page.
+    if (searchParams.get('needsReview') === 'true') {
+      query = query.eq('approval_status', 'flagged').eq('is_approved', false);
+    }
+
     if (status === 'active') {
       query = query.is('clock_out_time', null);
     } else if (status === 'completed') {
@@ -86,13 +110,15 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // ── WHERE WAS EACH PERSON? (M9a) ────────────────────────────────────────
-    // The founder wants the CONTRACTOR and PROJECT on a timecard, and hours
-    // totalled per contractor/project. `timecards.job_order_id` alone answers
-    // that for only ~60% of recent field entries, so this resolver also derives
-    // it from the day's ledger and work logs. READ-time only — nothing is
-    // written back into the payroll record. See lib/timecard-job-context.ts.
-    const jobContext = await resolveTimecardJobContext(
+    // ── WHERE WAS EACH PERSON? ──────────────────────────────────────────────
+    // The founder and Amanda want the CONTRACTOR, JOB NUMBER and PROJECT on a
+    // timecard. Named, never costed. `timecards.job_order_id`
+    // is the LAST source consulted, not the first: it is stamped at clock-in,
+    // before the office finishes the schedule board, and is never revisited.
+    // The board decides, the filed logs speak when it is silent, and a rung that
+    // was outranked is REPORTED. READ-time only — nothing is written back into
+    // the payroll record. See lib/timecard-job-context.ts.
+    const { byPersonDay: dayJobs, error: jobsError } = await loadTimecardDayJobs(
       (timecards ?? []).map((tc: any) => ({
         id: tc.id,
         user_id: tc.user_id,
@@ -101,51 +127,41 @@ export async function GET(request: NextRequest) {
       })),
       tenantId
     );
+    if (jobsError) console.error('[admin timecards] job lookup failed —', jobsError);
 
+    // THREE FIELDS PER CARD, AND ALL THREE ARE RENDERED — the operator profile's
+    // Timecards tab (app/dashboard/admin/operator-profiles) prints the label in
+    // its Job column, the conflict note beneath it, and the lookup-failure state
+    // instead of a blank. Nothing else is attached: a field no screen reads is
+    // the defect this file already shipped once (see the deletion note below).
     for (const tc of timecards ?? []) {
-      const ctx = jobContext.get(tc.id);
-      tc.job_context = ctx ?? null;
-      tc.job_context_label = formatJobContextLabel(ctx);
+      const day = dayJobs.get(personDayKey(tc.user_id, tc.date));
+      tc.job_context_labels = (day?.jobs ?? []).map((j) => ({
+        label: formatJobContextLabel(j),
+        qualifier: jobSourceNote(j.source),
+      }));
+      tc.job_conflict_note = formatJobConflictNote(day);
+      tc.job_lookup_failed = !!jobsError;
     }
 
-    // Hours by contractor and by project — the actual question ("how many hours
-    // are we working on this customer / this project"). Anything we could not
-    // attribute is counted SEPARATELY and reported, never folded into a total
-    // that would then read as complete.
-    const byContractor = new Map<string, { name: string; hours: number; entries: number }>();
-    const byProject = new Map<string, { name: string; contractor: string | null; hours: number; entries: number }>();
-    let unattributedHours = 0;
-    let unattributedEntries = 0;
-
-    for (const tc of timecards ?? []) {
-      const hours = Number(tc.total_hours) || 0;
-      const ctx = tc.job_context as { customerName?: string | null; projectName?: string | null } | null;
-      if (!ctx?.customerName && !ctx?.projectName) {
-        unattributedHours += hours;
-        unattributedEntries += 1;
-        continue;
-      }
-      if (ctx.customerName) {
-        const k = ctx.customerName;
-        const row = byContractor.get(k) ?? { name: k, hours: 0, entries: 0 };
-        row.hours += hours; row.entries += 1;
-        byContractor.set(k, row);
-      }
-      if (ctx.projectName) {
-        const k = `${ctx.customerName ?? ''}|${ctx.projectName}`;
-        const row = byProject.get(k) ?? { name: ctx.projectName, contractor: ctx.customerName ?? null, hours: 0, entries: 0 };
-        row.hours += hours; row.entries += 1;
-        byProject.set(k, row);
-      }
-    }
-
-    const round1 = (n: number) => Math.round(n * 10) / 10;
-    const hoursByContractor = [...byContractor.values()]
-      .map((r) => ({ ...r, hours: round1(r.hours) }))
-      .sort((a, b) => b.hours - a.hours);
-    const hoursByProject = [...byProject.values()]
-      .map((r) => ({ ...r, hours: round1(r.hours) }))
-      .sort((a, b) => b.hours - a.hours);
+    // ── DELETED (Aug 20): hoursByContractor / hoursByProject / unattributed /
+    //    multiJob / conflicts ────────────────────────────────────────────────
+    //
+    // They were computed on every request and read by NOBODY. The three callers
+    // of this route take the `timecards` array and nothing else: the grid page
+    // bulk-approves by id (and draws itself from `team-summary`), the operator
+    // profile lists the rows, and the sidebar reads a count.
+    //
+    // They are not wired up instead of deleted, for a reason beyond "unused".
+    // "Hours by contractor" is a BILLING question, and the only honest answer
+    // divides a day between the jobs worked — which is the work ticket's
+    // arithmetic and is deliberately kept off the payroll path (founder +
+    // Amanda, Aug 20; docs/plans/AUG19_FOUNDER_BRIEF.md §10). The deleted
+    // rollup filed each WHOLE day under one primary job, so a 9.7-hour day
+    // split between two contractors billed all 9.7 to the first. Rendered on a
+    // payroll screen that reads as a billing total and is wrong by design.
+    // Whoever needs hours-per-contractor should build it on the ticket side,
+    // from the split, not resurrect this.
 
     // Calculate summary statistics
     const totalHours = timecards?.reduce((sum: number, tc: any) => sum + (tc.total_hours || 0), 0) || 0;
@@ -182,15 +198,6 @@ export async function GET(request: NextRequest) {
             activeEntries,
           },
           userSummary: Object.values(userSummary),
-          // M9b — hours by contractor and by project. `unattributed` is reported
-          // rather than hidden: a total that silently omits hours we could not
-          // place is worse than no total, because it would be trusted.
-          hoursByContractor,
-          hoursByProject,
-          unattributed: {
-            hours: round1(unattributedHours),
-            entries: unattributedEntries,
-          },
         },
       },
       { status: 200 }

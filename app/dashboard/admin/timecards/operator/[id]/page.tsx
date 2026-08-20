@@ -1881,15 +1881,36 @@ function OperatorTimecardDetailPageInner() {
                           {dayEntries[0].job_number ? ` (${dayEntries[0].job_number})` : ''}
                         </p>
                       )}
-                      {/* WHO the day was worked FOR (M9a). The founder wants the
-                          contractor and project on the timecard so he can see
-                          where operators were, and total hours per contractor.
-                          Every distinct one on the day is listed — two jobs in a
-                          day is normal here. */}
+                      {/* WHO the day was worked FOR (founder + Amanda, Aug 20):
+                          contractor, job number and project for EVERY job the
+                          person was on that day. Two jobs in a day is normal and
+                          both get named. The hours on the right stay whole — this
+                          is a reference list, never an apportionment. */}
                       {hasEntries && (() => {
-                        const labels = [...new Set(
-                          dayEntries.map((e: any) => e.job_context_label).filter(Boolean)
+                        const lookupFailed = dayEntries.some((e: any) => e.job_lookup_failed);
+                        // Deduped by label, keeping the qualifier that came with it.
+                        const seen = new Set<string>();
+                        const labels: Array<{ label: string; qualifier: string | null }> = [];
+                        for (const e of dayEntries as any[]) {
+                          for (const l of (e.job_context_labels ?? []) as Array<{ label: string | null; qualifier: string | null }>) {
+                            if (!l.label || seen.has(l.label)) continue;
+                            seen.add(l.label);
+                            labels.push({ label: l.label, qualifier: l.qualifier });
+                          }
+                        }
+                        const conflicts = [...new Set(
+                          dayEntries.map((e: any) => e.job_conflict_note).filter(Boolean)
                         )] as string[];
+
+                        if (lookupFailed) {
+                          // NOT the same claim as "no job", and the office must
+                          // not act on it as though it were.
+                          return (
+                            <p className="text-[10px] text-amber-700 dark:text-amber-400 mt-0.5 font-semibold">
+                              Job lookup failed — this is not a record of &ldquo;no job&rdquo;. Reload to try again.
+                            </p>
+                          );
+                        }
                         if (labels.length === 0) {
                           // Say it plainly. A blank reads as "no hours", which is
                           // the opposite of what an unattributed entry means.
@@ -1900,16 +1921,36 @@ function OperatorTimecardDetailPageInner() {
                           );
                         }
                         return (
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {labels.map((label) => (
-                              <span
-                                key={label}
-                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30"
+                          <>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {labels.map(({ label, qualifier }) => (
+                                <span
+                                  key={label}
+                                  title={qualifier ?? 'from the schedule board'}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-sky-50 dark:bg-sky-900/30 text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-500/30"
+                                >
+                                  {label}
+                                  {qualifier && (
+                                    <span className="font-normal text-sky-600/70 dark:text-sky-400/60">
+                                      ({qualifier})
+                                    </span>
+                                  )}
+                                </span>
+                              ))}
+                            </div>
+                            {/* The disagreement, shown rather than resolved away.
+                                A card whose 7 a.m. tag names a different job than
+                                the board is exactly what the office is meant to
+                                catch and today cannot. */}
+                            {conflicts.map((note) => (
+                              <p
+                                key={note}
+                                className="mt-1 text-[10px] font-medium leading-snug text-amber-700 dark:text-amber-400"
                               >
-                                {label}
-                              </span>
+                                {note}
+                              </p>
                             ))}
-                          </div>
+                          </>
                         );
                       })()}
                     </div>

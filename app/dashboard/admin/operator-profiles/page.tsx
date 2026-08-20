@@ -122,6 +122,17 @@ interface Timecard {
   is_shop_hours: boolean;
   is_night_shift: boolean;
   hour_type: string;
+  /**
+   * WHERE THIS PERSON WAS — contractor, job number and project, one entry per
+   * job, formatted server-side (the resolver imports the service-role client
+   * and must never reach this bundle). `hours` above is the whole clocked day
+   * and is NOT divided between these; that split belongs to the work ticket.
+   */
+  job_context_labels?: { label: string | null; qualifier: string | null }[];
+  /** A record disagreed with the one that won. Shown, never swallowed. */
+  job_conflict_note?: string | null;
+  /** The lookup FAILED — a different, worse claim than "no job recorded". */
+  job_lookup_failed?: boolean;
 }
 
 // ── Helpers ─────────────────────────────────────────────────
@@ -989,6 +1000,10 @@ export default function OperatorProfilesPage() {
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">In</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Out</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Hours</th>
+                                {/* WHERE HE WAS. The founder + Amanda (Aug 20)
+                                    asked for contractor / job number / project
+                                    beside the hours; this table had none. */}
+                                <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Job</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Type</th>
                                 <th className="px-4 py-2.5 text-left text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
                               </tr>
@@ -1008,6 +1023,34 @@ export default function OperatorProfilesPage() {
                                     )}
                                   </td>
                                   <td className="px-4 py-2.5 text-sm font-bold text-gray-800 tabular-nums">{tc.total_hours?.toFixed(2) || '--'}</td>
+                                  {/* Three states stay distinct: a failed lookup
+                                      must never read as "no job", and "no job"
+                                      must never read as an empty cell. */}
+                                  <td className="px-4 py-2.5 max-w-[260px]">
+                                    {tc.job_lookup_failed ? (
+                                      <span className="text-[11px] font-semibold text-amber-700">Job lookup failed</span>
+                                    ) : (tc.job_context_labels ?? []).filter(j => j.label).length === 0 ? (
+                                      <span className="text-[11px] text-gray-400 italic">Not recorded</span>
+                                    ) : (
+                                      <div className="space-y-0.5">
+                                        {(tc.job_context_labels ?? [])
+                                          .filter(j => j.label)
+                                          .map((j, i) => (
+                                            <p key={i} className="text-[11px] leading-snug text-gray-700 break-words">
+                                              {j.label}
+                                              {j.qualifier && (
+                                                <span className="text-gray-400"> ({j.qualifier})</span>
+                                              )}
+                                            </p>
+                                          ))}
+                                      </div>
+                                    )}
+                                    {tc.job_conflict_note && (
+                                      <p className="mt-1 text-[10px] font-semibold text-amber-700 leading-snug break-words">
+                                        {tc.job_conflict_note}
+                                      </p>
+                                    )}
+                                  </td>
                                   <td className="px-4 py-2.5">
                                     <div className="flex flex-wrap gap-1">
                                       {tc.is_shop_hours && <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">Shop</span>}

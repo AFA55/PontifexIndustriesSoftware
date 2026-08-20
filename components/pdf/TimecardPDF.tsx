@@ -2,6 +2,13 @@ import React from 'react';
 import { Document, Page, Text, View, Image, StyleSheet } from '@react-pdf/renderer';
 import type { PDFBranding } from './DispatchTicketPDF';
 import type { WeekSummary, TimecardDayEntry } from '@/lib/timecard-utils';
+import {
+  formatJobContextLabel,
+  formatJobConflictNote,
+  jobSourceNote,
+  NO_JOB_RECORDED,
+  JOB_LOOKUP_FAILED,
+} from '@/lib/timecard-job-rules';
 
 // ── Interfaces ──────────────────────────────────────────────
 // Day rows are built by buildWeekDayEntries (lib/timecard-utils) — the alias
@@ -35,6 +42,15 @@ const createStyles = (primaryColor: string, secondaryColor: string) =>
   StyleSheet.create({
     page: {
       padding: 40,
+      // RESERVES the fixed footer's band. The footer is absolutely positioned,
+      // so it is OUT of the flow and the table would otherwise run underneath
+      // it: measured, a full page left only 2.6pt between the last row of hours
+      // and the footer's rule. Flowing content now stops ~16pt above the band.
+      // (Do NOT "fix" that clearance by raising the footer's `bottom` instead —
+      // the inset is measured from the page's BORDER box, so a larger `bottom`
+      // moves the footer UP into the content. At bottom:40 the rendered sheet
+      // printed the rule straight through the last two rows.)
+      paddingBottom: 56,
       fontSize: 9,
       fontFamily: 'Helvetica',
       backgroundColor: '#FFFFFF',
@@ -160,18 +176,42 @@ const createStyles = (primaryColor: string, secondaryColor: string) =>
       textTransform: 'uppercase',
       letterSpacing: 0.5,
     },
-    tableRow: {
-      flexDirection: 'row',
-      paddingVertical: 6,
+    // A day is a BLOCK, not a row: the cells on one line, and the jobs the
+    // person was on underneath. `wrap={false}` on the block keeps a day's job
+    // names with the hours they belong to when the table crosses a page.
+    dayBlock: {
+      paddingVertical: 5,
       paddingHorizontal: 8,
       borderBottom: '0.5 solid #E2E8F0',
     },
-    tableRowAlt: {
-      flexDirection: 'row',
-      paddingVertical: 6,
+    dayBlockAlt: {
+      paddingVertical: 5,
       paddingHorizontal: 8,
       borderBottom: '0.5 solid #E2E8F0',
       backgroundColor: '#F8FAFC',
+    },
+    cellRow: {
+      flexDirection: 'row',
+    },
+    jobLine: {
+      fontSize: 7,
+      color: '#475569',
+      marginTop: 2,
+    },
+    jobLineQualifier: {
+      fontSize: 6.5,
+      color: '#94A3B8',
+    },
+    jobLineMuted: {
+      fontSize: 7,
+      color: '#94A3B8',
+      fontStyle: 'italic',
+      marginTop: 2,
+    },
+    jobLineWarn: {
+      fontSize: 6.5,
+      color: '#B45309',
+      marginTop: 2,
     },
     tableRowTotal: {
       flexDirection: 'row',
@@ -270,9 +310,22 @@ const createStyles = (primaryColor: string, secondaryColor: string) =>
       marginTop: 8,
     },
 
-    // Footer
+    // Footer — pinned rather than pushed. `marginTop: 'auto'` only works while
+    // the page holds exactly one page's worth of content; a week where several
+    // days carry two or three job names overflows, and the footer then wandered
+    // into the middle of page 1. Absolute + `fixed` (on the View, below — the
+    // style alone does nothing) prints it at the bottom of EVERY page, so
+    // overflow degrades gracefully instead of garbling the sheet.
+    //
+    // `bottom` is measured from the page's BORDER box, not from inside the 40pt
+    // padding — 26 puts the rule just below the reserved band. Raising it does
+    // not add clearance, it eats content; the clearance lives in the page's
+    // `paddingBottom` above.
     footer: {
-      marginTop: 'auto',
+      position: 'absolute',
+      left: 40,
+      right: 40,
+      bottom: 26,
       borderTop: '1 solid #E2E8F0',
       paddingTop: 8,
       flexDirection: 'row',
@@ -329,6 +382,67 @@ function formatTimeDisplay(isoString: string | null, timeZone?: string): string 
   } catch {
     return '—';
   }
+}
+
+/**
+ * The job lines printed under one day.
+ *
+ * Amanda prints this sheet and runs payroll from it, so the three states are
+ * kept distinct on the page — "here is where he was", "nobody recorded where he
+ * was", and "we could not look it up" are three different claims and only the
+ * first is safe to act on. A blank would read as the last two being the first.
+ *
+ * At most MAX_JOB_LINES are named, then a count: three jobs in a day happened
+ * twice in 123 person-days, and a page that silently reflows is worse than a
+ * page that says "+2 more".
+ */
+const MAX_JOB_LINES = 3;
+
+interface JobLine {
+  text: string;
+  qualifier?: string | null;
+  tone: 'normal' | 'muted' | 'warn';
+}
+
+function buildJobLines(entry: TimecardPDFEntry, hasData: boolean): JobLine[] {
+  // The caller did not ask for job names at all — print nothing rather than a
+  // claim we were never given the data to make.
+  if (entry.jobs === undefined && !entry.jobsUnavailable) return [];
+  // A day nobody clocked has no job question to answer.
+  if (!hasData) return [];
+
+  if (entry.jobsUnavailable) {
+    return [{ text: JOB_LOOKUP_FAILED, tone: 'warn' }];
+  }
+
+  const jobs = entry.jobs ?? [];
+  if (jobs.length === 0) {
+    return [{ text: NO_JOB_RECORDED, tone: 'muted' }];
+  }
+
+  const lines: JobLine[] = [];
+  for (const job of jobs.slice(0, MAX_JOB_LINES)) {
+    const label = formatJobContextLabel(job);
+    if (!label) continue;
+    lines.push({ text: `• ${label}`, qualifier: jobSourceNote(job.source), tone: 'normal' });
+  }
+  if (jobs.length > MAX_JOB_LINES) {
+    lines.push({
+      text: `• +${jobs.length - MAX_JOB_LINES} more job${jobs.length - MAX_JOB_LINES === 1 ? '' : 's'} this day`,
+      tone: 'muted',
+    });
+  }
+
+  const conflict = formatJobConflictNote({
+    userId: '',
+    date: entry.date,
+    jobs,
+    conflicts: entry.jobConflicts ?? [],
+    unresolved: false,
+  });
+  if (conflict) lines.push({ text: conflict, tone: 'warn' });
+
+  return lines;
 }
 
 function formatWeekRangeDisplay(weekStart: string, weekEnd: string): string {
@@ -467,10 +581,12 @@ export function TimecardPage({
         {/* Table Rows — 7 days */}
         {entries.map((entry, idx) => {
           const hasData = entry.totalHours > 0 || entry.clockIn !== null;
-          const rowStyle = idx % 2 === 0 ? s.tableRow : s.tableRowAlt;
+          const rowStyle = idx % 2 === 0 ? s.dayBlock : s.dayBlockAlt;
+          const jobLines = buildJobLines(entry, hasData);
 
           return (
-            <View key={idx} style={rowStyle}>
+            <View key={idx} style={rowStyle} wrap={false}>
+            <View style={s.cellRow}>
               <Text
                 style={{
                   ...(hasData ? s.tableCell : s.tableCellMuted),
@@ -531,6 +647,26 @@ export function TimecardPage({
                     : 'Pending'
                   : '—'}
               </Text>
+            </View>
+            {/* WHERE THIS PERSON WAS — reference only. The Total Hrs above is
+                the whole clocked day and is NOT divided between these. */}
+            {jobLines.map((line, li) => (
+              <Text
+                key={li}
+                style={
+                  line.tone === 'warn'
+                    ? s.jobLineWarn
+                    : line.tone === 'muted'
+                      ? s.jobLineMuted
+                      : s.jobLine
+                }
+              >
+                {line.text}
+                {line.qualifier ? (
+                  <Text style={s.jobLineQualifier}>{`  (${line.qualifier})`}</Text>
+                ) : null}
+              </Text>
+            ))}
             </View>
           );
         })}
@@ -600,7 +736,11 @@ export function TimecardPage({
       </View>
 
       {/* ═══ FOOTER ═══ */}
-      <View style={s.footer}>
+      {/* `fixed` is what actually repeats it. Without it the absolute box is
+          laid out ONCE, lands on the last page, and page 1 of a two-page sheet
+          goes out with no company name, no date and no "Page 1 of 2" — a loose
+          sheet with no identity in a stack of thirteen. */}
+      <View style={s.footer} fixed>
         <Text style={s.footerText}>{footerLeft}</Text>
         <Text
           style={s.footerText}

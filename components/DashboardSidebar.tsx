@@ -247,7 +247,7 @@ function useBadgeCounts(role: string | null): BadgeCounts {
       const canMaintenance = !!role && BADGE_MAINTENANCE_ROLES.includes(role);
 
       const [tcRes, notifRes, maintRes] = await Promise.allSettled([
-        canTimecards ? authedFetch('/api/admin/timecards?pending=true') : Promise.resolve(null),
+        canTimecards ? authedFetch('/api/admin/timecards?needsReview=true') : Promise.resolve(null),
         authedFetch('/api/notifications?unread_only=true'),
         canMaintenance ? authedFetch('/api/admin/maintenance-requests?status=open') : Promise.resolve(null),
       ]);
@@ -258,7 +258,27 @@ function useBadgeCounts(role: string | null): BadgeCounts {
 
       if (tcRes.status === 'fulfilled' && tcRes.value?.ok) {
         const json = await tcRes.value.json();
-        timecards = json.total ?? json.count ?? (Array.isArray(json.data) ? json.data.length : 0);
+        // READ THE SHAPE THIS ROUTE ACTUALLY RETURNS.
+        //
+        // This was `json.total ?? json.count ?? (Array.isArray(json.data) ? …)`,
+        // and /api/admin/timecards returns none of those — it returns
+        // `{ success, data: { timecards, summary, userSummary } }`, where `data`
+        // is an OBJECT. So every branch missed and the badge sat at 0 forever,
+        // through however many weeks of cards waiting on approval. Nothing
+        // errored; the number was simply always zero, which is indistinguishable
+        // from "nothing to do" and so was never questioned.
+        //
+        // `summary.pendingApproval` is counted over the rows the route RETURNED,
+        // not over the table — safe here only because `?needsReview=true`
+        // filters server-side to a set far smaller than the 100-row page. Do
+        // not reuse this field on an unfiltered call; it would under-count.
+        //
+        // The query is `needsReview`, NOT `pending`: a `pending` card is one
+        // that is still OPEN (crew clocked in, `total_hours` null), so that
+        // badge would read ~8 every weekday and 0 by evening — motion, not
+        // signal. `flagged` is what the auto-approver refused and a human has
+        // not yet resolved. See the note in the route.
+        timecards = json.data?.summary?.pendingApproval ?? 0;
       }
 
       if (notifRes.status === 'fulfilled' && notifRes.value?.ok) {

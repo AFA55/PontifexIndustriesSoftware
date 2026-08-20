@@ -14,6 +14,9 @@ import {
   formatTime as formatTimeLocal,
   formatDay,
 } from './dates';
+// Type-only: erased at compile time, so this never pulls the server-side
+// resolver (and `supabaseAdmin` with it) into a client bundle.
+import type { TimecardDayJobs } from './timecard-job-rules';
 
 export interface TimecardEntry {
   id: string;
@@ -153,19 +156,58 @@ export interface TimecardDayEntry {
   totalHours: number;
   category: string;
   isApproved: boolean;
+  /**
+   * WHERE THIS PERSON WAS — contractor, job number and project, for every job
+   * they were on that day (founder + Amanda, Aug 20).
+   *
+   * REFERENCE ONLY. `totalHours` above is the TRUE CLOCKED DAY and is never
+   * apportioned between these; a day on two jobs still shows one whole total.
+   * Dividing hours per job is the WORK TICKET's job (lib/job-day-boundary.ts),
+   * and nothing on this path may do it.
+   *
+   * `undefined` = the caller did not ask for job names (the resolver is an extra
+   * round trip). `[]` with `jobsUnresolved` = asked, and nothing named a job.
+   */
+  jobs?: TimecardDayJobs['jobs'];
+  /** Evidence the precedence ladder outranked. Printed, never hidden. */
+  jobConflicts?: TimecardDayJobs['conflicts'];
+  /** Asked, and no record named a job. The row must SAY so — a blank reads as "no hours". */
+  jobsUnresolved?: boolean;
+  /** The job lookup itself failed. A different, worse claim than "no job". */
+  jobsUnavailable?: boolean;
 }
 
 /**
  * Collapse a week's raw timecards into one row per calendar day: first clock-in,
  * last clock-out, summed hours, category tags. Shared by the self-serve, admin
  * single-employee, and batch PDF routes (was copy-pasted in all three).
+ *
+ * @param dayJobs OPTIONAL, keyed by YYYY-MM-DD — one person's resolved jobs per
+ *                day, from `loadTimecardDayJobs`. Purely additive: it names jobs
+ *                and never touches an hour figure on this path.
+ * @param jobsUnavailable set when the job lookup failed, so every day prints
+ *                "could not load" instead of a blank that reads as "no job".
  */
 export function buildWeekDayEntries(
   entries: TimecardEntry[],
-  weekDates: string[]
+  weekDates: string[],
+  dayJobs?: Map<string, TimecardDayJobs>,
+  jobsUnavailable = false
 ): TimecardDayEntry[] {
   return weekDates.map((date) => {
     const dayEntries = entries.filter((tc) => tc.date === date);
+    const resolved = dayJobs?.get(date);
+    // A day nobody clocked has no job question to answer — leave it blank rather
+    // than printing "job not recorded" against a day off.
+    const jobFields =
+      dayJobs || jobsUnavailable
+        ? {
+            jobs: resolved?.jobs ?? [],
+            jobConflicts: resolved?.conflicts ?? [],
+            jobsUnresolved: !jobsUnavailable && (resolved?.jobs.length ?? 0) === 0,
+            jobsUnavailable,
+          }
+        : {};
 
     if (dayEntries.length === 0) {
       return {
@@ -193,9 +235,12 @@ export function buildWeekDayEntries(
       date,
       clockIn: firstEntry.clock_in_time,
       clockOut: lastEntry.clock_out_time,
+      // THE TRUE CLOCKED DAY, whole. Summed across the day's cards and never
+      // divided between the jobs named alongside it.
       totalHours: Number(totalHours.toFixed(2)),
       category: cats.join(', '),
       isApproved: dayEntries.every((e) => e.is_approved),
+      ...jobFields,
     };
   });
 }

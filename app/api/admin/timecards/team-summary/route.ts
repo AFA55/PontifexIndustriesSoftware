@@ -27,6 +27,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireTimecardViewer } from '@/lib/api-auth';
 import { resolveAvatarUrl } from '@/lib/avatar';
+import {
+  loadTimecardDayJobs,
+  formatJobContextLabel,
+  formatJobConflictNote,
+  jobSourceNote,
+  personDayKey,
+} from '@/lib/timecard-job-context';
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
@@ -57,6 +64,19 @@ interface DayInfo {
   isNoShow: boolean;
   firstTimecardId: string | null;
   firstClockIn: string | null;
+  /**
+   * WHERE THIS PERSON WAS — one label per job that day: job number, contractor,
+   * project (founder + Amanda, Aug 20). The grid cell has room for a number and
+   * nothing else, so these ride in the cell's tooltip.
+   *
+   * REFERENCE ONLY: `hours` above is the whole clocked day and is never divided
+   * between these.
+   */
+  jobLabels: string[];
+  /** The precedence disagreement, when there is one. Marked on the cell. */
+  jobConflict: string | null;
+  /** The lookup failed — different from, and worse than, "no job". */
+  jobLookupFailed: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -101,7 +121,10 @@ export async function GET(request: NextRequest) {
     // 2. Fetch all timecards for this week
     let timecardsQuery = supabaseAdmin
       .from('timecards')
-      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, entry_type, pay_type_override, break_minutes, notes, is_late, late_minutes')
+      // `job_order_id` is read for the job NAMES below. It is the LAST rung of
+      // the precedence ladder, never the answer on its own — it is stamped at
+      // clock-in, before the office finishes the board.
+      .select('id, user_id, date, clock_in_time, clock_out_time, total_hours, is_approved, is_shop_hours, is_night_shift, hour_type, entry_type, pay_type_override, break_minutes, notes, is_late, late_minutes, job_order_id')
       .gte('date', mondayStr)
       .lte('date', sundayStr)
       .order('date', { ascending: true });
@@ -168,6 +191,22 @@ export async function GET(request: NextRequest) {
     let activeClockins = 0;
     let lateArrivalsThisWeek = 0;
 
+    // WHERE EACH PERSON WAS, EACH DAY (founder + Amanda, Aug 20). One resolve for
+    // the whole week's grid — never a query per cell. Names only: not one hour
+    // figure below is touched by this. See lib/timecard-job-context.ts for the
+    // precedence (schedule board > filed work log > clock-in tag) and for why a
+    // disagreement is reported instead of quietly resolved.
+    const { byPersonDay: dayJobs, error: jobsError } = await loadTimecardDayJobs(
+      (timecards || []).map((tc: any) => ({
+        id: tc.id,
+        user_id: tc.user_id,
+        date: tc.date,
+        job_order_id: tc.job_order_id ?? null,
+      })),
+      tenantId
+    );
+    if (jobsError) console.error('[team-summary] job lookup failed —', jobsError);
+
     const teamMembers = (profiles || [])
       .filter(p => p.active !== false) // exclude deactivated accounts
       .map((profile) => {
@@ -176,7 +215,11 @@ export async function GET(request: NextRequest) {
         // Build daily hours map
         const dailyHours: Record<string, DayInfo> = {};
         DAY_NAMES.forEach(day => {
-          dailyHours[day] = { hours: 0, status: 'none', entryCount: 0, isLate: false, lateMinutes: 0, isNoShow: false, firstTimecardId: null, firstClockIn: null };
+          dailyHours[day] = {
+            hours: 0, status: 'none', entryCount: 0, isLate: false, lateMinutes: 0,
+            isNoShow: false, firstTimecardId: null, firstClockIn: null,
+            jobLabels: [], jobConflict: null, jobLookupFailed: !!jobsError,
+          };
         });
 
         let weeklyTotal = 0;
@@ -194,6 +237,19 @@ export async function GET(request: NextRequest) {
 
           dailyHours[dayName].hours += hours;
           dailyHours[dayName].entryCount += 1;
+
+          // Job NAMES for the cell's tooltip. Deduped across the day's cards;
+          // the hours line above is untouched and stays the whole clocked day.
+          const day = dayJobs.get(personDayKey(tc.user_id, tc.date));
+          for (const job of day?.jobs ?? []) {
+            const label = formatJobContextLabel(job);
+            const qualifier = jobSourceNote(job.source);
+            const line = qualifier ? `${label} (${qualifier})` : label;
+            if (line && !dailyHours[dayName].jobLabels.includes(line)) {
+              dailyHours[dayName].jobLabels.push(line);
+            }
+          }
+          dailyHours[dayName].jobConflict ??= formatJobConflictNote(day);
 
           // No-show: zero-hour record (entry_type='no_call_no_show'). Flag the day so
           // the grid renders a chip. Doesn't touch hours/OT math (no-show is 0 hours).

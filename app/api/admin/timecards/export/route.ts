@@ -23,6 +23,14 @@ import {
   buildWeekDayEntries,
 } from '@/lib/timecard-utils';
 import type { TimecardEntry } from '@/lib/timecard-utils';
+import {
+  loadTimecardDayJobs,
+  formatJobConflictNote,
+  personDayKey,
+  NO_JOB_RECORDED,
+  JOB_LOOKUP_FAILED,
+  type TimecardDayJobs,
+} from '@/lib/timecard-job-context';
 
 // ── CSV Export ─────────────────────────────────────────────
 async function generateCSV(weekStart: string, weekEnd: string, tenantId: string) {
@@ -41,6 +49,21 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
     throw new Error(`Failed to fetch timecards: ${error.message}`);
   }
 
+  // WHERE EACH PERSON WAS (founder + Amanda, Aug 20). Named per row, one row
+  // per card — the hours column is untouched and is still the whole clocked day.
+  // A card's own `job_order_id` is the LAST source consulted, not the first: it
+  // is stamped at clock-in, before the office finishes the board.
+  const { byPersonDay, error: jobsError } = await loadTimecardDayJobs(
+    (timecards || []).map((tc: Record<string, unknown>) => ({
+      id: String(tc.id),
+      user_id: String(tc.user_id),
+      date: String(tc.date),
+      job_order_id: (tc.job_order_id as string | null) ?? null,
+    })),
+    tenantId
+  );
+  if (jobsError) console.error('[timecard csv] job lookup failed —', jobsError);
+
   // CSV headers
   const headers = [
     'Employee Name',
@@ -51,6 +74,14 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
     'Total Hours',
     'Category',
     'Approved',
+    // Reference columns. Several jobs in a day are separated by " | " on ONE
+    // row — never split into extra rows, which would let a reader sum the hours
+    // column twice for the same day.
+    'Job Numbers',
+    'Contractors',
+    'Projects',
+    'Job Source',
+    'Job Conflict',
   ];
 
   // Payroll reads this file. The server runs UTC, so without the tenant's zone
@@ -89,6 +120,10 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
     if (tc.is_shop_hours) cats.push('Shop');
     if (cats.length === 0) cats.push('Regular');
 
+    const day = byPersonDay.get(personDayKey(String(tc.user_id), String(tc.date)));
+    const jobs = day?.jobs ?? [];
+    const noJob = jobsError ? JOB_LOOKUP_FAILED : NO_JOB_RECORDED;
+
     return [
       tc.full_name as string || tc.email as string || 'Unknown',
       dateStr,
@@ -98,6 +133,11 @@ async function generateCSV(weekStart: string, weekEnd: string, tenantId: string)
       tc.total_hours != null ? Number(tc.total_hours).toFixed(2) : '0.00',
       cats.join('; '),
       tc.is_approved ? 'Yes' : 'No',
+      jobs.length ? jobs.map((j) => j.jobNumber ?? '—').join(' | ') : noJob,
+      jobs.length ? jobs.map((j) => j.customerName ?? '—').join(' | ') : '',
+      jobs.length ? jobs.map((j) => j.projectName ?? '—').join(' | ') : '',
+      jobs.length ? jobs.map((j) => j.source).join(' | ') : '',
+      formatJobConflictNote(day) ?? '',
     ];
   });
 
@@ -174,6 +214,25 @@ async function generateBatchPDF(
   // The server runs UTC — without this every printed clock time is off.
   const timeZone = await getTenantTimezone(tenantId);
 
+  // WHERE EACH PERSON WAS, EACH DAY (founder + Amanda, Aug 20). One resolve for
+  // the whole batch, then sliced per operator — never a query per page.
+  const { byPersonDay, error: jobsError } = await loadTimecardDayJobs(
+    allTimecards.map((tc: any) => ({
+      id: tc.id,
+      user_id: tc.user_id,
+      date: tc.date,
+      job_order_id: tc.job_order_id ?? null,
+    })),
+    tenantId
+  );
+  if (jobsError) console.error('[timecard batch pdf] job lookup failed —', jobsError);
+  const jobsByUser = new Map<string, Map<string, TimecardDayJobs>>();
+  for (const day of byPersonDay.values()) {
+    const perUser = jobsByUser.get(day.userId) ?? new Map<string, TimecardDayJobs>();
+    perUser.set(day.date, day);
+    jobsByUser.set(day.userId, perUser);
+  }
+
   // One Document, one TimecardPage per operator
   const doc = React.createElement(
     Document,
@@ -192,7 +251,12 @@ async function generateBatchPDF(
         employeeId: uid.substring(0, 8).toUpperCase(),
         weekStart,
         weekEnd,
-        entries: buildWeekDayEntries(tcArray, weekDates),
+        entries: buildWeekDayEntries(
+          tcArray,
+          weekDates,
+          jobsByUser.get(uid) ?? new Map(),
+          !!jobsError
+        ),
         summary: calculateWeekSummary(tcArray),
         branding,
         timeZone,
