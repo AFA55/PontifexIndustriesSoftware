@@ -19,6 +19,87 @@
 > Priorities: **P0** = broken in prod / blocking · **P1** = this week · **P2** = soon · **P3** = someday.
 > When work completes: check it off, move to "Recently shipped" (keep ~2 sessions), then delete.
 
+## 🆕 AUG 20 — payroll accuracy: the timecard has been lying about WHERE
+
+> **One root cause explains Keon's wrong timecard, Axel's "Lenfeng" week, Nate's
+> wrong clock-in job, and the founder's whole complaint that payroll can't be
+> trusted.** `timecards.job_order_id` is resolved ONCE at clock-in and never
+> looked at again. The crew clocks in 07:00–07:15; the office finishes the board
+> 07:15–08:10. **Every card is stamped before the answer exists.**
+
+### 🔴 P0
+
+- [ ] **The timecard shows no job at all.** Verified — nothing in
+  `app/api/admin/timecards/**` or the operator report page references
+  `job_number`, `customer_name` or `project_name`. Amanda prints times and totals
+  with nothing saying where anyone was. **Founder + Amanda settled the model
+  (Aug 20):** the timecard shows contractor name, job ID and project name per
+  day, with **hours whole and undivided** — dividing a day between jobs belongs
+  on the ticket only. Full statement in `docs/plans/AUG19_FOUNDER_BRIEF.md` §10.
+- [ ] **Precedence, decided from evidence: board > daily log > card tag.** Proved
+  on Axel Valverde twice, to the second. **Tue 8/11** — clocked in `11:10:18Z`;
+  the only board row then was Leifeng `day_sequence 3` from the previous
+  afternoon, so the card said Leifeng; the office created his real job #1
+  (Industrial Safety Coatings, `day_sequence 1`) at `11:14:30Z`, **4 min 12 s
+  later**. **Wed 8/12** — clocked in `11:05:09Z` with *no* board row for the date,
+  fell back to Leifeng again; the office placed him on Estes Heating and Air with
+  Keon at `12:06:19Z`, **61 minutes later**. Card never updated either day.
+  Leifeng `JOB-2026-400368` has NULL crew slots, no `job_crew` row, and has sat
+  `status='scheduled'` since Aug 10 — the tag is pure residue.
+- [ ] **Keon Mcknight's week is wrong in three ways** (`bb5f3f96-…`). Two AM King
+  jobs at the SAME address: `QA-2026-533392` (project_name NULL, sched 8/17 only,
+  completed) and `JOB-2026-898480` ("GE - KAA pit infill", 8/19→8/20).
+  Mon 8/17 9.48 h · Tue 8/18 8.00 h · Wed 8/19 9.28 h · Thu 8/20 open.
+  (a) Wednesday's log is filed against the OLD job — never closed, so it stayed
+  reachable on his phone and caught later filings. (b) Tue and Thu have **no
+  board rows at all**. (c) the quick-add job has no `project_name`, so two jobs
+  for one customer at one address cannot be told apart by name.
+  **Do not repair his rows without asking** — that log is his own filed work.
+- [ ] **The In Route press stamps once per JOB, ever** —
+  `app/api/job-orders/[id]/status/route.ts:314`
+  (`if (status === 'in_route' && !existingJob.route_started_at)`). On day 2 of a
+  multi-day job the field is already set, so pressing In Route records nothing.
+  `app/api/job-orders/[id]/daily-log/route.ts:355` then copies the job-level
+  stamp into **every** day's log row. **This is the source of every stale press**
+  — and stale presses are why `lib/job-day-boundary.ts` abstains. Every
+  multi-day job has it. (`status/route.ts:547` sets `historyData.route_started_at
+  = now` unconditionally — check whether the true per-day press is already
+  recorded there and the daily-log copy is simply overwriting it.)
+- [ ] **The split abstains on days it could divide.** Keon Tue 8/11: ISC pressed
+  `11:31:50Z` same-day, closed `15:04:36Z`, recorded **0.06 h** (a phantom of
+  Dante's 0.09 class, computed work_started→completed); Leifeng's press is dated
+  **8/10** (stale), closed `20:07:12Z`, recorded **9.12 h** — it swallowed the
+  whole ISC morning for both Keon and Axel. Founder: *"it should still mark his
+  time on Industrial Safety Coatings as first job and then the moment he clicked
+  In Route for [the] other job, stop his time for [the] first job."* Fix: when a
+  later job has no usable same-day press, fall back to the earlier job's own
+  same-day `day_completed_at`. Only **5** multi-job person-days exist in
+  `daily_job_logs` since 2026-07-01; 4 of them have at least one same-day close.
+
+### ✅ Shipped Aug 20 (uncommitted at time of writing)
+
+- [x] **Operators were asked for job photos twice.** Both screens upload to the
+  same bucket, the same endpoint and the same `job_orders.photo_urls` column;
+  day-complete's gate inspected only its own local state, which starts empty on
+  mount. Production: same operator, same job, same day, two clusters — 1 m 40 s
+  apart on `JOB-2026-654657`, 3 m 24 s on `262301`, **35 s** on `160762`.
+  Day-complete now counts what was filed for that job today and says so.
+  Photos stay mandatory, and a day-1 photo cannot close day 5. Directly answers
+  Nate wanting to go back to paper.
+- [x] **Customers were getting completion emails with no photos.**
+  `reference_photo_urls` sent `completionPhotos` alone, so a crew that
+  photographed the work on the work-performed screen and added nothing at
+  closeout emailed the customer a thank-you with nothing in it.
+- [x] **Cross-tenant leak on the photo-fetch endpoint.** `GET
+  /api/job-orders/[id]/photos` had no same-tenant check — its sibling `POST` got
+  the M1 IDOR fix, the `GET` was missed. An admin in another tenant could
+  enumerate Patriot's job photos by id. Matters more now that day-complete reads
+  that endpoint on every load.
+- [x] **A finished job could still take today's clock-in** (`8166222e`, deployed
+  07:46 ET). Note Axel clocked in 07:11 and beat the deploy by 35 minutes, so
+  his 8/20 card carries the old fault; his week is otherwise the staleness bug
+  above, which that fix does NOT address.
+
 ## 🆕 AUG 14 — founder batch (demo day)
 
 ### ✅ Shipped this session

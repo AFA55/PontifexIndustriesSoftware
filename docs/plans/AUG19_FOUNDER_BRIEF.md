@@ -249,3 +249,128 @@ the thing a signature exists to prevent.
 Only the operator can press In Route — the helper cannot. So the press is a fact
 about the JOB and every crew member's card divides at the same moment. A
 confirmation step must therefore be asked of the operator and applied to the crew.
+
+---
+
+## 9. THE CREW WANTS TO GO BACK TO PAPER (Aug 20) — read this first
+
+> *"Nate pointed out that he still feels it's annoying to do [a] digital ticket
+> and wants to go back to paper… he has to submit pictures twice, make it so it
+> only asks for pictures once. And I have to go through [a] workflow to see
+> tickets later. We need to make this feel easier to them, not harder."*
+
+**This outranks everything else in this file.** Every hour of attribution work,
+every phantom-hour fix, every boundary rule assumes the crew keeps filing
+tickets. An operator asking for paper back is the only failure that makes all of
+it worthless. Treat it as the top signal, not a complaint.
+
+### Confirmed defect: photos are demanded twice
+
+```
+work-performed/page.tsx:697   photos attached to the work entry   → POST /job-orders/[id]/photos
+day-complete/page.tsx:424     completionPhotos                    → POST /job-orders/[id]/photos
+day-complete/page.tsx:314,491 "Add at least one job photo — or mark
+                               'Photos prohibited on this site' to skip."
+```
+
+Same endpoint, two prompts, and the **second one is mandatory** — it blocks
+completion even when the operator uploaded photos minutes earlier on the same
+job, the same day. He is not imagining it and he is not being lazy: the app
+genuinely asks twice and does not remember the first answer.
+
+**Fix direction:** day-complete should count photos already on the job for that
+day and only ask when there are none. The requirement is defensible; asking a
+second time for something already given is not.
+
+### The wider point, unfixed and unmeasured
+
+Nobody has counted how many taps, screens and required fields stand between a
+crew member finishing a cut and having it recorded. Paper is one sheet and a
+pen. The comparison the crew is making is real, and the platform currently loses
+it on effort even where it wins on everything else.
+
+Before adding another field to the operator flow, someone should walk it end to
+end on a phone, in gloves, and count. Candidates already visible from the code:
+- Photos asked twice (above).
+- Work performed and day-complete are separate screens with overlapping asks.
+- The founder: *"I have to go through [a] workflow to see tickets later"* — the
+  office side has the same problem in reverse.
+
+### Related, already known
+- The founder's own instruction from Aug 2: *"operator field data = the STORY,
+  not just quantities"* — pair the minimum numbers with a Quick Notes field and
+  drop non-essential required fields. That instruction and this complaint are
+  the same instruction.
+- Task: crews barely file a second clock cycle (~1.00 cards per person-day), so
+  the shop-ticket and split-shift work also depends on the flow being lighter.
+
+---
+
+## 10. Timecard vs ticket — the founder and Amanda settled the model (Aug 20)
+
+> *"Me and Amanda have concluded that it will be easier when processing timecards
+> to be able to see contractor name, job ID and project name when doing payroll,
+> and work performed be separate. Their hours in [the] timecard are true, and
+> then when we separate between jobs is more when we look at [the] ticket and
+> work performed."*
+
+**This settles the two-bases problem raised on Aug 19.** There is no conflict —
+they are two documents answering two questions:
+
+| | Timecard | Work ticket |
+|---|---|---|
+| Question | What do we PAY this person? | What do we BILL this customer? |
+| Hours | The **true clocked day**, whole. Never divided. | **Divided** per job at each In Route press. |
+| Jobs | **Listed** for reference — contractor, job ID, project name | Each job's own hours |
+| Lunch | Deducted (payroll) | Included (billable) |
+
+So the split shipped in `5ca940e9` stays exactly where it is — on the ticket —
+and the timecard gains job *names* without gaining job *arithmetic*.
+
+### The defect: the timecard shows no job at all
+
+Verified — `app/api/admin/timecards/[id]/pdf/route.ts` and the operator report
+path contain **no reference to `job_number`, `customer_name` or `project_name`**.
+Amanda prints times and totals with nothing saying where anyone was. This is the
+same complaint as item 2, now with the model to fix it properly.
+
+**Build:** per day on the timecard, show contractor name, job number and project
+name for every job that person was on. One job → name it. Several → name them
+all. Hours stay whole and undivided.
+
+### Keon's week — why his timecard was wrong, and it is not only display
+
+Two AM King jobs at the **same address** (300 Garlington Rd):
+
+```
+QA-2026-533392   AM KING   project_name NULL          scheduled 8/17 only    completed
+JOB-2026-898480  AM King   "GE - KAA pit infill"      scheduled 8/19 → 8/20  assigned
+```
+
+```
+Mon 8/17   9.48 h   board: QA-533392            card untagged
+Tue 8/18   8.00 h   board: NOTHING              card untagged   his log: QA-533392
+Wed 8/19   9.28 h   board: 898480               card: 898480    his log: QA-533392  ← conflict
+Thu 8/20   open     board: NOTHING              card: 898480
+```
+
+The founder's account is project 1 on Mon+Tue and project 2 on Wed+Thu. Three
+data problems produce the wrong printout:
+
+1. **Wednesday's log is filed against the OLD job.** QA-533392 was scheduled for
+   8/17 only and never closed, so it stayed reachable on his phone and caught
+   Tuesday's and Wednesday's filings. Same shape as Nate's clock-in on Aug 20 —
+   a finished job lingering and catching later work. The clock-in resolver now
+   refuses closed jobs; **the ticket-filing path has no equivalent guard.**
+2. **Tuesday and Thursday have no board rows**, so only his own log and his card
+   know where he was.
+3. **QA-533392 has no `project_name`** — it is a quick-add. Two jobs for one
+   customer at one address, and only one of them can be told apart by name.
+
+**Do not repair Keon's rows without asking** — his Wednesday log is his own filed
+work, and re-pointing it changes what an operator recorded.
+
+**The build must therefore resolve a day's jobs from all the evidence** (board,
+card tag, daily log, attribution) rather than any single source, and say when
+they disagree instead of silently picking one. A timecard that quietly picks the
+wrong job is worse than one that shows none, because Amanda would trust it.
