@@ -41,6 +41,7 @@ import { notFoundInCompany } from '@/lib/tenant-scope';
 import { toLocalYMD } from '@/lib/dates';
 import { attributableTimecards, TIMECARD_ATTRIBUTION_SELECT } from '@/lib/job-clock-attribution';
 import { STANDBY_HOURLY_RATE, STANDBY_MINIMUM_HOURS } from '@/lib/legal/standby-policy';
+import type { JobPhase } from '@/lib/job-phases';
 import {
   buildTicketDays,
   datesWorked,
@@ -306,6 +307,40 @@ export async function GET(request: NextRequest, context: RouteContext) {
       if (r.operator_id || r.helper_id) scheduledDates.add(r.assignment_date);
     }
 
+    // ── 2c. THE RUNS OF WORK ON THIS JOB (park → restart) ───────────────────
+    //
+    // One ticket, phases marked (founder, decision 2). Leifeng, JOB-2026-400368:
+    // worked Aug 10, 11 and 13, sat ten days, came back Aug 21 to different work
+    // under the same contract. Same job number throughout, so the printed sheet
+    // has to say where the break falls rather than letting three days and a
+    // Friday run together as one continuous week.
+    //
+    // A SEPARATE QUERY, ON PURPOSE. Hanging `job_phases(...)` off the job select
+    // in step 1 would mean one wrong column name — or one un-applied migration —
+    // makes PostgREST reject that whole select, the job read returns null, and
+    // the route answers 404 for a job that plainly exists. tsc and `npm run
+    // build` catch none of that. Isolated here, the worst case is a ticket with
+    // no phase band, which is exactly how every never-parked job already prints.
+    //
+    // Columns verified against supabase/migrations/20260820b_park_and_restart.sql.
+    // While that migration is unapplied the table does not exist and PostgREST
+    // answers PGRST205 ("Could not find the table 'public.job_phases' in the
+    // schema cache") — not the 42P01 an earlier comment here claimed, which is
+    // Postgres's own undefined_table SQLSTATE. Either way it is handled as "no
+    // phases" rather than thrown, because a job ticket is the sheet the office
+    // invoices from and it must not go dark over a feature table.
+    const { data: phaseRows, error: phaseError } = await scoped(
+      supabaseAdmin
+        .from('job_phases')
+        .select('id, job_order_id, phase_number, started_on, scope_text, parked_on, park_reason')
+        .eq('job_order_id', jobId)
+        .order('phase_number', { ascending: true })
+    );
+    if (phaseError) {
+      console.warn('work-ticket: job_phases read skipped:', phaseError.message);
+    }
+    const phases = (phaseRows ?? []) as JobPhase[];
+
     // ── 3. Names for everyone who can appear on the ticket ─────────────────
     const memberIds = new Set<string>();
     if (job.assigned_to) memberIds.add(job.assigned_to);
@@ -401,6 +436,14 @@ export async function GET(request: NextRequest, context: RouteContext) {
       // in-route presses. See `boundarySegments` in lib/work-ticket.ts.
       boundarySegments,
       todayYMD: today,
+      // The runs of work, so the sheet can draw the break between them. Empty
+      // for every job that was never restarted, and the builder then emits
+      // exactly the days it always did.
+      phases,
+      // lifetimeDay is a fact about the JOB, so it counts over the job's proven
+      // days — never over the printed window. In week mode Leifeng's Friday is
+      // still "day 4 on the job".
+      allWorkDates: worked,
     });
 
     // ── 6. Standby / subsistence inside the printed range ──────────────────
@@ -482,6 +525,10 @@ export async function GET(request: NextRequest, context: RouteContext) {
         range,
         dates_worked: worked,
         days,
+        // Both scopes stay readable on the one document — "nothing typed is
+        // ever lost". Empty for a job that was never restarted, and the page
+        // then prints the single `job.description` scope line it always has.
+        phases,
         totals: {
           hours: grandTotalHours(days),
           standby_hours: Math.round(standbyHours * 100) / 100,

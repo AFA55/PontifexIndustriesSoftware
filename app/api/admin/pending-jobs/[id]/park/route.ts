@@ -12,6 +12,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
+import { toLocalYMD } from '@/lib/dates';
 
 export async function POST(
   request: NextRequest,
@@ -52,6 +53,32 @@ export async function POST(
       console.error('Error parking job:', updErr);
       return NextResponse.json({ error: 'Failed to move the job to Pending' }, { status: 500 });
     }
+
+    // ── Close the live phase, if this job has any ───────────────────────────
+    // Only jobs that have already been restarted carry phase rows; a job on its
+    // first run has none, and parking it deliberately writes nothing. That is
+    // what lets this feature ship without a backfill and leaves the five jobs
+    // already sitting parked in production untouched.
+    //
+    // Fire-and-forget on purpose: the park itself has landed, and the ticket
+    // computes the visible gap from the days actually worked either side, not
+    // from this stamp. It only labels the pause. A missing table (migration not
+    // yet applied) lands here harmlessly too.
+    Promise.resolve(
+      supabaseAdmin
+        .from('job_phases')
+        // toLocalYMD, never `nowIso.slice(0, 10)` — that is the UTC date, which
+        // is the previous day for most of the evening in US timezones and would
+        // print a pause that started a day early.
+        .update({ parked_on: toLocalYMD(), park_reason: reason, parked_by: auth.userId })
+        .eq('job_order_id', id)
+        .eq('tenant_id', auth.tenantId)
+        .is('parked_on', null)
+    )
+      .then(({ error }) => {
+        if (error) console.error('park: closing the live phase failed:', error);
+      })
+      .catch(() => {});
 
     return NextResponse.json({ success: true });
   } catch (error) {

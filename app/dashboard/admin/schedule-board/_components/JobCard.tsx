@@ -63,6 +63,20 @@ export interface JobCardData {
   arrived_at_jobsite_at?: string | null;
   work_started_at?: string | null;
   work_completed_at?: string | null;
+  /** The customer's name for the site, when they gave one. Printed on the parked card. */
+  project_name?: string | null;
+  // ── PARKED (Aug 20) ────────────────────────────────────────────────────────
+  // These arrive only once `20260820b_park_and_restart.sql` appends them to
+  // `schedule_board_view`. Every one is optional so the board renders exactly as
+  // it does today until then — never a crash, never a "NaN days" chip.
+  on_hold?: boolean | null;
+  on_hold_reason?: string | null;
+  on_hold_placed_at?: string | null;
+  on_hold_released_at?: string | null;
+  /** Days this job has PROVEN work on, across every phase. Owned by the DB. */
+  total_days_worked?: number | null;
+  /** Whole days sitting, computed by the board API in the TENANT's timezone. */
+  days_parked?: number | null;
 }
 
 // ─── Live operator status pill ───────────────────────────────────────────

@@ -31,6 +31,7 @@ import { getTenantId } from '@/lib/get-tenant-id';
 import { logAuditEvent } from '@/lib/audit';
 import { logApiError } from '@/lib/error-logger';
 import { applyReassignment, shouldPromoteToAssigned, shouldDowngradeToScheduled, ordinal } from '@/lib/reassign';
+import { releaseParkedJobFields } from '@/lib/job-phases';
 import { crewClearNeedsConfirmation, crewClearBlockedMessage } from '@/lib/crew-assignment';
 import { isHelperOnlyPlacement } from '@/lib/off-platform-lead';
 
@@ -170,7 +171,9 @@ export async function POST(request: NextRequest) {
     // downgraded or re-stamped.)
     const { data: currentJob } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, status, assigned_to, helper_assigned_to')
+      .select(
+        'id, job_number, status, assigned_to, helper_assigned_to, on_hold, on_hold_placed_at, on_hold_released_at'
+      )
       .eq('id', jobOrderId)
       .eq('tenant_id', tenantId)
       .maybeSingle();
@@ -214,6 +217,14 @@ export async function POST(request: NextRequest) {
       assigned_to: effectiveOperatorId,
       helper_assigned_to: effectiveHelperId,
       updated_at: new Date().toISOString(),
+      // Crewing a parked job un-parks it. The status guard below promotes
+      // 'on_hold' now that PROMOTABLE_STATUSES admits it; this clears the
+      // boolean and stamps the release, which the status alone never did.
+      ...releaseParkedJobFields({
+        job: currentJob,
+        operatorId: effectiveOperatorId,
+        helperId: effectiveHelperId,
+      }),
     };
 
     // STATUS GUARD: promote only pre-work statuses; never downgrade a live job.

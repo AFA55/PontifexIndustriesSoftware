@@ -14,6 +14,7 @@ import { isValidTransition, validateTransitionTimestamp } from '@/lib/job-status
 import { sequenceBlocks } from '@/lib/reassign';
 import { tenantToday as resolveTenantToday } from '@/lib/tenant-timezone';
 import { sendWaiver } from '@/lib/waiver-dispatch';
+import { releaseParkedJobFields } from '@/lib/job-phases';
 
 async function updateJobStatus(
   request: NextRequest,
@@ -307,6 +308,34 @@ async function updateJobStatus(
     const updateData: any = {
       status,
     };
+
+    // ── MOVING A PARKED JOB FORWARD RELEASES THE PARK ───────────────────────
+    // `LEGAL_TRANSITIONS.on_hold` deliberately allows scheduled/assigned/
+    // in_route/in_progress — parking a job must be reversible, and Conrade hit
+    // the dead end when it was not. But the transition only ever rewrote
+    // `status`; the `on_hold` boolean and `on_hold_released_at` were left
+    // exactly as they were. That is the other half of how JOB-2026-974669 ended
+    // up `status='assigned'` while still flagged parked. A crew that is in
+    // route is not waiting on anybody.
+    if (currentStatus === 'on_hold' && status !== 'cancelled') {
+      const release = releaseParkedJobFields({
+        job: existingJob,
+        operatorId: existingJob.assigned_to ?? null,
+        helperId: existingJob.helper_assigned_to ?? null,
+        // The transition ITSELF is the release: the caller asked to move this
+        // job out of 'on_hold' into a live status. Stated explicitly because
+        // the crew passed here is the job's existing crew, which cannot on its
+        // own distinguish a return to work from a job being emptied — a
+        // crewless parked job pressed forward still has to release.
+        scheduling: true,
+        nowIso: new Date().toISOString(),
+      });
+      // The caller's requested status wins — it is the more specific
+      // statement, and `release.status` only ever guesses scheduled/assigned.
+      delete release.status;
+      delete release.assigned_at;
+      Object.assign(updateData, release);
+    }
 
     const now = new Date().toISOString();
 

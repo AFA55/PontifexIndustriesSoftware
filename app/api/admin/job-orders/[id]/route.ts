@@ -14,6 +14,7 @@ import { isTableNotFoundError } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { sendNotification } from '@/lib/send-reminder';
 import { shouldClearCrewOnDateMove, summarizeCrewChange, describeCrewClear } from '@/lib/crew-assignment';
+import { releaseParkedJobFields, schedulingDatesMoving } from '@/lib/job-phases';
 
 /**
  * Numeric fields that must be coerced to a number-or-null. A cleared field
@@ -373,6 +374,41 @@ export async function PATCH(
       console.warn(
         `[job-update] corrected inverted span on ${id}: end ${finalEnd} was before start ${finalStart} → ${updateFields.end_date}`
       );
+    }
+
+    // ── RE-DATING OR RE-CREWING A PARKED JOB UN-PARKS IT ────────────────────
+    // This PATCH is the general job editor, so correcting a PO number on a
+    // parked job must leave it parked. Moving its dates or putting a crew on it
+    // must not.
+    //
+    // And TAKING THE LAST MAN OFF IT must leave it parked too, which is why the
+    // date move is computed against the row rather than from the presence of a
+    // key: the editor resubmits `scheduled_date` unchanged alongside
+    // `assigned_to: null`, so "the body mentions a date" would read an unassign
+    // as a re-date and evict the job from the Parked column onto a stale past
+    // date nobody looks at. `releaseParkedJobFields` no-ops unless somebody is
+    // on the job after this write or `scheduling` is true.
+    {
+      const datesMoving = schedulingDatesMoving(updateFields, oldJobOrder);
+      const crewTouched =
+        'assigned_to' in updateFields || 'helper_assigned_to' in updateFields;
+      if (datesMoving || crewTouched) {
+        const finalOperator = ('assigned_to' in updateFields
+          ? updateFields.assigned_to
+          : oldJobOrder.assigned_to) as string | null;
+        const finalHelper = ('helper_assigned_to' in updateFields
+          ? updateFields.helper_assigned_to
+          : oldJobOrder.helper_assigned_to) as string | null;
+        Object.assign(
+          updateFields,
+          releaseParkedJobFields({
+            job: oldJobOrder,
+            operatorId: finalOperator,
+            helperId: finalHelper,
+            scheduling: datesMoving,
+          })
+        );
+      }
     }
 
     // Update job order (scoped to tenant)

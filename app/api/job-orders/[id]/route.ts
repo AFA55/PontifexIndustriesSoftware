@@ -12,6 +12,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { requireAuth, requireScheduleBoardAccess } from '@/lib/api-auth';
 import { filterJobEditFields, describeJobEditError } from '@/lib/job-edit-fields';
+import { releaseParkedJobFields, schedulingDatesMoving } from '@/lib/job-phases';
+import { attachPhaseDayNumbers, tenantLocalToday } from '@/lib/phase-day-server';
 
 export async function GET(
   request: NextRequest,
@@ -42,7 +44,23 @@ export async function GET(
         .maybeSingle();
       operatorProfile = prof;
     }
-    return NextResponse.json({ success: true, data: { ...data, profiles: operatorProfile } });
+    // day-complete prints "Multi-day job • Day N" off this payload and derived
+    // it as `total_days_worked + 1` — the LIFETIME count, which is the wrong
+    // number the moment a job has been parked and restarted. Adds
+    // `phase_day_number` / `phase_number` ONLY when the job has rows in
+    // `job_phases`; anything else is left byte-for-byte as it was, and nothing
+    // in here can throw. See lib/phase-day-server.ts.
+    //
+    // The tenant's calendar day is passed as a THUNK, not awaited here: this is
+    // the operator's job-detail load, and resolving it eagerly spent a `tenants`
+    // select before the `job_phases` read had shown it was needed — two
+    // sequential round trips on the hot path, one of them a guaranteed miss
+    // while the migration is unapplied. It is resolved only for a job that
+    // actually has phases.
+    const job: Record<string, any> = { ...data, profiles: operatorProfile };
+    await attachPhaseDayNumbers([job], () => tenantLocalToday(auth.tenantId));
+
+    return NextResponse.json({ success: true, data: job });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
@@ -95,6 +113,44 @@ export async function PATCH(
     }
 
     updateData.updated_at = new Date().toISOString();
+
+    // Re-dating or re-crewing a parked job un-parks it. Same rule and same
+    // helper as the admin PATCH, the schedule route and the two crewing
+    // routes — the board's inline editor is not a way around it.
+    //
+    // Taking the last man off it is NOT re-crewing it, and the dates are
+    // compared against the row rather than read off the body, because this
+    // editor resubmits the date it already had. Both are the same precondition:
+    // somebody is on the job after this write, or the job actually got a date.
+    if (
+      ['scheduled_date', 'end_date', 'scheduled_end_date', 'assigned_to', 'helper_assigned_to'].some(
+        (f) => f in updateData
+      )
+    ) {
+      const { data: parkState } = await supabaseAdmin
+        .from('job_orders')
+        .select(
+          'status, assigned_to, helper_assigned_to, scheduled_date, end_date, scheduled_end_date, on_hold, on_hold_placed_at, on_hold_released_at'
+        )
+        .eq('id', id)
+        .eq('tenant_id', auth.tenantId)
+        .maybeSingle();
+      if (parkState) {
+        Object.assign(
+          updateData,
+          releaseParkedJobFields({
+            job: parkState,
+            operatorId: ('assigned_to' in updateData
+              ? updateData.assigned_to
+              : parkState.assigned_to) as string | null,
+            helperId: ('helper_assigned_to' in updateData
+              ? updateData.helper_assigned_to
+              : parkState.helper_assigned_to) as string | null,
+            scheduling: schedulingDatesMoving(updateData, parkState),
+          })
+        );
+      }
+    }
 
     const { data, error } = await supabaseAdmin
       .from('job_orders')

@@ -43,7 +43,7 @@ export const dynamic = 'force-dynamic';
  * tenant name or color is hardcoded.
  */
 
-import { useCallback, useEffect, useMemo, useState, use } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState, use } from 'react';
 import Link from 'next/link';
 import { Printer, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import { authedFetch } from '@/lib/authed-fetch';
@@ -61,8 +61,10 @@ import {
   sumFootage,
   type TicketDay,
   type TicketMode,
+  type TicketPhaseBreak,
   type TicketRange,
 } from '@/lib/work-ticket';
+import { scopeHistory, type JobPhase } from '@/lib/job-phases';
 import { TICKET_COPY_FOOTER } from '@/lib/legal/prework-understandings';
 
 interface TicketJob {
@@ -101,6 +103,8 @@ interface TicketPayload {
   range: TicketRange;
   dates_worked: string[];
   days: TicketDay[];
+  /** `job_phases` — absent/empty for every job that was never restarted. */
+  phases?: JobPhase[];
   totals: { hours: number; standby_hours: number; subsistence_nights: number };
   standby: Array<{
     id: string;
@@ -231,6 +235,73 @@ function SectionBar({ accent, children }: { accent: string; children: React.Reac
     >
       {children}
     </div>
+  );
+}
+
+/**
+ * THE PHASE BREAK — a horizontal band drawn straight across the hours table
+ * between the last day of one run and the first day of the next.
+ *
+ * Founder, decision 2: *"One ticket, phases marked. Same job number. Earlier
+ * days group under the first scope, new days under the new scope, and the gap
+ * is visible. Everything the customer is billed for stays in one document."*
+ *
+ * WHY IT IS A BAND AND NOT A SIXTH FOOTNOTE MARK. The sheet already carries
+ * five († ‡ § ¶ ‖), and every one of them annotates one person's HOURS on one
+ * row — where that figure came from and how far to trust it. A phase break says
+ * nothing about anybody's hours; it is a statement about the whole sheet
+ * BETWEEN two day groups. Adding a sixth letter to a footnote sequence about
+ * hour-provenance would dilute all five to carry something on a different axis.
+ * A rule across the page is the honest shape of "the job stopped here".
+ *
+ * PRINT-SAFE. The customer signs this on paper, and browsers drop background
+ * colours from print by default. So the signal is the two heavy black rules and
+ * the bold uppercase line — the grey fill is a bonus, carried by `ticket-accent`
+ * (the one class the print stylesheet grants `print-color-adjust: exact`).
+ */
+function PhaseBreakRow({ brk, cols }: { brk: TicketPhaseBreak; cols: number }) {
+  const dayFmt = { weekday: 'short', month: 'short', day: 'numeric' } as const;
+  return (
+    <tr>
+      <td
+        className="ticket-accent"
+        colSpan={cols}
+        style={{
+          border: '1px solid #000',
+          borderTop: '2.5px solid #000',
+          borderBottom: '2.5px solid #000',
+          background: '#E4E4E4',
+          padding: '4px 6px',
+        }}
+      >
+        <div
+          style={{
+            fontSize: 9.5,
+            fontWeight: 900,
+            textTransform: 'uppercase',
+            letterSpacing: '0.09em',
+            lineHeight: 1.3,
+          }}
+        >
+          — Work paused {brk.days} day{brk.days === 1 ? '' : 's'} ·{' '}
+          {formatDay(brk.lastWorkedOn, dayFmt)} → {formatDay(brk.resumedOn, dayFmt)} —
+        </div>
+        {/* Why it sat. Blank on a job parked without a reason typed — say
+            nothing rather than invent one on a document the customer signs. */}
+        {brk.parkReason && (
+          <div style={{ fontSize: 8.5, fontStyle: 'italic', lineHeight: 1.35, marginTop: 1 }}>
+            Reason: {brk.parkReason}
+          </div>
+        )}
+        {/* WHAT THE CREW CAME BACK TO DO. The days below this line are billed
+            against this scope, not the one above it. */}
+        {brk.scopeText && (
+          <div style={{ fontSize: 9.5, fontWeight: 700, lineHeight: 1.35, marginTop: 1 }}>
+            New scope (phase {brk.phaseNumber}): {brk.scopeText}
+          </div>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -424,6 +495,13 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   // The closeout fold's honesty stamp, moved off the (now deleted) per-person
   // blocks and onto a footnote under the work column.
   const filedAtCloseout = useMemo(() => closeoutFilingDates(days), [days]);
+  // EVERY SCOPE THIS JOB HAS CARRIED, oldest first — "nothing typed is ever
+  // lost". One entry (the job's own description) for every job that was never
+  // restarted, and the single italic Scope line below is then unchanged.
+  const scopes = useMemo(
+    () => scopeHistory({ description: data?.job.description ?? null }, data?.phases ?? []),
+    [data]
+  );
   // The crew's own words, once for the whole sheet rather than once per day.
   const noteLines = useMemo(() => {
     const seen = new Set<string>();
@@ -474,8 +552,37 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   // one with a blank Total — is a line payroll and invoicing read as a day
   // worked here.
   const hourRows = (days || []).flatMap((d) =>
-    (d.people || []).filter((p) => !p.filed_off_job).map((p) => ({ date: d.date, p }))
+    (d.people || [])
+      .filter((p) => !p.filed_off_job)
+      .map((p, i) => ({
+        date: d.date,
+        p,
+        // The day's heading, printed once against the first row of the day
+        // rather than repeated down every person on it. ABSENT on a job that
+        // was never restarted — those tickets carry no day numbers today and
+        // this change must not start putting them on ~all of production.
+        dayLabel: i === 0 ? d.phase?.headingLabel ?? null : null,
+      }))
   );
+
+  // WHERE THE JOB STOPPED. `phaseBreak` sits on the first WORKED day of the
+  // resumed phase; the band is drawn immediately before that day's first row.
+  //
+  // Matched by `resumedOn <= row.date` rather than by equality so the band
+  // cannot silently vanish: if every person on the resume date is
+  // `filed_off_job` (their row is deliberately withheld — see above), the break
+  // still prints, above the next row that does appear. A break the sheet
+  // swallows is exactly the failure this feature exists to end.
+  const breaks = (days || []).map((d) => d.phaseBreak).filter(Boolean) as TicketPhaseBreak[];
+  let breakCursor = 0;
+  const hourRowsWithBreaks = hourRows.map((row) => {
+    let brk: TicketPhaseBreak | null = null;
+    while (breakCursor < breaks.length && breaks[breakCursor].resumedOn <= row.date) {
+      brk = breaks[breakCursor];
+      breakCursor++;
+    }
+    return { ...row, brk };
+  });
   // Footnote markers, printed only when the sheet actually contains one.
   // `&& !p.hours_boundary` MIRRORS THE ROW MARK. On a row the ¶ suppresses the †
   // (a divided row is inferred by definition), so a sheet whose ONLY inferred
@@ -960,10 +1067,36 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
             {/* ══ LEFT — WORK PERFORMED ═══════════════════════════════════ */}
             <div style={{ minWidth: 0 }}>
               <SectionBar accent={accent}>Work Performed</SectionBar>
-              {data.job.description && (
-                <p style={{ fontSize: 11, fontStyle: 'italic', margin: '0 0 5px' }}>
-                  Scope: {data.job.description}
-                </p>
+              {/* BOTH SCOPES, ON THE ONE DOCUMENT. A restarted job was billed
+                  under two descriptions of the work; printing only the current
+                  one would leave the earlier days on this sheet answering to a
+                  scope that was never theirs. Ordinary jobs have exactly one
+                  entry and keep the single italic line they have always had. */}
+              {scopes.length > 1 ? (
+                <div style={{ margin: '0 0 5px' }}>
+                  {scopes.map((s) => (
+                    <p
+                      key={s.phaseNumber}
+                      style={{ fontSize: 11, fontStyle: 'italic', margin: '0 0 2px', lineHeight: 1.35 }}
+                    >
+                      <span style={{ fontStyle: 'normal', fontWeight: 800 }}>
+                        Phase {s.phaseNumber}
+                        {s.isCurrent ? ' (current)' : ''}
+                        {s.startedOn
+                          ? `, from ${formatDay(s.startedOn, { month: 'short', day: 'numeric' })}`
+                          : ''}
+                        :
+                      </span>{' '}
+                      {s.scopeText}
+                    </p>
+                  ))}
+                </div>
+              ) : (
+                data.job.description && (
+                  <p style={{ fontSize: 11, fontStyle: 'italic', margin: '0 0 5px' }}>
+                    Scope: {data.job.description}
+                  </p>
+                )
               )}
 
               {workLines.length > 0 ? (
@@ -1085,10 +1218,24 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                   </tr>
                 </thead>
                 <tbody>
-                  {(hourRows || []).map(({ date, p }) => (
-                    <tr key={`${date}-${p.user_id}-row`}>
+                  {hourRowsWithBreaks.map(({ date, p, dayLabel, brk }) => (
+                    <Fragment key={`${date}-${p.user_id}-row`}>
+                      {/* THE JOB STOPPED HERE. Drawn across all seven columns
+                          between the two day groups — not a sixth footnote
+                          mark; see PhaseBreakRow. */}
+                      {brk && <PhaseBreakRow brk={brk} cols={7} />}
+                      <tr>
                       <td style={hourCell}>
                         {formatDay(date, { weekday: 'short', month: 'numeric', day: 'numeric' })}
+                        {/* TWO DAY NUMBERS, BOTH TRUE (founder, decision 4):
+                            "this is day one of getting back on it, and it's the
+                            fourth day we've been on this job." Only printed on
+                            a job that was actually restarted — see `dayLabel`. */}
+                        {dayLabel && (
+                          <div style={{ fontSize: 7.5, fontWeight: 700, lineHeight: 1.2 }}>
+                            {dayLabel}
+                          </div>
+                        )}
                       </td>
                       <td style={hourCell}>
                         {p.name} <span style={{ fontSize: 7.5 }}>({CREW_ROLE_LABEL[p.role]})</span>
@@ -1135,7 +1282,8 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                           The forced write-in height is dropped on a long list; it
                           is what pushed a twelve-day job onto a second page. */}
                       <td style={denseRows ? hourCell : { ...hourCell, height: 14 }} />
-                    </tr>
+                      </tr>
+                    </Fragment>
                   ))}
                   {Array.from({ length: padRows }).map((_, i) => (
                     <tr key={`pad-${i}`}>

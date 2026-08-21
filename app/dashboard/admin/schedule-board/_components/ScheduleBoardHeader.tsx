@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import {
   Calendar, ChevronLeft, Bell, FolderOpen, FileText, Sparkles,
-  Plus, RefreshCw, Loader2, Megaphone, KeyRound, ScanLine,
+  Plus, RefreshCw, Loader2, Megaphone, KeyRound, ScanLine, PauseCircle,
 } from 'lucide-react';
 import NotificationBell from '@/components/NotificationBell';
 
@@ -12,6 +12,9 @@ interface ScheduleBoardHeaderProps {
   pendingCount: number;
   willCallCount: number;
   showWillCall: boolean;
+  /** Jobs sitting on hold right now. Leifeng sat 10 days with no count anywhere. */
+  parkedCount: number;
+  showParked: boolean;
   changeRequestCount: number;
   autoScheduleLoading: boolean;
   unassignedCount: number;
@@ -19,6 +22,7 @@ interface ScheduleBoardHeaderProps {
   dispatchTotal: number;
   onOpenPendingQueue: () => void;
   onToggleWillCall: () => void;
+  onToggleParked: () => void;
   onAutoSchedule: () => void;
   onQuickAdd: () => void;
   onScanTicket?: () => void;
@@ -33,6 +37,8 @@ export default function ScheduleBoardHeader({
   pendingCount,
   willCallCount,
   showWillCall,
+  parkedCount,
+  showParked,
   changeRequestCount,
   autoScheduleLoading,
   unassignedCount,
@@ -40,6 +46,7 @@ export default function ScheduleBoardHeader({
   dispatchTotal,
   onOpenPendingQueue,
   onToggleWillCall,
+  onToggleParked,
   onAutoSchedule,
   onQuickAdd,
   onScanTicket,
@@ -85,6 +92,15 @@ export default function ScheduleBoardHeader({
             <button onClick={onToggleWillCall} className={`h-9 px-3 border rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${showWillCall ? 'bg-amber-100 border-amber-300 text-amber-800' : 'bg-amber-50 hover:bg-amber-100 border-amber-200 text-amber-700'}`}>
               <FolderOpen className="w-4 h-4" /> <span className="whitespace-nowrap">Will Call</span>
               <span className="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full text-xs font-bold">{willCallCount}</span>
+            </button>
+
+            {/* PARKED — the count that did not exist. Leifeng sat ten days and
+                nobody saw it; five more were sitting the day this shipped, the
+                oldest twenty-three days. The badge goes red the moment anything
+                is parked, because a quiet zero is what the board had before. */}
+            <button onClick={onToggleParked} className={`h-11 sm:h-9 px-3 border rounded-lg text-sm font-semibold transition-all flex items-center gap-1.5 ${showParked ? 'bg-red-100 border-red-300 text-red-800' : 'bg-slate-50 hover:bg-red-50 border-slate-200 text-slate-700'}`}>
+              <PauseCircle className="w-4 h-4" /> <span className="whitespace-nowrap">Parked</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-xs font-bold ${parkedCount > 0 ? 'bg-red-500 text-white' : 'bg-slate-200 text-slate-600'}`}>{parkedCount}</span>
             </button>
 
             {/* CHANGES button removed (founder, Aug 15). It had no onClick — it

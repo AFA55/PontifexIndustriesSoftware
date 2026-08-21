@@ -13,6 +13,8 @@ import { jobRunsOn } from '@/lib/job-workdays';
 import { requireScheduleBoardAccess } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { OFF_PLATFORM_LEAD_COLUMN, isMissingColumnError, placesSomeone } from '@/lib/off-platform-lead';
+import { isParked } from '@/lib/job-phases';
+import { partitionParked, withDaysParked } from '@/lib/parked-board';
 
 export async function GET(request: NextRequest) {
   try {
@@ -33,6 +35,11 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
       if (tenantRow?.timezone) tenantTz = tenantRow.timezone;
     } catch { /* non-critical */ }
+
+    // The tenant's calendar day. "How long has this been sitting" is a question
+    // about days the office actually lived through, so it is answered in the
+    // tenant's timezone — never UTC's, never the serverless region's.
+    const todayLocal = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date'); // YYYY-MM-DD
@@ -58,8 +65,7 @@ export async function GET(request: NextRequest) {
       // AND (has no end_date OR ends on or after startDate)
       query = query.lte('scheduled_date', endDate).or(`end_date.is.null,end_date.gte.${startDate}`);
     } else {
-      const today = new Date().toLocaleDateString('en-CA', { timeZone: tenantTz });
-      query = query.lte('scheduled_date', today).or(`end_date.is.null,end_date.gte.${today}`);
+      query = query.lte('scheduled_date', todayLocal).or(`end_date.is.null,end_date.gte.${todayLocal}`);
     }
 
     const { data: jobsRaw, error } = await query;
@@ -178,6 +184,60 @@ export async function GET(request: NextRequest) {
       console.error('Error fetching will-call jobs:', wcError);
     }
 
+    // ── 3b. PARKED JOBS (Aug 20) — global, like will-call ────────────────────
+    //
+    // Leifeng (JOB-2026-400368) sat parked TEN DAYS and nobody saw it, because a
+    // parked job's only home was its own scheduled date — a date that stopped
+    // meaning anything the moment the contractor pushed the crew off. Five more
+    // were sitting in production the day this was written, the oldest since
+    // Jul 28. None of them appeared anywhere the office looks.
+    //
+    // So this fetch is NOT date-filtered. A parked job has no date worth
+    // filtering on; what it has is an age.
+    //
+    // ⚠️ THE COLUMNS MAY NOT EXIST YET. `20260820b_park_and_restart.sql` appends
+    // the on_hold columns to `schedule_board_view` and is applied by hand.
+    // PostgREST rejects the WHOLE query on one unknown column, so a naive filter
+    // here would 500 the board — not degrade it — on every deploy that lands
+    // before the migration. Ask for the parked rows; if the column is not there,
+    // the folder is simply empty and the rest of the board is untouched.
+    const parkedRes = await supabaseAdmin
+      .from('schedule_board_view')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .neq('status', 'pending_approval')
+      .or('on_hold.is.true,on_hold_placed_at.not.is.null')
+      .order('on_hold_placed_at', { ascending: true, nullsFirst: false });
+
+    // VERIFIED Aug 20: `schedule_board_view` carries NONE of these columns yet,
+    // so this is the branch that runs in production until the migration is
+    // applied by hand — an empty folder and a board that is otherwise identical.
+    // Both names are checked because PostgREST reports whichever unknown column
+    // it reached first, and this query names two of them plus an order clause.
+    const parkColumnsAbsent =
+      isMissingColumnError(parkedRes.error, 'on_hold_placed_at') ||
+      isMissingColumnError(parkedRes.error, 'on_hold');
+    if (parkedRes.error && !parkColumnsAbsent) {
+      console.error('Error fetching parked jobs:', parkedRes.error);
+    }
+
+    // The SQL above is a coarse net — it catches anything that was ever on hold.
+    // `isParked` is the fine one, and it is the ONLY predicate allowed to decide.
+    // Production already proved the flag and the timestamps disagree:
+    // JOB-2026-974669 carries `on_hold = true` AND an `on_hold_released_at`,
+    // because the founder released it by hand and the boolean was left behind.
+    // Reading the boolean would show a live job as parked forever.
+    const parked = withDaysParked(
+      partitionParked((parkedRes.data as any[]) ?? []).parked,
+      todayLocal
+    );
+    const parkedIds = new Set(parked.map((j: any) => j.id));
+
+    // A parked will-call job belongs in ONE folder, and it is this one: "waiting
+    // for an open slot" and "stopped, with a reason and an age" are different
+    // claims, and only the second one is true.
+    const willCall = ((willCallJobs as any[]) ?? []).filter((j) => !isParked(j));
+
     // ── 4. Crew overlay (Aug 2026) ──────────────────────────────────────────
     // The board card only ever showed the lead (assigned_to) + the helper seat
     // (helper_assigned_to), so a 3rd/4th person added through job_crew was
@@ -187,7 +247,7 @@ export async function GET(request: NextRequest) {
     // TWO queries total for the whole board, never one per card:
     //   1. job_crew for every visible job id (tenant-scoped)
     //   2. profiles for the distinct user ids on those rows (tenant-scoped)
-    const boardJobs = [...(jobs || []), ...(pendingJobs || []), ...(willCallJobs || [])];
+    const boardJobs = [...(jobs || []), ...(pendingJobs || []), ...willCall, ...parked];
     const boardJobIds = Array.from(new Set(boardJobs.map((j: any) => j.id).filter(Boolean)));
 
     if (boardJobIds.length > 0) {
@@ -279,6 +339,16 @@ export async function GET(request: NextRequest) {
     // on the board — and those must keep landing in Unassigned exactly as today.
     for (const job of jobs || []) {
       const helperOnDay = job.day_crew_stated ? (job.helper_id ?? null) : null;
+      // PARKED JOBS LEAVE HERE FIRST — before `placesSomeone` gets a look at
+      // them. A parked job still satisfies the date filter above (its
+      // scheduled_date is simply stale), so it would otherwise draw in its
+      // operator's row AND in the Parked folder: one job in two places, one of
+      // which says a crew is on it today. The `parkedIds` set covers the case
+      // where the on_hold columns reached the view but this row's own copy did
+      // not carry them; `isParked` covers everything else.
+      if (parkedIds.has(job.id) || isParked(job)) {
+        continue; // returned in the `parked` bucket, globally, with its age
+      }
       if (job.is_will_call) {
         continue; // will-call fetched separately
       } else if (placesSomeone({ operator_id: job.assigned_to ?? null, helper_id: helperOnDay })) {
@@ -294,8 +364,9 @@ export async function GET(request: NextRequest) {
         assigned,
         unassigned,
         pending: pendingJobs || [],
-        willCall: willCallJobs || [],
-        total: (jobs?.length || 0) + (pendingJobs?.length || 0) + (willCallJobs?.length || 0),
+        willCall,
+        parked,
+        total: (jobs?.length || 0) + (pendingJobs?.length || 0) + willCall.length,
       },
       meta: {
         userRole: auth.role,

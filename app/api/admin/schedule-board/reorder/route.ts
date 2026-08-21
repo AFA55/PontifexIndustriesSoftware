@@ -18,6 +18,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSuperAdmin } from '@/lib/api-auth';
 import { getTenantId } from '@/lib/get-tenant-id';
 import { applyReassignment, shouldPromoteToAssigned, shouldDowngradeToScheduled } from '@/lib/reassign';
+import { releaseParkedJobFields } from '@/lib/job-phases';
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -86,7 +87,7 @@ export async function PATCH(request: NextRequest) {
         // and status-guarded (never downgrade a live job).
         const { data: currentJob } = await supabaseAdmin
           .from('job_orders')
-          .select('id, status')
+          .select('id, status, on_hold, on_hold_placed_at, on_hold_released_at')
           .eq('id', jobOrderId)
           .eq('tenant_id', tenantId)
           .maybeSingle();
@@ -97,6 +98,17 @@ export async function PATCH(request: NextRequest) {
         const updateData: Record<string, unknown> = {
           assigned_to: newOperatorId || null,
           updated_at: new Date().toISOString(),
+          // Crewing a parked job un-parks it — same rule as the assign route.
+          // Emptying one does NOT: with nobody left the helper returns `{}` and
+          // the job stays in the Parked column. `newHelperId ?? null` reads an
+          // omitted helper as nobody, deliberately matching the status guard
+          // three lines below rather than inventing a second reading here — it
+          // errs toward leaving the job parked, which is the visible failure.
+          ...releaseParkedJobFields({
+            job: currentJob,
+            operatorId: newOperatorId || null,
+            helperId: newHelperId ?? null,
+          }),
         };
         if (newHelperId !== undefined) {
           updateData.helper_assigned_to = newHelperId || null;

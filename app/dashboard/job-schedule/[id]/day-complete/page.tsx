@@ -36,6 +36,7 @@ import CustomerSatisfactionSurvey from '@/components/CustomerSatisfactionSurvey'
 import JobProgressLogger from '@/components/JobProgressLogger';
 import DayCloseoutChoice from '@/components/DayCloseoutChoice';
 import { toLocalYMD } from '@/lib/dates';
+import { displayDayNumber } from '@/lib/phase-day';
 import { photosFiledThisShift, currentShiftStartMs } from '@/lib/job-photo-day';
 import {
   planDayCloseout,
@@ -1479,7 +1480,10 @@ export default function DayCompletePage() {
           {job?.is_multi_day && (
             <div className="mt-3 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-200 dark:border-amber-800/40">
               <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
-                Multi-day job &bull; Day {(job?.total_days_worked || 0) + 1}
+                {/* Day of THIS run of work: `phase_day_number` when the job has
+                    been parked and restarted, otherwise the lifetime
+                    `total_days_worked + 1` it has always shown. */}
+                Multi-day job &bull; Day {displayDayNumber(job)}
               </p>
             </div>
           )}

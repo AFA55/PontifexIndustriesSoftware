@@ -29,6 +29,7 @@ import dynamicImport from 'next/dynamic';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { toLocalYMD, formatDayLong } from '@/lib/dates';
+import { displayDayNumber } from '@/lib/phase-day';
 import QuickAccessButtons from '@/components/QuickAccessButtons';
 import {
   Camera,
@@ -241,9 +242,12 @@ export default function WorkPerformed() {
           // Photos-prohibited flag set by the office on the schedule form
           // (site_compliance jsonb).
           setPhotosProhibited(found?.site_compliance?.photos_prohibited === true);
-          // Current day number: total_days_worked + 1 (today is a new day)
-          const daysWorked = found?.total_days_worked || 0;
-          setCurrentDayNumber(daysWorked + 1);
+          // Current day number. The server sends `phase_day_number` for a job
+          // that was parked and restarted — the day of THIS run, restarting at
+          // 1 — and nothing for any other job, which then reads
+          // `total_days_worked + 1` exactly as it always has. See
+          // lib/phase-day.ts.
+          setCurrentDayNumber(displayDayNumber(found));
         }
       } catch (err) {
         console.error('Error fetching job info:', err);

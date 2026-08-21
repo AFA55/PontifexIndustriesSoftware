@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { getTenantId } from '@/lib/get-tenant-id';
+import { attachPhaseDayNumbers, tenantLocalToday } from '@/lib/phase-day-server';
 
 // OFFICE-ONLY money/estimate fields — operators & helpers must NEVER receive
 // these (founder: cost/quote/hours are office-only). Nulled on every non-admin
@@ -325,6 +326,22 @@ export async function GET(request: NextRequest) {
       // Who else is on this ticket (job_crew) — the single-job path is what the
       // operator's ticket screen actually calls, so it needs this too.
       await attachCrew([specificJob]);
+
+      // ── WHICH DAY OF WHICH RUN IS THIS? ────────────────────────────────────
+      // The ticket screen and work-performed both print "Day N" off this
+      // payload, and both derived it as `total_days_worked + 1` — the LIFETIME
+      // count. On a job that was parked and restarted that is the wrong number:
+      // Leifeng's Friday is day 4 of the contract but day ONE of getting back
+      // on it, and the man on the slab means the latter.
+      //
+      // `phase_day_number` is added ONLY for a job with rows in `job_phases`,
+      // i.e. one that has actually been restarted. Every other job — which is
+      // every job in production today — gets no new field and the client falls
+      // straight back. Nothing here can throw; see lib/phase-day-server.ts.
+      await attachPhaseDayNumbers(
+        [specificJob],
+        tenantToday || (() => tenantLocalToday(tenantId))
+      );
 
       // Operators/helpers must not see office-only money & estimate fields.
       const safeSpecificJob = isAdmin ? specificJob : stripOfficeOnly(specificJob);

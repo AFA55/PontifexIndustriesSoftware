@@ -219,3 +219,90 @@ describe('POST /assign — legacy no-date path preserves an untouched helper sea
     expect((update!.args[0] as Record<string, unknown>).helper_assigned_to).toBeNull();
   });
 });
+
+/**
+ * ── TAKING THE LAST MAN OFF A PARKED JOB MUST LEAVE IT PARKED ───────────────
+ *
+ * JOB-2026-396494 is parked since Aug 17 with an operator on it and a
+ * `scheduled_date` now in the past. The dispatcher pulls that operator off —
+ * he is needed elsewhere while the job waits. If this route un-parks the job on
+ * that write, it leaves the Parked column and files itself under a stale past
+ * date the board's `lte(scheduled_date, today).or(end_date…)` filter does not
+ * surface either: invisible again, which is the ten-day Leifeng failure caused
+ * by the feature built to end it. Four of the six `on_hold` jobs in production
+ * carry an operator, so it is reachable on four rows today.
+ *
+ * Held at the ROUTE because the unit test can only prove the helper's rule; it
+ * cannot prove this route passes the right arguments to it.
+ */
+describe('POST /assign — a parked job stays parked unless someone lands on it', () => {
+  const PARKED_WITH_OPERATOR = {
+    id: 'job-1',
+    job_number: 'JOB-2026-396494',
+    status: 'on_hold',
+    assigned_to: 'op-1',
+    helper_assigned_to: null,
+    on_hold: true,
+    on_hold_placed_at: '2026-08-17T14:00:00Z',
+    on_hold_released_at: null,
+  };
+
+  beforeEach(() => {
+    (applyReassignment as jest.Mock).mockReset().mockResolvedValue(okReassign);
+    (supabaseAdmin.from as jest.Mock).mockReset();
+  });
+
+  it('unassigning writes NO release — the job is still on hold afterwards', async () => {
+    const seen = mockTables({
+      job_orders: [
+        { data: PARKED_WITH_OPERATOR },
+        {
+          data: {
+            id: 'job-1',
+            job_number: 'JOB-2026-396494',
+            assigned_to: null,
+            helper_assigned_to: null,
+            status: 'on_hold',
+          },
+          error: null,
+        },
+      ],
+    });
+
+    await POST(req({ jobOrderId: 'job-1', operatorId: null, force: true }));
+
+    const update = seen.find((c) => c.table === 'job_orders' && c.method === 'update');
+    const payload = update!.args[0] as Record<string, unknown>;
+    expect(payload.assigned_to).toBeNull();
+    // The three fields that would evict it from the Parked column.
+    expect(payload).not.toHaveProperty('on_hold');
+    expect(payload).not.toHaveProperty('on_hold_released_at');
+    expect(payload).not.toHaveProperty('status');
+  });
+
+  it('but crewing it DOES release the park — the ClemTenn fix is intact', async () => {
+    const seen = mockTables({
+      job_orders: [
+        { data: PARKED_WITH_OPERATOR },
+        {
+          data: {
+            id: 'job-1',
+            job_number: 'JOB-2026-396494',
+            assigned_to: 'op-2',
+            helper_assigned_to: null,
+            status: 'assigned',
+          },
+          error: null,
+        },
+      ],
+    });
+
+    await POST(req({ jobOrderId: 'job-1', operatorId: 'op-2' }));
+
+    const update = seen.find((c) => c.table === 'job_orders' && c.method === 'update');
+    const payload = update!.args[0] as Record<string, unknown>;
+    expect(payload.on_hold).toBe(false);
+    expect(payload.on_hold_released_at).toEqual(expect.any(String));
+    expect(payload.status).toBe('assigned');
+  });
+});

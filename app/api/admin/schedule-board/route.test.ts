@@ -255,3 +255,152 @@ describe('the migration is applied by hand, so the overlay has to survive its ab
     expect(job.off_platform_lead_name).toBeNull();
   });
 });
+
+// ═══ THE PARKED BUCKET ══════════════════════════════════════════════════════
+//
+// Leifeng sat parked ten days and appeared nowhere. The fix gives parked jobs a
+// bucket of their own — GLOBAL, like will-call, because a parked job's date
+// stopped meaning anything the moment it was parked.
+//
+// The claim that has to hold here is the one that would otherwise make the
+// column WORSE than nothing: a parked job must leave the day's classification
+// BEFORE `placesSomeone` sees it. Its scheduled_date still matches the filter,
+// so without the diversion it draws in its operator's row AND in the folder —
+// one job in two places, one of which says a crew is on it today.
+
+describe('the parked bucket', () => {
+  // Pinned so `days_parked` is arithmetic, not a function of the day this runs.
+  // The park stamps are midday UTC, which is the same calendar day in every
+  // timezone a person works in.
+  beforeEach(() => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-20T16:00:00Z'));
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Pinnacle Contracting, JOB-2026-815303 — parked since Jul 28. */
+  const pinnacle = boardJob({
+    id: 'pinnacle',
+    job_number: 'JOB-2026-815303',
+    customer_name: 'Pinnacle Contracting',
+    status: 'on_hold',
+    on_hold: true,
+    on_hold_placed_at: '2026-07-28T12:05:41.409Z',
+    on_hold_released_at: null,
+    on_hold_reason: "Moved to Pending — contractor hasn't set a firm date",
+    total_days_worked: 1,
+  });
+
+  /** Messer, JOB-2026-396494 — parked Aug 17, three days ago. */
+  const messer = boardJob({
+    id: 'messer',
+    job_number: 'JOB-2026-396494',
+    customer_name: 'Messer Construction',
+    status: 'on_hold',
+    on_hold: true,
+    on_hold_placed_at: '2026-08-17T12:00:00.000Z',
+    on_hold_released_at: null,
+    on_hold_reason: 'Site not ready: Electrician are not ready',
+    total_days_worked: 1,
+  });
+
+  /**
+   * ClemTenn, JOB-2026-974669 — RELEASED BY HAND, flag left behind. The exact
+   * production row that breaks a naive `on_hold === true`.
+   */
+  const clemtenn = boardJob({
+    id: 'clemtenn',
+    job_number: 'JOB-2026-974669',
+    customer_name: 'ClemTenn',
+    assigned_to: 'nate',
+    on_hold: true,
+    on_hold_placed_at: '2026-08-14T20:18:01.568Z',
+    on_hold_released_at: '2026-08-20T12:02:01.493Z',
+  });
+
+  function board(dated: unknown[], parkedRows: Result, willCallRows: unknown[] = []) {
+    mockTables({
+      tenants: [{ data: { timezone: 'America/New_York' } }],
+      schedule_board_view: [
+        { data: dated },
+        { data: [] }, // pending
+        { data: willCallRows }, // will-call
+        parkedRows, // parked
+      ],
+      job_daily_assignments: [{ data: [] }],
+      job_crew: [{ data: [] }],
+    });
+    return GET(req);
+  }
+
+  type Body = {
+    data: {
+      assigned: { id: string }[];
+      unassigned: { id: string }[];
+      willCall: { id: string }[];
+      parked: { id: string; job_number: string; days_parked: number | null; total_days_worked: number }[];
+    };
+  };
+
+  it('draws a parked job ONCE — in the folder, never also on its old crew row', async () => {
+    // The date filter still matches it: `scheduled_date` is simply stale.
+    const res = await board(
+      [pinnacle, boardJob({ id: 'live', assigned_to: 'nate' })],
+      { data: [pinnacle] }
+    );
+    const body = (await res.json()) as Body;
+
+    expect(body.data.parked.map((j) => j.id)).toEqual(['pinnacle']);
+    expect(body.data.assigned.map((j) => j.id)).toEqual(['live']);
+    expect(body.data.unassigned).toEqual([]);
+  });
+
+  it('does not park a job that was released by hand with the flag left true', async () => {
+    // `isParked` compares the timestamps; the boolean is only a hint. Reading
+    // the boolean would hide this live, assigned job from the board forever.
+    const res = await board([clemtenn], { data: [clemtenn] });
+    const body = (await res.json()) as Body;
+
+    expect(body.data.parked).toEqual([]);
+    expect(body.data.assigned.map((j) => j.id)).toEqual(['clemtenn']);
+  });
+
+  it('puts the longest-sitting job first and says how long each has sat', async () => {
+    const res = await board([], { data: [messer, pinnacle] });
+    const body = (await res.json()) as Body;
+
+    expect(body.data.parked.map((j) => j.job_number)).toEqual([
+      'JOB-2026-815303', // Jul 28
+      'JOB-2026-396494', // Aug 17
+    ]);
+    expect(body.data.parked.map((j) => j.days_parked)).toEqual([23, 3]);
+    expect(body.data.parked[0].total_days_worked).toBe(1);
+  });
+
+  it('claims a parked will-call job for the folder, not the will-call pile', async () => {
+    const parkedWillCall = { ...pinnacle, is_will_call: true };
+    const res = await board([], { data: [parkedWillCall] }, [parkedWillCall]);
+    const body = (await res.json()) as Body;
+
+    expect(body.data.parked.map((j) => j.id)).toEqual(['pinnacle']);
+    expect(body.data.willCall).toEqual([]);
+  });
+
+  it('degrades to an empty folder when the migration has not been applied', async () => {
+    // VERIFIED Aug 20: `schedule_board_view` carries none of the on_hold columns
+    // yet. PostgREST rejects the WHOLE query, and the board must not 500 on it.
+    const res = await board([boardJob({ assigned_to: 'nate' })], {
+      data: null,
+      error: {
+        code: '42703',
+        message: 'column schedule_board_view.on_hold does not exist',
+      },
+    });
+    const body = (await res.json()) as Body;
+
+    expect(res.status).toBe(200);
+    expect(body.data.parked).toEqual([]);
+    expect(body.data.assigned.map((j) => j.id)).toEqual(['job-1']);
+  });
+});

@@ -25,6 +25,8 @@ import AutoScheduleResultsModal from './_components/AutoScheduleResultsModal';
 import type { AutoScheduleResults } from './_components/AutoScheduleResultsModal';
 import DailyCodeModal from './_components/DailyCodeModal';
 import WillCallFolder from './_components/WillCallFolder';
+import ParkedFolder from './_components/ParkedFolder';
+import type { RestartPayload } from './_components/ParkedFolder';
 import WeeklyView from './_components/WeeklyView';
 import UnassignedSection from './_components/UnassignedSection';
 import BoardLoadingSkeleton from './_components/BoardLoadingSkeleton';
@@ -35,6 +37,7 @@ import type { ConflictData, RowChangeConflict } from './_components/types';
 import { useModuleGate } from '@/components/ModuleGuard';
 import { fetchPrintPdf, openPrintBlob } from '@/lib/print-failure';
 import { buildCrewNameIndex, resolveCrewId, isLiveJobStatus, type CrewNameIndex } from '@/lib/crew-assignment';
+import { canRestartParkedJob } from '@/lib/parked-board';
 
 // ─── Heavy components — dynamic-imported (rendered conditionally) ─────────
 const PendingQueueSidebar = dynamic(() => import('./_components/PendingQueueSidebar'), { ssr: false, loading: () => null });
@@ -81,6 +84,10 @@ export default function ScheduleBoardPage() {
   const [unassignedJobs, setUnassignedJobs] = useState<JobCardData[]>([]);
   const [pendingJobs, setPendingJobs] = useState<PendingJob[]>([]);
   const [willCallJobs, setWillCallJobs] = useState<JobCardData[]>([]);
+  // Parked jobs are GLOBAL, like will-call — a parked job's scheduled date
+  // stopped meaning anything the moment it was parked, so it is not date-scoped
+  // and does not clear when the office pages to another day.
+  const [parkedJobs, setParkedJobs] = useState<JobCardData[]>([]);
   const [jobNotes, setJobNotes] = useState<Record<string, NoteData[]>>({});
   const [dailyNotes, setDailyNotes] = useState<DailyNote[]>([]);
   const [holidaysByDate, setHolidaysByDate] = useState<Record<string, { id: string; name: string; pay_hours: number; applies_to: string }>>({});
@@ -141,6 +148,9 @@ export default function ScheduleBoardPage() {
   // ═══ UI STATE ═══
   const [showPendingQueue, setShowPendingQueue] = useState(false);
   const [showWillCall, setShowWillCall] = useState(false);
+  const [showParked, setShowParked] = useState(false);
+  /** Latches after the folder has opened itself once — see fetchScheduleData. */
+  const parkedAutoOpened = useRef(false);
   const [showQuickAdd, setShowQuickAdd] = useState(false);
   // Paper-ticket scanner: photo -> vision extraction -> Quick Add PREFILL
   // (review-first: nothing is created until the human submits the form).
@@ -661,6 +671,10 @@ export default function ScheduleBoardPage() {
         scheduling_flexibility: j.scheduling_flexibility || null,
       }));
       const willCall = (json.data?.willCall || []).map((j: any) => toJobCard(j, date));
+      // Sorted longest-sitting-first by the API. `|| []` so a deploy that lands
+      // before the park/restart migration renders an empty folder rather than
+      // throwing — the rest of the board is unaffected either way.
+      const parked = (json.data?.parked || []).map((j: any) => toJobCard(j, date));
 
       // ── Group assigned jobs into crew rows ────────────────────────────────
       //
@@ -733,6 +747,20 @@ export default function ScheduleBoardPage() {
       setUnassignedJobs(unassigned);
       setPendingJobs(pending);
       setWillCallJobs(willCall);
+      setParkedJobs(parked);
+
+      // OPEN IT THE FIRST TIME, IF ANYTHING IS SITTING.
+      //
+      // A collapsed folder behind a button is exactly the shape of the original
+      // failure — Leifeng sat ten days because seeing it required knowing to
+      // look. So the folder opens itself once per visit when something is
+      // parked, and never argues after that: `parkedAutoOpened` latches, so
+      // closing it stays closed for the rest of the session and paging between
+      // days does not re-open it.
+      if (parked.length > 0 && !parkedAutoOpened.current) {
+        parkedAutoOpened.current = true;
+        setShowParked(true);
+      }
     } catch (err: any) {
       console.error('Failed to fetch schedule:', err);
       addToast('error', 'Failed to Load', err?.message || 'Could not fetch schedule data');
@@ -1322,6 +1350,38 @@ export default function ScheduleBoardPage() {
     const movedJob = { ...job, is_will_call: false, scheduled_date: selectedDate };
     setUnassignedJobs(prev => [...prev, movedJob]);
     addToast('success', `${job.customer_name} → Scheduled`, `Moved to ${formatDisplayDate(selectedDate)} (unassigned)`);
+  };
+
+  // --- Parked: Restart ---
+  //
+  // Same job number, new scope, new dates — the founder's constraint, verbatim:
+  // *"same job ID should stay because same contract info"*. The route owns the
+  // release, the phase row and the audit entry; the board's only jobs are to
+  // send what the office typed and to stop showing the card.
+  //
+  // The optimistic removal is deliberate: the whole failure this feature exists
+  // to fix is a job that lingers unseen, and a card that lingers after the
+  // restart is the same lie in the other direction. The refetch that follows is
+  // the authority.
+  const handleRestartParkedJob = async (job: JobCardData, payload: RestartPayload): Promise<boolean> => {
+    try {
+      const res = await apiFetch(`/api/admin/jobs/${job.id}/restart`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        let msg = `HTTP ${res.status}`;
+        try { const j = await res.json(); msg = j.error || msg; } catch { /* ignore */ }
+        throw new Error(msg);
+      }
+      setParkedJobs(prev => prev.filter(p => p.id !== job.id));
+      addToast('success', `${job.customer_name} restarted`, `${job.job_number} is back on the board for ${formatDisplayDate(payload.scheduled_date)}`);
+      fetchScheduleData(selectedDate);
+      return true;
+    } catch (err: any) {
+      addToast('error', 'Restart Failed', err?.message || 'Could not restart this job');
+      return false;
+    }
   };
 
   // ═══ ASSIGNMENT WITH CONFLICT DETECTION ═══
@@ -2447,6 +2507,8 @@ export default function ScheduleBoardPage() {
         pendingCount={pendingJobs.length}
         willCallCount={willCallJobs.length}
         showWillCall={showWillCall}
+        parkedCount={parkedJobs.length}
+        showParked={showParked}
         changeRequestCount={changeRequestCount}
         autoScheduleLoading={autoScheduleLoading}
         unassignedCount={unassignedJobs.length}
@@ -2454,6 +2516,7 @@ export default function ScheduleBoardPage() {
         dispatchTotal={dispatchInfo?.total || 0}
         onOpenPendingQueue={() => setShowPendingQueue(true)}
         onToggleWillCall={() => setShowWillCall(!showWillCall)}
+        onToggleParked={() => setShowParked(!showParked)}
         onAutoSchedule={handleAutoSchedule}
         onQuickAdd={() => { setQuickAddPrefill(null); setShowQuickAdd(true); }}
         onScanTicket={() => scanInputRef.current?.click()}
@@ -2498,6 +2561,25 @@ export default function ScheduleBoardPage() {
           canEdit={canEdit}
           onMoveToSchedule={handleMoveWillCallToSchedule}
           onAssign={(job) => setAssignTarget({ job, source: 'willcall' })}
+        />
+      )}
+
+      {/* ═══ PARKED FOLDER ═════════════════════════════════════════════════ */}
+      {/* Beside Will Call, and above every date-scoped section, because a parked
+          job belongs to no date. Conditional rendering, never `hidden` — Tailwind
+          is pinned at 3.4.17 where `[hidden]{display:none}` loses to `flex`. */}
+      {showParked && (
+        <ParkedFolder
+          parkedJobs={parkedJobs}
+          // `canRestartParkedJob` ALONE — deliberately not `canEdit &&`.
+          // `canEdit` is three roles plus the `can_edit_schedule_board` flag,
+          // while the route (`requireSalesStaff`), `PARK_RESTART_ROLES` and the
+          // `job_phases` RLS policy all name the same five roles. Anding them
+          // broke it in both directions: a salesman or supervisor the API
+          // accepts never saw the button, and a flagged operator the API
+          // refuses would have. The permission is one set, in one place.
+          canRestart={canRestartParkedJob(userRole)}
+          onRestart={handleRestartParkedJob}
         />
       )}
 

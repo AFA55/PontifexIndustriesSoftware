@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireSalesStaff } from '@/lib/api-auth';
+import { releaseParkedJobFields } from '@/lib/job-phases';
 
 export async function PUT(
   request: NextRequest,
@@ -31,15 +32,15 @@ export async function PUT(
     }
 
     // P0-3: verify the job belongs to caller's tenant before mutating
-    {
-      const { data: jobCheck } = await supabaseAdmin
-        .from('job_orders')
-        .select('id, tenant_id')
-        .eq('id', jobId)
-        .maybeSingle();
-      if (!jobCheck || jobCheck.tenant_id !== tenantId) {
-        return NextResponse.json({ error: 'Job not found' }, { status: 404 });
-      }
+    const { data: jobCheck } = await supabaseAdmin
+      .from('job_orders')
+      .select(
+        'id, tenant_id, status, assigned_to, helper_assigned_to, on_hold, on_hold_placed_at, on_hold_released_at'
+      )
+      .eq('id', jobId)
+      .maybeSingle();
+    if (!jobCheck || jobCheck.tenant_id !== tenantId) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
     const { error } = await supabaseAdmin
@@ -48,6 +49,22 @@ export async function PUT(
         scheduled_date,
         end_date: end_date || null,
         scheduled_end_date: end_date || null,
+        // Putting a parked job back on the calendar un-parks it. Giving it a
+        // date is the office saying it is happening again; leaving the flag set
+        // is how a job ends up scheduled AND parked at the same time.
+        //
+        // `scheduling: true` is stated OUTRIGHT because this route exists to
+        // write a date and refuses the request without one (400, above). The
+        // crew it passes is the job's EXISTING crew, which on its own says
+        // nothing about whether the office is re-dating the job or emptying
+        // it — so the release cannot be left to infer it. See the precondition
+        // note on releaseParkedJobFields().
+        ...releaseParkedJobFields({
+          job: jobCheck,
+          operatorId: jobCheck.assigned_to ?? null,
+          helperId: jobCheck.helper_assigned_to ?? null,
+          scheduling: true,
+        }),
       })
       .eq('id', jobId)
       .eq('tenant_id', tenantId);

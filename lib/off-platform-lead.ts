@@ -117,6 +117,16 @@ export function describeOffPlatformLead(name: string | null | undefined): string
  * the statement or the schema cache catches it first. Both are matched, plus the
  * message text as a last resort for a client that drops the code.
  *
+ * A MISSING TABLE IS NOT A MISSING COLUMN, and this deliberately does not learn
+ * `PGRST205` ("Could not find the table 'x' in the schema cache"). Reaching for
+ * this helper to guard a read of a table that may not exist — `job_phases`, say —
+ * gets a false negative and an error logged on every request, so the temptation
+ * is to widen it here. Do not: `PGRST205` means the whole relation is absent,
+ * which for most callers is an outage rather than a column to shrug off, and
+ * folding it in would let one helper answer "yes, degrade" to both. Table
+ * absence has its own predicate — `isTableNotFoundError` in `lib/api-auth.ts`,
+ * which already matches `PGRST205` and `42P01`. Use that one.
+ *
  * IT MUST BE *THIS* COLUMN. The code alone used to be enough, and `42703` /
  * `PGRST204` are what a TYPO in any other column name answers too — so a
  * mis-spelled `helper_id` in the overlay select would have been read as "the

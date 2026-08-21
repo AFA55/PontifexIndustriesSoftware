@@ -121,6 +121,16 @@ export function toJobCard(job: any, viewDate?: string): JobCardData {
     arrived_at_jobsite_at: job.arrived_at_jobsite_at ?? null,
     work_started_at: job.work_started_at ?? null,
     work_completed_at: job.work_completed_at ?? null,
+    project_name: job.project_name ?? null,
+    // Parked facts. `?? null` throughout: absent until the park/restart
+    // migration appends them to schedule_board_view, and an absent column must
+    // read as "not parked", not as undefined leaking into a date or a count.
+    on_hold: job.on_hold ?? null,
+    on_hold_reason: job.on_hold_reason ?? null,
+    on_hold_placed_at: job.on_hold_placed_at ?? null,
+    on_hold_released_at: job.on_hold_released_at ?? null,
+    total_days_worked: job.total_days_worked ?? null,
+    days_parked: job.days_parked ?? null,
   };
 }
 

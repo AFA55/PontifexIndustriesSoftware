@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabase-admin';
 import { requireAdmin, resolveTenantScope } from '@/lib/api-auth';
 import { logAuditEvent } from '@/lib/audit';
+import { releaseParkedJobFields } from '@/lib/job-phases';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
@@ -230,7 +231,9 @@ export async function POST(request: NextRequest) {
 
     const { data: rawJobs, error: jobsError } = await supabaseAdmin
       .from('job_orders')
-      .select('id, job_number, customer_name, job_type, address, location, difficulty_rating, arrival_time, estimated_hours')
+      .select(
+        'id, job_number, customer_name, job_type, address, location, difficulty_rating, arrival_time, estimated_hours, status, on_hold, on_hold_placed_at, on_hold_released_at'
+      )
       .eq('tenant_id', tenantId)
       .eq('scheduled_date', date)
       .is('assigned_to', null)
@@ -405,6 +408,14 @@ export async function POST(request: NextRequest) {
     let successCount = 0;
     const errors: string[] = [];
 
+    // Auto-scheduling crews a job, so it un-parks one just like the manual
+    // paths do. This route was the fourth place the rule had to run and the
+    // one that was missed — a parked job matching the date filter above would
+    // have been handed an operator and left sitting `on_hold`.
+    const parkStateById = new Map(
+      ((rawJobs as Array<Record<string, unknown>>) ?? []).map((j) => [j.id as string, j])
+    );
+
     for (const assignment of assignments) {
       const { error: updateError } = await supabaseAdmin
         .from('job_orders')
@@ -413,6 +424,11 @@ export async function POST(request: NextRequest) {
           status: 'assigned',
           assigned_at: now,
           updated_at: now,
+          ...releaseParkedJobFields({
+            job: parkStateById.get(assignment.jobId) as never,
+            operatorId: assignment.operatorId,
+            nowIso: now,
+          }),
         })
         .eq('id', assignment.jobId)
         .eq('tenant_id', tenantId);

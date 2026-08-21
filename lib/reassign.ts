@@ -42,6 +42,7 @@ import { logAuditEvent } from '@/lib/audit';
 import { sendNotification } from '@/lib/send-reminder';
 import { sendSMS } from '@/lib/sms';
 import { enumerateYMDRange } from '@/lib/dates';
+import { releaseParkedJobFields } from '@/lib/job-phases';
 import {
   crewClearNeedsConfirmation,
   crewClearBlockedMessage,
@@ -88,8 +89,18 @@ export function expandScopeDates(
   return enumerateYMDRange(assignmentDate, endDate);
 }
 
-/** Statuses that may be promoted to 'assigned' when an operator is set. */
-const PROMOTABLE_STATUSES = ['scheduled', 'pending_approval'];
+/**
+ * Statuses that may be promoted to 'assigned' when an operator is set.
+ *
+ * `on_hold` belongs here, and its absence was a live bug. JOB-2026-974669
+ * (ClemTenn) sat parked from Aug 14 while the office placed Conrade on it for
+ * Aug 20 — it was his real job that morning, and the job stayed `on_hold` with
+ * `on_hold_released_at` null because this list did not admit it. Putting a
+ * NAMED person on a NAMED date is the office saying the job is happening; that
+ * outranks a flag nobody cleared. Promoting the status is only half the
+ * release — `releaseParkedJobFields()` clears the boolean and the timestamp.
+ */
+const PROMOTABLE_STATUSES = ['scheduled', 'pending_approval', 'on_hold'];
 
 /**
  * Status-guard predicate: promote to 'assigned' only from a pre-work status.
@@ -596,7 +607,7 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   const { data: job } = await supabaseAdmin
     .from('job_orders')
     .select(
-      'id, job_number, customer_name, location, job_type, arrival_time, assigned_to, helper_assigned_to, status, scheduled_date, end_date, is_multi_day, dispatched_at, tenant_id'
+      'id, job_number, customer_name, location, job_type, arrival_time, assigned_to, helper_assigned_to, status, scheduled_date, end_date, is_multi_day, dispatched_at, tenant_id, on_hold, on_hold_placed_at, on_hold_released_at'
     )
     .eq('id', jobOrderId)
     .eq('tenant_id', tenantId)
@@ -803,11 +814,32 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
   const prevHelperId: string | null = job.helper_assigned_to ?? null;
   const nowIso = new Date().toISOString();
 
+  // ── CREWING A PARKED JOB UN-PARKS IT ──────────────────────────────────────
+  // Computed OUTSIDE the `writeLead` branch on purpose. `writeLead` is false
+  // for a one-day placement on a future date — which is the ClemTenn shape
+  // exactly: parked Aug 14, Conrade placed on it for Aug 20. If the release
+  // rode along inside that branch, crewing a parked job for tomorrow would
+  // leave it parked, and the office would keep hitting this on every job it
+  // scheduled a day ahead. Placing a named person on a named date is the
+  // office saying the job is happening, whichever date it is.
+  //
+  // TAKING THE LAST PERSON OFF IS NOT THAT. With both ids null the helper
+  // returns `{}` — no release, no status, nothing — so an unassign leaves the
+  // job sitting in the Parked column where the office can still see it. The
+  // rule is "somebody is on it, or it got a date", and neither is true here.
+  const releaseFields = releaseParkedJobFields({
+    job,
+    operatorId,
+    helperId,
+    nowIso,
+  });
+
   if (writeLead) {
     const updateData: Record<string, unknown> = {
       assigned_to: operatorId ?? null,
       helper_assigned_to: helperId ?? null,
       updated_at: nowIso,
+      ...releaseFields,
     };
     // STATUS GUARD: promote only pre-work statuses; never downgrade a live job;
     // never re-stamp assigned_at on a live job.
@@ -875,6 +907,34 @@ export async function applyReassignment(params: ReassignParams): Promise<Reassig
         // Non-fatal — reassignment already landed; log and continue.
         console.error('reassign: job_crew preservation failed:', e);
       }
+    }
+  } else if (Object.keys(releaseFields).length > 0) {
+    // A ONE-DAY placement on a future date does not write the lead — but it
+    // still un-parks. This is the branch ClemTenn actually went through: the
+    // office crewed a parked job for a date that was not today, so nothing
+    // above ran and the job stayed parked with a named man on it.
+    //
+    // It fires ONLY on a real release. An unassign produces no fields at all,
+    // so this branch is skipped entirely and the write that empties a parked
+    // job writes nothing — previously it wrote the un-park and nothing else,
+    // which is how emptying a job evicted it from the only column showing it.
+    //
+    // Only the release is written here. The lead columns are deliberately left
+    // alone: rewriting them for a single future day is the bug the `writeLead`
+    // gate exists to prevent (it stripped a helper from every day of a job).
+    const { error: releaseError } = await supabaseAdmin
+      .from('job_orders')
+      .update({ ...releaseFields, updated_at: nowIso })
+      .eq('id', jobOrderId)
+      .eq('tenant_id', tenantId);
+
+    if (releaseError) {
+      // Non-fatal: the ledger row landed, which is the assignment itself. A
+      // job left parked is visible in the Parked folder and recoverable by
+      // hand; failing the whole reassignment here would lose the placement.
+      console.error('reassign: un-park on crewing failed:', releaseError);
+    } else {
+      updatedJob = { ...updatedJob, status: (releaseFields.status as string) ?? updatedJob.status };
     }
   }
 

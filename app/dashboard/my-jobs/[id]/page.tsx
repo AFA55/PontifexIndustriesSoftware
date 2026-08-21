@@ -24,6 +24,7 @@ import { PhotoViewer } from '@/components/PhotoUploader';
 import OfficeNotes from '../_components/OfficeNotes';
 import SiteComplianceList from '../_components/SiteComplianceList';
 import { buildComplianceItems } from '@/lib/site-compliance-display';
+import { displayDayNumber } from '@/lib/phase-day';
 
 // HelperWorkLog only renders when the user is in the helper slot on this job.
 // Whoever is assigned as `assigned_to` gets the full operator flow regardless of their profile role.
@@ -149,8 +150,11 @@ export default function JobDetailPage() {
             if (['in_route', 'on_site', 'in_progress', 'working', 'pending_completion', 'completed'].includes(found.status)) {
               setEquipmentOpen(false);
             }
-            const daysWorked = found?.total_days_worked || 0;
-            setDayNumber(daysWorked + 1);
+            // "Day N" means the day of THIS run of work. On a job that was
+            // parked and restarted the server sends `phase_day_number`, which
+            // restarts at 1 on the restart; without it this is the lifetime
+            // count it has always been. See lib/phase-day.ts.
+            setDayNumber(displayDayNumber(found));
 
             // Resume last position: if operator already visited work-performed today, send them back.
             // Helpers never follow this redirect — they have a separate simplified view.

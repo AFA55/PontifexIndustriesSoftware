@@ -22,6 +22,16 @@
 import { mondayOf, weekDatesFrom, toLocalYMD } from './dates';
 import { round2 } from './labor-cost';
 import type { WorkItemLike } from './work-items-format';
+import {
+  byDate as numberingByDate,
+  formatDayHeading,
+  numberJobDays,
+  phaseGaps,
+  sortPhases,
+  type JobPhase,
+  type PhaseDayNumber,
+  type PhaseGap,
+} from './job-phases';
 
 // ── Modes & ranges ──────────────────────────────────────────────────────────
 
@@ -502,11 +512,52 @@ export interface TicketPersonDay {
   hours_boundary_close?: boolean;
 }
 
+/**
+ * THE TWO DAY NUMBERS, CARRIED ONTO THE SHEET. See lib/job-phases.ts.
+ *
+ * `phaseDay` restarts at 1 on every restart — it is what the crew means by
+ * "day one of getting back on it". `lifetimeDay` never restarts — it is what
+ * the office bills and what `job_orders.total_days_worked` counts. Both are
+ * true at once and the heading prints both so the reader can never mistake one
+ * for the other.
+ */
+export interface TicketDayPhase {
+  phaseNumber: number;
+  phaseDay: number;
+  lifetimeDay: number;
+  /** `formatDayHeading` — "Day 1 — day 4 on the job", or plain "Day 4". */
+  headingLabel: string;
+}
+
+/** A gap in the calendar, plus the scope the job came back under. */
+export interface TicketPhaseBreak extends PhaseGap {
+  /** The RESUMED phase's scope — what the crew came back to do. */
+  scopeText: string | null;
+}
+
 export interface TicketDay {
   date: string;
   people: TicketPersonDay[];
   /** Sum of every person's hours that day (grand TOTAL TIME rolls these up). */
   total_hours: number;
+  /**
+   * ABSENT unless the job has `job_phases` rows — i.e. unless it was actually
+   * restarted. A job that was never parked prints exactly as it always has;
+   * see the byte-identity note on `phases` in BuildTicketDaysInput.
+   */
+  phase?: TicketDayPhase;
+  /**
+   * Set on the FIRST worked day of a phase that follows an earlier WORKED
+   * phase. This is the horizontal band the printed sheet draws across itself:
+   * the job stopped here, for this long, and came back to do this instead.
+   *
+   * Deliberately NOT a sixth footnote mark. The five marks († ‡ § ¶ ‖) all
+   * annotate one person's HOURS on one row; a phase break is a statement about
+   * the whole sheet between two day groups. Folding it into that sequence would
+   * dilute five marks that carry hour-provenance to say something on a
+   * different axis entirely.
+   */
+  phaseBreak?: TicketPhaseBreak;
 }
 
 export interface BuildTicketDaysInput {
@@ -650,6 +701,38 @@ export interface BuildTicketDaysInput {
    * would file. Omit and no future filter is applied.
    */
   todayYMD?: string;
+  /**
+   * THE RUNS OF WORK ON THIS JOB — `job_phases`, oldest first (order is not
+   * required; it is sorted here).
+   *
+   * ONE TICKET, PHASES MARKED (founder, decision 2): *"Same job number. Earlier
+   * days group under the first scope, new days under the new scope, and the gap
+   * is visible. Everything the customer is billed for stays in one document."*
+   * Leifeng, JOB-2026-400368 — worked Aug 10, 11 and 13, sat ten days, came
+   * back Aug 21 under a different scope on the same contract. Duplicating the
+   * ticket and extending the dates would have told the customer the crew was on
+   * it all week. They were not.
+   *
+   * EMPTY OR OMITTED MEANS NOTHING CHANGES. A job that was never restarted has
+   * no rows here, and this builder then emits `{ date, people, total_hours }`
+   * with no `phase` and no `phaseBreak` — the same three keys, in the same
+   * order, as before this feature existed. `lib/work-ticket.test.ts` asserts
+   * that deep-equality, because every ticket in production is that case.
+   */
+  phases?: readonly JobPhase[];
+  /**
+   * EVERY PROVEN WORK DATE ON THE JOB, not just the ones inside `range` — the
+   * route's own `worked` union.
+   *
+   * `lifetimeDay` is a fact about the JOB ("the fourth day we've been on this
+   * job"), so it cannot be counted from a window. In week mode the sheet shows
+   * Aug 17–23 and Leifeng's Friday is still day 4, because Aug 10, 11 and 13
+   * happened whether or not they are on this page. Omitted, the numbering falls
+   * back to the printed days, which is exact in the default 'job' mode.
+   *
+   * Ignored entirely when `phases` is empty.
+   */
+  allWorkDates?: readonly string[];
 }
 
 const UNASSIGNED = '__unassigned__';
@@ -1049,16 +1132,64 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     }
   }
 
-  return Array.from(byDate.keys())
-    .sort()
-    .map((date) => {
-      const people = Array.from(byDate.get(date)!.values()).sort((a, b) => {
-        const rank = ROLE_RANK[a.role] - ROLE_RANK[b.role];
-        return rank !== 0 ? rank : a.name.localeCompare(b.name);
-      });
-      const total = people.reduce((s, p) => s + (p.hours ?? 0), 0);
-      return { date, people, total_hours: round2(total) };
+  // ── 8. PHASE NUMBERING AND THE BREAK BETWEEN RUNS ────────────────────────
+  //
+  // Read-time only, and ONLY when the job actually has phases. `job_phases` is
+  // written on restart and nowhere else, so this whole block is dead code for
+  // every job that was never parked — which is the point. Nothing above it
+  // moves, no stored `day_number` is renumbered (see the header of
+  // lib/job-phases.ts for why that restraint is load-bearing against the 71
+  // orphan `work_items` billing rows), and the objects below keep their exact
+  // three keys when there is nothing to add.
+  const dayDates = Array.from(byDate.keys()).sort();
+  const phases = input.phases ? sortPhases(input.phases) : [];
+  let phaseByDate: Map<string, PhaseDayNumber> | null = null;
+  let breakByDate: Map<string, TicketPhaseBreak> | null = null;
+
+  if (phases.length > 0) {
+    // The date universe is the JOB's proven days, not this window's — see
+    // `allWorkDates`. A lifetime day counted from a week's worth of rows would
+    // call Leifeng's Friday "day 1" on the very sheet built to deny that.
+    const universe =
+      input.allWorkDates && input.allWorkDates.length > 0
+        ? Array.from(new Set([...input.allWorkDates, ...dayDates]))
+        : dayDates;
+    const numbering = numberJobDays(phases, universe);
+    phaseByDate = numberingByDate(numbering);
+
+    const scopeByPhase = new Map<number, string | null>(
+      phases.map((p) => [p.phase_number, p.scope_text?.trim() || null])
+    );
+    breakByDate = new Map(
+      phaseGaps(phases, numbering).map((g) => [
+        g.resumedOn,
+        { ...g, scopeText: scopeByPhase.get(g.phaseNumber) ?? null },
+      ])
+    );
+  }
+
+  return dayDates.map((date) => {
+    const people = Array.from(byDate.get(date)!.values()).sort((a, b) => {
+      const rank = ROLE_RANK[a.role] - ROLE_RANK[b.role];
+      return rank !== 0 ? rank : a.name.localeCompare(b.name);
     });
+    const total = people.reduce((s, p) => s + (p.hours ?? 0), 0);
+    const day: TicketDay = { date, people, total_hours: round2(total) };
+
+    const n = phaseByDate?.get(date);
+    if (n) {
+      day.phase = {
+        phaseNumber: n.phaseNumber,
+        phaseDay: n.phaseDay,
+        lifetimeDay: n.lifetimeDay,
+        headingLabel: formatDayHeading(n, phases.length),
+      };
+    }
+    const brk = breakByDate?.get(date);
+    if (brk) day.phaseBreak = brk;
+
+    return day;
+  });
 }
 
 /** Grand TOTAL TIME across the printed range (week mode's headline number). */
