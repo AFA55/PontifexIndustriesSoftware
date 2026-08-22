@@ -597,6 +597,10 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
   // different fact from `scheduled_only`, and it needs its own mark — see
   // `hours_split` in lib/work-ticket.ts.
   const hasSplit = hourRows.some(({ p }) => p.hours_split);
+  // A card EXISTS on these days and says SHOP. See `hours_shop` in
+  // lib/work-ticket.ts — this row used to print a fabricated 0.00 off the daily
+  // log, which read as "we checked, he did nothing".
+  const hasShop = hourRows.some(({ p }) => p.hours_shop);
   // THE DAY WAS SHARED AND THE IN-ROUTE PRESS DIVIDED IT. Its own mark, because
   // In/Out on these rows are the job's bounds rather than the person's clock,
   // the Total is that stretch rather than the card's paid hours, and Lunch is
@@ -1277,6 +1281,14 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                             mark, because "no card" and "card we cannot split"
                             send the office to two different places. */}
                         {p.hours_split && <span style={{ fontWeight: 400 }}>§</span>}
+                        {/* A card EXISTS for this day and says SHOP. Its own
+                            mark for the same reason § has one: the office reads
+                            a blank Total and goes looking, and "clocked to the
+                            shop" is the one answer that names the field to
+                            correct. Printed as ** — the six single marks
+                            (* † ‡ § ¶ ‖) are spent, and doubling is where that
+                            sequence goes next. */}
+                        {p.hours_shop && <span style={{ fontWeight: 400 }}>**</span>}
                       </td>
                       {/* Payroll/office writes here after the fact — always blank.
                           The forced write-in height is dropped on a long list; it
@@ -1347,6 +1359,18 @@ export default function WorkTicketPage({ params }: { params: Promise<{ id: strin
                 <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
                   § Hours split across jobs that day — the clock card carried no job tag and the
                   schedule had this person on more than one job.
+                </p>
+              )}
+              {/* NAMES THE FIELD TO FIX, deliberately. This is the one blank
+                  Total whose cause is a single wrong value on a card the office
+                  can edit, and the sheet is what the founder has in front of him
+                  when he notices the day is missing. No hour figure is printed:
+                  shop time is not job labour, and a number anywhere near this
+                  column is a number somebody bills. */}
+              {hasShop && (
+                <p style={{ fontSize: 8.5, margin: '2px 0 0', lineHeight: 1.35 }}>
+                  ** Clocked to the SHOP on this day, so those hours are not billed to this job. If
+                  the crew was on this job, correct the timecard&apos;s work location and reprint.
                 </p>
               )}
               {/* The founder's own rule, printed where the number is read:

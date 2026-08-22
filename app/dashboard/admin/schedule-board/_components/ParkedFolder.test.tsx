@@ -16,6 +16,31 @@ import { render, screen, fireEvent, waitFor, within } from '@testing-library/rea
 import ParkedFolder from './ParkedFolder';
 import type { JobCardData } from './JobCard';
 
+/**
+ * RESTART DATES ARE RELATIVE TO TODAY, NOT TYPED INTO THE FILE.
+ *
+ * These were `'2026-08-21'` / `'2026-08-24'`, and on 2026-08-22 the suite began
+ * failing with no code change: the restart modal refuses a start date in the
+ * past (a backwards restart silently reattributes already-billed hours to a
+ * scope that did not exist that day — the HIGH finding this modal's guard came
+ * from), so yesterday's literal disabled the submit and `onRestart` was never
+ * called.
+ *
+ * Second date fixture in this codebase to rot overnight. A test that fails by
+ * calendar rather than by defect trains people to ignore a red suite, which is
+ * the one thing a guard like this cannot survive.
+ */
+const ymd = (offsetDays: number) => {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const m = `${d.getMonth() + 1}`.padStart(2, '0');
+  const day = `${d.getDate()}`.padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+};
+const RESTART_ON = ymd(0);
+const RESTART_THROUGH = ymd(3);
+const BEFORE_RESTART = ymd(-2);
+
 const base: JobCardData = {
   id: 'x',
   job_number: 'JOB-2026-000000',
@@ -146,8 +171,8 @@ describe('ParkedFolder', () => {
     render(<ParkedFolder parkedJobs={[PINNACLE]} canRestart onRestart={onRestart} />);
     fireEvent.click(within(cardFor('JOB-2026-815303')).getByRole('button', { name: /restart/i }));
 
-    fireEvent.change(screen.getByLabelText(/back on it/i), { target: { value: '2026-08-21' } });
-    fireEvent.change(screen.getByLabelText(/through/i), { target: { value: '2026-08-24' } });
+    fireEvent.change(screen.getByLabelText(/back on it/i), { target: { value: RESTART_ON } });
+    fireEvent.change(screen.getByLabelText(/through/i), { target: { value: RESTART_THROUGH } });
     fireEvent.change(screen.getByLabelText(/what are they doing this time/i), {
       target: { value: '  Core drill 12 penetrations through the north wall.  ' },
     });
@@ -157,8 +182,8 @@ describe('ParkedFolder', () => {
     const [job, payload] = onRestart.mock.calls[0] as unknown as [JobCardData, any];
     expect(job.job_number).toBe('JOB-2026-815303'); // same contract, same number
     expect(payload).toEqual({
-      scheduled_date: '2026-08-21',
-      end_date: '2026-08-24',
+      scheduled_date: RESTART_ON,
+      end_date: RESTART_THROUGH,
       scope_text: 'Core drill 12 penetrations through the north wall.',
     });
   });
@@ -168,11 +193,11 @@ describe('ParkedFolder', () => {
     render(<ParkedFolder parkedJobs={[PINNACLE]} canRestart onRestart={onRestart} />);
     fireEvent.click(within(cardFor('JOB-2026-815303')).getByRole('button', { name: /restart/i }));
 
-    fireEvent.change(screen.getByLabelText(/back on it/i), { target: { value: '2026-08-21' } });
+    fireEvent.change(screen.getByLabelText(/back on it/i), { target: { value: RESTART_ON } });
     fireEvent.change(screen.getByLabelText(/what are they doing this time/i), {
       target: { value: 'Core drill.' },
     });
-    fireEvent.change(screen.getByLabelText(/through/i), { target: { value: '2026-08-19' } });
+    fireEvent.change(screen.getByLabelText(/through/i), { target: { value: BEFORE_RESTART } });
 
     expect(screen.getByText(/end date is before the start date/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /restart job/i })).toBeDisabled();

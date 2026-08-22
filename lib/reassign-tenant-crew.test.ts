@@ -33,6 +33,24 @@ jest.mock('@/lib/audit', () => ({ logAuditEvent: jest.fn() }));
 
 import { applyReassignment } from './reassign';
 import { supabaseAdmin } from './supabase-admin';
+import { toLocalYMD } from './dates';
+
+/**
+ * TODAY, not a date typed into the file.
+ *
+ * This was hardcoded `'2026-08-20'`, and on 2026-08-21 the suite started
+ * failing with no code change: a `scope: 'day'` write only touches
+ * `job_orders.helper_assigned_to` when the date IS tenant-local today
+ * (lib/reassign.ts — a future day's override must not be promoted to the job
+ * seat, because that stripped a helper from every day of a job once). So the
+ * fixture's date silently changed meaning at midnight and the assertion
+ * inverted.
+ *
+ * A date fixture that decays into a false alarm is worse than no test: this one
+ * guards CROSS-TENANT crew writes, and a suite that cries wolf every morning is
+ * a suite people stop reading. Derive it.
+ */
+const TODAY = toLocalYMD(new Date());
 
 type Result = { data?: unknown; error?: unknown };
 type ProfileRow = { id: string; tenant_id: string; full_name: string };
@@ -116,7 +134,7 @@ const job = {
   assigned_to: null,
   helper_assigned_to: null,
   status: 'scheduled',
-  scheduled_date: '2026-08-20',
+  scheduled_date: TODAY,
   end_date: null,
   is_multi_day: false,
   dispatched_at: null,
@@ -125,7 +143,7 @@ const job = {
 
 const params = {
   jobOrderId: 'job-1',
-  assignmentDate: '2026-08-20',
+  assignmentDate: TODAY,
   scope: 'day' as const,
   tenantId: OURS,
   actor: { userId: 'admin-1', userEmail: 'admin@example.com', role: 'admin' },

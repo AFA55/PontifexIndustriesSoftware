@@ -1796,3 +1796,223 @@ describe('buildTicketDays — Aug 19, a day divided at the in-route press', () =
     expect(days[0].total_hours).toBe(6.17);
   });
 });
+
+/**
+ * QA-2026-533392, AM King, Aug 17–18 2026 — production, verbatim.
+ *
+ * Founder: "I just tried to print out Keon's ticket for the 17th, he was there
+ * Monday Tuesday and the ticket only shows him time there for Monday."
+ *
+ * Nothing was missing from the attribution. Both of Keon's cards reach this job
+ * — Monday's off the board, Tuesday's off his own filed log, which named this
+ * job and nothing else on a day the board placed nobody anywhere. Tuesday's
+ * card carries all three shop markers, so `isShopCard` skips it, and the day
+ * then printed `0.00` — the day-2 log's `hours_worked`, written by a closeout
+ * whose `route_started_at` was still MONDAY's copy.
+ *
+ * A fabricated zero is the wrong answer twice over: it is not a measurement of
+ * anything, and it reads as "we checked, he did nothing" on a day whose own
+ * work items record six cores and seven posts. The day must print, the Total
+ * must be blank rather than zero, and the sheet must say WHY.
+ */
+describe('QA-2026-533392 — Tuesday is not a 0.00 day', () => {
+  const KEON = 'bb5f3f96-1960-477b-8ca4-24f3a38a2670';
+  const AXEL = '298b3194-20df-475e-8011-a3ad082b72ef';
+  const keonNames = new Map<string, string | null>([
+    [KEON, 'Keontre Mcknight'],
+    [AXEL, 'Axel valverde'],
+  ]);
+  const keonRoles = resolveCrewRoles({ assigned_to: KEON, helper_assigned_to: AXEL });
+
+  /** Both cards are UNTAGGED; both are attributed. Tuesday's says shop. */
+  const timecards: TicketTimecardRow[] = [
+    {
+      id: '07a84f02-7d6d-4ac1-a7c7-6e7f482208f1',
+      user_id: KEON,
+      date: '2026-08-17',
+      clock_in_time: '2026-08-17T11:00:00+00:00',
+      clock_out_time: '2026-08-17T20:59:00+00:00',
+      lunch_duration_minutes: 30,
+      net_hours: 9.42,
+      total_hours: 9.48,
+      is_shop_hours: false,
+      is_shop_time: false,
+      work_location: 'field',
+    },
+    {
+      id: 'e5d29f6a-da82-4809-9e39-ed7c5258f068',
+      user_id: KEON,
+      date: '2026-08-18',
+      clock_in_time: '2026-08-18T11:00:00+00:00',
+      clock_out_time: '2026-08-18T19:30:00+00:00',
+      lunch_duration_minutes: 30,
+      net_hours: 8.0,
+      total_hours: 8.0,
+      is_shop_hours: true,
+      is_shop_time: true,
+      work_location: 'shop',
+    },
+    {
+      id: '3fe0b0a3-d9d4-43de-bcde-13c4b9135260',
+      user_id: AXEL,
+      date: '2026-08-17',
+      clock_in_time: '2026-08-17T11:05:54.002+00:00',
+      clock_out_time: '2026-08-17T20:37:46.783+00:00',
+      lunch_duration_minutes: 30,
+      net_hours: 9.03,
+      total_hours: 9.03,
+      is_shop_hours: false,
+      is_shop_time: false,
+      work_location: 'field',
+    },
+  ];
+
+  /** Day 2 closed at 0.00; day 3 was filed from another job's day. */
+  const logs: TicketDailyLog[] = [
+    {
+      id: '7e3b2c00-c527-46fe-908b-39d7bfe7f210',
+      operator_id: KEON,
+      log_date: '2026-08-18',
+      day_number: 2,
+      hours_worked: 0,
+    },
+    {
+      id: '074d711f-0aa8-4b5d-8116-a146e56aa250',
+      operator_id: KEON,
+      log_date: '2026-08-19',
+      day_number: 3,
+      hours_worked: 0,
+    },
+  ];
+
+  const workItems: TicketWorkItem[] = [
+    {
+      id: '46410a21-e237-4aca-ae2a-e49345c8986a',
+      operator_id: KEON,
+      daily_log_id: '7e3b2c00-c527-46fe-908b-39d7bfe7f210',
+      day_number: 2,
+      work_date: '2026-08-18',
+      work_type: 'CORE DRILL',
+      quantity: 6,
+    },
+    {
+      id: '86c4706e-04ed-47cc-9662-439f44d6e89e',
+      operator_id: KEON,
+      daily_log_id: '7e3b2c00-c527-46fe-908b-39d7bfe7f210',
+      day_number: 2,
+      work_date: '2026-08-18',
+      work_type: 'GRINDING DOWN BALLOT POST',
+      quantity: 7,
+    },
+  ];
+
+  const build = () =>
+    buildTicketDays({
+      range: { from: '2026-08-17', to: '2026-08-19' },
+      timecards,
+      logs,
+      workItems,
+      helperLogs: [{ helper_id: AXEL, log_date: '2026-08-17', work_description: 'vacuumed slurry' }],
+      roles: keonRoles,
+      names: keonNames,
+      fallbackOperatorId: KEON,
+      quantitiesFrom: 'lead',
+      leadByDate: new Map([['2026-08-17', KEON]]),
+      // The board placed nobody at all on 8/18, and put Keon on ANOTHER AM King
+      // job on 8/19 — so only Wednesday is an off-job filing day.
+      offJobPersonDays: new Set([`${KEON}|2026-08-19`, `${AXEL}|2026-08-19`]),
+      scheduledPersonDays: new Set([`${KEON}|2026-08-17`, `${AXEL}|2026-08-17`]),
+      splitPersonDays: new Set(),
+      attributedCardIds: new Set(timecards.map((t) => t.id)),
+      todayYMD: '2026-08-21',
+    });
+
+  it('prints BOTH days — Monday with its hours, Tuesday at all', () => {
+    const days = build();
+    expect(days.map((d) => d.date)).toEqual(['2026-08-17', '2026-08-18']);
+  });
+
+  it('Monday carries both men, marked inferred', () => {
+    const monday = build()[0];
+    expect(monday.people.map((p) => [p.name, p.hours, p.hours_attributed])).toEqual([
+      ['Keontre Mcknight', 9.42, true],
+      ['Axel valverde', 9.03, true],
+    ]);
+    expect(monday.total_hours).toBe(18.45);
+  });
+
+  it('Tuesday prints a BLANK Total marked shop — never a fabricated 0.00', () => {
+    const tuesday = build()[1];
+    expect(tuesday.people).toHaveLength(1);
+    const keon = tuesday.people[0];
+    expect(keon.name).toBe('Keontre Mcknight');
+    // The defect: `hours` was 0, which prints as "0.00" and reads as measured.
+    expect(keon.hours).toBeNull();
+    expect(keon.hours_shop).toBe(true);
+    // NOT "scheduled, nothing clocked" — he clocked. And not a split day.
+    expect(keon.scheduled_only).toBeUndefined();
+    expect(keon.hours_split).toBeUndefined();
+    expect(tuesday.total_hours).toBe(0);
+  });
+
+  it("keeps Tuesday's measurements on Tuesday — the sheet's only record of the work", () => {
+    const tuesday = build()[1];
+    expect(tuesday.people[0].work_items.map((w) => w.work_type)).toEqual([
+      'CORE DRILL',
+      'GRINDING DOWN BALLOT POST',
+    ]);
+  });
+
+  it('folds Wednesday onto TUESDAY, never onto Monday', () => {
+    // The founder's complaint shape — "only shows Monday" — would also be
+    // produced by the closeout fold collapsing 8/18 into 8/17. It does not: the
+    // fold's target is the person's LAST real day at or before the filing date,
+    // and Tuesday is a real day here whatever its Total says.
+    const days = build();
+    expect(days.find((d) => d.date === '2026-08-19')).toBeUndefined();
+    expect(days[0].people[0].work_filed_on).toBeUndefined();
+    expect(days[1].people[0].work_filed_on).toBeUndefined(); // the 8/19 log carried no work
+  });
+
+  it('a shop card never becomes job labour, and never invents a day of its own', () => {
+    // Same Tuesday card, with the log and the measurements removed: nothing
+    // else puts Keon on this job that day, so there is no Tuesday to annotate.
+    const days = buildTicketDays({
+      range: { from: '2026-08-17', to: '2026-08-19' },
+      timecards,
+      logs: [],
+      workItems: [],
+      roles: keonRoles,
+      names: keonNames,
+      attributedCardIds: new Set(timecards.map((t) => t.id)),
+    });
+    expect(days.map((d) => d.date)).toEqual(['2026-08-17']);
+    expect(grandTotalHours(days)).toBe(18.45);
+  });
+
+  it('a REAL card on the same person-day still wins over the shop card', () => {
+    // Two cards, one shop and one field — the field card's hours stand and the
+    // row is an ordinary worked day, unmarked.
+    const days = buildTicketDays({
+      range: { from: '2026-08-18', to: '2026-08-18' },
+      timecards: [
+        timecards[1],
+        {
+          ...timecards[1],
+          id: 'field-card',
+          is_shop_hours: false,
+          is_shop_time: false,
+          work_location: 'field',
+          net_hours: 4.5,
+          total_hours: 4.5,
+        },
+      ],
+      logs,
+      workItems: [],
+      roles: keonRoles,
+      names: keonNames,
+    });
+    expect(days[0].people[0].hours).toBe(4.5);
+    expect(days[0].people[0].hours_shop).toBeUndefined();
+  });
+});

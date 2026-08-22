@@ -481,6 +481,40 @@ export interface TicketPersonDay {
    */
   hours_boundary?: boolean;
   /**
+   * THE ONLY CARD THIS PERSON CLOCKED THAT DAY WAS A **SHOP** CARD.
+   *
+   * `isShopCard` is not weakened by this flag and must not be: shop time is
+   * never job labour, `boundedJobHours` zeroes it, and a shop card is the one
+   * linked card that does not vouch for anybody being on a job (see
+   * `cardBacked`). What this records is the REASON the Total came out blank, so
+   * the sheet stops giving the wrong one.
+   *
+   * FOUNDER, Aug 21, on QA-2026-533392 (AM King): "I just tried to print out
+   * Keon's ticket for the 17th, he was there Monday Tuesday and the ticket only
+   * shows him time there for Monday."
+   *
+   * Tuesday was not missing. Keon's 8.00-hour card for it is attributed to this
+   * job correctly — untagged, the board placed him nowhere, and his own filed
+   * operator log named this job and nothing else. The card is skipped here
+   * because it carries `is_shop_hours` / `is_shop_time` / `work_location =
+   * 'shop'`, all three, frozen at a clock-in he made at 14:46 that afternoon and
+   * then had his times edited back to 07:00. He filed this job's day-2 log
+   * thirteen seconds after that card was created, with six cores and seven posts
+   * measured on it, so the flag is wrong — but it is a fact about the TIMECARD,
+   * and the ticket is not the place to overrule it. Correcting the card is one
+   * field and it is the office's call.
+   *
+   * What the sheet owed him was the truth about the gap. Before this it printed
+   * `0.00` against Tuesday — the daily log's `hours_worked`, which is the length
+   * of a closeout session and not a measurement of anything (the same defect as
+   * Dante's 0.09 Wednesday, one door over: `offJobPersonDays` could not catch it
+   * because the board placed him NOWHERE that day rather than elsewhere). A
+   * fabricated zero reads as "we checked, he did nothing", which is the exact
+   * opposite of what happened. So the fallback is refused on these person-days
+   * and the row prints with an empty Total and this mark instead.
+   */
+  hours_shop?: boolean;
+  /**
    * TRUE when this row's day was ordered by the SCHEDULE BOARD rather than by
    * the crew's own In Route presses — `divided_by_board`, rule 7's second
    * branch in lib/job-day-boundary.ts. Always accompanied by `hours_boundary`;
@@ -815,6 +849,13 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
    * exists to kill. A shop card is the one linked card that does not win.
    */
   const cardBacked = new Set<string>();
+  /**
+   * Person-days whose card was skipped as SHOP time. Not a weakening of that
+   * skip — a record of it, so steps 2 and 4 stop replacing the excluded hours
+   * with a daily log's session length and step 7 can name the real reason the
+   * Total is blank. See `hours_shop`.
+   */
+  const shopBacked = new Set<string>();
 
   const bucket = (date: string, userId: string): TicketPersonDay => {
     let day = byDate.get(date);
@@ -853,7 +894,14 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     if (!inRange(tc.date, range) || !tc.user_id) continue;
     // Shop time is not job labor — never bill it here, and (see `cardBacked`)
     // never let it vouch for a person being on this job that day either.
-    if (isShopCard(tc)) continue;
+    //
+    // DELIBERATELY BEFORE `bucket`: a shop card must not CREATE a day on this
+    // job's sheet. It only annotates one that some other evidence already put
+    // there. `hours_shop` is set in step 7 and only on rows that exist anyway.
+    if (isShopCard(tc)) {
+      shopBacked.add(dayKey(tc.user_id, tc.date as string));
+      continue;
+    }
     const p = bucket(tc.date as string, tc.user_id);
     // THE DAY DIVIDED AT THE PRESSES. When it did, the segment is this job's
     // whole truth about this card — its bounds and its hours both — and the
@@ -897,6 +945,26 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     }
   }
 
+  /**
+   * THE LOG'S `hours_worked` IS NOT A MEASUREMENT — it is how long the app sat
+   * open while somebody typed. It may stand in for a day's hours only when
+   * nothing better exists. Two person-days have something better and must
+   * refuse it:
+   *
+   *   • the office placed this person on ANOTHER job (`offJobPersonDays`) —
+   *     Dante's 0.09 h Wednesday;
+   *   • their only card that day was a SHOP card (`shopBacked`) — Keon's 0.00 h
+   *     Tuesday, where the log had run since the previous morning on a stale
+   *     `route_started_at` copy and closed at 0.00.
+   *
+   * Both are overridden by a card that DID reach this job (`cardBacked`): a
+   * recorded fact outranks both the ledger and the shop flag, and a person with
+   * two cards — one shop, one field — is on the field card's hours.
+   */
+  const refuseLogHours = (userId: string, date: string) =>
+    (isOffJob(userId, date) || shopBacked.has(dayKey(userId, date))) &&
+    !cardBacked.has(dayKey(userId, date));
+
   // 2. Daily logs — the day note + an hours fallback when no card was clocked
   //    to this job (the crew clocked a general day card instead).
   for (const log of input.logs) {
@@ -908,7 +976,7 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     // `hours_worked` on such a row is the length of the CLOSEOUT SESSION, not of
     // a day's work — 0.09h for Dante's five minutes in the truck. See
     // `offJobPersonDays`.
-    const offJob = isOffJob(userId, log.log_date as string) && !cardBacked.has(dayKey(userId, log.log_date as string));
+    const offJob = refuseLogHours(userId, log.log_date as string);
     if (!offJob && p.hours == null && log.hours_worked != null && Number.isFinite(Number(log.hours_worked))) {
       p.hours = round2(Number(log.hours_worked));
     }
@@ -930,7 +998,7 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     if (text) p.helper_note = text;
     // Same guard as the operator log above — a helper who filed this job's
     // paperwork from another job's day did not work here that day.
-    const offJob = isOffJob(hl.helper_id, hl.log_date as string) && !cardBacked.has(dayKey(hl.helper_id, hl.log_date as string));
+    const offJob = refuseLogHours(hl.helper_id, hl.log_date as string);
     if (!offJob && p.hours == null && hl.hours_worked != null && Number.isFinite(Number(hl.hours_worked))) {
       p.hours = round2(Number(hl.hours_worked));
     }
@@ -1106,25 +1174,34 @@ export function buildTicketDays(input: BuildTicketDaysInput): TicketDay[] {
     }
   }
 
-  // 7. WHY IS THIS TOTAL BLANK? Two different answers, and the sheet must not
+  // 7. WHY IS THIS TOTAL BLANK? Three different answers, and the sheet must not
   //    give the wrong one — the office reads a blank Total and goes looking for
   //    the card.
   //
   //      • `hours_split` — a card EXISTS and was dropped as unattributable,
   //        because the board had this person on this job and another one that
   //        day. Real, and worth 8.58 hours on JOB-2026-521763.
+  //      • `hours_shop` — a card EXISTS and says SHOP, so its hours are not job
+  //        labour. Real, and worth 8.00 hours on QA-2026-533392. Before this
+  //        the row printed a fabricated `0.00` off the daily log instead.
   //      • `scheduled_only` — the board created the row and nothing else ever
   //        touched it.
   //
-  //    Split wins the tie: it is the more specific statement, and both cannot
-  //    print against one Total. Read after every step above, because a seeded
-  //    row that later collected a card, a log or a measurement is an ordinary
-  //    worked day and must carry neither flag.
+  //    Split wins the tie, unchanged: it is the more specific statement, and no
+  //    two of these can print against one Total. Shop comes next and outranks
+  //    `scheduled_only`, because "sent here, nothing clocked" is FALSE about a
+  //    man who clocked — to the shop. Read after every step above, because a
+  //    seeded row that later collected a card, a log or a measurement is an
+  //    ordinary worked day and must carry none of the three.
   for (const [date, people] of byDate) {
     for (const [userId, p] of people) {
       const key = dayKey(userId, date);
       if (p.hours == null && input.splitPersonDays?.has(key)) {
         p.hours_split = true;
+        continue;
+      }
+      if (p.hours == null && shopBacked.has(key) && !cardBacked.has(key)) {
+        p.hours_shop = true;
         continue;
       }
       if (!seededOnly.has(key)) continue;
